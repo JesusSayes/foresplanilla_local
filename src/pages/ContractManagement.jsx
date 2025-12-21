@@ -29,6 +29,7 @@ export default function ContractManagement() {
   const [positionSearchTerm, setPositionSearchTerm] = useState("");
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
   const [siteSearchTerm, setSiteSearchTerm] = useState("");
+  const [conflictingContract, setConflictingContract] = useState(null);
 
   const queryClient = useQueryClient();
 
@@ -176,8 +177,30 @@ export default function ContractManagement() {
     if (editingContract) {
       updateContractMutation.mutate({ id: editingContract.id, data: formData });
     } else {
+      // Verificar si hay contratos vigentes para este empleado
+      const existingActiveContract = contracts.find(
+        c => c.employee_id === formData.employee_id && c.status === "Vigente"
+      );
+
+      if (existingActiveContract && formData.status === "Vigente") {
+        setConflictingContract(existingActiveContract);
+        return;
+      }
+
       createContractMutation.mutate(formData);
     }
+  };
+
+  const handleResolveConflict = (newStatus) => {
+    updateStatusMutation.mutate(
+      { id: conflictingContract.id, status: newStatus },
+      {
+        onSuccess: () => {
+          setConflictingContract(null);
+          createContractMutation.mutate(formData);
+        }
+      }
+    );
   };
 
   const handleGeneratePDF = (contract) => {
@@ -196,6 +219,7 @@ export default function ContractManagement() {
     setFormData({});
     setEditingContract(null);
     setShowForm(false);
+    setConflictingContract(null);
   };
 
   const filteredContracts = contracts.filter(c => {
@@ -743,6 +767,93 @@ export default function ContractManagement() {
                   disabled={createContractMutation.isPending || updateContractMutation.isPending}
                 >
                   {editingContract ? "Actualizar" : "Crear"} Contrato
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Conflict Modal */}
+      {conflictingContract && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-6"
+          onClick={() => setConflictingContract(null)}
+        >
+          <Card 
+            className="max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader className="border-b bg-amber-50">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <AlertCircle className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-bold text-slate-900">
+                    Contrato Vigente Detectado
+                  </CardTitle>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Este empleado ya tiene un contrato vigente
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="mb-6 p-4 bg-slate-50 rounded-lg">
+                <p className="text-sm text-slate-600 mb-2">Contrato actual:</p>
+                <div className="space-y-1">
+                  <p className="font-semibold text-slate-900">
+                    {conflictingContract.position} - {conflictingContract.contract_type}
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    Inicio: {format(new Date(conflictingContract.start_date), "dd/MM/yyyy")}
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    Remuneración: S/ {conflictingContract.salary.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-700 mb-4">
+                Para registrar el nuevo contrato, primero debes cambiar el estado del contrato actual.
+                Selecciona el nuevo estado:
+              </p>
+
+              <div className="space-y-3">
+                <Button
+                  className="w-full justify-start bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                  variant="outline"
+                  onClick={() => handleResolveConflict("Vencido")}
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Marcar como Vencido
+                </Button>
+                <Button
+                  className="w-full justify-start bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
+                  variant="outline"
+                  onClick={() => handleResolveConflict("Rescindido")}
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Marcar como Rescindido
+                </Button>
+                <Button
+                  className="w-full justify-start bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                  variant="outline"
+                  onClick={() => handleResolveConflict("Renovado")}
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Marcar como Renovado
+                </Button>
+              </div>
+
+              <div className="mt-6 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setConflictingContract(null)}
+                >
+                  Cancelar
                 </Button>
               </div>
             </CardContent>
