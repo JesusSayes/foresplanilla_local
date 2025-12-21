@@ -1,0 +1,640 @@
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Building, MapPin, Briefcase, CreditCard, Plus, Edit, Trash2, Search
+} from "lucide-react";
+import { toast } from "sonner";
+import { usePermissions } from "../components/hooks/usePermissions";
+
+export default function MasterDataManagement() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [employee, setEmployee] = useState(null);
+  const [activeTab, setActiveTab] = useState("sites");
+  const [showForm, setShowForm] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [formData, setFormData] = useState({});
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const user = await base44.auth.me();
+        setCurrentUser(user);
+
+        const employees = await base44.entities.Employee.filter({ 
+          work_email: user.email 
+        });
+        
+        if (employees && employees.length > 0) {
+          setEmployee(employees[0]);
+        }
+      } catch (error) {
+        console.error("Error loading user:", error);
+      }
+    };
+
+    loadUserData();
+  }, []);
+
+  const { data: sites = [] } = useQuery({
+    queryKey: ["sites"],
+    queryFn: async () => await base44.entities.Site.list("name"),
+  });
+
+  const { data: positions = [] } = useQuery({
+    queryKey: ["positions"],
+    queryFn: async () => await base44.entities.Position.list("name"),
+  });
+
+  const { data: banks = [] } = useQuery({
+    queryKey: ["banks"],
+    queryFn: async () => await base44.entities.Bank.list("name"),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async ({ entity, data }) => {
+      return await base44.entities[entity].create(data);
+    },
+    onSuccess: (_, { entity }) => {
+      queryClient.invalidateQueries([entity.toLowerCase() + "s"]);
+      toast.success("Registro creado correctamente");
+      resetForm();
+    },
+    onError: () => toast.error("Error al crear el registro"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ entity, id, data }) => {
+      return await base44.entities[entity].update(id, data);
+    },
+    onSuccess: (_, { entity }) => {
+      queryClient.invalidateQueries([entity.toLowerCase() + "s"]);
+      toast.success("Registro actualizado correctamente");
+      resetForm();
+    },
+    onError: () => toast.error("Error al actualizar el registro"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async ({ entity, id }) => {
+      return await base44.entities[entity].delete(id);
+    },
+    onSuccess: (_, { entity }) => {
+      queryClient.invalidateQueries([entity.toLowerCase() + "s"]);
+      toast.success("Registro eliminado correctamente");
+    },
+    onError: () => toast.error("Error al eliminar el registro"),
+  });
+
+  const handleCreate = (tab) => {
+    setActiveTab(tab);
+    setEditingItem(null);
+    setFormData({});
+    setShowForm(true);
+  };
+
+  const handleEdit = (item, tab) => {
+    setActiveTab(tab);
+    setEditingItem(item);
+    setFormData(item);
+    setShowForm(true);
+  };
+
+  const handleDelete = (item, entity) => {
+    if (confirm(`¿Eliminar este registro?`)) {
+      deleteMutation.mutate({ entity, id: item.id });
+    }
+  };
+
+  const handleSubmit = () => {
+    const entityMap = {
+      sites: "Site",
+      positions: "Position",
+      banks: "Bank",
+    };
+    const entity = entityMap[activeTab];
+
+    if (editingItem) {
+      updateMutation.mutate({ entity, id: editingItem.id, data: formData });
+    } else {
+      createMutation.mutate({ entity, data: formData });
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({});
+    setEditingItem(null);
+    setShowForm(false);
+  };
+
+  const filteredSites = sites.filter(s => 
+    s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.code?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredPositions = positions.filter(p => 
+    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.department?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredBanks = banks.filter(b => 
+    b.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.code?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (!employee || permissionsLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const hasAccess = hasAnyPermission([
+    "sites.view", "sites.manage",
+    "positions.view", "positions.manage",
+    "banks.view", "system.admin"
+  ]);
+
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
+            <p className="text-slate-600">No tienes permisos para ver datos maestros</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-slate-900 mb-2">
+            Gestión de Datos Maestros
+          </h1>
+          <p className="text-slate-600 text-lg">
+            Administra sedes, cargos, bancos y otros datos del sistema
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <MapPin className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">
+                {sites.length}
+              </div>
+              <p className="text-slate-600 text-sm">Sedes registradas</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-purple-100 rounded-xl">
+                  <Briefcase className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">
+                {positions.length}
+              </div>
+              <p className="text-slate-600 text-sm">Cargos definidos</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-green-100 rounded-xl">
+                  <CreditCard className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">
+                {banks.length}
+              </div>
+              <p className="text-slate-600 text-sm">Bancos activos</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full max-w-2xl grid-cols-3">
+            <TabsTrigger value="sites">Sedes</TabsTrigger>
+            <TabsTrigger value="positions">Cargos</TabsTrigger>
+            <TabsTrigger value="banks">Bancos</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="sites" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-bold">Sedes</CardTitle>
+                  {hasAnyPermission(["sites.create", "sites.manage", "system.admin"]) && (
+                    <Button
+                      onClick={() => handleCreate("sites")}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nueva Sede
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <Input
+                      placeholder="Buscar sede..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {filteredSites.map(site => (
+                    <div key={site.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-bold text-slate-900 text-lg">{site.name}</h4>
+                            <Badge className="bg-blue-100 text-blue-700">{site.code}</Badge>
+                            {!site.is_active && (
+                              <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
+                            )}
+                          </div>
+                          {site.address && (
+                            <p className="text-sm text-slate-600">{site.address}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          {hasAnyPermission(["sites.edit", "sites.manage", "system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEdit(site, "sites")}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {hasAnyPermission(["sites.delete", "sites.manage", "system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => handleDelete(site, "Site")}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="positions" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-bold">Cargos</CardTitle>
+                  {hasAnyPermission(["positions.create", "positions.manage", "system.admin"]) && (
+                    <Button
+                      onClick={() => handleCreate("positions")}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nuevo Cargo
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <Input
+                      placeholder="Buscar cargo..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {filteredPositions.map(pos => (
+                    <div key={pos.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-bold text-slate-900 text-lg">{pos.name}</h4>
+                            {pos.level && (
+                              <Badge className="bg-purple-100 text-purple-700">{pos.level}</Badge>
+                            )}
+                            {!pos.is_active && (
+                              <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
+                            )}
+                          </div>
+                          {pos.department && (
+                            <p className="text-sm text-slate-600 mb-1">
+                              <strong>Departamento:</strong> {pos.department}
+                            </p>
+                          )}
+                          {pos.description && (
+                            <p className="text-sm text-slate-600">{pos.description}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          {hasAnyPermission(["positions.edit", "positions.manage", "system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEdit(pos, "positions")}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {hasAnyPermission(["positions.delete", "positions.manage", "system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => handleDelete(pos, "Position")}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="banks" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-bold">Bancos</CardTitle>
+                  {hasAnyPermission(["banks.create", "system.admin"]) && (
+                    <Button
+                      onClick={() => handleCreate("banks")}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nuevo Banco
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <Input
+                      placeholder="Buscar banco..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {filteredBanks.map(bank => (
+                    <div key={bank.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-bold text-slate-900 text-lg">{bank.name}</h4>
+                            {bank.code && (
+                              <Badge className="bg-green-100 text-green-700">{bank.code}</Badge>
+                            )}
+                            {!bank.is_active && (
+                              <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {hasAnyPermission(["banks.edit", "system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEdit(bank, "banks")}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {hasAnyPermission(["banks.delete", "system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => handleDelete(bank, "Bank")}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Form Modal */}
+      {showForm && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+          onClick={resetForm}
+        >
+          <Card 
+            className="max-w-2xl w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl font-bold">
+                  {editingItem ? "Editar" : "Nuevo"} {activeTab === "sites" ? "Sede" : activeTab === "positions" ? "Cargo" : "Banco"}
+                </CardTitle>
+                <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                {activeTab === "sites" && (
+                  <>
+                    <div>
+                      <Label>Nombre *</Label>
+                      <Input
+                        value={formData.name || ""}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Ej: Sede Central"
+                      />
+                    </div>
+                    <div>
+                      <Label>Código *</Label>
+                      <Input
+                        value={formData.code || ""}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                        placeholder="Ej: VES"
+                      />
+                    </div>
+                    <div>
+                      <Label>Dirección</Label>
+                      <Input
+                        value={formData.address || ""}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_active_site"
+                        checked={formData.is_active !== false}
+                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="is_active_site" className="text-sm">Activo</label>
+                    </div>
+                  </>
+                )}
+
+                {activeTab === "positions" && (
+                  <>
+                    <div>
+                      <Label>Nombre *</Label>
+                      <Input
+                        value={formData.name || ""}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Ej: Gerente de Ventas"
+                      />
+                    </div>
+                    <div>
+                      <Label>Departamento</Label>
+                      <Input
+                        value={formData.department || ""}
+                        onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Nivel Jerárquico</Label>
+                      <Select 
+                        value={formData.level || ""} 
+                        onValueChange={(val) => setFormData({ ...formData, level: val })}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Directivo">Directivo</SelectItem>
+                          <SelectItem value="Gerencial">Gerencial</SelectItem>
+                          <SelectItem value="Jefatura">Jefatura</SelectItem>
+                          <SelectItem value="Supervisor">Supervisor</SelectItem>
+                          <SelectItem value="Operativo">Operativo</SelectItem>
+                          <SelectItem value="Administrativo">Administrativo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Descripción</Label>
+                      <Textarea
+                        value={formData.description || ""}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        rows={3}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_active_pos"
+                        checked={formData.is_active !== false}
+                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="is_active_pos" className="text-sm">Activo</label>
+                    </div>
+                  </>
+                )}
+
+                {activeTab === "banks" && (
+                  <>
+                    <div>
+                      <Label>Nombre *</Label>
+                      <Input
+                        value={formData.name || ""}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Ej: Banco de Crédito del Perú"
+                      />
+                    </div>
+                    <div>
+                      <Label>Código</Label>
+                      <Input
+                        value={formData.code || ""}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                        placeholder="Ej: BCP"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_active_bank"
+                        checked={formData.is_active !== false}
+                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="is_active_bank" className="text-sm">Activo</label>
+                    </div>
+                  </>
+                )}
+
+                <div className="flex gap-3 pt-4">
+                  <Button variant="outline" className="flex-1" onClick={resetForm}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                    onClick={handleSubmit}
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                  >
+                    {editingItem ? "Actualizar" : "Crear"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}

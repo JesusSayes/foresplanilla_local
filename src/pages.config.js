@@ -13,6 +13,7 @@ import Payslips from './pages/Payslips';
 import RoleManagement from './pages/RoleManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationRequest from './pages/VacationRequest';
+import MasterDataManagement from './pages/MasterDataManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -32,6 +33,7 @@ export const PAGES = {
     "RoleManagement": RoleManagement,
     "VacationCalendar": VacationCalendar,
     "VacationRequest": VacationRequest,
+    "MasterDataManagement": MasterDataManagement,
 }
 
 export const pagesConfig = {
