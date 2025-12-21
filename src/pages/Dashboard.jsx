@@ -10,7 +10,7 @@ import {
   ChevronRight, Briefcase, Mail, Phone
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { createPageUrl } from "./utils";
+import { createPageUrl } from "../utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
