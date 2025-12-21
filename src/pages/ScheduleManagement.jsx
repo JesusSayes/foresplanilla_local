@@ -426,46 +426,46 @@ export default function ScheduleManagement() {
                                   <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
                                 )}
                               </div>
-                            <div className="space-y-1 text-sm">
-                              <p className="text-slate-600">
-                                <strong>Lun-Vie:</strong> {schedule.monday_start || "--"} - {schedule.monday_end || "--"}
-                              </p>
-                              {schedule.saturday_start && (
-                                <p className="text-slate-600">
-                                  <strong>Sábado:</strong> {schedule.saturday_start} - {schedule.saturday_end}
-                                </p>
-                              )}
-                              <div className="flex gap-4 text-slate-600">
-                                <span><strong>Break:</strong> {schedule.break_duration_minutes} min</span>
-                                <span><strong>Tolerancia:</strong> {schedule.tolerance_minutes} min</span>
+                              <div className="space-y-1 text-sm">
+                               <p className="text-slate-600">
+                                 <strong>Lun-Vie:</strong> {schedule.monday_start || "--"} - {schedule.monday_end || "--"}
+                               </p>
+                               {schedule.saturday_start && (
+                                 <p className="text-slate-600">
+                                   <strong>Sábado:</strong> {schedule.saturday_start} - {schedule.saturday_end}
+                                 </p>
+                               )}
+                               <div className="flex gap-4 text-slate-600">
+                                 <span><strong>Break:</strong> {schedule.break_duration_minutes} min</span>
+                                 <span><strong>Tolerancia:</strong> {schedule.tolerance_minutes} min</span>
+                               </div>
                               </div>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            {hasAnyPermission(["schedules.edit", "schedules.manage", "system.admin"]) && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEdit(schedule)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                            )}
-                            {hasAnyPermission(["schedules.delete", "schedules.manage", "system.admin"]) && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600"
-                                onClick={() => handleDelete(schedule)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                              </div>
+                              <div className="flex gap-2">
+                              {hasAnyPermission(["schedules.edit", "schedules.manage", "system.admin"]) && (
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 onClick={() => handleEdit(schedule)}
+                               >
+                                 <Edit className="w-4 h-4" />
+                               </Button>
+                              )}
+                              {hasAnyPermission(["schedules.delete", "schedules.manage", "system.admin"]) && (
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 className="text-red-600"
+                                 onClick={() => handleDelete(schedule)}
+                               >
+                                 <Trash2 className="w-4 h-4" />
+                               </Button>
+                              )}
+                              </div>
+                              </div>
+                              </div>
+                              );
+                              })}
                   </div>
                 )}
               </TabsContent>
