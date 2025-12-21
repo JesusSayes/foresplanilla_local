@@ -12,9 +12,9 @@ import MasterDataManagement from './pages/MasterDataManagement';
 import MyProfile from './pages/MyProfile';
 import Payslips from './pages/Payslips';
 import RoleManagement from './pages/RoleManagement';
+import ScheduleManagement from './pages/ScheduleManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationRequest from './pages/VacationRequest';
-import ScheduleManagement from './pages/ScheduleManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -33,9 +33,9 @@ export const PAGES = {
     "MyProfile": MyProfile,
     "Payslips": Payslips,
     "RoleManagement": RoleManagement,
+    "ScheduleManagement": ScheduleManagement,
     "VacationCalendar": VacationCalendar,
     "VacationRequest": VacationRequest,
-    "ScheduleManagement": ScheduleManagement,
 }
 
 export const pagesConfig = {
