@@ -83,10 +83,10 @@ export default function Layout({ children, currentPageName }) {
         submenu: [
           { name: "Ver Asistencia", path: "AttendanceManagement" },
           { name: "Reportes Asistencia", path: "AttendanceReports" },
+          { name: "Gestión Horarios", path: "ScheduleManagement" },
           { name: "Mi Asistencia", path: "Attendance" },
         ]
       },
-      { name: "Gestión Horarios", icon: Clock, path: "ScheduleManagement" },
       { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
       { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
       ];
