@@ -13,6 +13,7 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import PermissionGuard from "../components/PermissionGuard";
 
 export default function ManagerApprovals() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -146,7 +147,8 @@ export default function ManagerApprovals() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <PermissionGuard employee={employee} requiredRole="manager">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -444,5 +446,6 @@ export default function ManagerApprovals() {
         )}
       </div>
     </div>
+    </PermissionGuard>
   );
 }

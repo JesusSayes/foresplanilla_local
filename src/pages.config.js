@@ -6,6 +6,7 @@ import Certificates from './pages/Certificates';
 import Attendance from './pages/Attendance';
 import ManagerApprovals from './pages/ManagerApprovals';
 import VacationCalendar from './pages/VacationCalendar';
+import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
@@ -22,4 +23,5 @@ export const PAGES = {
 export const pagesConfig = {
     mainPage: "Dashboard",
     Pages: PAGES,
+    Layout: __Layout,
 };
