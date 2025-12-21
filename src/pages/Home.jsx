@@ -98,25 +98,91 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
+  // Si no está autenticado, mostrar página de login
+  if (!employee) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="max-w-md w-full"
+        >
+          <Card className="border-0 shadow-2xl bg-white/95 backdrop-blur-lg">
+            <CardContent className="p-10">
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl">
+                  <Shield className="w-10 h-10 text-white" />
+                </div>
+                <h1 className="text-3xl font-bold text-slate-900 mb-2">
+                  Portal RRHH
+                </h1>
+                <p className="text-slate-600">
+                  Sistema de Gestión de Recursos Humanos
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <Button
+                  size="lg"
+                  className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-lg py-6"
+                  onClick={() => base44.auth.redirectToLogin(createPageUrl("Dashboard"))}
+                >
+                  <Shield className="w-5 h-5 mr-2" />
+                  Iniciar Sesión
+                </Button>
+
+                <p className="text-center text-sm text-slate-500">
+                  Accede con tus credenciales corporativas
+                </p>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-slate-200">
+                <div className="flex items-center justify-center gap-6 text-xs text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    Seguro
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    Rápido
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    Confiable
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <p className="text-center text-white/80 text-sm mt-6">
+            © 2025 Sistema de Gestión RRHH
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center">
+      <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-10">
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+          <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg">
             <Shield className="w-6 h-6 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white">Portal RRHH</h1>
         </div>
         <Button
           variant="outline"
-          className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20"
+          className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 shadow-lg hover:shadow-xl transition-all"
           onClick={() => base44.auth.logout()}
         >
           Cerrar Sesión
