@@ -78,6 +78,14 @@ export default function EmployeeManagement() {
     },
   });
 
+  const { data: sites = [] } = useQuery({
+    queryKey: ["sites"],
+    queryFn: async () => {
+      const allSites = await base44.entities.Site.list("name");
+      return allSites.filter(s => s.is_active);
+    },
+  });
+
   const createEmployeeMutation = useMutation({
     mutationFn: async (data) => {
       return await base44.entities.Employee.create(data);
