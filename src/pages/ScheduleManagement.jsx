@@ -24,6 +24,7 @@ export default function ScheduleManagement() {
     schedule_name: "",
     employee_id: null,
     department_name: "",
+    departments: [],
     monday_start: "09:00",
     monday_end: "18:00",
     tuesday_start: "09:00",
@@ -120,6 +121,7 @@ export default function ScheduleManagement() {
       schedule_name: "",
       employee_id: null,
       department_name: "",
+      departments: [],
       monday_start: "09:00",
       monday_end: "18:00",
       tuesday_start: "09:00",
@@ -143,7 +145,10 @@ export default function ScheduleManagement() {
 
   const handleEdit = (schedule) => {
     setEditingSchedule(schedule);
-    setFormData(schedule);
+    setFormData({
+      ...schedule,
+      departments: schedule.departments || []
+    });
     setShowForm(true);
   };
 
@@ -159,8 +164,8 @@ export default function ScheduleManagement() {
       return;
     }
 
-    if (!formData.employee_id && !formData.department_name) {
-      toast.error("Debe asignar a un empleado o departamento");
+    if (!formData.employee_id && formData.departments.length === 0) {
+      toast.error("Debe asignar a un empleado o al menos un departamento");
       return;
     }
 
@@ -176,6 +181,7 @@ export default function ScheduleManagement() {
       schedule_name: "",
       employee_id: null,
       department_name: "",
+      departments: [],
       monday_start: "09:00",
       monday_end: "18:00",
       tuesday_start: "09:00",
@@ -201,7 +207,7 @@ export default function ScheduleManagement() {
   const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
 
   const individualSchedules = schedules.filter(s => s.employee_id);
-  const departmentSchedules = schedules.filter(s => s.department_name && !s.employee_id);
+  const departmentSchedules = schedules.filter(s => (s.departments?.length > 0 || s.department_name) && !s.employee_id);
 
   const getEmployeeName = (empId) => {
     const emp = allEmployees.find(e => e.id === empId);
@@ -214,10 +220,11 @@ export default function ScheduleManagement() {
            s.schedule_name.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  const filteredDepartment = departmentSchedules.filter(s => 
-    s.department_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.schedule_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredDepartment = departmentSchedules.filter(s => {
+    const depts = s.departments || [s.department_name];
+    return depts.some(d => d?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+           s.schedule_name.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   if (!employee || permissionsLoading) {
     return (
@@ -400,21 +407,25 @@ export default function ScheduleManagement() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {filteredDepartment.map(schedule => (
-                      <div key={schedule.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h4 className="font-bold text-slate-900 text-lg">
-                                {schedule.schedule_name}
-                              </h4>
-                              <Badge className="bg-purple-100 text-purple-700">
-                                {schedule.department_name}
-                              </Badge>
-                              {!schedule.is_active && (
-                                <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
-                              )}
-                            </div>
+                    {filteredDepartment.map(schedule => {
+                      const scheduleDepts = schedule.departments || [schedule.department_name];
+                      return (
+                        <div key={schedule.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <h4 className="font-bold text-slate-900 text-lg">
+                                  {schedule.schedule_name}
+                                </h4>
+                                {scheduleDepts.filter(Boolean).map((dept, idx) => (
+                                  <Badge key={idx} className="bg-purple-100 text-purple-700">
+                                    {dept}
+                                  </Badge>
+                                ))}
+                                {!schedule.is_active && (
+                                  <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
+                                )}
+                              </div>
                             <div className="space-y-1 text-sm">
                               <p className="text-slate-600">
                                 <strong>Lun-Vie:</strong> {schedule.monday_start || "--"} - {schedule.monday_end || "--"}
@@ -491,12 +502,12 @@ export default function ScheduleManagement() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div>
                     <Label>Asignar a Empleado Individual</Label>
                     <Select 
                       value={formData.employee_id || ""} 
-                      onValueChange={(val) => setFormData({ ...formData, employee_id: val || null, department_name: "" })}
+                      onValueChange={(val) => setFormData({ ...formData, employee_id: val || null, departments: [] })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar empleado" />
@@ -513,21 +524,30 @@ export default function ScheduleManagement() {
                   </div>
 
                   <div>
-                    <Label>O asignar a Departamento</Label>
-                    <Select 
-                      value={formData.department_name || ""} 
-                      onValueChange={(val) => setFormData({ ...formData, department_name: val || "", employee_id: null })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar departamento" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={null}>Ninguno</SelectItem>
-                        {departments.map(dept => (
-                          <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>O asignar a Departamentos (múltiples)</Label>
+                    <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
+                      {departments.map(dept => (
+                        <label key={dept} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
+                          <input
+                            type="checkbox"
+                            checked={formData.departments?.includes(dept)}
+                            onChange={(e) => {
+                              const newDepts = e.target.checked
+                                ? [...(formData.departments || []), dept]
+                                : formData.departments.filter(d => d !== dept);
+                              setFormData({ ...formData, departments: newDepts, employee_id: null });
+                            }}
+                            className="w-4 h-4 rounded"
+                          />
+                          <span className="text-sm">{dept}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {formData.departments?.length > 0 && (
+                      <p className="text-xs text-slate-600 mt-2">
+                        {formData.departments.length} departamento(s) seleccionado(s)
+                      </p>
+                    )}
                   </div>
                 </div>
 
