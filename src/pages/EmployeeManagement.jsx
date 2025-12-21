@@ -62,6 +62,14 @@ export default function EmployeeManagement() {
     },
   });
 
+  const { data: positions = [] } = useQuery({
+    queryKey: ["positions"],
+    queryFn: async () => {
+      const allPositions = await base44.entities.Position.list("name");
+      return allPositions.filter(p => p.is_active);
+    },
+  });
+
   const createEmployeeMutation = useMutation({
     mutationFn: async (data) => {
       return await base44.entities.Employee.create(data);
@@ -608,46 +616,11 @@ export default function EmployeeManagement() {
                       <Select value={formData.position} onValueChange={(val) => setFormData({ ...formData, position: val })}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar cargo" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Director General">Director General</SelectItem>
-                          <SelectItem value="Gerente General">Gerente General</SelectItem>
-                          <SelectItem value="Gerente de Planta">Gerente de Planta</SelectItem>
-                          <SelectItem value="Gerente de Producción">Gerente de Producción</SelectItem>
-                          <SelectItem value="Gerente de Ventas">Gerente de Ventas</SelectItem>
-                          <SelectItem value="Gerente Comercial">Gerente Comercial</SelectItem>
-                          <SelectItem value="Gerente de Logística">Gerente de Logística</SelectItem>
-                          <SelectItem value="Jefe de Producción">Jefe de Producción</SelectItem>
-                          <SelectItem value="Jefe de Almacén">Jefe de Almacén</SelectItem>
-                          <SelectItem value="Jefe de Control de Calidad">Jefe de Control de Calidad</SelectItem>
-                          <SelectItem value="Jefe de Mantenimiento">Jefe de Mantenimiento</SelectItem>
-                          <SelectItem value="Supervisor de Producción">Supervisor de Producción</SelectItem>
-                          <SelectItem value="Supervisor de Calidad">Supervisor de Calidad</SelectItem>
-                          <SelectItem value="Contador">Contador</SelectItem>
-                          <SelectItem value="Asistente Contable">Asistente Contable</SelectItem>
-                          <SelectItem value="Jefe de RRHH">Jefe de RRHH</SelectItem>
-                          <SelectItem value="Asistente de RRHH">Asistente de RRHH</SelectItem>
-                          <SelectItem value="Vendedor">Vendedor</SelectItem>
-                          <SelectItem value="Ejecutivo de Ventas">Ejecutivo de Ventas</SelectItem>
-                          <SelectItem value="Ejecutivo de Cuentas">Ejecutivo de Cuentas</SelectItem>
-                          <SelectItem value="Coordinador de Ventas">Coordinador de Ventas</SelectItem>
-                          <SelectItem value="Carpintero">Carpintero</SelectItem>
-                          <SelectItem value="Operario de Maquinaria">Operario de Maquinaria</SelectItem>
-                          <SelectItem value="Operario de Producción">Operario de Producción</SelectItem>
-                          <SelectItem value="Lijador">Lijador</SelectItem>
-                          <SelectItem value="Barnizador">Barnizador</SelectItem>
-                          <SelectItem value="Ensamblador">Ensamblador</SelectItem>
-                          <SelectItem value="Cortador">Cortador</SelectItem>
-                          <SelectItem value="Operario de Almacén">Operario de Almacén</SelectItem>
-                          <SelectItem value="Montacarguista">Montacarguista</SelectItem>
-                          <SelectItem value="Chofer">Chofer</SelectItem>
-                          <SelectItem value="Conductor de Reparto">Conductor de Reparto</SelectItem>
-                          <SelectItem value="Inspector de Calidad">Inspector de Calidad</SelectItem>
-                          <SelectItem value="Técnico de Mantenimiento">Técnico de Mantenimiento</SelectItem>
-                          <SelectItem value="Electricista">Electricista</SelectItem>
-                          <SelectItem value="Mecánico">Mecánico</SelectItem>
-                          <SelectItem value="Asistente Administrativo">Asistente Administrativo</SelectItem>
-                          <SelectItem value="Recepcionista">Recepcionista</SelectItem>
-                          <SelectItem value="Auxiliar de Limpieza">Auxiliar de Limpieza</SelectItem>
-                          <SelectItem value="Vigilante">Vigilante</SelectItem>
+                          {positions.map(pos => (
+                            <SelectItem key={pos.id} value={pos.name}>
+                              {pos.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
