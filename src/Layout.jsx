@@ -87,6 +87,7 @@ export default function Layout({ children, currentPageName }) {
           { name: "Mi Asistencia", path: "Attendance" },
         ]
       },
+      { name: "Gestión Planillas", icon: FileText, path: "PayrollManagement" },
       { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
       { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
       ];
