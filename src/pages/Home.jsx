@@ -56,42 +56,42 @@ export default function Home() {
       icon: FileText,
       title: "Boletas de Pago",
       description: "Consulta y descarga tus boletas de remuneración",
-      color: "bg-blue-500",
+      color: "from-emerald-500 to-green-600",
       link: "Payslips"
     },
     {
       icon: Calendar,
       title: "Gestión de Vacaciones",
       description: "Solicita y gestiona tus días de descanso",
-      color: "bg-green-500",
+      color: "from-green-500 to-emerald-600",
       link: "VacationRequest"
     },
     {
       icon: Clock,
       title: "Control de Asistencia",
       description: "Visualiza tu registro de asistencia y horarios",
-      color: "bg-purple-500",
+      color: "from-teal-500 to-green-600",
       link: "Attendance"
     },
     {
       icon: Award,
       title: "Certificados",
       description: "Solicita certificados laborales y constancias",
-      color: "bg-orange-500",
+      color: "from-lime-500 to-emerald-600",
       link: "Certificates"
     },
     {
       icon: Users,
       title: "Mi Perfil",
       description: "Actualiza tu información personal",
-      color: "bg-pink-500",
+      color: "from-emerald-600 to-green-700",
       link: "MyProfile"
     },
     {
       icon: TrendingUp,
       title: "Dashboard",
       description: "Vista general de tu información",
-      color: "bg-indigo-500",
+      color: "from-green-600 to-emerald-700",
       link: "Dashboard"
     }
   ];
