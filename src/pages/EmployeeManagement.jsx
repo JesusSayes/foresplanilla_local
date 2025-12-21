@@ -135,6 +135,7 @@ export default function EmployeeManagement() {
       department: emp?.department || "",
       position: emp?.position || "",
       department_name: emp?.department_name || "",
+      site: emp?.site || "",
       hire_date: emp?.hire_date || "",
       contract_type: emp?.contract_type || "Indeterminado",
       base_salary: emp?.base_salary || "",
@@ -651,6 +652,19 @@ export default function EmployeeManagement() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <Label>Sede</Label>
+                      <Select value={formData.site} onValueChange={(val) => setFormData({ ...formData, site: val })}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar sede" /></SelectTrigger>
+                        <SelectContent>
+                          {sites.map(site => (
+                            <SelectItem key={site.id} value={site.name}>
+                              {site.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
                       <Label>Fecha de Ingreso</Label>
                       <Input
                         type="date"
@@ -658,6 +672,9 @@ export default function EmployeeManagement() {
                         onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
                       />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Tipo de Contrato</Label>
                       <Select value={formData.contract_type} onValueChange={(val) => setFormData({ ...formData, contract_type: val })}>
