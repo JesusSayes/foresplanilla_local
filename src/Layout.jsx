@@ -76,7 +76,6 @@ export default function Layout({ children, currentPageName }) {
           { name: "Certificados", path: "Certificates" },
         ]
       },
-      { name: "Datos Maestros", icon: Shield, path: "MasterDataManagement" },
       { 
         name: "Gestión Asistencia", 
         icon: CheckSquare, 
@@ -228,6 +227,15 @@ export default function Layout({ children, currentPageName }) {
                         <User className="w-4 h-4" />
                         Mi Perfil
                       </Link>
+                      {employee?.role === "admin" && (
+                        <Link
+                          to={createPageUrl("MasterDataManagement")}
+                          className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                        >
+                          <Shield className="w-4 h-4" />
+                          Datos Maestros
+                        </Link>
+                      )}
                       <button
                         onClick={handleLogout}
                         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
