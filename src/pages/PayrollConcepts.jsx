@@ -17,42 +17,185 @@ import { toast } from "sonner";
 // Conceptos predefinidos según legislación peruana
 const PREDEFINED_CONCEPTS = {
   ingresos: [
-    { name: "Remuneración Básica", isDefault: true, isCompulsory: true },
-    { name: "Asignación Familiar", description: "10% de RMV para trabajadores con hijos menores" },
-    { name: "Horas Extras al 25%", description: "Primeras 2 horas extras diarias" },
-    { name: "Horas Extras al 35%", description: "Horas extras posteriores a las 2 primeras" },
-    { name: "Bonificación por Movilidad", description: "No mayor a 24% de RMV" },
-    { name: "Bonificación por Alimentación", description: "No mayor a 20% de RMV" },
-    { name: "Comisiones", description: "Variable por ventas o desempeño" },
-    { name: "Gratificación Ordinaria", description: "Julio y Diciembre - equivalente a 1 sueldo" },
-    { name: "Gratificación Extraordinaria", description: "Bonificación adicional voluntaria" },
-    { name: "Bonificación por Escolaridad", description: "Apoyo educativo" },
-    { name: "Trabajo Nocturno (Sobretasa 35%)", description: "Trabajo entre 22:00 y 06:00" },
+    { 
+      name: "Remuneración Básica", 
+      isDefault: true, 
+      isCompulsory: true, 
+      is_dynamic: true,
+      calculation_formula: "base_salary",
+      description: "Salario base del contrato vigente"
+    },
+    { 
+      name: "Asignación Familiar", 
+      description: "10% de RMV para trabajadores con hijos menores",
+      is_dynamic: false
+    },
+    { 
+      name: "Horas Extras al 25%", 
+      description: "Primeras 2 horas extras diarias",
+      is_dynamic: true,
+      calculation_formula: "(base_salary / 30 / 8) * 1.25 * horas_extras_25"
+    },
+    { 
+      name: "Horas Extras al 35%", 
+      description: "Horas extras posteriores a las 2 primeras",
+      is_dynamic: true,
+      calculation_formula: "(base_salary / 30 / 8) * 1.35 * horas_extras_35"
+    },
+    { 
+      name: "Bonificación por Movilidad", 
+      description: "No mayor a 24% de RMV",
+      is_dynamic: false
+    },
+    { 
+      name: "Bonificación por Alimentación", 
+      description: "No mayor a 20% de RMV",
+      is_dynamic: false
+    },
+    { 
+      name: "Comisiones", 
+      description: "Variable por ventas o desempeño",
+      is_dynamic: false
+    },
+    { 
+      name: "Gratificación Ordinaria", 
+      description: "Julio y Diciembre - equivalente a 1 sueldo",
+      is_dynamic: true,
+      calculation_formula: "base_salary"
+    },
+    { 
+      name: "Gratificación Extraordinaria", 
+      description: "Bonificación adicional voluntaria",
+      is_dynamic: false
+    },
+    { 
+      name: "Bonificación por Escolaridad", 
+      description: "Apoyo educativo",
+      is_dynamic: false
+    },
+    { 
+      name: "Trabajo Nocturno (Sobretasa 35%)", 
+      description: "Trabajo entre 22:00 y 06:00",
+      is_dynamic: true,
+      calculation_formula: "(base_salary / 30 / 8) * 0.35 * horas_nocturnas"
+    },
   ],
   descuentos: [
-    { name: "AFP - Comisión", description: "Variable según AFP (aprox. 1.47% - 1.69%)", percentage: 1.6 },
-    { name: "AFP - Aporte Obligatorio", description: "10% sobre remuneración asegurable", percentage: 10 },
-    { name: "AFP - Seguro", description: "Aprox. 1.33% sobre remuneración asegurable", percentage: 1.33 },
-    { name: "ONP", description: "13% sobre remuneración bruta", percentage: 13 },
-    { name: "Impuesto a la Renta 5ta Categoría", description: "Según escala progresiva" },
-    { name: "Préstamos", description: "Descuento por préstamos otorgados" },
-    { name: "Adelanto Quincenal", description: "Adelanto de primera quincena" },
-    { name: "Descuento por Tardanzas", description: "Según reglamento interno" },
-    { name: "Descuento por Inasistencias", description: "Descuento proporcional" },
-    { name: "Retención Judicial", description: "Por orden judicial" },
+    { 
+      name: "AFP - Comisión", 
+      description: "Variable según AFP (aprox. 1.47% - 1.69%)", 
+      percentage: 1.6,
+      is_dynamic: true,
+      calculation_formula: "base_salary * 0.016"
+    },
+    { 
+      name: "AFP - Aporte Obligatorio", 
+      description: "10% sobre remuneración asegurable", 
+      percentage: 10,
+      is_dynamic: true,
+      calculation_formula: "base_salary * 0.10"
+    },
+    { 
+      name: "AFP - Seguro", 
+      description: "Aprox. 1.33% sobre remuneración asegurable", 
+      percentage: 1.33,
+      is_dynamic: true,
+      calculation_formula: "base_salary * 0.0133"
+    },
+    { 
+      name: "ONP", 
+      description: "13% sobre remuneración bruta", 
+      percentage: 13,
+      is_dynamic: true,
+      calculation_formula: "base_salary * 0.13"
+    },
+    { 
+      name: "Impuesto a la Renta 5ta Categoría", 
+      description: "Según escala progresiva",
+      is_dynamic: false
+    },
+    { 
+      name: "Préstamos", 
+      description: "Descuento por préstamos otorgados",
+      is_dynamic: false
+    },
+    { 
+      name: "Adelanto Quincenal", 
+      description: "Adelanto de primera quincena",
+      is_dynamic: false
+    },
+    { 
+      name: "Descuento por Tardanzas", 
+      description: "Según reglamento interno",
+      is_dynamic: false
+    },
+    { 
+      name: "Descuento por Inasistencias", 
+      description: "Descuento proporcional",
+      is_dynamic: false
+    },
+    { 
+      name: "Retención Judicial", 
+      description: "Por orden judicial",
+      is_dynamic: false
+    },
   ],
   aportaciones: [
-    { name: "ESSALUD", description: "9% sobre remuneración asegurable (empleador)", percentage: 9, paidBy: "employer" },
-    { name: "Seguro Vida Ley", description: "Aprox. 0.53% - 1.55% (empleador)", paidBy: "employer" },
-    { name: "SCTR Salud", description: "Seguro complementario trabajo de riesgo (empleador)", paidBy: "employer" },
-    { name: "SCTR Pensión", description: "Seguro complementario trabajo de riesgo (empleador)", paidBy: "employer" },
+    { 
+      name: "ESSALUD", 
+      description: "9% sobre remuneración asegurable (empleador)", 
+      percentage: 9, 
+      paidBy: "employer",
+      is_dynamic: true,
+      calculation_formula: "base_salary * 0.09"
+    },
+    { 
+      name: "Seguro Vida Ley", 
+      description: "Aprox. 0.53% - 1.55% (empleador)", 
+      paidBy: "employer",
+      is_dynamic: true,
+      calculation_formula: "base_salary * 0.0053"
+    },
+    { 
+      name: "SCTR Salud", 
+      description: "Seguro complementario trabajo de riesgo (empleador)", 
+      paidBy: "employer",
+      is_dynamic: false
+    },
+    { 
+      name: "SCTR Pensión", 
+      description: "Seguro complementario trabajo de riesgo (empleador)", 
+      paidBy: "employer",
+      is_dynamic: false
+    },
   ],
   otros: [
-    { name: "CTS Mayo", description: "Compensación por Tiempo de Servicios - Mayo" },
-    { name: "CTS Noviembre", description: "Compensación por Tiempo de Servicios - Noviembre" },
-    { name: "Utilidades", description: "Participación en utilidades de la empresa" },
-    { name: "Vacaciones", description: "30 días calendario por año trabajado" },
-    { name: "Liquidación de Beneficios Sociales", description: "Al cese laboral" },
+    { 
+      name: "CTS Mayo", 
+      description: "Compensación por Tiempo de Servicios - Mayo",
+      is_dynamic: false
+    },
+    { 
+      name: "CTS Noviembre", 
+      description: "Compensación por Tiempo de Servicios - Noviembre",
+      is_dynamic: false
+    },
+    { 
+      name: "Utilidades", 
+      description: "Participación en utilidades de la empresa",
+      is_dynamic: false
+    },
+    { 
+      name: "Vacaciones", 
+      description: "30 días calendario por año trabajado",
+      is_dynamic: true,
+      calculation_formula: "base_salary"
+    },
+    { 
+      name: "Liquidación de Beneficios Sociales", 
+      description: "Al cese laboral",
+      is_dynamic: false
+    },
   ]
 };
 
@@ -69,6 +212,8 @@ export default function PayrollConcepts() {
     concept_type: "Ingreso",
     concept_name: "",
     amount: "",
+    is_dynamic: false,
+    calculation_formula: "",
     is_recurring: false,
     notes: "",
   });
@@ -154,7 +299,9 @@ export default function PayrollConcepts() {
       employee_id: selectedEmployee || "general",
       concept_type: type === "ingresos" ? "Ingreso" : type === "descuentos" ? "Descuento" : "Aportación",
       concept_name: concept.name,
-      amount: 0,
+      amount: concept.is_dynamic ? 0 : "",
+      is_dynamic: concept.is_dynamic || false,
+      calculation_formula: concept.calculation_formula || "",
       month: selectedMonth,
       year: selectedYear,
       is_recurring: false,
@@ -164,14 +311,24 @@ export default function PayrollConcepts() {
 
     setFormData({
       ...conceptData,
-      amount: "",
+      amount: concept.is_dynamic ? "0" : "",
     });
     setShowForm(true);
   };
 
   const handleSubmit = () => {
-    if (!formData.concept_name || !formData.amount) {
-      toast.error("Completa los campos obligatorios");
+    if (!formData.concept_name) {
+      toast.error("El nombre del concepto es obligatorio");
+      return;
+    }
+
+    if (!formData.is_dynamic && !formData.amount) {
+      toast.error("El monto es obligatorio para conceptos fijos");
+      return;
+    }
+
+    if (formData.is_dynamic && !formData.calculation_formula) {
+      toast.error("La fórmula de cálculo es obligatoria para conceptos dinámicos");
       return;
     }
 
@@ -183,7 +340,7 @@ export default function PayrollConcepts() {
     const conceptData = {
       ...formData,
       employee_id: activeTab === "general" ? "general" : selectedEmployee,
-      amount: parseFloat(formData.amount),
+      amount: formData.is_dynamic ? 0 : parseFloat(formData.amount),
     };
 
     createConceptMutation.mutate(conceptData);
@@ -194,6 +351,8 @@ export default function PayrollConcepts() {
       concept_type: "Ingreso",
       concept_name: "",
       amount: "",
+      is_dynamic: false,
+      calculation_formula: "",
       is_recurring: false,
       notes: "",
     });
@@ -494,11 +653,22 @@ export default function PayrollConcepts() {
                                   }>
                                     {concept.concept_type}
                                   </Badge>
-                                  <p className={`font-bold text-sm mt-2 ${
-                                    concept.concept_type === "Ingreso" ? "text-green-600" : "text-red-600"
-                                  }`}>
-                                    S/ {concept.amount.toFixed(2)}
-                                  </p>
+                                  {concept.is_dynamic ? (
+                                    <div className="mt-2">
+                                      <Badge className="bg-purple-100 text-purple-700 text-xs">
+                                        Dinámico
+                                      </Badge>
+                                      <p className="text-xs text-slate-600 mt-1 font-mono">
+                                        {concept.calculation_formula}
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <p className={`font-bold text-sm mt-2 ${
+                                      concept.concept_type === "Ingreso" ? "text-green-600" : "text-red-600"
+                                    }`}>
+                                      S/ {concept.amount.toFixed(2)}
+                                    </p>
+                                  )}
                                   {concept.notes && (
                                     <p className="text-xs text-slate-600 mt-1">{concept.notes}</p>
                                   )}
@@ -514,7 +684,9 @@ export default function PayrollConcepts() {
                                       setFormData({
                                         concept_type: concept.concept_type,
                                         concept_name: concept.concept_name,
-                                        amount: concept.amount.toString(),
+                                        amount: concept.amount?.toString() || "0",
+                                        is_dynamic: concept.is_dynamic || false,
+                                        calculation_formula: concept.calculation_formula || "",
                                         is_recurring: concept.is_recurring,
                                         notes: concept.notes || "",
                                       });
@@ -688,15 +860,57 @@ export default function PayrollConcepts() {
               </div>
 
               <div>
-                <Label>Monto (S/)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.amount}
-                  onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                  placeholder="0.00"
-                />
+                <Label>Tipo de Cálculo</Label>
+                <Select 
+                  value={formData.is_dynamic ? "dynamic" : "fixed"} 
+                  onValueChange={(v) => setFormData({
+                    ...formData, 
+                    is_dynamic: v === "dynamic",
+                    amount: v === "dynamic" ? "0" : formData.amount,
+                    calculation_formula: v === "fixed" ? "" : formData.calculation_formula
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fixed">Monto Fijo</SelectItem>
+                    <SelectItem value="dynamic">Cálculo Dinámico</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-slate-500 mt-1">
+                  {formData.is_dynamic 
+                    ? "El monto se calculará automáticamente según la fórmula" 
+                    : "Ingresa un monto específico"
+                  }
+                </p>
               </div>
+
+              {formData.is_dynamic ? (
+                <div>
+                  <Label>Fórmula de Cálculo *</Label>
+                  <Input
+                    value={formData.calculation_formula}
+                    onChange={(e) => setFormData({...formData, calculation_formula: e.target.value})}
+                    placeholder="Ej: base_salary * 0.10"
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Variables disponibles: base_salary, worked_days, horas_extras_25, horas_extras_35, horas_nocturnas
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <Label>Monto (S/) *</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
 
               <div>
                 <Label>Notas</Label>
