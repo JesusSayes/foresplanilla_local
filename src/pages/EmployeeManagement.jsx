@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Users, Plus, Edit, Eye, UserX, UserCheck, Search, 
-  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield
+  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, CalendarDays
 } from "lucide-react";
 import { createPageUrl } from "../utils";
 import { format } from "date-fns";
@@ -33,7 +33,7 @@ export default function EmployeeManagement() {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [formData, setFormData] = useState({});
 
-  const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -328,6 +328,16 @@ export default function EmployeeManagement() {
                 >
                   <Shield className="w-4 h-4 mr-2" />
                   Importar Empleados
+                </Button>
+              )}
+              {hasAnyPermission(["vacations.calendar", "vacations.view_all", "system.admin"]) && (
+                <Button
+                  onClick={() => window.location.href = createPageUrl("VacationCalendar")}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <CalendarDays className="w-4 h-4 mr-2" />
+                  Calendario Vacaciones
                 </Button>
               )}
             </CardContent>
