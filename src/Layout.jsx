@@ -66,6 +66,7 @@ export default function Layout({ children, currentPageName }) {
       { name: "Gestión Asistencia", icon: CheckSquare, path: "AttendanceManagement" },
       { name: "Reportes Asistencia", icon: Clock, path: "AttendanceReports" },
       { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
+      { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
       { name: "Aprobar Vacaciones", icon: CheckSquare, path: "ManagerApprovals" },
       { name: "Calendario Vacaciones", icon: CalendarDays, path: "VacationCalendar" },
       { name: "Boletas", icon: FileText, path: "Payslips" },
