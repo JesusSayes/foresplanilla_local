@@ -72,6 +72,7 @@ export default function Layout({ children, currentPageName }) {
           { name: "Aprobar Vacaciones", path: "ManagerApprovals" },
           { name: "Calendario Vacaciones", path: "VacationCalendar" },
           { name: "Boletas", path: "Payslips" },
+          { name: "Vacaciones", path: "VacationRequest" },
         ]
       },
       { name: "Datos Maestros", icon: Shield, path: "MasterDataManagement" },
@@ -88,7 +89,6 @@ export default function Layout({ children, currentPageName }) {
       { name: "Gestión Horarios", icon: Clock, path: "ScheduleManagement" },
       { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
       { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
-      { name: "Vacaciones", icon: Calendar, path: "VacationRequest" },
       { name: "Certificados", icon: Award, path: "Certificates" },
       ];
 
