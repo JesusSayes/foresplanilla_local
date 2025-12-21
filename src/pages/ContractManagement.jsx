@@ -119,6 +119,19 @@ export default function ContractManagement() {
     },
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }) => {
+      return await base44.entities.Contract.update(id, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["contracts"]);
+      toast.success("Estado actualizado correctamente");
+    },
+    onError: () => {
+      toast.error("Error al actualizar el estado");
+    },
+  });
+
   const initializeForm = (contract = null, emp = null) => {
     setFormData({
       employee_id: contract?.employee_id || emp?.id || "",
@@ -400,6 +413,20 @@ export default function ContractManagement() {
                         </div>
 
                         <div className="flex gap-2 ml-4">
+                          <Select 
+                            value={contract.status} 
+                            onValueChange={(newStatus) => updateStatusMutation.mutate({ id: contract.id, status: newStatus })}
+                          >
+                            <SelectTrigger className="w-32 h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Vigente">Vigente</SelectItem>
+                              <SelectItem value="Vencido">Vencido</SelectItem>
+                              <SelectItem value="Rescindido">Rescindido</SelectItem>
+                              <SelectItem value="Renovado">Renovado</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <Button
                             size="sm"
                             variant="outline"
