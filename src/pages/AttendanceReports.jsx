@@ -73,6 +73,18 @@ export default function AttendanceReports() {
     },
   });
 
+  const { data: holidays = [] } = useQuery({
+    queryKey: ["holidays"],
+    queryFn: async () => {
+      return await base44.entities.Holiday.list("-date");
+    },
+  });
+
+  const isHoliday = (date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return holidays.some(h => h.date === dateStr && h.is_mandatory);
+  };
+
   const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
 
   const filteredEmployees = allEmployees.filter(emp => {
@@ -97,11 +109,12 @@ export default function AttendanceReports() {
     const totalDays = empRecords.length;
     const presentDays = empRecords.filter(r => !r.is_absent).length;
     const lateDays = empRecords.filter(r => r.is_late).length;
-    const absentDays = empRecords.filter(r => r.is_absent).length;
+    const absentDays = empRecords.filter(r => r.is_absent && !isHoliday(new Date(r.date))).length;
     const totalHours = empRecords.reduce((sum, r) => sum + (r.worked_hours || 0), 0);
     const totalLateMinutes = empRecords.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
+    const holidaysInPeriod = empRecords.filter(r => isHoliday(new Date(r.date))).length;
 
-    return { totalDays, presentDays, lateDays, absentDays, totalHours, totalLateMinutes };
+    return { totalDays, presentDays, lateDays, absentDays, totalHours, totalLateMinutes, holidaysInPeriod };
   };
 
   const departmentStats = departments.map(dept => {
@@ -374,7 +387,7 @@ export default function AttendanceReports() {
                         </Badge>
                       </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
                         <div className="p-3 bg-slate-50 rounded-lg">
                           <p className="text-slate-600 text-xs mb-1">Días trabajados</p>
                           <p className="font-bold text-slate-900">{stats.presentDays}</p>
@@ -384,16 +397,20 @@ export default function AttendanceReports() {
                           <p className="font-bold text-yellow-700">{stats.lateDays}</p>
                         </div>
                         <div className="p-3 bg-red-50 rounded-lg">
-                          <p className="text-slate-600 text-xs mb-1">Ausencias</p>
+                          <p className="text-slate-600 text-xs mb-1">Faltas</p>
                           <p className="font-bold text-red-700">{stats.absentDays}</p>
                         </div>
                         <div className="p-3 bg-blue-50 rounded-lg">
                           <p className="text-slate-600 text-xs mb-1">Total horas</p>
-                          <p className="font-bold text-blue-700">{stats.totalHours.toFixed(1)}h</p>
+                          <p className="font-bold text-blue-700">{stats.totalHours.toFixed(2)}h</p>
                         </div>
                         <div className="p-3 bg-orange-50 rounded-lg">
                           <p className="text-slate-600 text-xs mb-1">Min. tardanza</p>
                           <p className="font-bold text-orange-700">{stats.totalLateMinutes}</p>
+                        </div>
+                        <div className="p-3 bg-purple-50 rounded-lg">
+                          <p className="text-slate-600 text-xs mb-1">Feriados</p>
+                          <p className="font-bold text-purple-700">{stats.holidaysInPeriod}</p>
                         </div>
                       </div>
                     </div>

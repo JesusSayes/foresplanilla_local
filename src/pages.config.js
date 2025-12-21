@@ -10,6 +10,7 @@ import VacationRequest from './pages/VacationRequest';
 import ImportEmployees from './pages/ImportEmployees';
 import AttendanceReports from './pages/AttendanceReports';
 import AttendanceManagement from './pages/AttendanceManagement';
+import HolidayManagement from './pages/HolidayManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -26,6 +27,7 @@ export const PAGES = {
     "ImportEmployees": ImportEmployees,
     "AttendanceReports": AttendanceReports,
     "AttendanceManagement": AttendanceManagement,
+    "HolidayManagement": HolidayManagement,
 }
 
 export const pagesConfig = {

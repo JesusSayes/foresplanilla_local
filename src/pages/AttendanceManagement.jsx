@@ -73,6 +73,21 @@ export default function AttendanceManagement() {
     },
   });
 
+  const { data: holidays = [] } = useQuery({
+    queryKey: ["holidays"],
+    queryFn: async () => {
+      return await base44.entities.Holiday.list("-date");
+    },
+  });
+
+  const isHoliday = (date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return holidays.some(h => h.date === dateStr && h.is_mandatory);
+  };
+
+  const todayIsHoliday = isHoliday(selectedDate);
+  const holidayInfo = holidays.find(h => h.date === format(selectedDate, "yyyy-MM-dd"));
+
   const { data: pendingIncidents = [] } = useQuery({
     queryKey: ["pendingIncidents"],
     queryFn: async () => {
@@ -231,6 +246,27 @@ export default function AttendanceManagement() {
             </p>
           </div>
 
+          {/* Holiday Banner */}
+          {todayIsHoliday && (
+            <Card className="border-0 shadow-lg bg-gradient-to-r from-orange-500 to-red-500 text-white mb-6">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <CalendarIcon className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold mb-1">
+                      🎉 Día Feriado: {holidayInfo?.name}
+                    </h3>
+                    <p className="text-orange-100">
+                      Este es un día no laborable. No se contabiliza como falta para los empleados.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card className="border-0 shadow-lg">
@@ -369,7 +405,7 @@ export default function AttendanceManagement() {
                                 </p>
                               </div>
 
-                              <div className="grid grid-cols-3 gap-4 text-sm">
+                              <div className="grid grid-cols-4 gap-4 text-sm">
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Entrada</p>
                                   <p className="font-semibold text-slate-900">
@@ -385,7 +421,13 @@ export default function AttendanceManagement() {
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Horas</p>
                                   <p className="font-semibold text-slate-900">
-                                    {emp.record?.worked_hours?.toFixed(1) || "0"}h
+                                    {emp.record?.worked_hours?.toFixed(2) || "0.00"}h
+                                  </p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-xs text-slate-600 mb-1">Tardanza</p>
+                                  <p className={`font-semibold ${emp.record?.late_minutes > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                                    {emp.record?.late_minutes || 0} min
                                   </p>
                                 </div>
                               </div>
