@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { 
   Award, Download, FileText, Plus, Clock, 
   CheckCircle, AlertCircle, Calendar
@@ -21,6 +22,8 @@ export default function Certificates() {
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestType, setRequestType] = useState("Certificado de Trabajo");
   const [requestDescription, setRequestDescription] = useState("");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
 
   const queryClient = useQueryClient();
 
@@ -45,16 +48,26 @@ export default function Certificates() {
     loadUserData();
   }, []);
 
-  const { data: certificates = [], isLoading } = useQuery({
-    queryKey: ["certificates", employee?.id],
+  const { data: allEmployees = [] } = useQuery({
+    queryKey: ["allEmployees"],
     queryFn: async () => {
-      if (!employee?.id) return [];
+      return await base44.entities.Employee.filter({ status: "Activo" });
+    },
+    enabled: employee?.role === "admin",
+  });
+
+  const targetEmployeeId = employee?.role === "admin" ? selectedEmployeeId : employee?.id;
+
+  const { data: certificates = [], isLoading } = useQuery({
+    queryKey: ["certificates", targetEmployeeId],
+    queryFn: async () => {
+      if (!targetEmployeeId) return [];
       return await base44.entities.Certificate.filter(
-        { employee_id: employee.id },
+        { employee_id: targetEmployeeId },
         "-created_date"
       );
     },
-    enabled: !!employee?.id,
+    enabled: !!targetEmployeeId,
   });
 
   const requestCertificateMutation = useMutation({
@@ -80,11 +93,18 @@ export default function Certificates() {
       return;
     }
 
+    const employeeIdToUse = employee.role === "admin" ? selectedEmployeeId : employee.id;
+
+    if (employee.role === "admin" && !employeeIdToUse) {
+      toast.error("Por favor selecciona un empleado");
+      return;
+    }
+
     const requestData = {
-      employee_id: employee.id,
+      employee_id: employeeIdToUse,
       certificate_type: requestType,
       description: requestDescription || `Solicitud de ${requestType}`,
-      requested_by_employee: true,
+      requested_by_employee: employee.role !== "admin",
       status: "Solicitado",
     };
 
@@ -255,6 +275,45 @@ export default function Certificates() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="space-y-6">
+                    {employee.role === "admin" ? (
+                      <div>
+                        <Label className="text-sm font-semibold text-slate-900 mb-2 block">
+                          Empleado *
+                        </Label>
+                        <Select 
+                          value={selectedEmployeeId || ""}
+                          onValueChange={(value) => setSelectedEmployeeId(value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar empleado" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <div className="p-2 border-b">
+                              <Input
+                                placeholder="Buscar por nombre o código..."
+                                value={employeeSearchTerm}
+                                onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                                className="h-8"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            {allEmployees
+                              .filter(emp => {
+                                const searchLower = employeeSearchTerm.toLowerCase();
+                                return emp.first_name.toLowerCase().includes(searchLower) ||
+                                       emp.last_name.toLowerCase().includes(searchLower) ||
+                                       emp.employee_code.toLowerCase().includes(searchLower);
+                              })
+                              .map((emp) => (
+                                <SelectItem key={emp.id} value={emp.id}>
+                                  {emp.first_name} {emp.last_name} - {emp.employee_code}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : null}
+
                     <div>
                       <Label className="text-sm font-semibold text-slate-900 mb-2 block">
                         Tipo de Certificado
@@ -288,35 +347,76 @@ export default function Certificates() {
                       </p>
                     </div>
 
-                    <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-                      <h4 className="font-semibold text-slate-900 mb-2">Datos del empleado:</h4>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-slate-600">Nombre:</span>
-                          <p className="font-semibold text-slate-900">
-                            {employee.first_name} {employee.last_name}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-slate-600">Documento:</span>
-                          <p className="font-semibold text-slate-900">
-                            {employee.document_type} {employee.document_number}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-slate-600">Cargo:</span>
-                          <p className="font-semibold text-slate-900">
-                            {employee.position}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-slate-600">Fecha de ingreso:</span>
-                          <p className="font-semibold text-slate-900">
-                            {employee.hire_date && format(new Date(employee.hire_date), "dd/MM/yyyy")}
-                          </p>
+                    {((employee.role === "admin" && selectedEmployeeId) || employee.role !== "admin") && (
+                      <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                        <h4 className="font-semibold text-slate-900 mb-2">Datos del empleado:</h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          {employee.role === "admin" && selectedEmployeeId ? (
+                            <>
+                              {(() => {
+                                const selectedEmp = allEmployees.find(e => e.id === selectedEmployeeId);
+                                if (!selectedEmp) return null;
+                                return (
+                                  <>
+                                    <div>
+                                      <span className="text-slate-600">Nombre:</span>
+                                      <p className="font-semibold text-slate-900">
+                                        {selectedEmp.first_name} {selectedEmp.last_name}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <span className="text-slate-600">Documento:</span>
+                                      <p className="font-semibold text-slate-900">
+                                        {selectedEmp.document_type} {selectedEmp.document_number}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <span className="text-slate-600">Cargo:</span>
+                                      <p className="font-semibold text-slate-900">
+                                        {selectedEmp.position}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <span className="text-slate-600">Fecha de ingreso:</span>
+                                      <p className="font-semibold text-slate-900">
+                                        {selectedEmp.hire_date && format(new Date(selectedEmp.hire_date), "dd/MM/yyyy")}
+                                      </p>
+                                    </div>
+                                  </>
+                                );
+                              })()}
+                            </>
+                          ) : (
+                            <>
+                              <div>
+                                <span className="text-slate-600">Nombre:</span>
+                                <p className="font-semibold text-slate-900">
+                                  {employee.first_name} {employee.last_name}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-slate-600">Documento:</span>
+                                <p className="font-semibold text-slate-900">
+                                  {employee.document_type} {employee.document_number}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-slate-600">Cargo:</span>
+                                <p className="font-semibold text-slate-900">
+                                  {employee.position}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-slate-600">Fecha de ingreso:</span>
+                                <p className="font-semibold text-slate-900">
+                                  {employee.hire_date && format(new Date(employee.hire_date), "dd/MM/yyyy")}
+                                </p>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
-                    </div>
+                    )}
 
                     <div className="flex gap-3">
                       <Button
@@ -347,7 +447,9 @@ export default function Certificates() {
           <div>
             <Card className="border-0 shadow-lg sticky top-8">
               <CardHeader className="border-b">
-                <CardTitle className="text-xl font-bold">Mis Solicitudes</CardTitle>
+                <CardTitle className="text-xl font-bold">
+                  {employee.role === "admin" && selectedEmployeeId ? "Solicitudes del Empleado" : "Mis Solicitudes"}
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
                 {isLoading ? (
