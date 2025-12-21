@@ -53,6 +53,40 @@ export default function Attendance() {
     loadUserData();
   }, []);
 
+  const { data: workSchedule } = useQuery({
+    queryKey: ["workSchedule", employee?.id, employee?.department_name],
+    queryFn: async () => {
+      if (!employee?.id) return null;
+      
+      // First try to find individual schedule
+      const individualSchedules = await base44.entities.WorkSchedule.filter(
+        { employee_id: employee.id, is_active: true },
+        "-created_date",
+        1
+      );
+      
+      if (individualSchedules && individualSchedules.length > 0) {
+        return individualSchedules[0];
+      }
+      
+      // If not found, try department schedule
+      if (employee.department_name) {
+        const departmentSchedules = await base44.entities.WorkSchedule.filter(
+          { department_name: employee.department_name, is_active: true },
+          "-created_date",
+          1
+        );
+        
+        if (departmentSchedules && departmentSchedules.length > 0) {
+          return departmentSchedules[0];
+        }
+      }
+      
+      return null;
+    },
+    enabled: !!employee?.id,
+  });
+
   const { data: attendanceRecords = [], isLoading } = useQuery({
     queryKey: ["attendanceRecords", employee?.id, dateRange, selectedDate],
     queryFn: async () => {
@@ -167,6 +201,36 @@ export default function Attendance() {
       "Rechazada": { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle },
     };
     return configs[status] || configs["Pendiente"];
+  };
+
+  const getScheduleForDay = (date) => {
+    if (!workSchedule) return { start: "09:00", end: "18:00" };
+    
+    const dayOfWeek = format(new Date(date), "EEEE", { locale: es }).toLowerCase();
+    const dayMapping = {
+      "lunes": { start: workSchedule.monday_start, end: workSchedule.monday_end },
+      "martes": { start: workSchedule.tuesday_start, end: workSchedule.tuesday_end },
+      "miércoles": { start: workSchedule.wednesday_start, end: workSchedule.wednesday_end },
+      "jueves": { start: workSchedule.thursday_start, end: workSchedule.thursday_end },
+      "viernes": { start: workSchedule.friday_start, end: workSchedule.friday_end },
+      "sábado": { start: workSchedule.saturday_start, end: workSchedule.saturday_end },
+      "domingo": { start: workSchedule.sunday_start, end: workSchedule.sunday_end },
+    };
+    
+    return dayMapping[dayOfWeek] || { start: "09:00", end: "18:00" };
+  };
+
+  const calculateWorkedHours = (clockIn, clockOut, breakMinutes = 60) => {
+    if (!clockIn || !clockOut) return 0;
+    
+    const [inHour, inMin] = clockIn.split(":").map(Number);
+    const [outHour, outMin] = clockOut.split(":").map(Number);
+    
+    const inMinutes = inHour * 60 + inMin;
+    const outMinutes = outHour * 60 + outMin;
+    
+    const totalMinutes = outMinutes - inMinutes - breakMinutes;
+    return totalMinutes / 60;
   };
 
   const calculateStats = () => {
@@ -312,6 +376,46 @@ export default function Attendance() {
               </CardContent>
             </Card>
 
+            {/* Work Schedule Info */}
+            {workSchedule && (
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-indigo-50 to-purple-50">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-indigo-100 rounded-xl">
+                      <Clock className="w-6 h-6 text-indigo-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-900 mb-2">
+                        {workSchedule.schedule_name}
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        {workSchedule.monday_start && (
+                          <div>
+                            <span className="text-slate-600">Lun-Vie:</span>
+                            <p className="font-semibold text-slate-900">
+                              {workSchedule.monday_start} - {workSchedule.monday_end}
+                            </p>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-slate-600">Break:</span>
+                          <p className="font-semibold text-slate-900">
+                            {workSchedule.break_duration_minutes} min
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-slate-600">Tolerancia:</span>
+                          <p className="font-semibold text-slate-900">
+                            {workSchedule.tolerance_minutes} min
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Records Table */}
             <Card className="border-0 shadow-lg">
               <CardHeader className="border-b bg-slate-50/50">
@@ -333,6 +437,13 @@ export default function Attendance() {
                   <div className="space-y-3">
                     {attendanceRecords.map((record) => {
                       const StatusIcon = getStatusConfig(record.status).icon;
+                      const daySchedule = getScheduleForDay(record.date);
+                      const expectedHours = calculateWorkedHours(
+                        daySchedule.start, 
+                        daySchedule.end, 
+                        workSchedule?.break_duration_minutes || 60
+                      );
+                      
                       return (
                         <div 
                           key={record.id}
@@ -343,13 +454,19 @@ export default function Attendance() {
                               <h4 className="font-semibold text-slate-900 mb-1">
                                 {format(new Date(record.date), "EEEE, dd 'de' MMMM", { locale: es })}
                               </h4>
-                              <div className="flex gap-4 text-sm text-slate-600">
-                                <span>
-                                  <strong>Entrada:</strong> {record.clock_in || "No registrada"}
-                                </span>
-                                <span>
-                                  <strong>Salida:</strong> {record.clock_out || "No registrada"}
-                                </span>
+                              <div className="flex gap-4 text-sm">
+                                <div>
+                                  <span className="text-slate-500 text-xs">Programado:</span>
+                                  <p className="text-slate-600 font-medium">
+                                    {daySchedule.start} - {daySchedule.end}
+                                  </p>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500 text-xs">Registrado:</span>
+                                  <p className={`font-medium ${record.clock_in && record.clock_out ? 'text-slate-900' : 'text-red-600'}`}>
+                                    {record.clock_in || "- -"} - {record.clock_out || "- -"}
+                                  </p>
+                                </div>
                               </div>
                             </div>
                             <Badge className={getStatusConfig(record.status).color}>
@@ -358,28 +475,35 @@ export default function Attendance() {
                             </Badge>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div className="grid grid-cols-3 gap-4 text-sm bg-slate-50 rounded-lg p-3">
                             <div>
-                              <span className="text-slate-600">Horas trabajadas</span>
+                              <span className="text-slate-600 text-xs">Horas trabajadas</span>
                               <p className="font-semibold text-slate-900">
-                                {record.worked_hours ? `${record.worked_hours.toFixed(2)}h` : "N/A"}
+                                {record.worked_hours ? `${record.worked_hours.toFixed(2)}h` : "0h"}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-slate-600 text-xs">Horas esperadas</span>
+                              <p className="font-semibold text-slate-700">
+                                {expectedHours.toFixed(2)}h
                               </p>
                             </div>
                             {record.is_late && (
                               <div>
-                                <span className="text-slate-600">Tardanza</span>
+                                <span className="text-slate-600 text-xs">Tardanza</span>
                                 <p className="font-semibold text-orange-600">
                                   {record.late_minutes} min
                                 </p>
                               </div>
                             )}
-                            {record.notes && (
-                              <div className="col-span-3">
-                                <span className="text-slate-600">Observaciones: </span>
-                                <span className="text-slate-900">{record.notes}</span>
-                              </div>
-                            )}
                           </div>
+
+                          {record.notes && (
+                            <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                              <span className="text-slate-600">📝 </span>
+                              <span className="text-slate-900">{record.notes}</span>
+                            </div>
+                          )}
 
                           {(record.is_late || record.is_absent || record.status === "Incompleto") && (
                             <Button
