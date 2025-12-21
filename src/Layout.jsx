@@ -66,6 +66,7 @@ export default function Layout({ children, currentPageName }) {
       { name: "Importar Empleados", icon: Shield, path: "ImportEmployees" },
       { name: "Datos Maestros", icon: Shield, path: "MasterDataManagement" },
       { name: "Gestión Asistencia", icon: CheckSquare, path: "AttendanceManagement" },
+      { name: "Gestión Horarios", icon: Clock, path: "ScheduleManagement" },
       { name: "Reportes Asistencia", icon: Clock, path: "AttendanceReports" },
       { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
       { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
