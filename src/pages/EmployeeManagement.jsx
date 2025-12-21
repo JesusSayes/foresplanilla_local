@@ -32,6 +32,8 @@ export default function EmployeeManagement() {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [formData, setFormData] = useState({});
+  const [positionSearchTerm, setPositionSearchTerm] = useState("");
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
 
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -69,6 +71,14 @@ export default function EmployeeManagement() {
     queryFn: async () => {
       const allPositions = await base44.entities.Position.list("name");
       return allPositions.filter(p => p.is_active);
+    },
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ["departments"],
+    queryFn: async () => {
+      const allDepartments = await base44.entities.Department.list("name");
+      return allDepartments.filter(d => d.is_active);
     },
   });
 
@@ -660,20 +670,48 @@ export default function EmployeeManagement() {
                       <Select value={formData.position} onValueChange={(val) => setFormData({ ...formData, position: val })}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar cargo" /></SelectTrigger>
                         <SelectContent>
-                          {positions.map(pos => (
-                            <SelectItem key={pos.id} value={pos.name}>
-                              {pos.name}
-                            </SelectItem>
-                          ))}
+                          <div className="p-2 border-b">
+                            <Input
+                              placeholder="Buscar cargo..."
+                              value={positionSearchTerm}
+                              onChange={(e) => setPositionSearchTerm(e.target.value)}
+                              className="h-8"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          {positions
+                            .filter(pos => pos.name.toLowerCase().includes(positionSearchTerm.toLowerCase()))
+                            .map(pos => (
+                              <SelectItem key={pos.id} value={pos.name}>
+                                {pos.name}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
                       <Label>Área/Departamento</Label>
-                      <Input
-                        value={formData.department_name}
-                        onChange={(e) => setFormData({ ...formData, department_name: e.target.value })}
-                      />
+                      <Select value={formData.department_name} onValueChange={(val) => setFormData({ ...formData, department_name: val })}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
+                        <SelectContent>
+                          <div className="p-2 border-b">
+                            <Input
+                              placeholder="Buscar departamento..."
+                              value={departmentSearchTerm}
+                              onChange={(e) => setDepartmentSearchTerm(e.target.value)}
+                              className="h-8"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          {departments
+                            .filter(dept => dept.name.toLowerCase().includes(departmentSearchTerm.toLowerCase()))
+                            .map(dept => (
+                              <SelectItem key={dept.id} value={dept.name}>
+                                {dept.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
