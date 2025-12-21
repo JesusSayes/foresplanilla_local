@@ -26,6 +26,9 @@ export default function ContractManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [formData, setFormData] = useState({});
+  const [positionSearchTerm, setPositionSearchTerm] = useState("");
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
+  const [siteSearchTerm, setSiteSearchTerm] = useState("");
 
   const queryClient = useQueryClient();
 
@@ -54,6 +57,30 @@ export default function ContractManagement() {
     queryKey: ["allEmployees"],
     queryFn: async () => {
       return await base44.entities.Employee.filter({ status: "Activo" });
+    },
+  });
+
+  const { data: positions = [] } = useQuery({
+    queryKey: ["positions"],
+    queryFn: async () => {
+      const allPositions = await base44.entities.Position.list("name");
+      return allPositions.filter(p => p.is_active);
+    },
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ["departments"],
+    queryFn: async () => {
+      const allDepartments = await base44.entities.Department.list("name");
+      return allDepartments.filter(d => d.is_active);
+    },
+  });
+
+  const { data: sites = [] } = useQuery({
+    queryKey: ["sites"],
+    queryFn: async () => {
+      const allSites = await base44.entities.Site.list("name");
+      return allSites.filter(s => s.is_active);
     },
   });
 
@@ -522,26 +549,77 @@ export default function ContractManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Cargo *</Label>
-                      <Input
-                        value={formData.position}
-                        onChange={(e) => setFormData({...formData, position: e.target.value})}
-                      />
+                      <Select value={formData.position} onValueChange={(val) => setFormData({ ...formData, position: val })}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar cargo" /></SelectTrigger>
+                        <SelectContent>
+                          <div className="p-2 border-b">
+                            <Input
+                              placeholder="Buscar cargo..."
+                              value={positionSearchTerm}
+                              onChange={(e) => setPositionSearchTerm(e.target.value)}
+                              className="h-8"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          {positions
+                            .filter(pos => pos.name.toLowerCase().includes(positionSearchTerm.toLowerCase()))
+                            .map(pos => (
+                              <SelectItem key={pos.id} value={pos.name}>
+                                {pos.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label>Departamento/Área</Label>
-                      <Input
-                        value={formData.department}
-                        onChange={(e) => setFormData({...formData, department: e.target.value})}
-                      />
+                      <Select value={formData.department} onValueChange={(val) => setFormData({ ...formData, department: val })}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
+                        <SelectContent>
+                          <div className="p-2 border-b">
+                            <Input
+                              placeholder="Buscar departamento..."
+                              value={departmentSearchTerm}
+                              onChange={(e) => setDepartmentSearchTerm(e.target.value)}
+                              className="h-8"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          {departments
+                            .filter(dept => dept.name.toLowerCase().includes(departmentSearchTerm.toLowerCase()))
+                            .map(dept => (
+                              <SelectItem key={dept.id} value={dept.name}>
+                                {dept.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
                   <div>
-                    <Label>Lugar de Trabajo</Label>
-                    <Input
-                      value={formData.work_location}
-                      onChange={(e) => setFormData({...formData, work_location: e.target.value})}
-                    />
+                    <Label>Sede</Label>
+                    <Select value={formData.work_location} onValueChange={(val) => setFormData({ ...formData, work_location: val })}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar sede" /></SelectTrigger>
+                      <SelectContent>
+                        <div className="p-2 border-b">
+                          <Input
+                            placeholder="Buscar sede..."
+                            value={siteSearchTerm}
+                            onChange={(e) => setSiteSearchTerm(e.target.value)}
+                            className="h-8"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        {sites
+                          .filter(site => site.name.toLowerCase().includes(siteSearchTerm.toLowerCase()))
+                          .map(site => (
+                            <SelectItem key={site.id} value={site.name}>
+                              {site.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4">
