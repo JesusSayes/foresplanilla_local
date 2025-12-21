@@ -412,12 +412,8 @@ export default function EmployeeManagement() {
                               <span>{emp.position}</span>
                               <span>•</span>
                               <span>{emp.department_name}</span>
-                              {emp.site && (
-                                <>
-                                  <span>•</span>
-                                  <span className="text-indigo-600 font-medium">{emp.site}</span>
-                                </>
-                              )}
+                              <span>•</span>
+                              <span className="text-indigo-600 font-medium">{emp.site || "Sin sede"}</span>
                             </div>
                           </div>
 
