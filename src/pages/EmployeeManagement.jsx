@@ -221,7 +221,7 @@ export default function EmployeeManagement() {
     setShowForm(false);
   };
 
-  const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
+  const departmentNames = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
 
   const filteredEmployees = allEmployees.filter(emp => {
     const matchesSearch = emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -313,7 +313,7 @@ export default function EmployeeManagement() {
                 </div>
               </div>
               <div className="text-2xl font-bold text-slate-900 mb-1">
-                {departments.length}
+                {departmentNames.length}
               </div>
               <p className="text-slate-600 text-sm">Departamentos</p>
             </CardContent>
@@ -377,7 +377,7 @@ export default function EmployeeManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {departments.map(dept => (
+                  {departmentNames.map(dept => (
                     <SelectItem key={dept} value={dept}>{dept}</SelectItem>
                   ))}
                 </SelectContent>
