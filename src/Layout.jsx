@@ -61,6 +61,7 @@ export default function Layout({ children, currentPageName }) {
 
     const adminMenu = [
       { name: "Dashboard", icon: LayoutDashboard, path: "Dashboard" },
+      { name: "Importar Empleados", icon: Shield, path: "ImportEmployees" },
       { name: "Aprobar Vacaciones", icon: CheckSquare, path: "ManagerApprovals" },
       { name: "Calendario Vacaciones", icon: CalendarDays, path: "VacationCalendar" },
       { name: "Boletas", icon: FileText, path: "Payslips" },

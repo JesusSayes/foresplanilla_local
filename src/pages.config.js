@@ -7,6 +7,7 @@ import MyProfile from './pages/MyProfile';
 import Payslips from './pages/Payslips';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationRequest from './pages/VacationRequest';
+import ImportEmployees from './pages/ImportEmployees';
 import __Layout from './Layout.jsx';
 
 
@@ -20,10 +21,11 @@ export const PAGES = {
     "Payslips": Payslips,
     "VacationCalendar": VacationCalendar,
     "VacationRequest": VacationRequest,
+    "ImportEmployees": ImportEmployees,
 }
 
 export const pagesConfig = {
-    mainPage: "Home",
+    mainPage: "Dashboard",
     Pages: PAGES,
     Layout: __Layout,
 };
