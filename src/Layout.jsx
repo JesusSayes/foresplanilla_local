@@ -129,8 +129,9 @@ export default function Layout({ children, currentPageName }) {
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden lg:flex items-center gap-1">
-              {menuItems.map((item) => {
+            {employee && (
+              <nav className="hidden lg:flex items-center gap-1">
+                {menuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentPageName === item.path || 
                   (item.submenu && item.submenu.some(sub => sub.path === currentPageName));
@@ -193,8 +194,9 @@ export default function Layout({ children, currentPageName }) {
                     <span>{item.name}</span>
                   </Link>
                 );
-              })}
-            </nav>
+                })}
+              </nav>
+            )}
 
             {/* Right Side Actions */}
             <div className="flex items-center gap-3">
