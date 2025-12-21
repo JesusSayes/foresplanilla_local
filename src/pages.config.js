@@ -1,37 +1,37 @@
 import Attendance from './pages/Attendance';
+import AttendanceManagement from './pages/AttendanceManagement';
+import AttendanceReports from './pages/AttendanceReports';
 import Certificates from './pages/Certificates';
 import Dashboard from './pages/Dashboard';
+import EmployeeManagement from './pages/EmployeeManagement';
+import HolidayManagement from './pages/HolidayManagement';
 import Home from './pages/Home';
+import ImportEmployees from './pages/ImportEmployees';
 import ManagerApprovals from './pages/ManagerApprovals';
 import MyProfile from './pages/MyProfile';
 import Payslips from './pages/Payslips';
+import RoleManagement from './pages/RoleManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationRequest from './pages/VacationRequest';
-import ImportEmployees from './pages/ImportEmployees';
-import AttendanceReports from './pages/AttendanceReports';
-import AttendanceManagement from './pages/AttendanceManagement';
-import HolidayManagement from './pages/HolidayManagement';
-import RoleManagement from './pages/RoleManagement';
-import EmployeeManagement from './pages/EmployeeManagement';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "Attendance": Attendance,
+    "AttendanceManagement": AttendanceManagement,
+    "AttendanceReports": AttendanceReports,
     "Certificates": Certificates,
     "Dashboard": Dashboard,
+    "EmployeeManagement": EmployeeManagement,
+    "HolidayManagement": HolidayManagement,
     "Home": Home,
+    "ImportEmployees": ImportEmployees,
     "ManagerApprovals": ManagerApprovals,
     "MyProfile": MyProfile,
     "Payslips": Payslips,
+    "RoleManagement": RoleManagement,
     "VacationCalendar": VacationCalendar,
     "VacationRequest": VacationRequest,
-    "ImportEmployees": ImportEmployees,
-    "AttendanceReports": AttendanceReports,
-    "AttendanceManagement": AttendanceManagement,
-    "HolidayManagement": HolidayManagement,
-    "RoleManagement": RoleManagement,
-    "EmployeeManagement": EmployeeManagement,
 }
 
 export const pagesConfig = {

@@ -681,6 +681,16 @@ export default function EmployeeManagement() {
                       </Select>
                     </div>
                     <div>
+                      <Label>Supervisor Directo</Label>
+                      <Input
+                        value={formData.supervisor_name}
+                        onChange={(e) => setFormData({ ...formData, supervisor_name: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
                       <Label>Fecha de Ingreso</Label>
                       <Input
                         type="date"
@@ -688,9 +698,6 @@ export default function EmployeeManagement() {
                         onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Tipo de Contrato</Label>
                       <Select value={formData.contract_type} onValueChange={(val) => setFormData({ ...formData, contract_type: val })}>
@@ -707,14 +714,6 @@ export default function EmployeeManagement() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label>Salario Base</Label>
-                      <Input
-                        type="number"
-                        value={formData.base_salary}
-                        onChange={(e) => setFormData({ ...formData, base_salary: parseFloat(e.target.value) })}
-                      />
-                    </div>
-                    <div>
                       <Label>Estado</Label>
                       <Select value={formData.status} onValueChange={(val) => setFormData({ ...formData, status: val })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
@@ -724,6 +723,14 @@ export default function EmployeeManagement() {
                           <SelectItem value="Cesado">Cesado</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div>
+                      <Label>Salario Base</Label>
+                      <Input
+                        type="number"
+                        value={formData.base_salary}
+                        onChange={(e) => setFormData({ ...formData, base_salary: parseFloat(e.target.value) })}
+                      />
                     </div>
                   </div>
 
@@ -748,14 +755,6 @@ export default function EmployeeManagement() {
                         onChange={(e) => setFormData({ ...formData, bank_account: e.target.value })}
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <Label>Supervisor Directo</Label>
-                    <Input
-                      value={formData.supervisor_name}
-                      onChange={(e) => setFormData({ ...formData, supervisor_name: e.target.value })}
-                    />
                   </div>
                 </TabsContent>
 
