@@ -56,49 +56,49 @@ export default function Home() {
       icon: FileText,
       title: "Boletas de Pago",
       description: "Consulta y descarga tus boletas de remuneración",
-      color: "from-emerald-500 to-green-600",
+      color: "from-[#1a5850] to-[#0f3d37]",
       link: "Payslips"
     },
     {
       icon: Calendar,
       title: "Gestión de Vacaciones",
       description: "Solicita y gestiona tus días de descanso",
-      color: "from-green-500 to-emerald-600",
+      color: "from-[#1a5850] to-[#0f3d37]",
       link: "VacationRequest"
     },
     {
       icon: Clock,
       title: "Control de Asistencia",
       description: "Visualiza tu registro de asistencia y horarios",
-      color: "from-teal-500 to-green-600",
+      color: "from-[#1a5850] to-[#0f3d37]",
       link: "Attendance"
     },
     {
       icon: Award,
       title: "Certificados",
       description: "Solicita certificados laborales y constancias",
-      color: "from-lime-500 to-emerald-600",
+      color: "from-[#1a5850] to-[#0f3d37]",
       link: "Certificates"
     },
     {
       icon: Users,
       title: "Mi Perfil",
       description: "Actualiza tu información personal",
-      color: "from-emerald-600 to-green-700",
+      color: "from-[#1a5850] to-[#0f3d37]",
       link: "MyProfile"
     },
     {
       icon: TrendingUp,
       title: "Dashboard",
       description: "Vista general de tu información",
-      color: "from-green-600 to-emerald-700",
+      color: "from-[#1a5850] to-[#0f3d37]",
       link: "Dashboard"
     }
   ];
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 flex items-center justify-center">
+      <div className="min-h-screen bg-[#1a5850] flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -107,7 +107,7 @@ export default function Home() {
   // Si no está autenticado, mostrar página de login
   if (!employee) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#1a5850] flex items-center justify-center p-6">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -117,8 +117,12 @@ export default function Home() {
           <Card className="border-0 shadow-2xl bg-white/95 backdrop-blur-lg">
             <CardContent className="p-10">
               <div className="text-center mb-8">
-                <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-green-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl">
-                  <Shield className="w-10 h-10 text-white" />
+                <div className="mx-auto mb-6">
+                  <img 
+                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6947a46a4a533fe8f1a3a057/dc4db427e_image.png"
+                    alt="PAMA Logo"
+                    className="h-24 mx-auto"
+                  />
                 </div>
                 <h1 className="text-3xl font-bold text-slate-900 mb-2">
                   Portal RRHH
@@ -131,7 +135,7 @@ export default function Home() {
               <div className="space-y-4">
                 <Button
                   size="lg"
-                  className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-lg py-6"
+                  className="w-full bg-[#1a5850] hover:bg-[#0f3d37] text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-lg py-6"
                   onClick={() => base44.auth.redirectToLogin(createPageUrl("Dashboard"))}
                 >
                   <Shield className="w-5 h-5 mr-2" />
@@ -146,15 +150,15 @@ export default function Home() {
               <div className="mt-8 pt-6 border-t border-slate-200">
                 <div className="flex items-center justify-center gap-6 text-xs text-slate-500">
                   <span className="flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <CheckCircle className="w-4 h-4 text-[#1a5850]" />
                     Seguro
                   </span>
                   <span className="flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <CheckCircle className="w-4 h-4 text-[#1a5850]" />
                     Rápido
                   </span>
                   <span className="flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <CheckCircle className="w-4 h-4 text-[#1a5850]" />
                     Confiable
                   </span>
                 </div>
@@ -171,14 +175,15 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600">
+    <div className="min-h-screen bg-[#1a5850]">
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-10">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg">
-            <Shield className="w-6 h-6 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-white">Portal RRHH</h1>
+        <div className="flex items-center gap-4">
+          <img 
+            src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6947a46a4a533fe8f1a3a057/dc4db427e_image.png"
+            alt="PAMA Logo"
+            className="h-12"
+          />
         </div>
         <Button
           variant="outline"
@@ -221,7 +226,7 @@ export default function Home() {
 
           <Button
             size="lg"
-            className="mt-8 bg-white text-emerald-600 hover:bg-white/90 shadow-2xl text-lg px-8 py-6 hover:scale-105 transition-all duration-300 font-bold"
+            className="mt-8 bg-white text-[#1a5850] hover:bg-white/90 shadow-2xl text-lg px-8 py-6 hover:scale-105 transition-all duration-300 font-bold"
             onClick={() => navigate(createPageUrl("Dashboard"))}
           >
             Ir al Dashboard
@@ -259,7 +264,7 @@ export default function Home() {
                         <Icon className="w-8 h-8 text-white" />
                       </div>
                       
-                      <h4 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-emerald-600 transition-colors">
+                      <h4 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-[#1a5850] transition-colors">
                         {feature.title}
                       </h4>
                       
@@ -267,7 +272,7 @@ export default function Home() {
                         {feature.description}
                       </p>
                       
-                      <div className="flex items-center text-emerald-600 font-bold text-sm group-hover:gap-2 transition-all">
+                      <div className="flex items-center text-[#1a5850] font-bold text-sm group-hover:gap-2 transition-all">
                         Acceder
                         <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-2 transition-transform" />
                       </div>
