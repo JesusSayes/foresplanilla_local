@@ -16,6 +16,8 @@ import ScheduleManagement from './pages/ScheduleManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationRequest from './pages/VacationRequest';
 import PayrollManagement from './pages/PayrollManagement';
+import PerformanceManagement from './pages/PerformanceManagement';
+import MyPerformance from './pages/MyPerformance';
 import __Layout from './Layout.jsx';
 
 
@@ -38,6 +40,8 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationRequest": VacationRequest,
     "PayrollManagement": PayrollManagement,
+    "PerformanceManagement": PerformanceManagement,
+    "MyPerformance": MyPerformance,
 }
 
 export const pagesConfig = {
