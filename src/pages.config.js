@@ -4,6 +4,8 @@ import VacationRequest from './pages/VacationRequest';
 import MyProfile from './pages/MyProfile';
 import Certificates from './pages/Certificates';
 import Attendance from './pages/Attendance';
+import ManagerApprovals from './pages/ManagerApprovals';
+import VacationCalendar from './pages/VacationCalendar';
 
 
 export const PAGES = {
@@ -13,6 +15,8 @@ export const PAGES = {
     "MyProfile": MyProfile,
     "Certificates": Certificates,
     "Attendance": Attendance,
+    "ManagerApprovals": ManagerApprovals,
+    "VacationCalendar": VacationCalendar,
 }
 
 export const pagesConfig = {
