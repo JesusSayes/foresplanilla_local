@@ -20,6 +20,8 @@ export default function ScheduleManagement() {
   const [showForm, setShowForm] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [formData, setFormData] = useState({
     schedule_name: "",
     employee_id: null,
@@ -140,6 +142,8 @@ export default function ScheduleManagement() {
       tolerance_minutes: 10,
       is_active: true,
     });
+    setEmployeeSearch("");
+    setShowEmployeeDropdown(false);
     setShowForm(true);
   };
 
@@ -149,6 +153,13 @@ export default function ScheduleManagement() {
       ...schedule,
       departments: schedule.departments || []
     });
+    if (schedule.employee_id) {
+      const emp = allEmployees.find(e => e.id === schedule.employee_id);
+      if (emp) {
+        setEmployeeSearch(`${emp.first_name} ${emp.last_name} - ${emp.employee_code}`);
+      }
+    }
+    setShowEmployeeDropdown(false);
     setShowForm(true);
   };
 
@@ -200,6 +211,8 @@ export default function ScheduleManagement() {
       tolerance_minutes: 10,
       is_active: true,
     });
+    setEmployeeSearch("");
+    setShowEmployeeDropdown(false);
     setEditingSchedule(null);
     setShowForm(false);
   };
@@ -224,6 +237,13 @@ export default function ScheduleManagement() {
     const depts = s.departments || [s.department_name];
     return depts.some(d => d?.toLowerCase().includes(searchTerm.toLowerCase())) ||
            s.schedule_name.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  const filteredEmployees = allEmployees.filter(emp => {
+    const searchLower = employeeSearch.toLowerCase();
+    return emp.first_name.toLowerCase().includes(searchLower) ||
+           emp.last_name.toLowerCase().includes(searchLower) ||
+           emp.employee_code.toLowerCase().includes(searchLower);
   });
 
   if (!employee || permissionsLoading) {
