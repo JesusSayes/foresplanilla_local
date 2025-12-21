@@ -63,6 +63,11 @@ export default function MasterDataManagement() {
     queryFn: async () => await base44.entities.Bank.list("name"),
   });
 
+  const { data: departments = [] } = useQuery({
+    queryKey: ["departments"],
+    queryFn: async () => await base44.entities.Department.list("name"),
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ entity, data }) => {
       return await base44.entities[entity].create(data);
@@ -122,6 +127,7 @@ export default function MasterDataManagement() {
     const entityMap = {
       sites: "Site",
       positions: "Position",
+      departments: "Department",
       banks: "Bank",
     };
     const entity = entityMap[activeTab];
@@ -147,6 +153,11 @@ export default function MasterDataManagement() {
   const filteredPositions = positions.filter(p => 
     p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.department?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredDepartments = departments.filter(d => 
+    d.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    d.code?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredBanks = banks.filter(b => 
@@ -193,7 +204,7 @@ export default function MasterDataManagement() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
@@ -225,6 +236,20 @@ export default function MasterDataManagement() {
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-orange-100 rounded-xl">
+                  <Building className="w-6 h-6 text-orange-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">
+                {departments.length}
+              </div>
+              <p className="text-slate-600 text-sm">Departamentos</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
                 <div className="p-3 bg-green-100 rounded-xl">
                   <CreditCard className="w-6 h-6 text-green-600" />
                 </div>
@@ -238,9 +263,10 @@ export default function MasterDataManagement() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-3">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="sites">Sedes</TabsTrigger>
             <TabsTrigger value="positions">Cargos</TabsTrigger>
+            <TabsTrigger value="departments">Departamentos</TabsTrigger>
             <TabsTrigger value="banks">Bancos</TabsTrigger>
           </TabsList>
 
@@ -399,6 +425,82 @@ export default function MasterDataManagement() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="departments" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-bold">Departamentos</CardTitle>
+                  {hasAnyPermission(["departments.create", "system.admin"]) && (
+                    <Button
+                      onClick={() => handleCreate("departments")}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nuevo Departamento
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <Input
+                      placeholder="Buscar departamento..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {filteredDepartments.map(dept => (
+                    <div key={dept.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-bold text-slate-900 text-lg">{dept.name}</h4>
+                            {dept.code && (
+                              <Badge className="bg-orange-100 text-orange-700">{dept.code}</Badge>
+                            )}
+                            {!dept.is_active && (
+                              <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
+                            )}
+                          </div>
+                          {dept.description && (
+                            <p className="text-sm text-slate-600">{dept.description}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          {hasAnyPermission(["departments.edit", "system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEdit(dept, "departments")}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {hasAnyPermission(["departments.delete", "system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => handleDelete(dept, "Department")}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="banks" className="space-y-6">
             <Card className="border-0 shadow-lg">
               <CardHeader className="border-b bg-slate-50/50">
@@ -487,7 +589,7 @@ export default function MasterDataManagement() {
             <CardHeader className="border-b">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl font-bold">
-                  {editingItem ? "Editar" : "Nuevo"} {activeTab === "sites" ? "Sede" : activeTab === "positions" ? "Cargo" : "Banco"}
+                  {editingItem ? "Editar" : "Nuevo"} {activeTab === "sites" ? "Sede" : activeTab === "positions" ? "Cargo" : activeTab === "departments" ? "Departamento" : "Banco"}
                 </CardTitle>
                 <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
               </div>
@@ -583,6 +685,45 @@ export default function MasterDataManagement() {
                         className="w-4 h-4 rounded"
                       />
                       <label htmlFor="is_active_pos" className="text-sm">Activo</label>
+                    </div>
+                  </>
+                )}
+
+                {activeTab === "departments" && (
+                  <>
+                    <div>
+                      <Label>Nombre *</Label>
+                      <Input
+                        value={formData.name || ""}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Ej: Recursos Humanos"
+                      />
+                    </div>
+                    <div>
+                      <Label>Código</Label>
+                      <Input
+                        value={formData.code || ""}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                        placeholder="Ej: RRHH"
+                      />
+                    </div>
+                    <div>
+                      <Label>Descripción</Label>
+                      <Textarea
+                        value={formData.description || ""}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        rows={3}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_active_dept"
+                        checked={formData.is_active !== false}
+                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="is_active_dept" className="text-sm">Activo</label>
                     </div>
                   </>
                 )}
