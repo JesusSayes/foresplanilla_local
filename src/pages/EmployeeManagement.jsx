@@ -113,6 +113,13 @@ export default function EmployeeManagement() {
     enabled: !!historyEmployeeId,
   });
 
+  const { data: allContracts = [] } = useQuery({
+    queryKey: ["allContracts"],
+    queryFn: async () => {
+      return await base44.entities.Contract.list("-created_date");
+    },
+  });
+
   const createChangeLogMutation = useMutation({
     mutationFn: async (changeData) => {
       return await base44.entities.EmployeeChangeLog.create(changeData);
@@ -192,6 +199,16 @@ export default function EmployeeManagement() {
   });
 
   const initializeForm = (emp = null) => {
+    // Buscar el último contrato vigente del empleado
+    let baseSalary = emp?.base_salary || "";
+    if (emp?.id) {
+      const employeeContracts = allContracts.filter(c => c.employee_id === emp.id && c.status === "Vigente");
+      if (employeeContracts.length > 0) {
+        const latestContract = employeeContracts.sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
+        baseSalary = latestContract.salary || baseSalary;
+      }
+    }
+
     setFormData({
       employee_code: emp?.employee_code || "",
       document_type: emp?.document_type || "DNI",
@@ -213,7 +230,7 @@ export default function EmployeeManagement() {
       site: emp?.site || "",
       hire_date: emp?.hire_date || "",
       contract_type: emp?.contract_type || "Indeterminado",
-      base_salary: emp?.base_salary || "",
+      base_salary: baseSalary,
       bank_name: emp?.bank_name || "",
       bank_account: emp?.bank_account || "",
       status: emp?.status || "Activo",
