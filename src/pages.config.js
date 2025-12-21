@@ -10,13 +10,14 @@ import ImportEmployees from './pages/ImportEmployees';
 import ManagerApprovals from './pages/ManagerApprovals';
 import MasterDataManagement from './pages/MasterDataManagement';
 import MyProfile from './pages/MyProfile';
+import OrgChart from './pages/OrgChart';
+import PayrollManagement from './pages/PayrollManagement';
 import Payslips from './pages/Payslips';
 import RoleManagement from './pages/RoleManagement';
 import ScheduleManagement from './pages/ScheduleManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationRequest from './pages/VacationRequest';
-import PayrollManagement from './pages/PayrollManagement';
-import OrgChart from './pages/OrgChart';
+import PayrollConcepts from './pages/PayrollConcepts';
 import __Layout from './Layout.jsx';
 
 
@@ -33,13 +34,14 @@ export const PAGES = {
     "ManagerApprovals": ManagerApprovals,
     "MasterDataManagement": MasterDataManagement,
     "MyProfile": MyProfile,
+    "OrgChart": OrgChart,
+    "PayrollManagement": PayrollManagement,
     "Payslips": Payslips,
     "RoleManagement": RoleManagement,
     "ScheduleManagement": ScheduleManagement,
     "VacationCalendar": VacationCalendar,
     "VacationRequest": VacationRequest,
-    "PayrollManagement": PayrollManagement,
-    "OrgChart": OrgChart,
+    "PayrollConcepts": PayrollConcepts,
 }
 
 export const pagesConfig = {
