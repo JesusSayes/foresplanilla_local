@@ -149,16 +149,30 @@ export default function ScheduleManagement() {
 
   const handleEdit = (schedule) => {
     setEditingSchedule(schedule);
+    
+    // Cargar departamentos: convertir department_name a array si existe
+    let depts = [];
+    if (schedule.departments && schedule.departments.length > 0) {
+      depts = schedule.departments;
+    } else if (schedule.department_name) {
+      depts = [schedule.department_name];
+    }
+    
     setFormData({
       ...schedule,
-      departments: schedule.departments || []
+      departments: depts,
+      employee_id: schedule.employee_id || null
     });
+    
     if (schedule.employee_id) {
       const emp = allEmployees.find(e => e.id === schedule.employee_id);
       if (emp) {
         setEmployeeSearch(`${emp.first_name} ${emp.last_name} - ${emp.employee_code}`);
       }
+    } else {
+      setEmployeeSearch("");
     }
+    
     setShowEmployeeDropdown(false);
     setShowForm(true);
   };
