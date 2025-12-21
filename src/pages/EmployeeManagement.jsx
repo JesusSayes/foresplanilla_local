@@ -70,6 +70,14 @@ export default function EmployeeManagement() {
     },
   });
 
+  const { data: banks = [] } = useQuery({
+    queryKey: ["banks"],
+    queryFn: async () => {
+      const allBanks = await base44.entities.Bank.list("name");
+      return allBanks.filter(b => b.is_active);
+    },
+  });
+
   const createEmployeeMutation = useMutation({
     mutationFn: async (data) => {
       return await base44.entities.Employee.create(data);
@@ -681,10 +689,16 @@ export default function EmployeeManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Banco</Label>
-                      <Input
-                        value={formData.bank_name}
-                        onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
-                      />
+                      <Select value={formData.bank_name} onValueChange={(val) => setFormData({ ...formData, bank_name: val })}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar banco" /></SelectTrigger>
+                        <SelectContent>
+                          {banks.map(bank => (
+                            <SelectItem key={bank.id} value={bank.name}>
+                              {bank.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label>Número de Cuenta</Label>
