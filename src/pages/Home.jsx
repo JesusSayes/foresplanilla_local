@@ -18,6 +18,12 @@ export default function Home() {
   useEffect(() => {
     const loadEmployee = async () => {
       try {
+        const isAuth = await base44.auth.isAuthenticated();
+        if (!isAuth) {
+          setLoading(false);
+          return;
+        }
+
         const user = await base44.auth.me();
         const employees = await base44.entities.Employee.filter({ 
           work_email: user.email 
