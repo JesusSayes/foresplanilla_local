@@ -5,7 +5,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { 
   LayoutDashboard, FileText, Calendar, Clock, 
-  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown
+  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown, TrendingUp
 } from "lucide-react";
 
 export default function Layout({ children, currentPageName }) {
