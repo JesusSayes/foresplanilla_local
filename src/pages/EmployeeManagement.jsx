@@ -25,6 +25,7 @@ export default function EmployeeManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [siteFilter, setSiteFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -218,7 +219,8 @@ export default function EmployeeManagement() {
                           emp.document_number.includes(searchTerm);
     const matchesStatus = statusFilter === "all" || emp.status === statusFilter;
     const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
-    return matchesSearch && matchesStatus && matchesDept;
+    const matchesSite = siteFilter === "all" || emp.site === siteFilter;
+    return matchesSearch && matchesStatus && matchesDept && matchesSite;
   });
 
   const getStatusConfig = (status) => {
@@ -359,6 +361,18 @@ export default function EmployeeManagement() {
                   ))}
                 </SelectContent>
               </Select>
+
+              <Select value={siteFilter} onValueChange={setSiteFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Sede" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {sites.map(site => (
+                    <SelectItem key={site.id} value={site.name}>{site.code}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </CardHeader>
           <CardContent className="p-6">
@@ -398,6 +412,12 @@ export default function EmployeeManagement() {
                               <span>{emp.position}</span>
                               <span>•</span>
                               <span>{emp.department_name}</span>
+                              {emp.site && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-indigo-600 font-medium">{emp.site}</span>
+                                </>
+                              )}
                             </div>
                           </div>
 
@@ -841,6 +861,7 @@ export default function EmployeeManagement() {
                   <h3 className="font-bold text-slate-900 mb-3">Información Laboral</h3>
                   <div className="space-y-2 text-sm">
                     <p><strong>Departamento:</strong> {selectedEmployee.department_name}</p>
+                    <p><strong>Sede:</strong> {selectedEmployee.site || "N/A"}</p>
                     <p><strong>Fecha Ingreso:</strong> {selectedEmployee.hire_date ? format(new Date(selectedEmployee.hire_date), "dd/MM/yyyy") : "N/A"}</p>
                     <p><strong>Contrato:</strong> {selectedEmployee.contract_type}</p>
                     <p><strong>Estado:</strong> <Badge className={getStatusConfig(selectedEmployee.status).color}>{selectedEmployee.status}</Badge></p>
