@@ -81,6 +81,7 @@ export default function Layout({ children, currentPageName }) {
         submenu: [
           { name: "Ver Asistencia", path: "AttendanceManagement" },
           { name: "Reportes Asistencia", path: "AttendanceReports" },
+          { name: "Mi Asistencia", path: "Attendance" },
         ]
       },
       { name: "Gestión Horarios", icon: Clock, path: "ScheduleManagement" },
@@ -88,7 +89,6 @@ export default function Layout({ children, currentPageName }) {
       { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
       { name: "Boletas", icon: FileText, path: "Payslips" },
       { name: "Vacaciones", icon: Calendar, path: "VacationRequest" },
-      { name: "Asistencia", icon: Clock, path: "Attendance" },
       { name: "Certificados", icon: Award, path: "Certificates" },
       ];
 
