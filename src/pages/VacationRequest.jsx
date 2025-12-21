@@ -22,6 +22,7 @@ export default function VacationRequest() {
   const [employee, setEmployee] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [formData, setFormData] = useState({
     request_type: "Vacaciones",
     start_date: null,
@@ -212,6 +213,13 @@ export default function VacationRequest() {
 
   const selectedDays = calculateDaysIfSelected();
 
+  const filteredEmployees = allEmployees.filter(emp => {
+    const searchLower = employeeSearchTerm.toLowerCase();
+    return emp.first_name.toLowerCase().includes(searchLower) ||
+           emp.last_name.toLowerCase().includes(searchLower) ||
+           emp.employee_code.toLowerCase().includes(searchLower);
+  });
+
   if (!employee) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -338,21 +346,35 @@ export default function VacationRequest() {
                         <label className="block text-sm font-semibold text-slate-900 mb-2">
                           Empleado *
                         </label>
-                        <Select 
-                          value={selectedEmployeeId || ""}
-                          onValueChange={(value) => setSelectedEmployeeId(value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar empleado" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {allEmployees.map((emp) => (
-                              <SelectItem key={emp.id} value={emp.id}>
-                                {emp.first_name} {emp.last_name} - {emp.employee_code}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="space-y-2">
+                          <Input
+                            placeholder="Buscar por nombre o código..."
+                            value={employeeSearchTerm}
+                            onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                            className="mb-2"
+                          />
+                          <Select 
+                            value={selectedEmployeeId || ""}
+                            onValueChange={(value) => setSelectedEmployeeId(value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar empleado" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {filteredEmployees.length === 0 ? (
+                                <div className="p-2 text-sm text-slate-500 text-center">
+                                  No se encontraron empleados
+                                </div>
+                              ) : (
+                                filteredEmployees.map((emp) => (
+                                  <SelectItem key={emp.id} value={emp.id}>
+                                    {emp.first_name} {emp.last_name} - {emp.employee_code}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     ) : (
                       <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
