@@ -120,17 +120,6 @@ export default function Layout({ children, currentPageName }) {
               <h1 className="text-xl font-bold text-slate-900">
                 Portal RRHH
               </h1>
-              {employee && (
-                <div className="hidden md:flex items-center gap-3 pl-4 border-l border-slate-200">
-                  <p className="text-sm text-slate-600">
-                    {employee.first_name} {employee.last_name}
-                  </p>
-                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold ${roleBadge.color}`}>
-                    <Shield className="w-3 h-3" />
-                    {roleBadge.text}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Desktop Navigation */}
@@ -161,6 +150,18 @@ export default function Layout({ children, currentPageName }) {
 
             {/* Right Side Actions */}
             <div className="flex items-center gap-3">
+              {employee && (
+                <div className="hidden md:flex items-center gap-3 pr-3 border-r border-slate-200">
+                  <p className="text-sm text-slate-600">
+                    {employee.first_name} {employee.last_name}
+                  </p>
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold ${roleBadge.color}`}>
+                    <Shield className="w-3 h-3" />
+                    {roleBadge.text}
+                  </div>
+                </div>
+              )}
+
               <Button
                 variant="outline"
                 size="sm"
