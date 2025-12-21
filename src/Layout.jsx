@@ -5,7 +5,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { 
   LayoutDashboard, FileText, Calendar, Clock, 
-  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users
+  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown
 } from "lucide-react";
 
 export default function Layout({ children, currentPageName }) {
@@ -62,7 +62,16 @@ export default function Layout({ children, currentPageName }) {
 
     const adminMenu = [
       { name: "Dashboard", icon: LayoutDashboard, path: "Dashboard" },
-      { name: "Gestión Empleados", icon: Users, path: "EmployeeManagement" },
+      { 
+        name: "Gestión Empleados", 
+        icon: Users, 
+        path: "EmployeeManagement",
+        submenu: [
+          { name: "Ver Empleados", path: "EmployeeManagement" },
+          { name: "Importar Empleados", path: "ImportEmployees" },
+          { name: "Calendario Vacaciones", path: "VacationCalendar" },
+        ]
+      },
       { name: "Datos Maestros", icon: Shield, path: "MasterDataManagement" },
       { name: "Gestión Asistencia", icon: CheckSquare, path: "AttendanceManagement" },
       { name: "Gestión Horarios", icon: Clock, path: "ScheduleManagement" },
@@ -70,7 +79,6 @@ export default function Layout({ children, currentPageName }) {
       { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
       { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
       { name: "Aprobar Vacaciones", icon: CheckSquare, path: "ManagerApprovals" },
-      { name: "Calendario Vacaciones", icon: CalendarDays, path: "VacationCalendar" },
       { name: "Boletas", icon: FileText, path: "Payslips" },
       { name: "Vacaciones", icon: Calendar, path: "VacationRequest" },
       { name: "Asistencia", icon: Clock, path: "Attendance" },
@@ -125,7 +133,49 @@ export default function Layout({ children, currentPageName }) {
             <nav className="hidden lg:flex items-center gap-1">
               {menuItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = currentPageName === item.path;
+                const isActive = currentPageName === item.path || 
+                  (item.submenu && item.submenu.some(sub => sub.path === currentPageName));
+                
+                if (item.submenu) {
+                  return (
+                    <div key={item.path} className="relative group">
+                      <button
+                        className={`
+                          flex items-center gap-2 px-4 py-2 rounded-lg
+                          transition-all duration-200 text-sm
+                          ${isActive 
+                            ? 'bg-indigo-50 text-indigo-600 font-semibold' 
+                            : 'text-slate-700 hover:bg-slate-50'
+                          }
+                        `}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span>{item.name}</span>
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                      <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <div className="py-2">
+                          {item.submenu.map((subItem) => (
+                            <Link
+                              key={subItem.path}
+                              to={createPageUrl(subItem.path)}
+                              className={`
+                                flex items-center px-4 py-2 text-sm
+                                transition-colors duration-150
+                                ${currentPageName === subItem.path
+                                  ? 'bg-indigo-50 text-indigo-600 font-semibold'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                                }
+                              `}
+                            >
+                              {subItem.name}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
                 
                 return (
                   <Link

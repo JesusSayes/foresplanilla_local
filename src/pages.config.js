@@ -3,7 +3,6 @@ import AttendanceManagement from './pages/AttendanceManagement';
 import AttendanceReports from './pages/AttendanceReports';
 import Certificates from './pages/Certificates';
 import Dashboard from './pages/Dashboard';
-import EmployeeManagement from './pages/EmployeeManagement';
 import HolidayManagement from './pages/HolidayManagement';
 import Home from './pages/Home';
 import ImportEmployees from './pages/ImportEmployees';
@@ -15,6 +14,7 @@ import RoleManagement from './pages/RoleManagement';
 import ScheduleManagement from './pages/ScheduleManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationRequest from './pages/VacationRequest';
+import EmployeeManagement from './pages/EmployeeManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -24,7 +24,6 @@ export const PAGES = {
     "AttendanceReports": AttendanceReports,
     "Certificates": Certificates,
     "Dashboard": Dashboard,
-    "EmployeeManagement": EmployeeManagement,
     "HolidayManagement": HolidayManagement,
     "Home": Home,
     "ImportEmployees": ImportEmployees,
@@ -36,6 +35,7 @@ export const PAGES = {
     "ScheduleManagement": ScheduleManagement,
     "VacationCalendar": VacationCalendar,
     "VacationRequest": VacationRequest,
+    "EmployeeManagement": EmployeeManagement,
 }
 
 export const pagesConfig = {
