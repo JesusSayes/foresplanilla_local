@@ -12,6 +12,7 @@ import AttendanceReports from './pages/AttendanceReports';
 import AttendanceManagement from './pages/AttendanceManagement';
 import HolidayManagement from './pages/HolidayManagement';
 import RoleManagement from './pages/RoleManagement';
+import EmployeeManagement from './pages/EmployeeManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -30,6 +31,7 @@ export const PAGES = {
     "AttendanceManagement": AttendanceManagement,
     "HolidayManagement": HolidayManagement,
     "RoleManagement": RoleManagement,
+    "EmployeeManagement": EmployeeManagement,
 }
 
 export const pagesConfig = {

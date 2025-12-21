@@ -62,6 +62,7 @@ export default function Layout({ children, currentPageName }) {
 
     const adminMenu = [
       { name: "Dashboard", icon: LayoutDashboard, path: "Dashboard" },
+      { name: "Gestión Empleados", icon: Users, path: "EmployeeManagement" },
       { name: "Importar Empleados", icon: Shield, path: "ImportEmployees" },
       { name: "Gestión Asistencia", icon: CheckSquare, path: "AttendanceManagement" },
       { name: "Reportes Asistencia", icon: Clock, path: "AttendanceReports" },
