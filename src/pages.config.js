@@ -16,6 +16,7 @@ import ScheduleManagement from './pages/ScheduleManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationRequest from './pages/VacationRequest';
 import PayrollManagement from './pages/PayrollManagement';
+import OrgChart from './pages/OrgChart';
 import __Layout from './Layout.jsx';
 
 
@@ -38,6 +39,7 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationRequest": VacationRequest,
     "PayrollManagement": PayrollManagement,
+    "OrgChart": OrgChart,
 }
 
 export const pagesConfig = {

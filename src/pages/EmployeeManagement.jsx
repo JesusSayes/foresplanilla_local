@@ -12,13 +12,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Users, Plus, Edit, Eye, UserX, UserCheck, Search, 
-  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield
+  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History
 } from "lucide-react";
 import { createPageUrl } from "../utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
+import EmployeeHistory from "../components/employees/EmployeeHistory";
 
 export default function EmployeeManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -34,6 +35,8 @@ export default function EmployeeManagement() {
   const [formData, setFormData] = useState({});
   const [positionSearchTerm, setPositionSearchTerm] = useState("");
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
 
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -98,9 +101,41 @@ export default function EmployeeManagement() {
     },
   });
 
+  const { data: employeeChanges = [], isLoading: historyLoading } = useQuery({
+    queryKey: ["employeeChanges", historyEmployeeId],
+    queryFn: async () => {
+      if (!historyEmployeeId) return [];
+      return await base44.entities.EmployeeChangeLog.filter(
+        { employee_id: historyEmployeeId },
+        "-created_date"
+      );
+    },
+    enabled: !!historyEmployeeId,
+  });
+
+  const createChangeLogMutation = useMutation({
+    mutationFn: async (changeData) => {
+      return await base44.entities.EmployeeChangeLog.create(changeData);
+    },
+  });
+
   const createEmployeeMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.Employee.create(data);
+      const newEmployee = await base44.entities.Employee.create(data);
+      
+      // Registrar creación en el historial
+      await createChangeLogMutation.mutateAsync({
+        employee_id: newEmployee.id,
+        field_changed: "Registro completo",
+        old_value: "",
+        new_value: "Empleado creado",
+        change_type: "Creación",
+        changed_by: currentUser?.email || "Sistema",
+        change_date: new Date().toISOString(),
+        notes: "Registro inicial del empleado en el sistema"
+      });
+      
+      return newEmployee;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["allEmployees"]);
@@ -114,11 +149,39 @@ export default function EmployeeManagement() {
   });
 
   const updateEmployeeMutation = useMutation({
-    mutationFn: async ({ id, data }) => {
-      return await base44.entities.Employee.update(id, data);
+    mutationFn: async ({ id, data, oldData }) => {
+      const updatedEmployee = await base44.entities.Employee.update(id, data);
+      
+      // Registrar cambios en el historial
+      const changedFields = [];
+      Object.keys(data).forEach(key => {
+        if (oldData[key] !== data[key] && data[key] !== undefined) {
+          changedFields.push({
+            field: key,
+            oldValue: oldData[key] || "",
+            newValue: data[key] || ""
+          });
+        }
+      });
+      
+      // Crear registros de cambio
+      for (const change of changedFields) {
+        await createChangeLogMutation.mutateAsync({
+          employee_id: id,
+          field_changed: change.field,
+          old_value: String(change.oldValue),
+          new_value: String(change.newValue),
+          change_type: "Actualización",
+          changed_by: currentUser?.email || "Sistema",
+          change_date: new Date().toISOString(),
+        });
+      }
+      
+      return updatedEmployee;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["allEmployees"]);
+      queryClient.invalidateQueries(["employeeChanges"]);
       toast.success("Empleado actualizado correctamente");
       resetForm();
     },
@@ -194,7 +257,11 @@ export default function EmployeeManagement() {
     }
 
     if (editingEmployee) {
-      updateEmployeeMutation.mutate({ id: editingEmployee.id, data: formData });
+      updateEmployeeMutation.mutate({ 
+        id: editingEmployee.id, 
+        data: formData,
+        oldData: editingEmployee 
+      });
     } else {
       createEmployeeMutation.mutate(formData);
     }
@@ -208,11 +275,30 @@ export default function EmployeeManagement() {
     
     try {
       await base44.entities.Employee.update(emp.id, { status: newStatus });
+      
+      // Registrar cambio de estado
+      await createChangeLogMutation.mutateAsync({
+        employee_id: emp.id,
+        field_changed: "status",
+        old_value: emp.status,
+        new_value: newStatus,
+        change_type: "Cambio de Estado",
+        changed_by: currentUser?.email || "Sistema",
+        change_date: new Date().toISOString(),
+        notes: `Estado cambiado de ${emp.status} a ${newStatus}`
+      });
+      
       queryClient.invalidateQueries(["allEmployees"]);
+      queryClient.invalidateQueries(["employeeChanges"]);
       toast.success(`Estado actualizado a ${newStatus}`);
     } catch (error) {
       toast.error("Error al actualizar el estado");
     }
+  };
+
+  const handleViewHistory = (emp) => {
+    setHistoryEmployeeId(emp.id);
+    setShowHistory(true);
   };
 
   const resetForm = () => {
@@ -449,15 +535,26 @@ export default function EmployeeManagement() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleView(emp)}
+                                title="Ver detalles"
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
-                              
+
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleViewHistory(emp)}
+                                title="Ver historial"
+                              >
+                                <History className="w-4 h-4" />
+                              </Button>
+
                               {hasPermission("employees.edit") && (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleEdit(emp)}
+                                  title="Editar"
                                 >
                                   <Edit className="w-4 h-4" />
                                 </Button>
@@ -469,6 +566,7 @@ export default function EmployeeManagement() {
                                   variant="outline"
                                   className="text-red-600"
                                   onClick={() => handleStatusChange(emp, "Suspendido")}
+                                  title="Suspender"
                                 >
                                   <UserX className="w-4 h-4" />
                                 </Button>
@@ -480,6 +578,7 @@ export default function EmployeeManagement() {
                                   variant="outline"
                                   className="text-green-600"
                                   onClick={() => handleStatusChange(emp, "Activo")}
+                                  title="Activar"
                                 >
                                   <UserCheck className="w-4 h-4" />
                                 </Button>
@@ -850,6 +949,28 @@ export default function EmployeeManagement() {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistory && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
+          onClick={() => setShowHistory(false)}
+        >
+          <div 
+            className="max-w-4xl w-full my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <EmployeeHistory changes={employeeChanges} isLoading={historyLoading} />
+            <Button
+              onClick={() => setShowHistory(false)}
+              className="w-full mt-4"
+              variant="outline"
+            >
+              Cerrar
+            </Button>
+          </div>
         </div>
       )}
 
