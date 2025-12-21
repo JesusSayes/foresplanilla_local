@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   DollarSign, Plus, Trash2, Search, TrendingUp, 
-  TrendingDown, Users, AlertCircle, Edit2
+  TrendingDown, Users, AlertCircle, Edit2, CheckCircle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -310,126 +310,234 @@ export default function PayrollConcepts() {
                 </p>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="space-y-6">
-                  {/* Ingresos */}
-                  <div>
-                    <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-green-600" />
-                      Ingresos
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {PREDEFINED_CONCEPTS.ingresos.map((concept, idx) => (
-                        <div key={idx} className="p-3 border border-slate-200 rounded-lg hover:shadow-md transition-all">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-slate-900 text-sm">{concept.name}</h4>
-                              {concept.description && (
-                                <p className="text-xs text-slate-600 mt-1">{concept.description}</p>
-                              )}
-                            </div>
-                            <Button
-                              size="sm"
-                              onClick={() => handleAddPredefined(concept, "ingresos")}
-                              className="ml-2"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </Button>
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Columna Izquierda: Conceptos No Incorporados */}
+                  <div className="space-y-4">
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                      <h3 className="font-bold text-slate-900 mb-1 flex items-center gap-2">
+                        <Plus className="w-5 h-5 text-slate-600" />
+                        Conceptos Disponibles
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">Haz clic en (+) para incorporar</p>
+                      
+                      <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                        {/* Ingresos */}
+                        <div>
+                          <h4 className="font-semibold text-sm text-green-700 mb-2 flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4" />
+                            Ingresos
+                          </h4>
+                          <div className="space-y-2">
+                            {PREDEFINED_CONCEPTS.ingresos
+                              .filter(concept => !generalConcepts.find(c => c.concept_name === concept.name))
+                              .map((concept, idx) => (
+                                <div key={idx} className="p-2 bg-white border border-slate-200 rounded hover:shadow-sm transition-all">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <h5 className="font-medium text-slate-900 text-xs truncate">{concept.name}</h5>
+                                      {concept.description && (
+                                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{concept.description}</p>
+                                      )}
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleAddPredefined(concept, "ingresos")}
+                                      className="h-7 w-7 p-0 flex-shrink-0"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
                           </div>
                         </div>
-                      ))}
+
+                        {/* Descuentos */}
+                        <div>
+                          <h4 className="font-semibold text-sm text-red-700 mb-2 flex items-center gap-2">
+                            <TrendingDown className="w-4 h-4" />
+                            Descuentos
+                          </h4>
+                          <div className="space-y-2">
+                            {PREDEFINED_CONCEPTS.descuentos
+                              .filter(concept => !generalConcepts.find(c => c.concept_name === concept.name))
+                              .map((concept, idx) => (
+                                <div key={idx} className="p-2 bg-white border border-slate-200 rounded hover:shadow-sm transition-all">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <h5 className="font-medium text-slate-900 text-xs truncate">{concept.name}</h5>
+                                      {concept.description && (
+                                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{concept.description}</p>
+                                      )}
+                                      {concept.percentage && (
+                                        <Badge className="bg-red-100 text-red-700 text-xs mt-1">{concept.percentage}%</Badge>
+                                      )}
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleAddPredefined(concept, "descuentos")}
+                                      className="h-7 w-7 p-0 flex-shrink-0"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+
+                        {/* Aportaciones */}
+                        <div>
+                          <h4 className="font-semibold text-sm text-blue-700 mb-2 flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            Aportaciones
+                          </h4>
+                          <div className="space-y-2">
+                            {PREDEFINED_CONCEPTS.aportaciones
+                              .filter(concept => !generalConcepts.find(c => c.concept_name === concept.name))
+                              .map((concept, idx) => (
+                                <div key={idx} className="p-2 bg-blue-50 border border-blue-200 rounded hover:shadow-sm transition-all">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <h5 className="font-medium text-slate-900 text-xs truncate">{concept.name}</h5>
+                                      {concept.description && (
+                                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{concept.description}</p>
+                                      )}
+                                      {concept.percentage && (
+                                        <Badge className="bg-blue-100 text-blue-700 text-xs mt-1">{concept.percentage}%</Badge>
+                                      )}
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleAddPredefined(concept, "aportaciones")}
+                                      className="h-7 w-7 p-0 flex-shrink-0"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+
+                        {/* Otros */}
+                        <div>
+                          <h4 className="font-semibold text-sm text-purple-700 mb-2 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            Otros
+                          </h4>
+                          <div className="space-y-2">
+                            {PREDEFINED_CONCEPTS.otros
+                              .filter(concept => !generalConcepts.find(c => c.concept_name === concept.name))
+                              .map((concept, idx) => (
+                                <div key={idx} className="p-2 bg-white border border-slate-200 rounded hover:shadow-sm transition-all">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <h5 className="font-medium text-slate-900 text-xs truncate">{concept.name}</h5>
+                                      {concept.description && (
+                                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{concept.description}</p>
+                                      )}
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleAddPredefined(concept, "ingresos")}
+                                      className="h-7 w-7 p-0 flex-shrink-0"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Descuentos */}
-                  <div>
-                    <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                      <TrendingDown className="w-5 h-5 text-red-600" />
-                      Descuentos
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {PREDEFINED_CONCEPTS.descuentos.map((concept, idx) => (
-                        <div key={idx} className="p-3 border border-slate-200 rounded-lg hover:shadow-md transition-all">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-slate-900 text-sm">{concept.name}</h4>
-                              {concept.description && (
-                                <p className="text-xs text-slate-600 mt-1">{concept.description}</p>
-                              )}
-                              {concept.percentage && (
-                                <Badge className="bg-red-100 text-red-700 mt-1">{concept.percentage}%</Badge>
-                              )}
-                            </div>
-                            <Button
-                              size="sm"
-                              onClick={() => handleAddPredefined(concept, "descuentos")}
-                              className="ml-2"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </Button>
+                  {/* Columna Derecha: Conceptos Incorporados */}
+                  <div className="space-y-4">
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="font-bold text-slate-900 mb-1 flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        Conceptos Incorporados
+                      </h3>
+                      <p className="text-xs text-slate-600 mb-4">Configurados para la planilla general</p>
+                      
+                      <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
+                        {generalConcepts.length === 0 ? (
+                          <div className="text-center py-12 text-slate-500">
+                            <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                            <p className="text-sm">No hay conceptos incorporados aún</p>
+                            <p className="text-xs mt-1">Agrega conceptos desde la columna izquierda</p>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Aportaciones */}
-                  <div>
-                    <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                      <Users className="w-5 h-5 text-blue-600" />
-                      Aportaciones del Empleador
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {PREDEFINED_CONCEPTS.aportaciones.map((concept, idx) => (
-                        <div key={idx} className="p-3 border border-slate-200 rounded-lg hover:shadow-md transition-all bg-blue-50">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-slate-900 text-sm">{concept.name}</h4>
-                              {concept.description && (
-                                <p className="text-xs text-slate-600 mt-1">{concept.description}</p>
-                              )}
-                              {concept.percentage && (
-                                <Badge className="bg-blue-100 text-blue-700 mt-1">{concept.percentage}%</Badge>
-                              )}
+                        ) : (
+                          generalConcepts.map(concept => (
+                            <div key={concept.id} className="p-3 bg-white border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    {concept.concept_type === "Ingreso" ? (
+                                      <TrendingUp className="w-4 h-4 text-green-600" />
+                                    ) : concept.concept_type === "Aportación" ? (
+                                      <Users className="w-4 h-4 text-blue-600" />
+                                    ) : (
+                                      <TrendingDown className="w-4 h-4 text-red-600" />
+                                    )}
+                                    <span className="font-semibold text-slate-900 text-sm">{concept.concept_name}</span>
+                                  </div>
+                                  <Badge className={
+                                    concept.concept_type === "Ingreso" 
+                                      ? "bg-green-100 text-green-700 text-xs" 
+                                      : concept.concept_type === "Aportación"
+                                      ? "bg-blue-100 text-blue-700 text-xs"
+                                      : "bg-red-100 text-red-700 text-xs"
+                                  }>
+                                    {concept.concept_type}
+                                  </Badge>
+                                  <p className={`font-bold text-sm mt-2 ${
+                                    concept.concept_type === "Ingreso" ? "text-green-600" : "text-red-600"
+                                  }`}>
+                                    S/ {concept.amount.toFixed(2)}
+                                  </p>
+                                  {concept.notes && (
+                                    <p className="text-xs text-slate-600 mt-1">{concept.notes}</p>
+                                  )}
+                                  {concept.is_recurring && (
+                                    <Badge className="bg-indigo-100 text-indigo-700 text-xs mt-1">Recurrente</Badge>
+                                  )}
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setFormData({
+                                        concept_type: concept.concept_type,
+                                        concept_name: concept.concept_name,
+                                        amount: concept.amount.toString(),
+                                        is_recurring: concept.is_recurring,
+                                        notes: concept.notes || "",
+                                      });
+                                      setShowForm(true);
+                                    }}
+                                    className="h-7 w-7 p-0 text-slate-600 hover:text-indigo-600"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => deleteConceptMutation.mutate(concept.id)}
+                                    className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
-                            <Button
-                              size="sm"
-                              onClick={() => handleAddPredefined(concept, "aportaciones")}
-                              className="ml-2"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Otros */}
-                  <div>
-                    <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                      <AlertCircle className="w-5 h-5 text-purple-600" />
-                      Otros Beneficios
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {PREDEFINED_CONCEPTS.otros.map((concept, idx) => (
-                        <div key={idx} className="p-3 border border-slate-200 rounded-lg hover:shadow-md transition-all">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-slate-900 text-sm">{concept.name}</h4>
-                              {concept.description && (
-                                <p className="text-xs text-slate-600 mt-1">{concept.description}</p>
-                              )}
-                            </div>
-                            <Button
-                              size="sm"
-                              onClick={() => handleAddPredefined(concept, "ingresos")}
-                              className="ml-2"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                          ))
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
