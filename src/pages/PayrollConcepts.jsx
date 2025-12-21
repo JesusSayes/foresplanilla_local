@@ -790,11 +790,22 @@ export default function PayrollConcepts() {
                                   <Badge className="bg-blue-100 text-blue-700">Recurrente</Badge>
                                 )}
                               </div>
-                              <p className={`font-bold ${
-                                concept.concept_type === "Ingreso" ? "text-green-600" : "text-red-600"
-                              }`}>
-                                S/ {concept.amount.toFixed(2)}
-                              </p>
+                              {concept.is_dynamic ? (
+                                <div className="mt-1">
+                                  <Badge className="bg-purple-100 text-purple-700 text-xs">
+                                    Dinámico
+                                  </Badge>
+                                  <p className="text-xs text-slate-600 mt-1 font-mono">
+                                    {concept.calculation_formula}
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className={`font-bold ${
+                                  concept.concept_type === "Ingreso" ? "text-green-600" : "text-red-600"
+                                }`}>
+                                  S/ {concept.amount.toFixed(2)}
+                                </p>
+                              )}
                               {concept.notes && (
                                 <p className="text-xs text-slate-600 mt-1">{concept.notes}</p>
                               )}
