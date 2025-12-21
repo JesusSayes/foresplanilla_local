@@ -13,6 +13,9 @@ export default function Layout({ children, currentPageName }) {
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Pages that don't need sidebar/layout
+  const noLayoutPages = ["Home"];
+
   useEffect(() => {
     const loadEmployee = async () => {
       try {
@@ -90,6 +93,11 @@ export default function Layout({ children, currentPageName }) {
         <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  // Render without layout for specific pages
+  if (noLayoutPages.includes(currentPageName)) {
+    return <>{children}</>;
   }
 
   return (

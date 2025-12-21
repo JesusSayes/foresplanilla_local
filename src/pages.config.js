@@ -6,6 +6,7 @@ import Certificates from './pages/Certificates';
 import Attendance from './pages/Attendance';
 import ManagerApprovals from './pages/ManagerApprovals';
 import VacationCalendar from './pages/VacationCalendar';
+import Home from './pages/Home';
 import __Layout from './Layout.jsx';
 
 
@@ -18,6 +19,7 @@ export const PAGES = {
     "Attendance": Attendance,
     "ManagerApprovals": ManagerApprovals,
     "VacationCalendar": VacationCalendar,
+    "Home": Home,
 }
 
 export const pagesConfig = {
