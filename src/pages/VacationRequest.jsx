@@ -21,6 +21,7 @@ export default function VacationRequest() {
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [formData, setFormData] = useState({
     request_type: "Vacaciones",
     start_date: null,
@@ -52,30 +53,40 @@ export default function VacationRequest() {
     loadUserData();
   }, []);
 
-  const { data: vacationBalance } = useQuery({
-    queryKey: ["vacationBalance", employee?.id],
+  const { data: allEmployees = [] } = useQuery({
+    queryKey: ["allEmployees"],
     queryFn: async () => {
-      if (!employee?.id) return null;
+      return await base44.entities.Employee.filter({ status: "Activo" });
+    },
+    enabled: employee?.role === "admin",
+  });
+
+  const targetEmployeeId = employee?.role === "admin" ? selectedEmployeeId : employee?.id;
+
+  const { data: vacationBalance } = useQuery({
+    queryKey: ["vacationBalance", targetEmployeeId],
+    queryFn: async () => {
+      if (!targetEmployeeId) return null;
       const balances = await base44.entities.VacationBalance.filter(
-        { employee_id: employee.id, is_active: true },
+        { employee_id: targetEmployeeId, is_active: true },
         "-period_start",
         1
       );
       return balances[0];
     },
-    enabled: !!employee?.id,
+    enabled: !!targetEmployeeId,
   });
 
   const { data: requests = [], isLoading } = useQuery({
-    queryKey: ["vacationRequests", employee?.id],
+    queryKey: ["vacationRequests", targetEmployeeId],
     queryFn: async () => {
-      if (!employee?.id) return [];
+      if (!targetEmployeeId) return [];
       return await base44.entities.VacationRequest.filter(
-        { employee_id: employee.id },
+        { employee_id: targetEmployeeId },
         "-created_date"
       );
     },
-    enabled: !!employee?.id,
+    enabled: !!targetEmployeeId,
   });
 
   const createRequestMutation = useMutation({
@@ -107,6 +118,13 @@ export default function VacationRequest() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    const employeeIdToUse = employee.role === "admin" ? selectedEmployeeId : employee.id;
+
+    if (employee.role === "admin" && !employeeIdToUse) {
+      toast.error("Por favor selecciona un empleado");
+      return;
+    }
+
     if (!formData.start_date || !formData.end_date) {
       toast.error("Por favor selecciona las fechas");
       return;
@@ -121,7 +139,7 @@ export default function VacationRequest() {
     const businessDays = differenceInBusinessDays(formData.end_date, formData.start_date) + 1;
 
     const requestData = {
-      employee_id: employee.id,
+      employee_id: employeeIdToUse,
       request_type: formData.request_type,
       start_date: format(formData.start_date, "yyyy-MM-dd"),
       end_date: format(formData.end_date, "yyyy-MM-dd"),
@@ -143,6 +161,9 @@ export default function VacationRequest() {
       reason: "",
       supporting_document_url: null,
     });
+    if (employee?.role !== "admin") {
+      setSelectedEmployeeId(null);
+    }
   };
 
   const handleFileUpload = async (e) => {
@@ -312,6 +333,38 @@ export default function VacationRequest() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-6">
+                    {employee.role === "admin" ? (
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-900 mb-2">
+                          Empleado *
+                        </label>
+                        <Select 
+                          value={selectedEmployeeId || ""}
+                          onValueChange={(value) => setSelectedEmployeeId(value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar empleado" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allEmployees.map((emp) => (
+                              <SelectItem key={emp.id} value={emp.id}>
+                                {emp.first_name} {emp.last_name} - {emp.employee_code}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                        <label className="block text-sm font-semibold text-slate-900 mb-1">
+                          Empleado
+                        </label>
+                        <p className="text-slate-700">
+                          {employee.first_name} {employee.last_name} - {employee.employee_code}
+                        </p>
+                      </div>
+                    )}
+
                     <div>
                       <label className="block text-sm font-semibold text-slate-900 mb-2">
                         Tipo de solicitud
@@ -473,7 +526,9 @@ export default function VacationRequest() {
           <div className="space-y-6">
             <Card className="border-0 shadow-lg">
               <CardHeader className="border-b">
-                <CardTitle className="text-xl font-bold">Mis Solicitudes</CardTitle>
+                <CardTitle className="text-xl font-bold">
+                  {employee.role === "admin" && selectedEmployeeId ? "Solicitudes del Empleado" : "Mis Solicitudes"}
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
                 {isLoading ? (
