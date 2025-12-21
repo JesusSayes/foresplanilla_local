@@ -83,8 +83,7 @@ export default function Layout({ children, currentPageName }) {
       { name: "Vacaciones", icon: Calendar, path: "VacationRequest" },
       { name: "Asistencia", icon: Clock, path: "Attendance" },
       { name: "Certificados", icon: Award, path: "Certificates" },
-      { name: "Perfil", icon: User, path: "MyProfile" },
-    ];
+      ];
 
     if (role === "admin") return adminMenu;
     if (role === "manager") return managerMenu;
@@ -200,26 +199,37 @@ export default function Layout({ children, currentPageName }) {
             {/* Right Side Actions */}
             <div className="flex items-center gap-3">
               {employee && (
-                <div className="hidden md:flex items-center gap-3 pr-3 border-r border-slate-200">
-                  <p className="text-sm text-slate-600">
-                    {employee.first_name} {employee.last_name}
-                  </p>
-                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold ${roleBadge.color}`}>
-                    <Shield className="w-3 h-3" />
-                    {roleBadge.text}
+                <div className="hidden md:block relative group">
+                  <button className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-slate-50 transition-all">
+                    <p className="text-sm text-slate-600">
+                      {employee.first_name} {employee.last_name}
+                    </p>
+                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold ${roleBadge.color}`}>
+                      <Shield className="w-3 h-3" />
+                      {roleBadge.text}
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  </button>
+                  <div className="absolute top-full right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div className="py-2">
+                      <Link
+                        to={createPageUrl("MyProfile")}
+                        className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <User className="w-4 h-4" />
+                        Mi Perfil
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Cerrar Sesión
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
-
-              <Button
-                variant="outline"
-                size="sm"
-                className="hidden lg:flex text-red-600 hover:bg-red-50 hover:text-red-700"
-                onClick={handleLogout}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Cerrar Sesión
-              </Button>
 
               {/* Mobile menu button */}
               <Button
