@@ -540,22 +540,75 @@ export default function ScheduleManagement() {
                 <div className="space-y-4">
                   <div>
                     <Label>Asignar a Empleado Individual</Label>
-                    <Select 
-                      value={formData.employee_id || ""} 
-                      onValueChange={(val) => setFormData({ ...formData, employee_id: val || null, departments: [] })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar empleado" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={null}>Ninguno</SelectItem>
-                        {allEmployees.map(emp => (
-                          <SelectItem key={emp.id} value={emp.id}>
-                            {emp.first_name} {emp.last_name} - {emp.employee_code}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowEmployeeDropdown(!showEmployeeDropdown)}
+                        className="w-full flex items-center justify-between px-3 py-2 border border-slate-200 rounded-md bg-white hover:bg-slate-50 text-left"
+                      >
+                        <span className={formData.employee_id ? "text-slate-900" : "text-slate-500"}>
+                          {formData.employee_id && employeeSearch ? employeeSearch : "Seleccionar empleado"}
+                        </span>
+                        <ChevronsUpDown className="w-4 h-4 text-slate-400" />
+                      </button>
+                      
+                      {showEmployeeDropdown && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
+                          <div className="p-2 border-b">
+                            <Input
+                              placeholder="Buscar por nombre o código..."
+                              value={employeeSearch}
+                              onChange={(e) => setEmployeeSearch(e.target.value)}
+                              autoFocus
+                              className="h-8"
+                            />
+                          </div>
+                          <div className="max-h-60 overflow-y-auto">
+                            <button
+                              type="button"
+                              className="w-full px-3 py-2 text-left hover:bg-slate-50 text-sm text-slate-600 border-b"
+                              onClick={() => {
+                                setFormData({ ...formData, employee_id: null });
+                                setEmployeeSearch("");
+                                setShowEmployeeDropdown(false);
+                              }}
+                            >
+                              Ninguno
+                            </button>
+                            {filteredEmployees.length > 0 ? (
+                              filteredEmployees.map(emp => (
+                                <button
+                                  key={emp.id}
+                                  type="button"
+                                  className={`w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center justify-between ${
+                                    formData.employee_id === emp.id ? 'bg-indigo-50' : ''
+                                  }`}
+                                  onClick={() => {
+                                    setFormData({ ...formData, employee_id: emp.id, departments: [] });
+                                    setEmployeeSearch(`${emp.first_name} ${emp.last_name} - ${emp.employee_code}`);
+                                    setShowEmployeeDropdown(false);
+                                  }}
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-medium text-slate-900">
+                                      {emp.first_name} {emp.last_name}
+                                    </span>
+                                    <span className="text-xs text-slate-500">{emp.employee_code}</span>
+                                  </div>
+                                  {formData.employee_id === emp.id && (
+                                    <Check className="w-4 h-4 text-indigo-600" />
+                                  )}
+                                </button>
+                              ))
+                            ) : (
+                              <div className="px-3 py-4 text-sm text-slate-500 text-center">
+                                No se encontraron empleados
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div>
