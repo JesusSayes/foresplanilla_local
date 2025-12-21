@@ -10,12 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   DollarSign, FileText, Calendar, Users, Download, 
-  Eye, CheckCircle, AlertCircle, Plus, Search
+  Eye, CheckCircle, AlertCircle, Plus, Search, Lock, Edit2
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
+import ConceptsManager from "../components/payroll/ConceptsManager";
+import { createPageUrl } from "../utils";
 
 export default function PayrollManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -27,6 +29,9 @@ export default function PayrollManagement() {
   const [previewData, setPreviewData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [additionalConcepts, setAdditionalConcepts] = useState([]);
+  const [showConceptsFor, setShowConceptsFor] = useState(null);
+  const [selectedPayslipForClose, setSelectedPayslipForClose] = useState(null);
 
   const queryClient = useQueryClient();
 
@@ -82,19 +87,61 @@ export default function PayrollManagement() {
     },
   });
 
+  const { data: payrollConcepts = [] } = useQuery({
+    queryKey: ["payrollConcepts", selectedMonth, selectedYear],
+    queryFn: async () => {
+      return await base44.entities.PayrollConcept.filter({
+        month: selectedMonth,
+        year: selectedYear,
+        is_applied: false
+      });
+    },
+  });
+
   const createPayslipsMutation = useMutation({
     mutationFn: async (payslips) => {
-      return await base44.entities.Payslip.bulkCreate(payslips);
+      const createdPayslips = await base44.entities.Payslip.bulkCreate(payslips);
+      
+      // Marcar conceptos como aplicados
+      const conceptsToUpdate = additionalConcepts.map(c => ({
+        ...c,
+        is_applied: true,
+        payslip_id: createdPayslips.find(p => p.employee_id === c.employee_id)?.id
+      }));
+      
+      if (conceptsToUpdate.length > 0) {
+        await Promise.all(conceptsToUpdate.map(c => 
+          base44.entities.PayrollConcept.create(c)
+        ));
+      }
+      
+      return createdPayslips;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["payslips"]);
+      queryClient.invalidateQueries(["payrollConcepts"]);
       toast.success("Planilla generada exitosamente");
       setShowPreview(false);
       setPreviewData([]);
+      setAdditionalConcepts([]);
     },
     onError: (error) => {
       toast.error("Error al generar la planilla");
       console.error(error);
+    },
+  });
+
+  const updatePayslipStatusMutation = useMutation({
+    mutationFn: async ({ id, status }) => {
+      return await base44.entities.Payslip.update(id, { status });
+    },
+    onSuccess: (_, { status }) => {
+      queryClient.invalidateQueries(["payslips"]);
+      toast.success(`Planilla ${status === "Aprobada" ? "aprobada" : "marcada como pagada"}`);
+      setSelectedPayslipForClose(null);
+    },
+    onError: () => {
+      toast.error("Error al actualizar el estado");
     },
   });
 
@@ -133,6 +180,15 @@ export default function PayrollManagement() {
       const tardinessDiscount = lateRecords.length * (baseSalary / 30);
       const absenceDiscount = absentRecords.length * (baseSalary / 30);
 
+      // Conceptos adicionales
+      const empConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
+      const additionalIncome = empConcepts
+        .filter(c => c.concept_type === "Ingreso")
+        .reduce((sum, c) => sum + c.amount, 0);
+      const additionalDeductions = empConcepts
+        .filter(c => c.concept_type === "Descuento" || c.concept_type === "Aportación")
+        .reduce((sum, c) => sum + c.amount, 0);
+
       // AFP/ONP (aproximado 13%)
       const pensionDeduction = baseSalary * 0.13;
       
@@ -140,7 +196,7 @@ export default function PayrollManagement() {
       const healthInsurance = baseSalary * 0.09;
 
       // Total ingresos
-      const totalIncome = baseSalary;
+      const totalIncome = baseSalary + additionalIncome;
 
       // Buscar adelanto quincenal si es mensual
       let advanceDeduction = 0;
@@ -159,7 +215,7 @@ export default function PayrollManagement() {
       }
 
       // Total descuentos
-      const totalDeductions = pensionDeduction + healthInsurance + tardinessDiscount + absenceDiscount + advanceDeduction;
+      const totalDeductions = pensionDeduction + healthInsurance + tardinessDiscount + absenceDiscount + advanceDeduction + additionalDeductions;
 
       // Neto a pagar
       const netPay = totalIncome - totalDeductions;
@@ -179,7 +235,7 @@ export default function PayrollManagement() {
         base_salary: baseSalary,
         family_allowance: 0,
         overtime_pay: 0,
-        bonuses: 0,
+        bonuses: additionalIncome,
         commissions: 0,
         other_income: 0,
         total_income: totalIncome,
@@ -190,7 +246,7 @@ export default function PayrollManagement() {
         absence_discount: absenceDiscount,
         loan_deduction: 0,
         advance_deduction: advanceDeduction,
-        other_deductions: 0,
+        other_deductions: additionalDeductions,
         total_deductions: totalDeductions,
         net_pay: netPay,
         payment_date: format(new Date(selectedYear, selectedMonth - 1, payrollType === "Quincenal" ? 15 : 30), "yyyy-MM-dd"),
@@ -455,6 +511,17 @@ export default function PayrollManagement() {
                   <Eye className="w-4 h-4 mr-2" />
                   Vista Previa
                 </Button>
+
+                <div className="pt-4 border-t">
+                  <Button
+                    onClick={() => window.location.href = createPageUrl("PayrollConcepts")}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <Edit2 className="w-4 h-4 mr-2" />
+                    Gestionar Conceptos
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -497,54 +564,95 @@ export default function PayrollManagement() {
                   </div>
 
                   <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                    {previewData.map((payslip, index) => (
-                      <div key={index} className="p-4 border border-slate-200 rounded-lg">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h4 className="font-bold text-slate-900">
-                              {payslip.employee_code} - {payslip.employee_name}
-                            </h4>
-                            <p className="text-sm text-slate-600">{payslip.department}</p>
-                          </div>
-                          <Badge className="bg-indigo-100 text-indigo-700">
-                            {payslip.worked_days} días
-                          </Badge>
-                        </div>
+                    {previewData.map((payslip, index) => {
+                      const empConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === payslip.employee_id);
+                      const hasAdditionalConcepts = empConcepts.length > 0;
 
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p className="text-slate-600">Salario Base</p>
-                            <p className="font-semibold text-slate-900">
-                              S/ {payslip.base_salary.toFixed(2)}
-                            </p>
+                      return (
+                        <div key={index} className="p-4 border border-slate-200 rounded-lg">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-slate-900">
+                                  {payslip.employee_code} - {payslip.employee_name}
+                                </h4>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setShowConceptsFor(showConceptsFor === payslip.employee_id ? null : payslip.employee_id)}
+                                  className="ml-2"
+                                >
+                                  <Edit2 className="w-3 h-3 mr-1" />
+                                  Conceptos
+                                </Button>
+                              </div>
+                              <p className="text-sm text-slate-600">{payslip.department}</p>
+                            </div>
+                            <Badge className="bg-indigo-100 text-indigo-700">
+                              {payslip.worked_days} días
+                            </Badge>
                           </div>
-                          <div>
-                            <p className="text-slate-600">Total Ingresos</p>
-                            <p className="font-semibold text-green-600">
-                              S/ {payslip.total_income.toFixed(2)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-slate-600">Descuentos</p>
-                            <p className="font-semibold text-red-600">
-                              -S/ {payslip.total_deductions.toFixed(2)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-slate-600 font-bold">Neto a Pagar</p>
-                            <p className="font-bold text-indigo-600 text-lg">
-                              S/ {payslip.net_pay.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
 
-                        {payslip.advance_deduction > 0 && (
-                          <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
-                            Adelanto descontado: S/ {payslip.advance_deduction.toFixed(2)}
+                          {showConceptsFor === payslip.employee_id && (
+                            <div className="mb-3">
+                              <ConceptsManager
+                                employeeId={payslip.employee_id}
+                                employeeName={payslip.employee_name}
+                                month={selectedMonth}
+                                year={selectedYear}
+                                concepts={additionalConcepts}
+                                onAdd={(concept) => setAdditionalConcepts([...additionalConcepts, concept])}
+                                onRemove={(idx) => {
+                                  const filtered = additionalConcepts.filter((_, i) => i !== idx);
+                                  setAdditionalConcepts(filtered);
+                                  // Recalcular planilla
+                                  setTimeout(() => calculatePayroll(), 100);
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-slate-600">Salario Base</p>
+                              <p className="font-semibold text-slate-900">
+                                S/ {payslip.base_salary.toFixed(2)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-slate-600">Total Ingresos</p>
+                              <p className="font-semibold text-green-600">
+                                S/ {payslip.total_income.toFixed(2)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-slate-600">Descuentos</p>
+                              <p className="font-semibold text-red-600">
+                                -S/ {payslip.total_deductions.toFixed(2)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-slate-600 font-bold">Neto a Pagar</p>
+                              <p className="font-bold text-indigo-600 text-lg">
+                                S/ {payslip.net_pay.toFixed(2)}
+                              </p>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    ))}
+
+                          {payslip.advance_deduction > 0 && (
+                            <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+                              Adelanto descontado: S/ {payslip.advance_deduction.toFixed(2)}
+                            </div>
+                          )}
+
+                          {hasAdditionalConcepts && (
+                            <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                              ✓ {empConcepts.length} concepto(s) adicional(es) aplicado(s)
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <div className="mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
@@ -618,25 +726,49 @@ export default function PayrollManagement() {
                                           </Badge>
                                         </div>
                                         <div className="grid grid-cols-3 gap-4 text-sm">
-                                          <div>
-                                            <p className="text-slate-600">Neto a Pagar</p>
-                                            <p className="font-bold text-indigo-600">
-                                              S/ {payslip.net_pay.toFixed(2)}
-                                            </p>
-                                          </div>
-                                          <div>
-                                            <p className="text-slate-600">Días Trabajados</p>
-                                            <p className="font-semibold text-slate-900">{payslip.worked_days}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-slate-600">Fecha de Pago</p>
-                                            <p className="font-semibold text-slate-900">
-                                              {format(new Date(payslip.payment_date), 'dd/MM/yyyy')}
-                                            </p>
-                                          </div>
+                                         <div>
+                                           <p className="text-slate-600">Neto a Pagar</p>
+                                           <p className="font-bold text-indigo-600">
+                                             S/ {payslip.net_pay.toFixed(2)}
+                                           </p>
+                                         </div>
+                                         <div>
+                                           <p className="text-slate-600">Días Trabajados</p>
+                                           <p className="font-semibold text-slate-900">{payslip.worked_days}</p>
+                                         </div>
+                                         <div>
+                                           <p className="text-slate-600">Fecha de Pago</p>
+                                           <p className="font-semibold text-slate-900">
+                                             {format(new Date(payslip.payment_date), 'dd/MM/yyyy')}
+                                           </p>
+                                         </div>
                                         </div>
-                                      </div>
-                                    </div>
+                                        </div>
+                                        {payslip.status === "Calculada" && (
+                                        <div className="mt-3 flex gap-2">
+                                         <Button
+                                           size="sm"
+                                           onClick={() => updatePayslipStatusMutation.mutate({ id: payslip.id, status: "Aprobada" })}
+                                           className="flex-1 bg-blue-600 hover:bg-blue-700"
+                                         >
+                                           <CheckCircle className="w-3 h-3 mr-1" />
+                                           Aprobar
+                                         </Button>
+                                        </div>
+                                        )}
+                                        {payslip.status === "Aprobada" && (
+                                        <div className="mt-3 flex gap-2">
+                                         <Button
+                                           size="sm"
+                                           onClick={() => updatePayslipStatusMutation.mutate({ id: payslip.id, status: "Pagada" })}
+                                           className="flex-1 bg-green-600 hover:bg-green-700"
+                                         >
+                                           <Lock className="w-3 h-3 mr-1" />
+                                           Marcar como Pagada
+                                         </Button>
+                                        </div>
+                                        )}
+                                        </div>
                                   </div>
                                 );
                               })}
