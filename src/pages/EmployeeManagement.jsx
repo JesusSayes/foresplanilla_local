@@ -894,8 +894,10 @@ export default function EmployeeManagement() {
                       <Input
                         type="number"
                         value={formData.base_salary}
-                        onChange={(e) => setFormData({ ...formData, base_salary: parseFloat(e.target.value) })}
+                        readOnly
+                        className="bg-slate-100 cursor-not-allowed"
                       />
+                      <p className="text-xs text-slate-500 mt-1">Se obtiene del último contrato vigente</p>
                     </div>
                   </div>
 
