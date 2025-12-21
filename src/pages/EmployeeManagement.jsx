@@ -12,8 +12,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Users, Plus, Edit, Eye, UserX, UserCheck, Search, 
-  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin
+  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield
 } from "lucide-react";
+import { createPageUrl } from "../utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -309,7 +310,7 @@ export default function EmployeeManagement() {
           </Card>
 
           <Card className="border-0 shadow-lg">
-            <CardContent className="p-6 flex items-center justify-center">
+            <CardContent className="p-6 space-y-3">
               {hasPermission("employees.create") && (
                 <Button
                   onClick={handleCreate}
@@ -317,6 +318,16 @@ export default function EmployeeManagement() {
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Nuevo Empleado
+                </Button>
+              )}
+              {hasPermission("employees.import") && (
+                <Button
+                  onClick={() => window.location.href = createPageUrl("ImportEmployees")}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Shield className="w-4 h-4 mr-2" />
+                  Importar Empleados
                 </Button>
               )}
             </CardContent>
