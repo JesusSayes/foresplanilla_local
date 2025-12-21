@@ -16,6 +16,7 @@ import {
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInMinutes, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import ClockInOutWidget from "../components/attendance/ClockInOutWidget";
 
 export default function Attendance() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -87,7 +88,7 @@ export default function Attendance() {
     enabled: !!employee?.id,
   });
 
-  const { data: attendanceRecords = [], isLoading } = useQuery({
+  const { data: attendanceRecords = [], isLoading, refetch: refetchRecords } = useQuery({
     queryKey: ["attendanceRecords", employee?.id, dateRange, selectedDate],
     queryFn: async () => {
       if (!employee?.id) return [];
@@ -113,6 +114,10 @@ export default function Attendance() {
     },
     enabled: !!employee?.id,
   });
+
+  const todayRecord = attendanceRecords.find(
+    r => r.date === format(new Date(), "yyyy-MM-dd")
+  );
 
   const { data: incidents = [] } = useQuery({
     queryKey: ["attendanceIncidents", employee?.id],
@@ -246,6 +251,15 @@ export default function Attendance() {
 
   const stats = calculateStats();
 
+  const handleClockAction = async (data, isUpdate = false) => {
+    if (isUpdate) {
+      await base44.entities.AttendanceRecord.update(data.id, data);
+    } else {
+      await base44.entities.AttendanceRecord.create(data);
+    }
+    refetchRecords();
+  };
+
   if (!employee) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -322,6 +336,16 @@ export default function Attendance() {
               <p className="text-slate-600 text-sm">Promedio diario</p>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Clock In/Out Widget */}
+        <div className="mb-8">
+          <ClockInOutWidget
+            employee={employee}
+            workSchedule={workSchedule}
+            todayRecord={todayRecord}
+            onClockAction={handleClockAction}
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

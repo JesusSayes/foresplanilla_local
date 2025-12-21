@@ -8,6 +8,7 @@ import Payslips from './pages/Payslips';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationRequest from './pages/VacationRequest';
 import ImportEmployees from './pages/ImportEmployees';
+import AttendanceReports from './pages/AttendanceReports';
 import __Layout from './Layout.jsx';
 
 
@@ -22,6 +23,7 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationRequest": VacationRequest,
     "ImportEmployees": ImportEmployees,
+    "AttendanceReports": AttendanceReports,
 }
 
 export const pagesConfig = {
