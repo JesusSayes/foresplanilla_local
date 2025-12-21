@@ -69,6 +69,7 @@ export default function Layout({ children, currentPageName }) {
         submenu: [
           { name: "Ver Empleados", path: "EmployeeManagement" },
           { name: "Organigrama", path: "OrgChart" },
+          { name: "Gestión Contratos", path: "ContractManagement" },
           { name: "Importar Empleados", path: "ImportEmployees" },
           { name: "Aprobar Vacaciones", path: "ManagerApprovals" },
           { name: "Calendario Vacaciones", path: "VacationCalendar" },
