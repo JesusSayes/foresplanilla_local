@@ -22,8 +22,8 @@ const PREDEFINED_CONCEPTS = {
       isDefault: true, 
       isCompulsory: true, 
       is_dynamic: true,
-      calculation_formula: "base_salary",
-      description: "Salario base del contrato vigente"
+      calculation_formula: "(base_salary / 30) * worked_days",
+      description: "Salario base proporcional a días trabajados (30 días = salario completo)"
     },
     { 
       name: "Asignación Familiar", 
