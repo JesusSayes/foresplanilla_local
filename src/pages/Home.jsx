@@ -221,7 +221,7 @@ export default function Home() {
 
           <Button
             size="lg"
-            className="mt-8 bg-white text-indigo-600 hover:bg-white/90 shadow-xl text-lg px-8 py-6"
+            className="mt-8 bg-white text-emerald-600 hover:bg-white/90 shadow-2xl text-lg px-8 py-6 hover:scale-105 transition-all duration-300 font-bold"
             onClick={() => navigate(createPageUrl("Dashboard"))}
           >
             Ir al Dashboard
