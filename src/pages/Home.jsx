@@ -251,26 +251,28 @@ export default function Home() {
                   transition={{ duration: 0.4, delay: 0.3 + index * 0.1 }}
                 >
                   <Card
-                    className="group cursor-pointer border-0 bg-white/10 backdrop-blur-lg hover:bg-white/20 transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+                    className="group cursor-pointer border-0 bg-white hover:shadow-2xl transition-all duration-300 hover:scale-105 overflow-hidden"
                     onClick={() => navigate(createPageUrl(feature.link))}
                   >
-                    <CardContent className="p-6">
-                      <div className={`w-14 h-14 ${feature.color} rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
-                        <Icon className="w-7 h-7 text-white" />
+                    <CardContent className="p-6 relative">
+                      <div className={`w-16 h-16 bg-gradient-to-br ${feature.color} rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-xl`}>
+                        <Icon className="w-8 h-8 text-white" />
                       </div>
                       
-                      <h4 className="text-xl font-bold text-white mb-2">
+                      <h4 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-emerald-600 transition-colors">
                         {feature.title}
                       </h4>
                       
-                      <p className="text-white/70 text-sm mb-4">
+                      <p className="text-slate-600 text-sm mb-4">
                         {feature.description}
                       </p>
                       
-                      <div className="flex items-center text-white font-medium text-sm group-hover:gap-2 transition-all">
+                      <div className="flex items-center text-emerald-600 font-bold text-sm group-hover:gap-2 transition-all">
                         Acceder
-                        <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                        <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-2 transition-transform" />
                       </div>
+
+                      <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
                     </CardContent>
                   </Card>
                 </motion.div>
