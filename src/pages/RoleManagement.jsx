@@ -227,15 +227,51 @@ export default function RoleManagement() {
   );
 
   const permissionCategories = {
-    "Empleados": ["employees.view", "employees.edit", "employees.create", "employees.delete", "employees.import"],
-    "Asistencia": ["attendance.view_own", "attendance.view_all", "attendance.view_department", "attendance.edit", "attendance.approve_incidents", "attendance.manage"],
-    "Vacaciones": ["vacations.view_own", "vacations.view_all", "vacations.view_department", "vacations.approve", "vacations.manage"],
-    "Nómina": ["payroll.view_own", "payroll.view_all", "payroll.edit", "payroll.create", "payroll.delete"],
-    "Certificados": ["certificates.view_own", "certificates.view_all", "certificates.approve", "certificates.create"],
-    "Horarios": ["schedules.view", "schedules.edit", "schedules.create"],
-    "Feriados": ["holidays.view", "holidays.manage"],
-    "Reportes": ["reports.view", "reports.export"],
-    "Administración": ["roles.view", "roles.manage", "system.admin"],
+    "Empleados": [
+      "employees.view", "employees.edit", "employees.create", "employees.delete", 
+      "employees.import", "employees.export", "employees.change_status"
+    ],
+    "Asistencia": [
+      "attendance.view_own", "attendance.view_all", "attendance.view_department", 
+      "attendance.edit", "attendance.approve_incidents", "attendance.manage", "attendance.export"
+    ],
+    "Vacaciones": [
+      "vacations.view_own", "vacations.view_all", "vacations.view_department", 
+      "vacations.approve", "vacations.manage", "vacations.calendar"
+    ],
+    "Nómina": [
+      "payroll.view_own", "payroll.view_all", "payroll.edit", "payroll.create", 
+      "payroll.delete", "payroll.calculate", "payroll.approve"
+    ],
+    "Certificados": [
+      "certificates.view_own", "certificates.view_all", "certificates.approve", 
+      "certificates.create", "certificates.request"
+    ],
+    "Horarios": [
+      "schedules.view", "schedules.edit", "schedules.create", "schedules.delete", "schedules.assign"
+    ],
+    "Feriados": [
+      "holidays.view", "holidays.manage", "holidays.create", "holidays.edit", "holidays.delete"
+    ],
+    "Sedes": [
+      "sites.view", "sites.create", "sites.edit", "sites.delete", "sites.manage"
+    ],
+    "Departamentos": [
+      "departments.view", "departments.create", "departments.edit", "departments.delete", "departments.manage"
+    ],
+    "Cargos/Posiciones": [
+      "positions.view", "positions.create", "positions.edit", "positions.delete", "positions.manage"
+    ],
+    "Bancos": [
+      "banks.view", "banks.create", "banks.edit", "banks.delete"
+    ],
+    "Reportes": [
+      "reports.view", "reports.export", "reports.attendance", "reports.payroll", 
+      "reports.vacations", "reports.employees"
+    ],
+    "Administración": [
+      "roles.view", "roles.manage", "roles.assign", "system.admin", "system.settings"
+    ],
   };
 
   if (!employee) {
