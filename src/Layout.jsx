@@ -5,7 +5,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { 
   LayoutDashboard, FileText, Calendar, Clock, 
-  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown, TrendingUp
+  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown
 } from "lucide-react";
 
 export default function Layout({ children, currentPageName }) {
@@ -49,7 +49,6 @@ export default function Layout({ children, currentPageName }) {
       { name: "Mis Boletas", icon: FileText, path: "Payslips" },
       { name: "Mis Vacaciones", icon: Calendar, path: "VacationRequest" },
       { name: "Mi Asistencia", icon: Clock, path: "Attendance" },
-      { name: "Mi Desempeño", icon: TrendingUp, path: "MyPerformance" },
       { name: "Certificados", icon: Award, path: "Certificates" },
       { name: "Mi Perfil", icon: User, path: "MyProfile" },
     ];
@@ -59,7 +58,6 @@ export default function Layout({ children, currentPageName }) {
       { name: "Reportes Asistencia", icon: Clock, path: "AttendanceReports" },
       { name: "Aprobar Vacaciones", icon: CheckSquare, path: "ManagerApprovals" },
       { name: "Calendario Equipo", icon: CalendarDays, path: "VacationCalendar" },
-      { name: "Gestión Desempeño", icon: TrendingUp, path: "PerformanceManagement" },
     ];
 
     const adminMenu = [
@@ -90,7 +88,6 @@ export default function Layout({ children, currentPageName }) {
         ]
       },
       { name: "Gestión Planillas", icon: FileText, path: "PayrollManagement" },
-      { name: "Gestión Desempeño", icon: TrendingUp, path: "PerformanceManagement" },
       { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
       { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
       ];
