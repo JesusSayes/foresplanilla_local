@@ -69,6 +69,7 @@ export default function Layout({ children, currentPageName }) {
         submenu: [
           { name: "Ver Empleados", path: "EmployeeManagement" },
           { name: "Importar Empleados", path: "ImportEmployees" },
+          { name: "Aprobar Vacaciones", path: "ManagerApprovals" },
           { name: "Calendario Vacaciones", path: "VacationCalendar" },
         ]
       },
@@ -78,7 +79,6 @@ export default function Layout({ children, currentPageName }) {
       { name: "Reportes Asistencia", icon: Clock, path: "AttendanceReports" },
       { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
       { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
-      { name: "Aprobar Vacaciones", icon: CheckSquare, path: "ManagerApprovals" },
       { name: "Boletas", icon: FileText, path: "Payslips" },
       { name: "Vacaciones", icon: Calendar, path: "VacationRequest" },
       { name: "Asistencia", icon: Clock, path: "Attendance" },
