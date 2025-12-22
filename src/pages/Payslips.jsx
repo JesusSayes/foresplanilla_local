@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   FileText, Download, Search, Calendar as CalendarIcon,
-  TrendingUp, TrendingDown, Filter, Eye
+  TrendingUp, TrendingDown, Filter, Eye, Settings
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { createPageUrl } from "../utils";
 
 export default function Payslips() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -114,11 +115,23 @@ export default function Payslips() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Mis Boletas de Pago</h1>
-          <p className="text-slate-600 text-lg">
-            Consulta y descarga tus boletas de remuneración
-          </p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-4xl font-bold text-slate-900 mb-2">Mis Boletas de Pago</h1>
+            <p className="text-slate-600 text-lg">
+              Consulta y descarga tus boletas de remuneración
+            </p>
+          </div>
+          {employee?.role === "admin" && (
+            <Button
+              onClick={() => window.location.href = createPageUrl("PayslipTemplateConfig")}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              Configurar Boletas
+            </Button>
+          )}
         </div>
 
         {/* Statistics */}
