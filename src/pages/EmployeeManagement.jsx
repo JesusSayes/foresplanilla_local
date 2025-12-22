@@ -443,7 +443,7 @@ export default function EmployeeManagement() {
                           emp.document_number.includes(searchTerm);
     const matchesStatus = statusFilter === "all" || emp.status === statusFilter;
     const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
-    const matchesSite = siteFilter === "all" || emp.site === siteFilter;
+    const matchesSite = siteFilter === "all" || emp.site === siteFilter || (siteFilter === "sin_sede" && !emp.site);
     return matchesSearch && matchesStatus && matchesDept && matchesSite;
   });
 
@@ -602,6 +602,7 @@ export default function EmployeeManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="sin_sede">Sin sede</SelectItem>
                   {sites.map(site => (
                     <SelectItem key={site.id} value={site.name}>{site.code}</SelectItem>
                   ))}
