@@ -697,9 +697,9 @@ export default function PayrollConcepts() {
                     <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                       <h3 className="font-bold text-slate-900 mb-1 flex items-center gap-2">
                         <CheckCircle className="w-5 h-5 text-green-600" />
-                        Conceptos Incorporados
+                        Conceptos Incorporados (Todos los Empleados)
                       </h3>
-                      <p className="text-xs text-slate-600 mb-4">Configurados para la planilla general</p>
+                      <p className="text-xs text-slate-600 mb-4">Estos conceptos se aplican a todos los empleados</p>
                       
                       <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
                         {generalConcepts.length === 0 ? (
@@ -834,7 +834,7 @@ export default function PayrollConcepts() {
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-bold text-slate-900">
-                        Conceptos Asignados
+                        Conceptos Individuales (Solo este empleado)
                       </h3>
                       <Button size="sm" onClick={() => setShowForm(true)}>
                         <Plus className="w-4 h-4 mr-2" />
