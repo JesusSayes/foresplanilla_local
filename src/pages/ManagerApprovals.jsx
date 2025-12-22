@@ -21,6 +21,7 @@ export default function ManagerApprovals() {
   const [filterStatus, setFilterStatus] = useState("Pendiente");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [reviewAction, setReviewAction] = useState(null);
   const [reviewForm, setReviewForm] = useState({
     action: "",
     comments: "",
@@ -143,6 +144,12 @@ export default function ManagerApprovals() {
 
   const handleReview = (action) => {
     if (!selectedRequest) return;
+
+    // Validar comentario solo para rechazo
+    if (action === "reject" && !reviewForm.comments.trim()) {
+      toast.error("El motivo del rechazo es obligatorio");
+      return;
+    }
 
     const updateData = {
       status: action === "approve" ? "Aprobada" : "Rechazada",
@@ -390,7 +397,10 @@ export default function ManagerApprovals() {
                           <Button
                             variant="outline"
                             className="flex-1 text-red-600 hover:bg-red-50"
-                            onClick={() => setSelectedRequest(request)}
+                            onClick={() => {
+                              setSelectedRequest(request);
+                              setReviewAction("reject");
+                            }}
                           >
                             <XCircle className="w-4 h-4 mr-2" />
                             Rechazar
@@ -398,16 +408,8 @@ export default function ManagerApprovals() {
                           <Button
                             className="flex-1 bg-green-600 hover:bg-green-700"
                             onClick={() => {
-                              const updateData = {
-                                status: "Aprobada",
-                                approved_by: `${employee.first_name} ${employee.last_name}`,
-                                approved_date: format(new Date(), "yyyy-MM-dd"),
-                              };
-                              updateRequestMutation.mutate({
-                                id: request.id,
-                                data: updateData,
-                                request: request,
-                              });
+                              setSelectedRequest(request);
+                              setReviewAction("approve");
                             }}
                           >
                             <CheckCircle className="w-4 h-4 mr-2" />
@@ -423,12 +425,13 @@ export default function ManagerApprovals() {
           </div>
         )}
 
-        {/* Rejection Modal */}
+        {/* Review Modal */}
         {selectedRequest && (
           <div 
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             onClick={() => {
               setSelectedRequest(null);
+              setReviewAction(null);
               setReviewForm({ action: "", comments: "" });
             }}
           >
@@ -436,16 +439,17 @@ export default function ManagerApprovals() {
               className="max-w-lg w-full"
               onClick={(e) => e.stopPropagation()}
             >
-              <CardHeader className="border-b">
+              <CardHeader className={`border-b ${reviewAction === "approve" ? "bg-green-50" : "bg-red-50"}`}>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-xl font-bold">
-                    Rechazar Solicitud
+                    {reviewAction === "approve" ? "Aprobar Solicitud" : "Rechazar Solicitud"}
                   </CardTitle>
                   <Button 
                     variant="ghost" 
                     size="icon"
                     onClick={() => {
                       setSelectedRequest(null);
+                      setReviewAction(null);
                       setReviewForm({ action: "", comments: "" });
                     }}
                   >
@@ -456,22 +460,32 @@ export default function ManagerApprovals() {
               <CardContent className="p-6">
                 <div className="space-y-6">
                   <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-slate-600 mb-1">
                       <strong>Empleado:</strong> {getEmployeeName(selectedRequest.employee_id)}
                     </p>
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-slate-600 mb-1">
+                      <strong>Tipo:</strong> {selectedRequest.request_type}
+                    </p>
+                    <p className="text-sm text-slate-600 mb-1">
                       <strong>Periodo:</strong> {format(new Date(selectedRequest.start_date), "dd MMM", { locale: es })} - {format(new Date(selectedRequest.end_date), "dd MMM yyyy", { locale: es })}
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      <strong>Días:</strong> {selectedRequest.total_days} días ({selectedRequest.business_days} hábiles)
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-semibold text-slate-900 mb-2">
-                      Motivo del rechazo
+                      {reviewAction === "approve" ? "Comentario (Opcional)" : "Motivo del rechazo *"}
                     </label>
                     <Textarea
                       value={reviewForm.comments}
                       onChange={(e) => setReviewForm({ ...reviewForm, comments: e.target.value })}
-                      placeholder="Explica por qué se rechaza esta solicitud..."
+                      placeholder={
+                        reviewAction === "approve" 
+                          ? "Ej: Aprobado. Que disfrute sus vacaciones..." 
+                          : "Explica por qué se rechaza esta solicitud..."
+                      }
                       rows={4}
                     />
                   </div>
@@ -482,17 +496,20 @@ export default function ManagerApprovals() {
                       className="flex-1"
                       onClick={() => {
                         setSelectedRequest(null);
+                        setReviewAction(null);
                         setReviewForm({ action: "", comments: "" });
                       }}
                     >
                       Cancelar
                     </Button>
                     <Button
-                      className="flex-1 bg-red-600 hover:bg-red-700"
-                      onClick={() => handleReview("reject")}
-                      disabled={!reviewForm.comments.trim() || updateRequestMutation.isPending}
+                      className={`flex-1 ${reviewAction === "approve" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}
+                      onClick={() => handleReview(reviewAction)}
+                      disabled={updateRequestMutation.isPending || (reviewAction === "reject" && !reviewForm.comments.trim())}
                     >
-                      {updateRequestMutation.isPending ? "Rechazando..." : "Confirmar Rechazo"}
+                      {updateRequestMutation.isPending 
+                        ? (reviewAction === "approve" ? "Aprobando..." : "Rechazando...") 
+                        : (reviewAction === "approve" ? "Confirmar Aprobación" : "Confirmar Rechazo")}
                     </Button>
                   </div>
                 </div>
