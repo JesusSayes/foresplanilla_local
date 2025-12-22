@@ -103,14 +103,23 @@ export default function Layout({ children, currentPageName }) {
       { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
       ];
 
+      const superAdminMenu = [
+      ...adminMenu,
+      { name: "Inicializar Roles", icon: Shield, path: "SystemRoleInitializer" },
+      ];
+
+    if (role === "super_admin") return superAdminMenu;
     if (role === "admin") return adminMenu;
     if (role === "manager") return managerMenu;
+    if (role === "hr_readonly") return adminMenu; // RRHH Solo lectura ve todo pero sin editar
     return employeeMenu;
   };
 
   const getRoleBadge = (role) => {
     const badges = {
+      "super_admin": { text: "Super Admin", color: "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-400" },
       "admin": { text: "Administrador", color: "bg-purple-100 text-purple-700 border-purple-300" },
+      "hr_readonly": { text: "RRHH", color: "bg-cyan-100 text-cyan-700 border-cyan-300" },
       "manager": { text: "Manager", color: "bg-blue-100 text-blue-700 border-blue-300" },
       "empleado": { text: "Empleado", color: "bg-green-100 text-green-700 border-green-300" },
     };

@@ -22,6 +22,7 @@ import ScheduleManagement from './pages/ScheduleManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationRequest from './pages/VacationRequest';
 import VacationManagement from './pages/VacationManagement';
+import SystemRoleInitializer from './pages/SystemRoleInitializer';
 import __Layout from './Layout.jsx';
 
 
@@ -50,6 +51,7 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationRequest": VacationRequest,
     "VacationManagement": VacationManagement,
+    "SystemRoleInitializer": SystemRoleInitializer,
 }
 
 export const pagesConfig = {
