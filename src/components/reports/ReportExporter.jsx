@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { FileDown, FileText } from "lucide-react";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
 
 export function exportToCSV(data, columns, reportName) {
   if (!data || data.length === 0) {
@@ -37,40 +36,56 @@ export function exportToPDF(data, columns, reportName, reportType) {
     return;
   }
 
-  const doc = new jsPDF('l', 'mm', 'a4');
+  const doc = new jsPDF('p', 'mm', 'a4');
   
   // Header
-  doc.setFontSize(18);
+  doc.setFontSize(16);
   doc.setFont(undefined, 'bold');
   doc.text(reportName, 14, 15);
   
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont(undefined, 'normal');
   doc.text(`Tipo: ${reportType}`, 14, 22);
   doc.text(`Generado: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 27);
   doc.text(`Total registros: ${data.length}`, 14, 32);
 
-  // Table
-  const headers = columns.map(col => col.label || col.id);
-  const rows = data.map(row => 
-    columns.map(col => {
-      const value = row[col.id];
-      if (value === null || value === undefined) return '';
-      if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-      if (typeof value === 'object') return JSON.stringify(value);
-      return String(value);
-    })
-  );
-
-  doc.autoTable({
-    head: [headers],
-    body: rows,
-    startY: 37,
-    styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    margin: { left: 14, right: 14 },
+  // Simple table rendering
+  let y = 40;
+  const lineHeight = 6;
+  const colWidth = 180 / Math.min(columns.length, 5);
+  
+  // Headers
+  doc.setFontSize(8);
+  doc.setFont(undefined, 'bold');
+  columns.slice(0, 5).forEach((col, i) => {
+    doc.text(col.label || col.id, 14 + (i * colWidth), y);
   });
+  
+  y += lineHeight;
+  doc.setFont(undefined, 'normal');
+  
+  // Rows (limited to first 50 for PDF)
+  data.slice(0, 50).forEach(row => {
+    if (y > 280) return; // Page limit
+    
+    columns.slice(0, 5).forEach((col, i) => {
+      const value = row[col.id];
+      let displayValue = '';
+      if (value === null || value === undefined) displayValue = '';
+      else if (typeof value === 'boolean') displayValue = value ? 'Sí' : 'No';
+      else if (typeof value === 'object') displayValue = JSON.stringify(value).substring(0, 20);
+      else displayValue = String(value).substring(0, 30);
+      
+      doc.text(displayValue, 14 + (i * colWidth), y);
+    });
+    y += lineHeight;
+  });
+  
+  if (data.length > 50) {
+    y += 5;
+    doc.setFontSize(7);
+    doc.text(`Nota: Mostrando primeros 50 registros de ${data.length}. Use CSV para exportar todos.`, 14, y);
+  }
 
   doc.save(`${reportName}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
 }
