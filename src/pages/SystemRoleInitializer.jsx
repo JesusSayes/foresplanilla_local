@@ -165,7 +165,7 @@ export default function SystemRoleInitializer() {
     },
   });
 
-  if (!employee || employee.role !== "super_admin" && employee.role !== "admin") {
+  if (!employee || (employee.role !== "super_admin" && employee.role !== "admin")) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <Card className="max-w-md">

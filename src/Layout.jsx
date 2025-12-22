@@ -101,11 +101,11 @@ export default function Layout({ children, currentPageName }) {
       },
       { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
       { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
+      { name: "Inicializar Roles Sistema", icon: Shield, path: "SystemRoleInitializer" },
       ];
 
       const superAdminMenu = [
       ...adminMenu,
-      { name: "Inicializar Roles", icon: Shield, path: "SystemRoleInitializer" },
       ];
 
     if (role === "super_admin") return superAdminMenu;
