@@ -314,24 +314,43 @@ export default function VacationManagement() {
                           </Button>
                         </div>
 
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-slate-600">Días Disponibles</span>
-                            <span className="font-bold text-green-600">{balance.available} días</span>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs text-slate-600 mb-1">Días Disponibles</p>
+                              <p className="text-2xl font-bold text-green-600">{balance.available} días</p>
+                            </div>
+                            <div className="text-right">
+                              <Badge className={
+                                balance.available === 0 ? "bg-red-100 text-red-700" :
+                                balance.available < 10 ? "bg-amber-100 text-amber-700" :
+                                "bg-green-100 text-green-700"
+                              }>
+                                {balance.available === 0 ? "Sin saldo" :
+                                 balance.available < 10 ? "Saldo bajo" :
+                                 "Disponible"}
+                              </Badge>
+                            </div>
                           </div>
+                          
                           <Progress value={percentage} className="h-2" />
-                          <div className="grid grid-cols-3 gap-4 text-xs text-slate-600">
-                            <div>
-                              <p>Total</p>
-                              <p className="font-semibold text-slate-900">{balance.total}</p>
+                          
+                          <div className="grid grid-cols-4 gap-3 text-xs">
+                            <div className="bg-slate-50 rounded p-2 text-center">
+                              <p className="text-slate-600 mb-1">Total</p>
+                              <p className="font-bold text-slate-900 text-lg">{balance.total}</p>
                             </div>
-                            <div>
-                              <p>Tomados</p>
-                              <p className="font-semibold text-blue-600">{balance.taken}</p>
+                            <div className="bg-blue-50 rounded p-2 text-center">
+                              <p className="text-blue-600 mb-1">Tomados</p>
+                              <p className="font-bold text-blue-700 text-lg">{balance.taken}</p>
                             </div>
-                            <div>
-                              <p>Pendientes</p>
-                              <p className="font-semibold text-green-600">{balance.pending}</p>
+                            <div className="bg-green-50 rounded p-2 text-center">
+                              <p className="text-green-600 mb-1">Disponibles</p>
+                              <p className="font-bold text-green-700 text-lg">{balance.available}</p>
+                            </div>
+                            <div className="bg-purple-50 rounded p-2 text-center">
+                              <p className="text-purple-600 mb-1">Progreso</p>
+                              <p className="font-bold text-purple-700 text-lg">{Math.round(percentage)}%</p>
                             </div>
                           </div>
                         </div>
