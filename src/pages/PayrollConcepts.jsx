@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   DollarSign, Plus, Trash2, Search, TrendingUp, 
-  TrendingDown, Users, AlertCircle, Edit2, CheckCircle
+  TrendingDown, Users, AlertCircle, Edit2, CheckCircle, User
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -798,113 +798,289 @@ export default function PayrollConcepts() {
 
           {/* Individual Configuration */}
           <TabsContent value="individual" className="space-y-6">
+            {/* Employee Search Card */}
             <Card className="border-0 shadow-lg">
-              <CardHeader className="border-b">
-                <CardTitle className="text-xl font-bold">Conceptos por Empleado</CardTitle>
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-bold">Seleccionar Empleado</CardTitle>
+                  {selectedEmployee && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedEmployee(null)}
+                    >
+                      Cambiar Empleado
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <Label>Seleccionar Empleado</Label>
-                  <div className="flex gap-3 mt-2">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                {!selectedEmployee ? (
+                  <div>
+                    <div className="relative mb-4">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
                       <Input
-                        placeholder="Buscar empleado..."
+                        placeholder="Buscar por nombre, código o departamento..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9"
+                        className="pl-10 h-12 text-base"
                       />
                     </div>
-                    <Select value={selectedEmployee || ""} onValueChange={setSelectedEmployee}>
-                      <SelectTrigger className="w-64">
-                        <SelectValue placeholder="Seleccionar empleado" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredEmployees.map(emp => (
-                          <SelectItem key={emp.id} value={emp.id}>
-                            {emp.employee_code} - {emp.first_name} {emp.last_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
 
-                {selectedEmployee && (
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-slate-900">
-                        Conceptos Individuales (Solo este empleado)
-                      </h3>
-                      <Button size="sm" onClick={() => setShowForm(true)}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Agregar Manual
-                      </Button>
-                    </div>
-
-                    {individualConcepts.length === 0 ? (
-                      <div className="text-center py-8 text-slate-500">
-                        No hay conceptos asignados a este empleado
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {individualConcepts.map(concept => (
-                          <div key={concept.id} className="p-3 border border-slate-200 rounded-lg flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                {concept.concept_type === "Ingreso" ? (
-                                  <TrendingUp className="w-4 h-4 text-green-600" />
-                                ) : (
-                                  <TrendingDown className="w-4 h-4 text-red-600" />
-                                )}
-                                <span className="font-semibold text-slate-900">{concept.concept_name}</span>
-                                <Badge className={
-                                  concept.concept_type === "Ingreso" 
-                                    ? "bg-green-100 text-green-700" 
-                                    : "bg-red-100 text-red-700"
-                                }>
-                                  {concept.concept_type}
-                                </Badge>
-                                {concept.is_recurring && (
-                                  <Badge className="bg-blue-100 text-blue-700">Recurrente</Badge>
-                                )}
-                              </div>
-                              {concept.is_dynamic ? (
-                                <div className="mt-1">
-                                  <Badge className="bg-purple-100 text-purple-700 text-xs">
-                                    Dinámico
-                                  </Badge>
-                                  <p className="text-xs text-slate-600 mt-1 font-mono">
-                                    {concept.calculation_formula}
-                                  </p>
-                                </div>
-                              ) : (
-                                <p className={`font-bold ${
-                                  concept.concept_type === "Ingreso" ? "text-green-600" : "text-red-600"
-                                }`}>
-                                  S/ {concept.amount.toFixed(2)}
-                                </p>
-                              )}
-                              {concept.notes && (
-                                <p className="text-xs text-slate-600 mt-1">{concept.notes}</p>
-                              )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+                      {filteredEmployees.map(emp => (
+                        <button
+                          key={emp.id}
+                          onClick={() => setSelectedEmployee(emp.id)}
+                          className="p-4 border-2 border-slate-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                              <Users className="w-5 h-5 text-indigo-600" />
                             </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => deleteConceptMutation.mutate(concept.id)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <div className="flex-1">
+                              <p className="font-semibold text-slate-900">
+                                {emp.first_name} {emp.last_name}
+                              </p>
+                              <p className="text-xs text-slate-600">
+                                {emp.employee_code} • {emp.department_name || 'Sin departamento'}
+                              </p>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <div className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center">
+                      <Users className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-slate-900 text-lg">
+                        {allEmployees.find(e => e.id === selectedEmployee)?.first_name} {allEmployees.find(e => e.id === selectedEmployee)?.last_name}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {allEmployees.find(e => e.id === selectedEmployee)?.employee_code} • {allEmployees.find(e => e.id === selectedEmployee)?.department_name}
+                      </p>
+                    </div>
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* Concepts Display - Only if employee is selected */}
+            {selectedEmployee && (
+              <>
+                {/* General Concepts Applicable */}
+                <Card className="border-0 shadow-lg">
+                  <CardHeader className="border-b bg-green-50/50">
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      Conceptos Generales Aplicables
+                    </CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Estos conceptos se aplicarán automáticamente a este empleado
+                    </p>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    {generalConcepts.length === 0 ? (
+                      <div className="text-center py-8 text-slate-500">
+                        <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <p>No hay conceptos generales configurados</p>
+                        <p className="text-xs mt-1">Ve a la pestaña "Configuración General" para agregar conceptos</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {generalConcepts.map(concept => (
+                          <div key={concept.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <div className="flex items-center gap-2 mb-2">
+                              {concept.concept_type === "Ingreso" ? (
+                                <TrendingUp className="w-4 h-4 text-green-600" />
+                              ) : concept.concept_type === "Aportación" ? (
+                                <Users className="w-4 h-4 text-blue-600" />
+                              ) : (
+                                <TrendingDown className="w-4 h-4 text-red-600" />
+                              )}
+                              <span className="font-semibold text-slate-900 text-sm">{concept.concept_name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge className={
+                                concept.concept_type === "Ingreso" 
+                                  ? "bg-green-100 text-green-700 text-xs" 
+                                  : concept.concept_type === "Aportación"
+                                  ? "bg-blue-100 text-blue-700 text-xs"
+                                  : "bg-red-100 text-red-700 text-xs"
+                              }>
+                                {concept.concept_type}
+                              </Badge>
+                              {concept.is_dynamic && (
+                                <Badge className="bg-purple-100 text-purple-700 text-xs">
+                                  Dinámico
+                                </Badge>
+                              )}
+                            </div>
+                            {concept.is_dynamic ? (
+                              <p className="text-xs text-slate-600 mt-2 font-mono">
+                                {concept.calculation_formula}
+                              </p>
+                            ) : (
+                              <p className={`font-bold text-sm mt-2 ${
+                                concept.concept_type === "Ingreso" ? "text-green-600" : "text-red-600"
+                              }`}>
+                                S/ {concept.amount.toFixed(2)}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Individual Concepts */}
+                <Card className="border-0 shadow-lg">
+                  <CardHeader className="border-b bg-blue-50/50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg font-bold flex items-center gap-2">
+                          <User className="w-5 h-5 text-blue-600" />
+                          Conceptos Específicos del Empleado
+                        </CardTitle>
+                        <p className="text-sm text-slate-600 mt-1">
+                          Conceptos únicos que solo se aplican a este empleado
+                        </p>
+                      </div>
+                      <Button size="sm" onClick={() => setShowForm(true)} className="bg-blue-600 hover:bg-blue-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Agregar Concepto
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    {individualConcepts.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500">
+                        <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <p className="font-semibold mb-1">No hay conceptos específicos</p>
+                        <p className="text-xs">Este empleado solo tiene los conceptos generales aplicables</p>
+                        <Button 
+                          size="sm" 
+                          onClick={() => setShowForm(true)}
+                          className="mt-4"
+                          variant="outline"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Agregar Primer Concepto
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {individualConcepts.map(concept => (
+                          <div key={concept.id} className="p-4 border-2 border-blue-200 bg-blue-50/30 rounded-lg hover:shadow-md transition-all">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  {concept.concept_type === "Ingreso" ? (
+                                    <TrendingUp className="w-5 h-5 text-green-600" />
+                                  ) : concept.concept_type === "Aportación" ? (
+                                    <Users className="w-5 h-5 text-blue-600" />
+                                  ) : (
+                                    <TrendingDown className="w-5 h-5 text-red-600" />
+                                  )}
+                                  <span className="font-bold text-slate-900 text-base">{concept.concept_name}</span>
+                                  <Badge className={
+                                    concept.concept_type === "Ingreso" 
+                                      ? "bg-green-100 text-green-700" 
+                                      : concept.concept_type === "Aportación"
+                                      ? "bg-blue-100 text-blue-700"
+                                      : "bg-red-100 text-red-700"
+                                  }>
+                                    {concept.concept_type}
+                                  </Badge>
+                                  {concept.is_recurring && (
+                                    <Badge className="bg-indigo-100 text-indigo-700">Recurrente</Badge>
+                                  )}
+                                </div>
+                                {concept.is_dynamic ? (
+                                  <div className="mt-2">
+                                    <Badge className="bg-purple-100 text-purple-700 text-xs">
+                                      Cálculo Dinámico
+                                    </Badge>
+                                    <p className="text-sm text-slate-600 mt-2 font-mono bg-white p-2 rounded border">
+                                      {concept.calculation_formula}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <p className={`font-bold text-lg mt-2 ${
+                                    concept.concept_type === "Ingreso" ? "text-green-600" : "text-red-600"
+                                  }`}>
+                                    S/ {concept.amount.toFixed(2)}
+                                  </p>
+                                )}
+                                {concept.notes && (
+                                  <p className="text-sm text-slate-600 mt-2 bg-white p-2 rounded border">
+                                    {concept.notes}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex gap-2 ml-4">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setFormData({
+                                      concept_type: concept.concept_type,
+                                      concept_name: concept.concept_name,
+                                      amount: concept.amount?.toString() || "0",
+                                      is_dynamic: concept.is_dynamic || false,
+                                      calculation_formula: concept.calculation_formula || "",
+                                      is_recurring: concept.is_recurring,
+                                      notes: concept.notes || "",
+                                    });
+                                    setShowForm(true);
+                                  }}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => deleteConceptMutation.mutate(concept.id)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Summary Card */}
+                <Card className="border-0 shadow-lg bg-gradient-to-br from-slate-50 to-slate-100">
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-3 gap-6 text-center">
+                      <div>
+                        <p className="text-sm text-slate-600 mb-1">Conceptos Generales</p>
+                        <p className="text-2xl font-bold text-slate-900">{generalConcepts.length}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600 mb-1">Conceptos Específicos</p>
+                        <p className="text-2xl font-bold text-blue-600">{individualConcepts.length}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600 mb-1">Total Conceptos</p>
+                        <p className="text-2xl font-bold text-indigo-600">{generalConcepts.length + individualConcepts.length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </TabsContent>
         </Tabs>
       </div>
