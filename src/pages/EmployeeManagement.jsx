@@ -896,13 +896,14 @@ export default function EmployeeManagement() {
                       <Select value={formData.position} onValueChange={(val) => setFormData({ ...formData, position: val })}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar cargo" /></SelectTrigger>
                         <SelectContent>
-                          <div className="p-2 border-b">
+                          <div className="p-2 border-b sticky top-0 bg-white z-10">
                             <Input
                               placeholder="Buscar cargo..."
                               value={positionSearchTerm}
                               onChange={(e) => setPositionSearchTerm(e.target.value)}
                               className="h-8"
                               onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
                             />
                           </div>
                           {positions
@@ -920,13 +921,14 @@ export default function EmployeeManagement() {
                       <Select value={formData.department_name} onValueChange={(val) => setFormData({ ...formData, department_name: val })}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
                         <SelectContent>
-                          <div className="p-2 border-b">
+                          <div className="p-2 border-b sticky top-0 bg-white z-10">
                             <Input
                               placeholder="Buscar departamento..."
                               value={departmentSearchTerm}
                               onChange={(e) => setDepartmentSearchTerm(e.target.value)}
                               className="h-8"
                               onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
                             />
                           </div>
                           {departments
