@@ -120,6 +120,14 @@ export const usePermissions = () => {
           const emp = employees[0];
           setEmployee(emp);
 
+          // Super Admin tiene acceso total inmediato
+          if (emp.role === "super_admin") {
+            setPermissions(Object.keys(AVAILABLE_PERMISSIONS));
+            setRoles([{ name: "Super Admin", permissions: Object.keys(AVAILABLE_PERMISSIONS), priority: 1000 }]);
+            setLoading(false);
+            return;
+          }
+
           // Obtener roles asignados al usuario
           const userRoles = await base44.entities.UserRole.filter({ 
             employee_id: emp.id 
@@ -158,6 +166,8 @@ export const usePermissions = () => {
   }, []);
 
   const hasPermission = (permission) => {
+    // Super Admin siempre tiene todos los permisos
+    if (employee?.role === "super_admin") return true;
     return permissions.includes(permission) || permissions.includes("system.admin");
   };
 
@@ -170,9 +180,60 @@ export const usePermissions = () => {
   };
 
   const canAccessDepartment = (departmentName) => {
+    // Super Admin y Admin pueden ver todo
+    if (employee?.role === "super_admin" || employee?.role === "admin") return true;
+    
     const hasDepartmentRestriction = roles.some(r => r.department_restricted);
     if (!hasDepartmentRestriction) return true;
     return employee?.department_name === departmentName;
+  };
+
+  const canAccessEmployee = (targetEmployeeId) => {
+    // El empleado puede ver sus propios datos
+    if (employee?.id === targetEmployeeId) return true;
+    
+    // Super Admin puede ver todo
+    if (employee?.role === "super_admin") return true;
+    
+    // Admin puede ver todo
+    if (employee?.role === "admin") return true;
+    
+    // Managers con equipo específico
+    if (employee?.managed_team_ids && employee.managed_team_ids.includes(targetEmployeeId)) {
+      return true;
+    }
+    
+    // Managers con acceso por departamento
+    const hasTeamRestriction = roles.some(r => r.team_restricted);
+    if (!hasTeamRestriction) {
+      return canAccessDepartment(employee?.department_name);
+    }
+    
+    return false;
+  };
+
+  const getAccessibleEmployeeIds = async () => {
+    // Super Admin ve todo
+    if (employee?.role === "super_admin" || employee?.role === "admin") {
+      const allEmployees = await base44.entities.Employee.list();
+      return allEmployees.map(e => e.id);
+    }
+    
+    // Manager con equipo específico
+    if (employee?.managed_team_ids && employee.managed_team_ids.length > 0) {
+      return employee.managed_team_ids;
+    }
+    
+    // Manager por departamento
+    if (employee?.department_name) {
+      const deptEmployees = await base44.entities.Employee.filter({
+        department_name: employee.department_name
+      });
+      return deptEmployees.map(e => e.id);
+    }
+    
+    // Empleado normal solo ve sus propios datos
+    return [employee?.id];
   };
 
   return {
@@ -184,12 +245,15 @@ export const usePermissions = () => {
     hasAnyPermission,
     hasAllPermissions,
     canAccessDepartment,
+    canAccessEmployee,
+    getAccessibleEmployeeIds,
   };
 };
 
 // Permisos básicos por rol antiguo (para compatibilidad)
 const getBasicPermissionsByRole = (role) => {
   const basicPermissions = {
+    super_admin: Object.keys(AVAILABLE_PERMISSIONS),
     admin: [
       "system.admin",
       "employees.view", "employees.edit", "employees.create", "employees.delete", "employees.import",
@@ -201,6 +265,16 @@ const getBasicPermissionsByRole = (role) => {
       "holidays.view", "holidays.manage",
       "reports.view", "reports.export",
       "roles.view", "roles.manage",
+    ],
+    hr_readonly: [
+      "employees.view",
+      "attendance.view_all",
+      "vacations.view_all",
+      "payroll.view_all",
+      "certificates.view_all",
+      "schedules.view",
+      "holidays.view",
+      "reports.view", "reports.export",
     ],
     manager: [
       "employees.view",
