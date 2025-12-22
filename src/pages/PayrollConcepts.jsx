@@ -398,13 +398,28 @@ export default function PayrollConcepts() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">
-            Gestión de Conceptos de Planilla
-          </h1>
-          <p className="text-slate-600 text-lg">
-            Configura ingresos, descuentos y aportaciones según legislación peruana
-          </p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-4xl font-bold text-slate-900 mb-2">
+              Gestión de Conceptos de Planilla
+            </h1>
+            <p className="text-slate-600 text-lg">
+              Configura ingresos, descuentos y aportaciones según legislación peruana
+            </p>
+          </div>
+          <Button
+            onClick={() => {
+              if (confirm("¿Estás seguro de eliminar todos los conceptos excepto AFP y ONP automáticos? Esta acción no se puede deshacer.")) {
+                clearAllConceptsMutation.mutate();
+              }
+            }}
+            variant="outline"
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            disabled={clearAllConceptsMutation.isPending}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            {clearAllConceptsMutation.isPending ? "Limpiando..." : "Limpiar Conceptos"}
+          </Button>
         </div>
 
         {/* Stats */}
