@@ -19,6 +19,7 @@ import jsPDF from "jspdf";
 import ConceptsManager from "../components/payroll/ConceptsManager";
 import { createPageUrl } from "../utils";
 import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
+import PayslipPreview from "../components/payroll/PayslipPreview";
 
 export default function PayrollManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -33,6 +34,7 @@ export default function PayrollManagement() {
   const [additionalConcepts, setAdditionalConcepts] = useState([]);
   const [showConceptsFor, setShowConceptsFor] = useState(null);
   const [selectedPayslipForClose, setSelectedPayslipForClose] = useState(null);
+  const [previewPayslip, setPreviewPayslip] = useState(null);
 
   const queryClient = useQueryClient();
 
@@ -114,6 +116,14 @@ export default function PayrollManagement() {
     queryFn: async () => {
       const rmvs = await base44.entities.RMV.filter({ is_active: true }, "-effective_date");
       return rmvs.length > 0 ? rmvs[0] : { amount: 1025 };
+    },
+  });
+
+  const { data: companyInfo } = useQuery({
+    queryKey: ["companyInfo"],
+    queryFn: async () => {
+      const companies = await base44.entities.CompanyInfo.filter({ is_active: true });
+      return companies.length > 0 ? companies[0] : null;
     },
   });
 
@@ -597,10 +607,18 @@ export default function PayrollManagement() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => setShowConceptsFor(showConceptsFor === payslip.employee_id ? null : payslip.employee_id)}
-                                  className="ml-2"
                                 >
                                   <Edit2 className="w-3 h-3 mr-1" />
                                   Conceptos
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setPreviewPayslip(payslip)}
+                                  className="bg-blue-50 hover:bg-blue-100"
+                                >
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  Ver Boleta
                                 </Button>
                               </div>
                               <p className="text-sm text-slate-600">{payslip.department}</p>
@@ -851,6 +869,34 @@ export default function PayrollManagement() {
             )}
           </div>
         </div>
+
+        {/* Modal de Vista Previa de Boleta */}
+        {previewPayslip && (
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
+            onClick={() => setPreviewPayslip(null)}
+          >
+            <div 
+              className="max-w-4xl w-full my-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-4 flex justify-end">
+                <Button
+                  onClick={() => setPreviewPayslip(null)}
+                  variant="outline"
+                  className="bg-white"
+                >
+                  ✕ Cerrar
+                </Button>
+              </div>
+              <PayslipPreview 
+                payslip={previewPayslip} 
+                employee={allEmployees.find(e => e.id === previewPayslip.employee_id)}
+                companyInfo={companyInfo}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
