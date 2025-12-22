@@ -306,6 +306,55 @@ export default function PayrollConcepts() {
     },
   });
 
+  const syncONPConceptsMutation = useMutation({
+    mutationFn: async () => {
+      const onpEmployees = allEmployees.filter(emp => emp.pension_system === "ONP");
+      
+      if (onpEmployees.length === 0) {
+        throw new Error("No hay empleados con sistema ONP");
+      }
+
+      const allConcepts = await base44.entities.PayrollConcept.list();
+      let syncedCount = 0;
+
+      for (const emp of onpEmployees) {
+        // Verificar si el empleado ya tiene concepto ONP
+        const hasONP = allConcepts.some(c => 
+          c.employee_id === emp.id && c.concept_name === "ONP"
+        );
+
+        if (!hasONP) {
+          // Crear concepto ONP para este empleado
+          await base44.entities.PayrollConcept.create({
+            employee_id: emp.id,
+            concept_type: "Descuento",
+            concept_name: "ONP",
+            amount: 0,
+            is_dynamic: true,
+            calculation_formula: "base_salary * 0.13",
+            month: selectedMonth,
+            year: selectedYear,
+            is_recurring: true,
+            is_applied: false,
+            notes: "ONP - 13% sobre remuneración bruta (Auto-sincronizado)"
+          });
+          syncedCount++;
+        }
+      }
+
+      return { total: onpEmployees.length, synced: syncedCount };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries(["payrollConcepts"]);
+      toast.success(
+        `Sincronización completa: ${result.synced} empleados actualizados de ${result.total} con ONP`
+      );
+    },
+    onError: (error) => {
+      toast.error(error.message || "Error al sincronizar conceptos ONP");
+    },
+  });
+
   const handleAddPredefined = (concept, type, afpData = null) => {
     if (!selectedEmployee && activeTab === "individual") {
       toast.error("Selecciona un empleado primero");
@@ -461,19 +510,30 @@ export default function PayrollConcepts() {
               Configura ingresos, descuentos y aportaciones según legislación peruana
             </p>
           </div>
-          <Button
-            onClick={() => {
-              if (confirm("¿Estás seguro de eliminar todos los conceptos excepto AFP y ONP automáticos? Esta acción no se puede deshacer.")) {
-                clearAllConceptsMutation.mutate();
-              }
-            }}
-            variant="outline"
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            disabled={clearAllConceptsMutation.isPending}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            {clearAllConceptsMutation.isPending ? "Limpiando..." : "Limpiar Conceptos"}
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => syncONPConceptsMutation.mutate()}
+              variant="outline"
+              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              disabled={syncONPConceptsMutation.isPending}
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              {syncONPConceptsMutation.isPending ? "Sincronizando..." : "Sincronizar ONP"}
+            </Button>
+            <Button
+              onClick={() => {
+                if (confirm("¿Estás seguro de eliminar todos los conceptos excepto AFP y ONP automáticos? Esta acción no se puede deshacer.")) {
+                  clearAllConceptsMutation.mutate();
+                }
+              }}
+              variant="outline"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              disabled={clearAllConceptsMutation.isPending}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              {clearAllConceptsMutation.isPending ? "Limpiando..." : "Limpiar Conceptos"}
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
