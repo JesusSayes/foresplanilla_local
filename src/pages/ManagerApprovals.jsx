@@ -78,11 +78,59 @@ export default function ManagerApprovals() {
   });
 
   const updateRequestMutation = useMutation({
-    mutationFn: async ({ id, data }) => {
-      return await base44.entities.VacationRequest.update(id, data);
+    mutationFn: async ({ id, data, request }) => {
+      const updatedRequest = await base44.entities.VacationRequest.update(id, data);
+      
+      // Si se aprobó la solicitud, actualizar el balance de vacaciones y crear concepto de descuento si es sin goce
+      if (data.status === "Aprobada") {
+        try {
+          // Actualizar balance de vacaciones si es solicitud de vacaciones
+          if (request.request_type === "Vacaciones") {
+            const balances = await base44.entities.VacationBalance.filter({
+              employee_id: request.employee_id,
+              is_active: true
+            });
+            
+            if (balances.length > 0) {
+              const balance = balances[0];
+              await base44.entities.VacationBalance.update(balance.id, {
+                days_taken: (balance.days_taken || 0) + request.business_days,
+                days_pending: (balance.total_entitled_days || 0) - ((balance.days_taken || 0) + request.business_days)
+              });
+            }
+          }
+          
+          // Si es permiso sin goce, crear concepto de descuento en planilla
+          if (request.request_type === "Permiso sin goce") {
+            const emp = employees.find(e => e.id === request.employee_id);
+            if (emp && emp.base_salary) {
+              const startDate = new Date(request.start_date);
+              const discountAmount = (emp.base_salary / 30) * request.total_days;
+              
+              await base44.entities.PayrollConcept.create({
+                employee_id: request.employee_id,
+                concept_type: "Descuento",
+                concept_name: "Permiso sin goce",
+                amount: discountAmount,
+                is_dynamic: false,
+                month: startDate.getMonth() + 1,
+                year: startDate.getFullYear(),
+                is_recurring: false,
+                is_applied: false,
+                notes: `Descuento por ${request.total_days} días de permiso sin goce (${format(new Date(request.start_date), "dd/MM/yyyy")} - ${format(new Date(request.end_date), "dd/MM/yyyy")})`
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error al actualizar balance o crear descuento:", error);
+        }
+      }
+      
+      return updatedRequest;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["allVacationRequests"]);
+      queryClient.invalidateQueries(["vacationBalances"]);
       toast.success("Solicitud actualizada correctamente");
       setSelectedRequest(null);
       setReviewForm({ action: "", comments: "" });
@@ -107,6 +155,7 @@ export default function ManagerApprovals() {
     updateRequestMutation.mutate({
       id: selectedRequest.id,
       data: updateData,
+      request: selectedRequest,
     });
   };
 
@@ -349,9 +398,16 @@ export default function ManagerApprovals() {
                           <Button
                             className="flex-1 bg-green-600 hover:bg-green-700"
                             onClick={() => {
-                              setSelectedRequest(request);
-                              setReviewForm({ action: "approve", comments: "" });
-                              handleReview("approve");
+                              const updateData = {
+                                status: "Aprobada",
+                                approved_by: `${employee.first_name} ${employee.last_name}`,
+                                approved_date: format(new Date(), "yyyy-MM-dd"),
+                              };
+                              updateRequestMutation.mutate({
+                                id: request.id,
+                                data: updateData,
+                                request: request,
+                              });
                             }}
                           >
                             <CheckCircle className="w-4 h-4 mr-2" />
