@@ -101,6 +101,14 @@ export default function EmployeeManagement() {
     },
   });
 
+  const { data: afps = [] } = useQuery({
+    queryKey: ["afps"],
+    queryFn: async () => {
+      const allAFPs = await base44.entities.AFP.list("name");
+      return allAFPs.filter(a => a.is_active);
+    },
+  });
+
   const { data: employeeChanges = [], isLoading: historyLoading } = useQuery({
     queryKey: ["employeeChanges", historyEmployeeId],
     queryFn: async () => {
@@ -159,6 +167,27 @@ export default function EmployeeManagement() {
     mutationFn: async ({ id, data, oldData }) => {
       const updatedEmployee = await base44.entities.Employee.update(id, data);
       
+      // Si cambió la AFP, actualizar conceptos de planilla
+      if (data.afp_id && data.afp_id !== oldData.afp_id && data.pension_system === "AFP") {
+        const selectedAFP = afps.find(a => a.id === data.afp_id);
+        if (selectedAFP) {
+          await syncAFPConcepts(id, selectedAFP);
+        }
+      }
+      
+      // Si cambió el sistema de pensiones a AFP, agregar conceptos
+      if (data.pension_system === "AFP" && oldData.pension_system !== "AFP" && data.afp_id) {
+        const selectedAFP = afps.find(a => a.id === data.afp_id);
+        if (selectedAFP) {
+          await syncAFPConcepts(id, selectedAFP);
+        }
+      }
+      
+      // Si cambió a ONP o Ninguno, eliminar conceptos AFP
+      if ((data.pension_system === "ONP" || data.pension_system === "Ninguno") && oldData.pension_system === "AFP") {
+        await removeAFPConcepts(id);
+      }
+      
       // Registrar cambios en el historial
       const changedFields = [];
       Object.keys(data).forEach(key => {
@@ -198,6 +227,85 @@ export default function EmployeeManagement() {
     },
   });
 
+  const syncAFPConcepts = async (employeeId, afp) => {
+    try {
+      // Eliminar conceptos AFP anteriores
+      await removeAFPConcepts(employeeId);
+      
+      // Agregar nuevos conceptos AFP
+      const currentDate = new Date();
+      const month = currentDate.getMonth() + 1;
+      const year = currentDate.getFullYear();
+      
+      const afpConcepts = [
+        {
+          employee_id: employeeId,
+          concept_type: "Descuento",
+          concept_name: "AFP - Comisión",
+          amount: 0,
+          is_dynamic: true,
+          calculation_formula: `base_salary * ${(afp.commission_percentage / 100).toFixed(4)}`,
+          month,
+          year,
+          is_recurring: true,
+          is_applied: false,
+          notes: `${afp.name} - Comisión ${afp.commission_percentage}%`
+        },
+        {
+          employee_id: employeeId,
+          concept_type: "Descuento",
+          concept_name: "AFP - Aporte Obligatorio",
+          amount: 0,
+          is_dynamic: true,
+          calculation_formula: `base_salary * ${(afp.obligatory_contribution_percentage / 100).toFixed(4)}`,
+          month,
+          year,
+          is_recurring: true,
+          is_applied: false,
+          notes: `${afp.name} - Aporte Obligatorio ${afp.obligatory_contribution_percentage}%`
+        },
+        {
+          employee_id: employeeId,
+          concept_type: "Descuento",
+          concept_name: "AFP - Seguro",
+          amount: 0,
+          is_dynamic: true,
+          calculation_formula: `base_salary * ${(afp.insurance_percentage / 100).toFixed(4)}`,
+          month,
+          year,
+          is_recurring: true,
+          is_applied: false,
+          notes: `${afp.name} - Seguro ${afp.insurance_percentage}%`
+        }
+      ];
+      
+      for (const concept of afpConcepts) {
+        await base44.entities.PayrollConcept.create(concept);
+      }
+      
+      toast.success(`Conceptos AFP de ${afp.name} agregados automáticamente`);
+    } catch (error) {
+      console.error("Error al sincronizar conceptos AFP:", error);
+    }
+  };
+
+  const removeAFPConcepts = async (employeeId) => {
+    try {
+      const allConcepts = await base44.entities.PayrollConcept.filter({ employee_id: employeeId });
+      const afpConcepts = allConcepts.filter(c => 
+        c.concept_name.includes("AFP - Comisión") || 
+        c.concept_name.includes("AFP - Aporte Obligatorio") || 
+        c.concept_name.includes("AFP - Seguro")
+      );
+      
+      for (const concept of afpConcepts) {
+        await base44.entities.PayrollConcept.delete(concept.id);
+      }
+    } catch (error) {
+      console.error("Error al eliminar conceptos AFP:", error);
+    }
+  };
+
   const initializeForm = (emp = null) => {
     // Buscar el último contrato vigente del empleado
     let baseSalary = emp?.base_salary || "";
@@ -231,6 +339,8 @@ export default function EmployeeManagement() {
       hire_date: emp?.hire_date || "",
       contract_type: emp?.contract_type || "Indeterminado",
       base_salary: baseSalary,
+      pension_system: emp?.pension_system || "Ninguno",
+      afp_id: emp?.afp_id || "",
       bank_name: emp?.bank_name || "",
       bank_account: emp?.bank_account || "",
       status: emp?.status || "Activo",
