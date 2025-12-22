@@ -277,6 +277,30 @@ export default function PayrollConcepts() {
     },
   });
 
+  const clearAllConceptsMutation = useMutation({
+    mutationFn: async () => {
+      const allConcepts = await base44.entities.PayrollConcept.list();
+      
+      // Filtrar conceptos a eliminar (todos excepto AFP y ONP automáticos)
+      const conceptsToDelete = allConcepts.filter(c => 
+        !c.concept_name.includes("AFP - ") && c.concept_name !== "ONP"
+      );
+      
+      for (const concept of conceptsToDelete) {
+        await base44.entities.PayrollConcept.delete(concept.id);
+      }
+      
+      return conceptsToDelete.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries(["payrollConcepts"]);
+      toast.success(`${count} conceptos eliminados. Conceptos AFP y ONP preservados.`);
+    },
+    onError: () => {
+      toast.error("Error al limpiar conceptos");
+    },
+  });
+
   const handleAddPredefined = (concept, type, afpData = null) => {
     if (!selectedEmployee && activeTab === "individual") {
       toast.error("Selecciona un empleado primero");
