@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Shield, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AVAILABLE_PERMISSIONS } from "../components/hooks/usePermissions";
