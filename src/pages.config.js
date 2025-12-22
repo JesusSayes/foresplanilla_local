@@ -19,6 +19,7 @@ import RoleManagement from './pages/RoleManagement';
 import ScheduleManagement from './pages/ScheduleManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationRequest from './pages/VacationRequest';
+import CompanySettings from './pages/CompanySettings';
 import __Layout from './Layout.jsx';
 
 
@@ -44,6 +45,7 @@ export const PAGES = {
     "ScheduleManagement": ScheduleManagement,
     "VacationCalendar": VacationCalendar,
     "VacationRequest": VacationRequest,
+    "CompanySettings": CompanySettings,
 }
 
 export const pagesConfig = {
