@@ -28,6 +28,7 @@ export default function EmployeeManagement() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [siteFilter, setSiteFilter] = useState("all");
+  const [positionSearchTerm, setPositionSearchTerm] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
