@@ -1013,6 +1013,40 @@ export default function EmployeeManagement() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <Label>Sistema de Pensiones</Label>
+                      <Select value={formData.pension_system || "Ninguno"} onValueChange={(val) => {
+                        setFormData({ ...formData, pension_system: val, afp_id: val === "AFP" ? formData.afp_id : "" });
+                      }}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Ninguno">Ninguno</SelectItem>
+                          <SelectItem value="AFP">AFP</SelectItem>
+                          <SelectItem value="ONP">ONP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {formData.pension_system === "AFP" && (
+                      <div>
+                        <Label>AFP Afiliada</Label>
+                        <Select value={formData.afp_id || ""} onValueChange={(val) => setFormData({ ...formData, afp_id: val })}>
+                          <SelectTrigger><SelectValue placeholder="Seleccionar AFP" /></SelectTrigger>
+                          <SelectContent>
+                            {afps.map(afp => (
+                              <SelectItem key={afp.id} value={afp.id}>
+                                {afp.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Los descuentos AFP se agregarán automáticamente
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
                       <Label>Banco</Label>
                       <Select value={formData.bank_name} onValueChange={(val) => setFormData({ ...formData, bank_name: val })}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar banco" /></SelectTrigger>
