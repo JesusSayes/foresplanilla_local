@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Building, MapPin, Briefcase, CreditCard, Plus, Edit, Trash2, Search
+  Building, MapPin, Briefcase, CreditCard, Plus, Edit, Trash2, Search, DollarSign
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
@@ -68,6 +68,11 @@ export default function MasterDataManagement() {
     queryFn: async () => await base44.entities.Department.list("name"),
   });
 
+  const { data: rmvRecords = [] } = useQuery({
+    queryKey: ["rmvs"],
+    queryFn: async () => await base44.entities.RMV.list("-effective_date"),
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ entity, data }) => {
       return await base44.entities[entity].create(data);
@@ -123,14 +128,28 @@ export default function MasterDataManagement() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const entityMap = {
       sites: "Site",
       positions: "Position",
       departments: "Department",
       banks: "Bank",
+      rmv: "RMV",
     };
     const entity = entityMap[activeTab];
+
+    // Para RMV, desactivar todos los registros anteriores antes de crear uno nuevo
+    if (activeTab === "rmv" && !editingItem) {
+      try {
+        const activeRMVs = rmvRecords.filter(r => r.is_active);
+        for (const rmv of activeRMVs) {
+          await base44.entities.RMV.update(rmv.id, { is_active: false });
+        }
+        queryClient.invalidateQueries(["rmvs"]);
+      } catch (error) {
+        console.error("Error al desactivar RMV anteriores:", error);
+      }
+    }
 
     if (editingItem) {
       updateMutation.mutate({ entity, id: editingItem.id, data: formData });
@@ -164,6 +183,13 @@ export default function MasterDataManagement() {
     b.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     b.code?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const filteredRMVs = rmvRecords.filter(r => 
+    r.amount?.toString().includes(searchTerm) ||
+    r.notes?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const activeRMV = rmvRecords.find(r => r.is_active);
 
   if (!employee || permissionsLoading) {
     return (
@@ -204,7 +230,7 @@ export default function MasterDataManagement() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
@@ -260,14 +286,29 @@ export default function MasterDataManagement() {
               <p className="text-slate-600 text-sm">Bancos activos</p>
             </CardContent>
           </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-indigo-100 rounded-xl">
+                  <DollarSign className="w-6 h-6 text-indigo-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">
+                {activeRMV ? `S/ ${activeRMV.amount.toFixed(2)}` : "N/A"}
+              </div>
+              <p className="text-slate-600 text-sm">RMV Vigente</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <TabsList className="grid w-full max-w-3xl grid-cols-5">
             <TabsTrigger value="sites">Sedes</TabsTrigger>
             <TabsTrigger value="positions">Cargos</TabsTrigger>
             <TabsTrigger value="departments">Departamentos</TabsTrigger>
             <TabsTrigger value="banks">Bancos</TabsTrigger>
+            <TabsTrigger value="rmv">RMV</TabsTrigger>
           </TabsList>
 
           <TabsContent value="sites" className="space-y-6">
@@ -573,6 +614,94 @@ export default function MasterDataManagement() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="rmv" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Remuneración Mínima Vital (RMV)</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Solo puede haber un valor activo a la vez. Al crear un nuevo registro, los anteriores se desactivan automáticamente.
+                    </p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button
+                      onClick={() => handleCreate("rmv")}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nueva RMV
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <Input
+                      placeholder="Buscar RMV..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {filteredRMVs.map(rmv => (
+                    <div key={rmv.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-bold text-slate-900 text-xl">S/ {rmv.amount.toFixed(2)}</h4>
+                            {rmv.is_active ? (
+                              <Badge className="bg-green-100 text-green-700">Vigente</Badge>
+                            ) : (
+                              <Badge className="bg-gray-100 text-gray-700">Histórico</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-slate-600 mb-1">
+                            <strong>Fecha de vigencia:</strong> {new Date(rmv.effective_date).toLocaleDateString('es-PE')}
+                          </p>
+                          {rmv.notes && (
+                            <p className="text-sm text-slate-600">{rmv.notes}</p>
+                          )}
+                          {rmv.is_active && (
+                            <p className="text-xs text-indigo-600 mt-2">
+                              Asignación Familiar (10% RMV): S/ {(rmv.amount * 0.10).toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEdit(rmv, "rmv")}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {hasAnyPermission(["system.admin"]) && !rmv.is_active && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => handleDelete(rmv, "RMV")}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -589,7 +718,7 @@ export default function MasterDataManagement() {
             <CardHeader className="border-b">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl font-bold">
-                  {editingItem ? "Editar" : "Nuevo"} {activeTab === "sites" ? "Sede" : activeTab === "positions" ? "Cargo" : activeTab === "departments" ? "Departamento" : "Banco"}
+                  {editingItem ? "Editar" : "Nuevo"} {activeTab === "sites" ? "Sede" : activeTab === "positions" ? "Cargo" : activeTab === "departments" ? "Departamento" : activeTab === "banks" ? "Banco" : "RMV"}
                 </CardTitle>
                 <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
               </div>
@@ -756,6 +885,62 @@ export default function MasterDataManagement() {
                       />
                       <label htmlFor="is_active_bank" className="text-sm">Activo</label>
                     </div>
+                  </>
+                )}
+
+                {activeTab === "rmv" && (
+                  <>
+                    <div>
+                      <Label>Monto de RMV (S/) *</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={formData.amount || ""}
+                        onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
+                        placeholder="Ej: 1025.00"
+                      />
+                      {formData.amount && (
+                        <p className="text-xs text-slate-600 mt-1">
+                          Asignación Familiar (10%): S/ {(formData.amount * 0.10).toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label>Fecha de Vigencia *</Label>
+                      <Input
+                        type="date"
+                        value={formData.effective_date || ""}
+                        onChange={(e) => setFormData({ ...formData, effective_date: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Notas</Label>
+                      <Textarea
+                        value={formData.notes || ""}
+                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                        rows={3}
+                        placeholder="Observaciones sobre esta RMV..."
+                      />
+                    </div>
+                    {editingItem && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="is_active_rmv"
+                          checked={formData.is_active !== false}
+                          onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                          className="w-4 h-4 rounded"
+                        />
+                        <label htmlFor="is_active_rmv" className="text-sm">Vigente</label>
+                      </div>
+                    )}
+                    {!editingItem && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <p className="text-xs text-amber-800">
+                          Al crear esta RMV, todos los registros anteriores se marcarán automáticamente como históricos.
+                        </p>
+                      </div>
+                    )}
                   </>
                 )}
 

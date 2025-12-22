@@ -28,7 +28,8 @@ const PREDEFINED_CONCEPTS = {
     { 
       name: "Asignación Familiar", 
       description: "10% de RMV para trabajadores con hijos menores",
-      is_dynamic: false
+      is_dynamic: true,
+      calculation_formula: "rmv * 0.10"
     },
     { 
       name: "Horas Extras al 25%", 
