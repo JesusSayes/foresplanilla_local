@@ -351,7 +351,7 @@ export default function PayrollConcepts() {
     setShowForm(true);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.concept_name) {
       toast.error("El nombre del concepto es obligatorio");
       return;
@@ -378,7 +378,32 @@ export default function PayrollConcepts() {
       amount: formData.is_dynamic ? 0 : parseFloat(formData.amount),
     };
 
-    createConceptMutation.mutate(conceptData);
+    // Si es ONP y es concepto general, sincronizar con empleados que tienen ONP
+    if (activeTab === "general" && formData.concept_name === "ONP") {
+      const onpEmployees = allEmployees.filter(emp => emp.pension_system === "ONP");
+      
+      // Crear concepto general
+      await createConceptMutation.mutateAsync(conceptData);
+      
+      // Crear conceptos individuales para cada empleado con ONP
+      for (const emp of onpEmployees) {
+        try {
+          await base44.entities.PayrollConcept.create({
+            ...conceptData,
+            employee_id: emp.id,
+            notes: `${conceptData.notes || "ONP - 13% sobre remuneración bruta"} (Auto-asignado)`
+          });
+        } catch (error) {
+          console.error(`Error al crear concepto ONP para empleado ${emp.id}:`, error);
+        }
+      }
+      
+      toast.success(`Concepto ONP agregado para ${onpEmployees.length} empleados con ONP`);
+      queryClient.invalidateQueries(["payrollConcepts"]);
+      resetForm();
+    } else {
+      createConceptMutation.mutate(conceptData);
+    }
   };
 
   const resetForm = () => {
