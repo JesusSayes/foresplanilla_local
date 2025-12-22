@@ -73,6 +73,11 @@ export default function MasterDataManagement() {
     queryFn: async () => await base44.entities.RMV.list("-effective_date"),
   });
 
+  const { data: afps = [] } = useQuery({
+    queryKey: ["afps"],
+    queryFn: async () => await base44.entities.AFP.list("name"),
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ entity, data }) => {
       return await base44.entities[entity].create(data);
@@ -135,6 +140,7 @@ export default function MasterDataManagement() {
       departments: "Department",
       banks: "Bank",
       rmv: "RMV",
+      afp: "AFP",
     };
     const entity = entityMap[activeTab];
 
@@ -191,6 +197,11 @@ export default function MasterDataManagement() {
 
   const activeRMV = rmvRecords.find(r => r.is_active);
 
+  const filteredAFPs = afps.filter(a => 
+    a.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.code?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (!employee || permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -230,7 +241,7 @@ export default function MasterDataManagement() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
@@ -300,15 +311,30 @@ export default function MasterDataManagement() {
               <p className="text-slate-600 text-sm">RMV Vigente</p>
             </CardContent>
           </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-teal-100 rounded-xl">
+                  <Building className="w-6 h-6 text-teal-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">
+                {afps.length}
+              </div>
+              <p className="text-slate-600 text-sm">AFPs registradas</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-3xl grid-cols-5">
+          <TabsList className="grid w-full max-w-4xl grid-cols-6">
             <TabsTrigger value="sites">Sedes</TabsTrigger>
             <TabsTrigger value="positions">Cargos</TabsTrigger>
             <TabsTrigger value="departments">Departamentos</TabsTrigger>
             <TabsTrigger value="banks">Bancos</TabsTrigger>
             <TabsTrigger value="rmv">RMV</TabsTrigger>
+            <TabsTrigger value="afp">AFP</TabsTrigger>
           </TabsList>
 
           <TabsContent value="sites" className="space-y-6">
@@ -702,6 +728,101 @@ export default function MasterDataManagement() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="afp" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Administradoras de Fondos de Pensiones (AFP)</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Configura las AFPs con sus respectivos porcentajes de comisión, aporte y seguro
+                    </p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button
+                      onClick={() => handleCreate("afp")}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nueva AFP
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <Input
+                      placeholder="Buscar AFP..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {filteredAFPs.map(afp => (
+                    <div key={afp.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-3">
+                            <h4 className="font-bold text-slate-900 text-lg">{afp.name}</h4>
+                            {afp.code && (
+                              <Badge className="bg-teal-100 text-teal-700">{afp.code}</Badge>
+                            )}
+                            {!afp.is_active && (
+                              <Badge className="bg-red-100 text-red-700">Inactiva</Badge>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div className="p-2 bg-blue-50 rounded">
+                              <p className="text-xs text-slate-600 mb-1">Comisión</p>
+                              <p className="font-bold text-blue-700">{afp.commission_percentage}%</p>
+                            </div>
+                            <div className="p-2 bg-green-50 rounded">
+                              <p className="text-xs text-slate-600 mb-1">Aporte Obligatorio</p>
+                              <p className="font-bold text-green-700">{afp.obligatory_contribution_percentage}%</p>
+                            </div>
+                            <div className="p-2 bg-purple-50 rounded">
+                              <p className="text-xs text-slate-600 mb-1">Seguro</p>
+                              <p className="font-bold text-purple-700">{afp.insurance_percentage}%</p>
+                            </div>
+                          </div>
+                          {afp.notes && (
+                            <p className="text-sm text-slate-600 mt-2">{afp.notes}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEdit(afp, "afp")}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => handleDelete(afp, "AFP")}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -718,7 +839,7 @@ export default function MasterDataManagement() {
             <CardHeader className="border-b">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl font-bold">
-                  {editingItem ? "Editar" : "Nuevo"} {activeTab === "sites" ? "Sede" : activeTab === "positions" ? "Cargo" : activeTab === "departments" ? "Departamento" : activeTab === "banks" ? "Banco" : "RMV"}
+                  {editingItem ? "Editar" : "Nuevo"} {activeTab === "sites" ? "Sede" : activeTab === "positions" ? "Cargo" : activeTab === "departments" ? "Departamento" : activeTab === "banks" ? "Banco" : activeTab === "rmv" ? "RMV" : "AFP"}
                 </CardTitle>
                 <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
               </div>
@@ -941,6 +1062,78 @@ export default function MasterDataManagement() {
                         </p>
                       </div>
                     )}
+                  </>
+                )}
+
+                {activeTab === "afp" && (
+                  <>
+                    <div>
+                      <Label>Nombre de la AFP *</Label>
+                      <Input
+                        value={formData.name || ""}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Ej: AFP Integra"
+                      />
+                    </div>
+                    <div>
+                      <Label>Código</Label>
+                      <Input
+                        value={formData.code || ""}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                        placeholder="Ej: INTEGRA"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label>% Comisión *</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={formData.commission_percentage || ""}
+                          onChange={(e) => setFormData({ ...formData, commission_percentage: parseFloat(e.target.value) })}
+                          placeholder="Ej: 1.47"
+                        />
+                      </div>
+                      <div>
+                        <Label>% Aporte Obligatorio *</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={formData.obligatory_contribution_percentage || 10}
+                          onChange={(e) => setFormData({ ...formData, obligatory_contribution_percentage: parseFloat(e.target.value) })}
+                          placeholder="Ej: 10.00"
+                        />
+                      </div>
+                      <div>
+                        <Label>% Seguro *</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={formData.insurance_percentage || ""}
+                          onChange={(e) => setFormData({ ...formData, insurance_percentage: parseFloat(e.target.value) })}
+                          placeholder="Ej: 1.33"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Notas</Label>
+                      <Textarea
+                        value={formData.notes || ""}
+                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                        rows={2}
+                        placeholder="Observaciones sobre esta AFP..."
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_active_afp"
+                        checked={formData.is_active !== false}
+                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="is_active_afp" className="text-sm">Activa</label>
+                    </div>
                   </>
                 )}
 

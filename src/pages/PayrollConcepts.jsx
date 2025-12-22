@@ -83,27 +83,6 @@ const PREDEFINED_CONCEPTS = {
   ],
   descuentos: [
     { 
-      name: "AFP - Comisión", 
-      description: "Variable según AFP (aprox. 1.47% - 1.69%)", 
-      percentage: 1.6,
-      is_dynamic: true,
-      calculation_formula: "base_salary * 0.016"
-    },
-    { 
-      name: "AFP - Aporte Obligatorio", 
-      description: "10% sobre remuneración asegurable", 
-      percentage: 10,
-      is_dynamic: true,
-      calculation_formula: "base_salary * 0.10"
-    },
-    { 
-      name: "AFP - Seguro", 
-      description: "Aprox. 1.33% sobre remuneración asegurable", 
-      percentage: 1.33,
-      is_dynamic: true,
-      calculation_formula: "base_salary * 0.0133"
-    },
-    { 
       name: "ONP", 
       description: "13% sobre remuneración bruta", 
       percentage: 13,
@@ -249,6 +228,14 @@ export default function PayrollConcepts() {
     },
   });
 
+  const { data: afps = [] } = useQuery({
+    queryKey: ["afps"],
+    queryFn: async () => {
+      const allAFPs = await base44.entities.AFP.list("name");
+      return allAFPs.filter(a => a.is_active);
+    },
+  });
+
   const { data: payrollConcepts = [] } = useQuery({
     queryKey: ["payrollConcepts", selectedMonth, selectedYear, selectedEmployee],
     queryFn: async () => {
@@ -290,10 +277,27 @@ export default function PayrollConcepts() {
     },
   });
 
-  const handleAddPredefined = (concept, type) => {
+  const handleAddPredefined = (concept, type, afpData = null) => {
     if (!selectedEmployee && activeTab === "individual") {
       toast.error("Selecciona un empleado primero");
       return;
+    }
+
+    let formula = concept.calculation_formula || "";
+    let description = concept.description || "";
+
+    // Si es un concepto de AFP y se pasó data de AFP específica
+    if (afpData) {
+      if (concept.name === "AFP - Comisión") {
+        formula = `base_salary * ${(afpData.commission_percentage / 100).toFixed(4)}`;
+        description = `${afpData.name} - Comisión ${afpData.commission_percentage}%`;
+      } else if (concept.name === "AFP - Aporte Obligatorio") {
+        formula = `base_salary * ${(afpData.obligatory_contribution_percentage / 100).toFixed(4)}`;
+        description = `${afpData.name} - Aporte Obligatorio ${afpData.obligatory_contribution_percentage}%`;
+      } else if (concept.name === "AFP - Seguro") {
+        formula = `base_salary * ${(afpData.insurance_percentage / 100).toFixed(4)}`;
+        description = `${afpData.name} - Seguro ${afpData.insurance_percentage}%`;
+      }
     }
 
     const conceptData = {
@@ -302,12 +306,12 @@ export default function PayrollConcepts() {
       concept_name: concept.name,
       amount: concept.is_dynamic ? 0 : "",
       is_dynamic: concept.is_dynamic || false,
-      calculation_formula: concept.calculation_formula || "",
+      calculation_formula: formula,
       month: selectedMonth,
       year: selectedYear,
       is_recurring: false,
       is_applied: false,
-      notes: concept.description || "",
+      notes: description,
     };
 
     setFormData({
@@ -512,11 +516,85 @@ export default function PayrollConcepts() {
                           </div>
                         </div>
 
-                        {/* Descuentos */}
+                        {/* Descuentos - AFPs */}
                         <div>
                           <h4 className="font-semibold text-sm text-red-700 mb-2 flex items-center gap-2">
                             <TrendingDown className="w-4 h-4" />
-                            Descuentos
+                            Descuentos AFP
+                          </h4>
+                          {afps.length === 0 ? (
+                            <p className="text-xs text-slate-500 italic p-2">
+                              No hay AFPs registradas. Configúralas en Datos Maestros.
+                            </p>
+                          ) : (
+                            <div className="space-y-3">
+                              {afps.map(afp => (
+                                <div key={afp.id} className="p-2 bg-red-50 border border-red-200 rounded">
+                                  <h5 className="font-semibold text-xs text-slate-900 mb-2">{afp.name}</h5>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between p-1 bg-white rounded hover:shadow-sm transition-all">
+                                      <div className="flex-1">
+                                        <p className="text-xs font-medium text-slate-800">Comisión</p>
+                                        <p className="text-xs text-slate-500">{afp.commission_percentage}%</p>
+                                      </div>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleAddPredefined(
+                                          { name: "AFP - Comisión", is_dynamic: true },
+                                          "descuentos",
+                                          afp
+                                        )}
+                                        className="h-6 w-6 p-0"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                    <div className="flex items-center justify-between p-1 bg-white rounded hover:shadow-sm transition-all">
+                                      <div className="flex-1">
+                                        <p className="text-xs font-medium text-slate-800">Aporte Obligatorio</p>
+                                        <p className="text-xs text-slate-500">{afp.obligatory_contribution_percentage}%</p>
+                                      </div>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleAddPredefined(
+                                          { name: "AFP - Aporte Obligatorio", is_dynamic: true },
+                                          "descuentos",
+                                          afp
+                                        )}
+                                        className="h-6 w-6 p-0"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                    <div className="flex items-center justify-between p-1 bg-white rounded hover:shadow-sm transition-all">
+                                      <div className="flex-1">
+                                        <p className="text-xs font-medium text-slate-800">Seguro</p>
+                                        <p className="text-xs text-slate-500">{afp.insurance_percentage}%</p>
+                                      </div>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleAddPredefined(
+                                          { name: "AFP - Seguro", is_dynamic: true },
+                                          "descuentos",
+                                          afp
+                                        )}
+                                        className="h-6 w-6 p-0"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Otros Descuentos */}
+                        <div>
+                          <h4 className="font-semibold text-sm text-red-700 mb-2 flex items-center gap-2">
+                            <TrendingDown className="w-4 h-4" />
+                            Otros Descuentos
                           </h4>
                           <div className="space-y-2">
                             {PREDEFINED_CONCEPTS.descuentos
