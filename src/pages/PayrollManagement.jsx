@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import ConceptsManager from "../components/payroll/ConceptsManager";
 import { createPageUrl } from "../utils";
+import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 
 export default function PayrollManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -90,11 +91,29 @@ export default function PayrollManagement() {
   const { data: payrollConcepts = [] } = useQuery({
     queryKey: ["payrollConcepts", selectedMonth, selectedYear],
     queryFn: async () => {
-      return await base44.entities.PayrollConcept.filter({
-        month: selectedMonth,
-        year: selectedYear,
-        is_applied: false
+      const allConcepts = await base44.entities.PayrollConcept.list();
+      
+      // Filtrar conceptos generales y específicos del mes/año
+      return allConcepts.filter(c => {
+        // Conceptos recurrentes
+        if (c.is_recurring && !c.is_applied) return true;
+        
+        // Conceptos específicos del mes/año
+        if (c.month === selectedMonth && c.year === selectedYear && !c.is_applied) return true;
+        
+        // Conceptos generales (sin mes/año específico)
+        if (c.employee_id === "general" && !c.is_applied) return true;
+        
+        return false;
       });
+    },
+  });
+
+  const { data: rmvData } = useQuery({
+    queryKey: ["rmv"],
+    queryFn: async () => {
+      const rmvs = await base44.entities.RMV.filter({ is_active: true }, "-effective_date");
+      return rmvs.length > 0 ? rmvs[0] : { amount: 1025 };
     },
   });
 
@@ -164,39 +183,34 @@ export default function PayrollManagement() {
     }
 
     const payslipsData = await Promise.all(filteredEmployees.map(async (emp) => {
-      // Calcular días trabajados
+      // Preparar datos de asistencia
       const empAttendance = attendanceRecords.filter(r => r.employee_id === emp.id);
       const workedDays = payrollType === "Quincenal" ? 15 : empAttendance.filter(r => r.status === "Completo" || r.status === "Incompleto").length;
       
-      // Salario base proporcional
-      let baseSalary = emp.base_salary || 0;
-      if (payrollType === "Quincenal") {
-        baseSalary = baseSalary / 2;
-      }
+      const attendanceData = {
+        worked_days: workedDays,
+        regular_hours: empAttendance.reduce((sum, r) => sum + (r.worked_hours || 0), 0),
+        overtime_hours: 0,
+        horas_extras_25: 0,
+        horas_extras_35: 0,
+        horas_nocturnas: 0,
+      };
 
-      // Calcular descuentos por asistencia
+      // Obtener conceptos del empleado (generales + específicos)
+      const generalConcepts = payrollConcepts.filter(c => c.employee_id === "general");
+      const specificConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
+      const allEmpConcepts = [...generalConcepts, ...specificConcepts];
+
+      // Usar el calculador automático
+      const calculator = new PayrollCalculator(emp, selectedMonth, selectedYear, payrollType);
+      const result = await calculator.calculatePayroll(allEmpConcepts, attendanceData, rmvData?.amount || 1025);
+
+      // Calcular descuentos por asistencia (adicionales al sistema)
       const lateRecords = empAttendance.filter(r => r.is_late && r.late_minutes > 10);
       const absentRecords = empAttendance.filter(r => r.is_absent);
-      const tardinessDiscount = lateRecords.length * (baseSalary / 30);
-      const absenceDiscount = absentRecords.length * (baseSalary / 30);
-
-      // Conceptos adicionales
-      const empConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
-      const additionalIncome = empConcepts
-        .filter(c => c.concept_type === "Ingreso")
-        .reduce((sum, c) => sum + c.amount, 0);
-      const additionalDeductions = empConcepts
-        .filter(c => c.concept_type === "Descuento" || c.concept_type === "Aportación")
-        .reduce((sum, c) => sum + c.amount, 0);
-
-      // AFP/ONP (aproximado 13%)
-      const pensionDeduction = baseSalary * 0.13;
-      
-      // Seguro de salud (aproximado 9%)
-      const healthInsurance = baseSalary * 0.09;
-
-      // Total ingresos
-      const totalIncome = baseSalary + additionalIncome;
+      const baseSalaryForCalc = payrollType === "Quincenal" ? (emp.base_salary || 0) / 2 : (emp.base_salary || 0);
+      const tardinessDiscount = lateRecords.length * (baseSalaryForCalc / 30);
+      const absenceDiscount = absentRecords.length * (baseSalaryForCalc / 30);
 
       // Buscar adelanto quincenal si es mensual
       let advanceDeduction = 0;
@@ -214,11 +228,9 @@ export default function PayrollManagement() {
         }
       }
 
-      // Total descuentos
-      const totalDeductions = pensionDeduction + healthInsurance + tardinessDiscount + absenceDiscount + advanceDeduction + additionalDeductions;
-
-      // Neto a pagar
-      const netPay = totalIncome - totalDeductions;
+      // Ajustar totales con descuentos adicionales
+      const adjustedDeductions = result.totals.totalDeductions + tardinessDiscount + absenceDiscount + advanceDeduction;
+      const adjustedNetPay = result.totals.totalIncome - adjustedDeductions;
 
       return {
         employee_id: emp.id,
@@ -232,25 +244,29 @@ export default function PayrollManagement() {
         payroll_number: payrollNumber,
         advance_payment_id: advancePaymentId,
         worked_days: workedDays,
-        base_salary: baseSalary,
+        base_salary: result.context.base_salary,
         family_allowance: 0,
         overtime_pay: 0,
-        bonuses: additionalIncome,
+        bonuses: result.totals.totalIncome - result.context.base_salary,
         commissions: 0,
         other_income: 0,
-        total_income: totalIncome,
-        pension_deduction: pensionDeduction,
-        health_insurance: healthInsurance,
-        income_tax: 0,
+        total_income: result.totals.totalIncome,
+        pension_deduction: result.deductions.find(d => d.concept_name.includes("AFP") || d.concept_name === "ONP")?.calculated_amount || 0,
+        health_insurance: 0,
+        income_tax: result.deductions.find(d => d.concept_name.includes("Renta"))?.calculated_amount || 0,
         tardiness_discount: tardinessDiscount,
         absence_discount: absenceDiscount,
         loan_deduction: 0,
         advance_deduction: advanceDeduction,
-        other_deductions: additionalDeductions,
-        total_deductions: totalDeductions,
-        net_pay: netPay,
+        other_deductions: result.totals.totalDeductions,
+        total_deductions: adjustedDeductions,
+        net_pay: adjustedNetPay,
         payment_date: format(new Date(selectedYear, selectedMonth - 1, payrollType === "Quincenal" ? 15 : 30), "yyyy-MM-dd"),
         status: "Calculada",
+        calculation_summary: result.summary,
+        calculation_log: result.calculationLog,
+        has_errors: result.errors.length > 0,
+        errors: result.errors,
       };
     }));
 
@@ -567,9 +583,10 @@ export default function PayrollManagement() {
                     {previewData.map((payslip, index) => {
                       const empConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === payslip.employee_id);
                       const hasAdditionalConcepts = empConcepts.length > 0;
+                      const hasCalculationErrors = payslip.has_errors;
 
                       return (
-                        <div key={index} className="p-4 border border-slate-200 rounded-lg">
+                        <div key={index} className={`p-4 border rounded-lg ${hasCalculationErrors ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}>
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
@@ -649,6 +666,58 @@ export default function PayrollManagement() {
                             <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
                               ✓ {empConcepts.length} concepto(s) adicional(es) aplicado(s)
                             </div>
+                          )}
+
+                          {hasCalculationErrors && (
+                            <div className="mt-3 p-2 bg-red-50 border border-red-300 rounded">
+                              <p className="text-xs font-semibold text-red-800 mb-1">
+                                ⚠️ Errores en el cálculo:
+                              </p>
+                              {payslip.errors.map((err, idx) => (
+                                <p key={idx} className="text-xs text-red-700">
+                                  • {err.formula}: {err.error}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+
+                          {payslip.calculation_summary && (
+                            <details className="mt-3">
+                              <summary className="text-xs text-slate-600 cursor-pointer hover:text-slate-900">
+                                Ver resumen detallado de cálculos
+                              </summary>
+                              <div className="mt-2 p-3 bg-slate-50 rounded text-xs space-y-2">
+                                <div>
+                                  <p className="font-semibold text-slate-900 mb-1">Ingresos ({payslip.calculation_summary.breakdown.incomes.count}):</p>
+                                  {payslip.calculation_summary.breakdown.incomes.items.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between text-slate-700 ml-2">
+                                      <span>{item.name} {item.formula && `(${item.formula})`}</span>
+                                      <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-slate-900 mb-1">Descuentos ({payslip.calculation_summary.breakdown.deductions.count}):</p>
+                                  {payslip.calculation_summary.breakdown.deductions.items.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between text-slate-700 ml-2">
+                                      <span>{item.name} {item.formula && `(${item.formula})`}</span>
+                                      <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                                {payslip.calculation_summary.breakdown.contributions.count > 0 && (
+                                  <div>
+                                    <p className="font-semibold text-slate-900 mb-1">Aportes Empleador ({payslip.calculation_summary.breakdown.contributions.count}):</p>
+                                    {payslip.calculation_summary.breakdown.contributions.items.map((item, idx) => (
+                                      <div key={idx} className="flex justify-between text-slate-700 ml-2">
+                                        <span>{item.name} {item.formula && `(${item.formula})`}</span>
+                                        <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </details>
                           )}
                         </div>
                       );
