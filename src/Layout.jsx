@@ -248,6 +248,13 @@ export default function Layout({ children, currentPageName }) {
                             Información Empresa
                           </Link>
                           <Link
+                            to={createPageUrl("PayslipTemplateConfig")}
+                            className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            <Shield className="w-4 h-4" />
+                            Plantillas Boletas
+                          </Link>
+                          <Link
                             to={createPageUrl("MasterDataManagement")}
                             className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                           >

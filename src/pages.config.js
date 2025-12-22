@@ -20,6 +20,7 @@ import ScheduleManagement from './pages/ScheduleManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationRequest from './pages/VacationRequest';
 import CompanySettings from './pages/CompanySettings';
+import PayslipTemplateConfig from './pages/PayslipTemplateConfig';
 import __Layout from './Layout.jsx';
 
 
@@ -46,6 +47,7 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationRequest": VacationRequest,
     "CompanySettings": CompanySettings,
+    "PayslipTemplateConfig": PayslipTemplateConfig,
 }
 
 export const pagesConfig = {
