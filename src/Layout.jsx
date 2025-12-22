@@ -70,6 +70,7 @@ export default function Layout({ children, currentPageName }) {
           { name: "Ver Empleados", path: "EmployeeManagement" },
           { name: "Organigrama", path: "OrgChart" },
           { name: "Importar Empleados", path: "ImportEmployees" },
+          { name: "Gestión Vacaciones", path: "VacationManagement" },
           { name: "Aprobar Vacaciones", path: "ManagerApprovals" },
           { name: "Calendario Vacaciones", path: "VacationCalendar" },
           { name: "Boletas", path: "Payslips" },
