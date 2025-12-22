@@ -240,18 +240,17 @@ export default function PayrollConcepts() {
     queryKey: ["payrollConcepts", selectedMonth, selectedYear, selectedEmployee, activeTab],
     queryFn: async () => {
       if (activeTab === "general") {
-        // Para configuración general, traer solo conceptos generales sin filtro de mes/año
+        // Para configuración general, traer solo conceptos generales
         return await base44.entities.PayrollConcept.filter({ employee_id: "general" }, "-created_date");
       } else {
-        // Para configuración individual, filtrar por empleado, mes y año
-        const filter = {
-          month: selectedMonth,
-          year: selectedYear,
-        };
-        if (selectedEmployee) {
-          filter.employee_id = selectedEmployee;
-        }
-        return await base44.entities.PayrollConcept.filter(filter, "-created_date");
+        // Para configuración individual, traer conceptos generales + conceptos del empleado
+        const allConcepts = await base44.entities.PayrollConcept.list("-created_date");
+        
+        // Filtrar conceptos generales o del empleado seleccionado
+        return allConcepts.filter(c => 
+          c.employee_id === "general" || 
+          (selectedEmployee && c.employee_id === selectedEmployee)
+        );
       }
     },
   });
