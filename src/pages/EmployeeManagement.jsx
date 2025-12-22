@@ -135,23 +135,7 @@ export default function EmployeeManagement() {
   });
 
   const createEmployeeMutation = useMutation({
-    mutationFn: async (data) => {
-      const newEmployee = await base44.entities.Employee.create(data);
-      
-      // Registrar creación en el historial
-      await createChangeLogMutation.mutateAsync({
-        employee_id: newEmployee.id,
-        field_changed: "Registro completo",
-        old_value: "",
-        new_value: "Empleado creado",
-        change_type: "Creación",
-        changed_by: currentUser?.email || "Sistema",
-        change_date: new Date().toISOString(),
-        notes: "Registro inicial del empleado en el sistema"
-      });
-      
-      return newEmployee;
-    },
+    mutationFn: handleCreateEmployee,
     onSuccess: () => {
       queryClient.invalidateQueries(["allEmployees"]);
       toast.success("Empleado creado correctamente");
@@ -186,6 +170,17 @@ export default function EmployeeManagement() {
       // Si cambió a ONP o Ninguno, eliminar conceptos AFP
       if ((data.pension_system === "ONP" || data.pension_system === "Ninguno") && oldData.pension_system === "AFP") {
         await removeAFPConcepts(id);
+      }
+      
+      // Si cambió a ONP, agregar concepto ONP y eliminar AFP
+      if (data.pension_system === "ONP" && oldData.pension_system !== "ONP") {
+        await removeAFPConcepts(id);
+        await addONPConcept(id);
+      }
+      
+      // Si cambió de ONP a otro sistema, eliminar concepto ONP
+      if (data.pension_system !== "ONP" && oldData.pension_system === "ONP") {
+        await removeONPConcept(id);
       }
       
       // Registrar cambios en el historial
@@ -306,6 +301,45 @@ export default function EmployeeManagement() {
     }
   };
 
+  const addONPConcept = async (employeeId) => {
+    try {
+      const currentDate = new Date();
+      const month = currentDate.getMonth() + 1;
+      const year = currentDate.getFullYear();
+      
+      await base44.entities.PayrollConcept.create({
+        employee_id: employeeId,
+        concept_type: "Descuento",
+        concept_name: "ONP",
+        amount: 0,
+        is_dynamic: true,
+        calculation_formula: "base_salary * 0.13",
+        month,
+        year,
+        is_recurring: true,
+        is_applied: false,
+        notes: "ONP - 13% sobre remuneración bruta"
+      });
+      
+      toast.success("Concepto ONP agregado automáticamente");
+    } catch (error) {
+      console.error("Error al agregar concepto ONP:", error);
+    }
+  };
+
+  const removeONPConcept = async (employeeId) => {
+    try {
+      const allConcepts = await base44.entities.PayrollConcept.filter({ employee_id: employeeId });
+      const onpConcepts = allConcepts.filter(c => c.concept_name === "ONP");
+      
+      for (const concept of onpConcepts) {
+        await base44.entities.PayrollConcept.delete(concept.id);
+      }
+    } catch (error) {
+      console.error("Error al eliminar concepto ONP:", error);
+    }
+  };
+
   const initializeForm = (emp = null) => {
     // Buscar el último contrato vigente del empleado
     let baseSalary = emp?.base_salary || "";
@@ -392,6 +426,37 @@ export default function EmployeeManagement() {
     } else {
       createEmployeeMutation.mutate(formData);
     }
+  };
+
+  const handleCreateEmployee = async (data) => {
+    const newEmployee = await base44.entities.Employee.create(data);
+    
+    // Si seleccionó ONP, agregar concepto automáticamente
+    if (data.pension_system === "ONP") {
+      await addONPConcept(newEmployee.id);
+    }
+    
+    // Si seleccionó AFP, agregar conceptos automáticamente
+    if (data.pension_system === "AFP" && data.afp_id) {
+      const selectedAFP = afps.find(a => a.id === data.afp_id);
+      if (selectedAFP) {
+        await syncAFPConcepts(newEmployee.id, selectedAFP);
+      }
+    }
+    
+    // Registrar creación en el historial
+    await createChangeLogMutation.mutateAsync({
+      employee_id: newEmployee.id,
+      field_changed: "Registro completo",
+      old_value: "",
+      new_value: "Empleado creado",
+      change_type: "Creación",
+      changed_by: currentUser?.email || "Sistema",
+      change_date: new Date().toISOString(),
+      notes: "Registro inicial del empleado en el sistema"
+    });
+    
+    return newEmployee;
   };
 
   const handleStatusChange = async (emp, newStatus) => {
