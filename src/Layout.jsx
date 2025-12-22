@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "./utils";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { 
   LayoutDashboard, FileText, Calendar, Clock, 
   User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown
