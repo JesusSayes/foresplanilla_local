@@ -134,6 +134,37 @@ export default function EmployeeManagement() {
     },
   });
 
+  const handleCreateEmployee = async (data) => {
+    const newEmployee = await base44.entities.Employee.create(data);
+    
+    // Si seleccionó ONP, agregar concepto automáticamente
+    if (data.pension_system === "ONP") {
+      await addONPConcept(newEmployee.id);
+    }
+    
+    // Si seleccionó AFP, agregar conceptos automáticamente
+    if (data.pension_system === "AFP" && data.afp_id) {
+      const selectedAFP = afps.find(a => a.id === data.afp_id);
+      if (selectedAFP) {
+        await syncAFPConcepts(newEmployee.id, selectedAFP);
+      }
+    }
+    
+    // Registrar creación en el historial
+    await createChangeLogMutation.mutateAsync({
+      employee_id: newEmployee.id,
+      field_changed: "Registro completo",
+      old_value: "",
+      new_value: "Empleado creado",
+      change_type: "Creación",
+      changed_by: currentUser?.email || "Sistema",
+      change_date: new Date().toISOString(),
+      notes: "Registro inicial del empleado en el sistema"
+    });
+    
+    return newEmployee;
+  };
+
   const createEmployeeMutation = useMutation({
     mutationFn: handleCreateEmployee,
     onSuccess: () => {
@@ -426,37 +457,6 @@ export default function EmployeeManagement() {
     } else {
       createEmployeeMutation.mutate(formData);
     }
-  };
-
-  const handleCreateEmployee = async (data) => {
-    const newEmployee = await base44.entities.Employee.create(data);
-    
-    // Si seleccionó ONP, agregar concepto automáticamente
-    if (data.pension_system === "ONP") {
-      await addONPConcept(newEmployee.id);
-    }
-    
-    // Si seleccionó AFP, agregar conceptos automáticamente
-    if (data.pension_system === "AFP" && data.afp_id) {
-      const selectedAFP = afps.find(a => a.id === data.afp_id);
-      if (selectedAFP) {
-        await syncAFPConcepts(newEmployee.id, selectedAFP);
-      }
-    }
-    
-    // Registrar creación en el historial
-    await createChangeLogMutation.mutateAsync({
-      employee_id: newEmployee.id,
-      field_changed: "Registro completo",
-      old_value: "",
-      new_value: "Empleado creado",
-      change_type: "Creación",
-      changed_by: currentUser?.email || "Sistema",
-      change_date: new Date().toISOString(),
-      notes: "Registro inicial del empleado en el sistema"
-    });
-    
-    return newEmployee;
   };
 
   const handleStatusChange = async (emp, newStatus) => {
