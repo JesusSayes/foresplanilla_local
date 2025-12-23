@@ -388,41 +388,25 @@ export default function PayrollConcepts() {
       }
     }
 
-    // Determinar categoría basada en tipo
-    let category = "Otros";
-    if (type === "ingresos") {
-      if (concept.name.includes("Remuneración")) category = "Remuneración Base";
-      else if (concept.name.includes("Hora")) category = "Horas Extras";
-      else if (concept.name.includes("Asignación")) category = "Asignaciones";
-      else category = "Bonificaciones";
-    } else if (type === "descuentos") {
-      if (concept.name.includes("AFP") || concept.name.includes("ONP")) category = "AFP/ONP";
-      else if (concept.name.includes("Impuesto") || concept.name.includes("Renta")) category = "Impuestos";
-      else if (concept.name.includes("Préstamo")) category = "Préstamos";
-      else category = "Descuentos Varios";
-    } else if (type === "aportaciones") {
-      if (concept.name.includes("ESSALUD")) category = "EsSalud";
-      else if (concept.name.includes("SCTR")) category = "SCTR";
-      else category = "Otros";
-    }
-
-    setEditingConcept(null);
-    setFormData({
-      concept_type: type === "ingresos" ? "Ingreso" : type === "descuentos" ? "Descuento" : type === "aportaciones" ? "Aportación" : "Otros",
-      concept_category: category,
+    const conceptData = {
+      employee_id: selectedEmployee || "general",
+      concept_type: type === "ingresos" ? "Ingreso" : type === "descuentos" ? "Descuento" : "Aportación",
       concept_name: concept.name,
-      concept_code: "",
-      description: description,
-      amount: concept.is_dynamic ? "0" : "",
+      amount: concept.is_dynamic ? 0 : "",
       is_dynamic: concept.is_dynamic || false,
       calculation_formula: formula,
+      month: selectedMonth,
+      year: selectedYear,
       is_recurring: false,
-      is_mandatory: false,
-      applies_to_payroll_types: ["Mensual"],
+      is_applied: false,
       notes: description,
+    };
+
+    setFormData({
+      ...conceptData,
+      amount: concept.is_dynamic ? "0" : "",
     });
     setShowForm(true);
-    toast.info("Edita el concepto antes de incorporarlo");
   };
 
   const handleSubmit = async () => {
