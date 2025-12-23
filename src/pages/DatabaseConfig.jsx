@@ -10,14 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Database, Plus, Trash2, Edit2, CheckCircle, 
-  AlertCircle, RefreshCw, Server, Key
+  AlertCircle, RefreshCw, Server, Key, Activity
 } from "lucide-react";
 import { toast } from "sonner";
+import SyncMonitor from "../components/attendance/SyncMonitor";
 
 export default function DatabaseConfig() {
   const [employee, setEmployee] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingConnection, setEditingConnection] = useState(null);
+  const [showMonitor, setShowMonitor] = useState(null);
   const [formData, setFormData] = useState({
     connection_name: "",
     connection_type: "MySQL",
@@ -212,6 +214,24 @@ export default function DatabaseConfig() {
           </Button>
         </div>
 
+        {/* Sync Monitor */}
+        {showMonitor && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-slate-900">
+                Monitor: {connections.find(c => c.id === showMonitor)?.connection_name}
+              </h2>
+              <Button variant="outline" onClick={() => setShowMonitor(null)}>
+                Cerrar Monitor
+              </Button>
+            </div>
+            <SyncMonitor 
+              connectionId={showMonitor}
+              connectionName={connections.find(c => c.id === showMonitor)?.connection_name}
+            />
+          </div>
+        )}
+
         {/* Connections List */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {connections.length === 0 ? (
@@ -285,6 +305,15 @@ export default function DatabaseConfig() {
                   </div>
 
                   <div className="flex gap-2 mt-6 pt-4 border-t">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowMonitor(conn.id)}
+                      className="flex-1"
+                    >
+                      <Activity className="w-4 h-4 mr-1" />
+                      Monitor
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"

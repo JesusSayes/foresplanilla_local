@@ -5,6 +5,7 @@ import Certificates from './pages/Certificates';
 import CompanySettings from './pages/CompanySettings';
 import ContractManagement from './pages/ContractManagement';
 import Dashboard from './pages/Dashboard';
+import DatabaseConfig from './pages/DatabaseConfig';
 import EmployeeManagement from './pages/EmployeeManagement';
 import HolidayManagement from './pages/HolidayManagement';
 import Home from './pages/Home';
@@ -25,7 +26,6 @@ import UserManagement from './pages/UserManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
-import DatabaseConfig from './pages/DatabaseConfig';
 import __Layout from './Layout.jsx';
 
 
@@ -37,6 +37,7 @@ export const PAGES = {
     "CompanySettings": CompanySettings,
     "ContractManagement": ContractManagement,
     "Dashboard": Dashboard,
+    "DatabaseConfig": DatabaseConfig,
     "EmployeeManagement": EmployeeManagement,
     "HolidayManagement": HolidayManagement,
     "Home": Home,
@@ -57,7 +58,6 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
-    "DatabaseConfig": DatabaseConfig,
 }
 
 export const pagesConfig = {
