@@ -20,6 +20,16 @@ export default function Layout({ children, currentPageName }) {
   useEffect(() => {
     const loadEmployee = async () => {
       try {
+        const isAuth = await base44.auth.isAuthenticated();
+        if (!isAuth) {
+          // Si no está autenticado y no está en Home, redirigir a Home
+          if (currentPageName !== "Home") {
+            window.location.href = createPageUrl("Home");
+          }
+          setLoading(false);
+          return;
+        }
+
         const user = await base44.auth.me();
         const employees = await base44.entities.Employee.filter({ 
           work_email: user.email 
@@ -30,16 +40,20 @@ export default function Layout({ children, currentPageName }) {
         }
       } catch (error) {
         console.error("Error loading employee:", error);
+        // En caso de error de autenticación, redirigir a Home
+        if (currentPageName !== "Home") {
+          window.location.href = createPageUrl("Home");
+        }
       } finally {
         setLoading(false);
       }
     };
 
     loadEmployee();
-  }, []);
+  }, [currentPageName]);
 
   const handleLogout = () => {
-    base44.auth.logout();
+    base44.auth.logout(createPageUrl("Home"));
   };
 
   const getMenuItems = () => {
