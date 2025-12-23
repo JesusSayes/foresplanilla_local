@@ -35,6 +35,7 @@ export default function PayrollManagement() {
   const [showConceptsFor, setShowConceptsFor] = useState(null);
   const [selectedPayslipForClose, setSelectedPayslipForClose] = useState(null);
   const [previewPayslip, setPreviewPayslip] = useState(null);
+  const [excludedEmployees, setExcludedEmployees] = useState([]);
 
   const queryClient = useQueryClient();
 
@@ -192,6 +193,9 @@ export default function PayrollManagement() {
       filteredEmployees = filteredEmployees.filter(emp => emp.department_name === departmentFilter);
     }
 
+    // Excluir empleados que el usuario haya quitado
+    filteredEmployees = filteredEmployees.filter(emp => !excludedEmployees.includes(emp.id));
+
     const payslipsData = await Promise.all(filteredEmployees.map(async (emp) => {
       // Preparar datos de asistencia
       const empAttendance = attendanceRecords.filter(r => r.employee_id === emp.id);
@@ -330,6 +334,42 @@ export default function PayrollManagement() {
       return rest;
     });
     createPayslipsMutation.mutate(payslipsToCreate);
+  };
+
+  const handleRemoveEmployee = (employeeId) => {
+    setPreviewData(previewData.filter(p => p.employee_id !== employeeId));
+    setExcludedEmployees([...excludedEmployees, employeeId]);
+    toast.success("Empleado excluido de la planilla");
+  };
+
+  const handleAddEmployee = (employee) => {
+    // Quitar de excluidos
+    setExcludedEmployees(excludedEmployees.filter(id => id !== employee.id));
+    toast.success("Empleado agregado. Regenere la vista previa.");
+  };
+
+  // Obtener empleados no incluidos en la planilla actual
+  const getExcludedEmployeesData = () => {
+    const includedIds = previewData.map(p => p.employee_id);
+    
+    // Empleados que están en el filtro pero no en la preview
+    let baseEmployees = allEmployees;
+    
+    if (searchTerm) {
+      baseEmployees = baseEmployees.filter(emp => 
+        emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    if (departmentFilter !== "all") {
+      baseEmployees = baseEmployees.filter(emp => emp.department_name === departmentFilter);
+    }
+
+    return baseEmployees.filter(emp => 
+      !includedIds.includes(emp.id) || excludedEmployees.includes(emp.id)
+    );
   };
 
   const filteredPayslips = existingPayslips.filter(p => {
@@ -620,6 +660,14 @@ export default function PayrollManagement() {
                                   <Eye className="w-3 h-3 mr-1" />
                                   Ver Boleta
                                 </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleRemoveEmployee(payslip.employee_id)}
+                                  className="text-red-600 hover:bg-red-50"
+                                >
+                                  ✕ Quitar
+                                </Button>
                               </div>
                               <p className="text-sm text-slate-600">{payslip.department}</p>
                             </div>
@@ -753,6 +801,39 @@ export default function PayrollManagement() {
                       {previewData.length} empleados
                     </p>
                   </div>
+
+                  {/* Empleados No Incluidos */}
+                  {getExcludedEmployeesData().length > 0 && (
+                    <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                      <h4 className="font-bold text-amber-900 mb-3 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" />
+                        Empleados No Incluidos ({getExcludedEmployeesData().length})
+                      </h4>
+                      <p className="text-xs text-amber-700 mb-3">
+                        Estos empleados no están incluidos en la planilla actual. Puede agregarlos o generar una planilla adicional para ellos.
+                      </p>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {getExcludedEmployeesData().map(emp => (
+                          <div key={emp.id} className="flex items-center justify-between bg-white p-2 rounded border border-amber-200">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-900">
+                                {emp.employee_code} - {emp.first_name} {emp.last_name}
+                              </p>
+                              <p className="text-xs text-slate-600">{emp.department_name}</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => handleAddEmployee(emp)}
+                              className="bg-green-600 hover:bg-green-700 text-xs"
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              Agregar
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ) : (

@@ -195,6 +195,11 @@ export class PayrollCalculator {
    * Determina si un concepto debe aplicarse según periodicidad y fechas
    */
   shouldApplyConcept(concept) {
+    // REGLA ESPECIAL: En planillas quincenales NO aplicar descuentos
+    if (this.payrollType === "Quincenal" && concept.concept_type === "Descuento") {
+      return false;
+    }
+
     // Verificar si es recurrente o específico del mes/año
     if (concept.is_recurring) {
       return true; // Los conceptos recurrentes siempre se aplican
