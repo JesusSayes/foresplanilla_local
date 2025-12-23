@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   DollarSign, Plus, Trash2, Search, TrendingUp, 
-  TrendingDown, Users, AlertCircle, Edit2, CheckCircle, User
+  TrendingDown, Users, AlertCircle, Edit2, CheckCircle, User, Copy
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -191,13 +191,19 @@ export default function PayrollConcepts() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [formData, setFormData] = useState({
     concept_type: "Ingreso",
+    concept_category: "Bonificaciones",
     concept_name: "",
+    concept_code: "",
+    description: "",
     amount: "",
     is_dynamic: false,
     calculation_formula: "",
     is_recurring: false,
+    is_mandatory: false,
+    applies_to_payroll_types: ["Mensual"],
     notes: "",
   });
+  const [editingConcept, setEditingConcept] = useState(null);
 
   const queryClient = useQueryClient();
 
@@ -258,15 +264,18 @@ export default function PayrollConcepts() {
 
   const createConceptMutation = useMutation({
     mutationFn: async (data) => {
+      if (editingConcept) {
+        return await base44.entities.PayrollConcept.update(editingConcept.id, data);
+      }
       return await base44.entities.PayrollConcept.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["payrollConcepts"]);
-      toast.success("Concepto creado correctamente");
+      toast.success(editingConcept ? "Concepto actualizado" : "Concepto creado correctamente");
       resetForm();
     },
     onError: () => {
-      toast.error("Error al crear el concepto");
+      toast.error(editingConcept ? "Error al actualizar" : "Error al crear el concepto");
     },
   });
 
@@ -455,16 +464,61 @@ export default function PayrollConcepts() {
     }
   };
 
+  const handleEdit = (concept) => {
+    setEditingConcept(concept);
+    setFormData({
+      concept_type: concept.concept_type,
+      concept_category: concept.concept_category || "Otros",
+      concept_name: concept.concept_name,
+      concept_code: concept.concept_code || "",
+      description: concept.description || "",
+      amount: concept.amount?.toString() || "0",
+      is_dynamic: concept.is_dynamic || false,
+      calculation_formula: concept.calculation_formula || "",
+      is_recurring: concept.is_recurring || false,
+      is_mandatory: concept.is_mandatory || false,
+      applies_to_payroll_types: concept.applies_to_payroll_types || ["Mensual"],
+      notes: concept.notes || "",
+    });
+    setShowForm(true);
+  };
+
+  const handleCopy = (concept) => {
+    setEditingConcept(null);
+    setFormData({
+      concept_type: concept.concept_type,
+      concept_category: concept.concept_category || "Otros",
+      concept_name: `${concept.concept_name} (Copia)`,
+      concept_code: concept.concept_code ? `${concept.concept_code}_COPY` : "",
+      description: concept.description || "",
+      amount: concept.amount?.toString() || "0",
+      is_dynamic: concept.is_dynamic || false,
+      calculation_formula: concept.calculation_formula || "",
+      is_recurring: concept.is_recurring || false,
+      is_mandatory: concept.is_mandatory || false,
+      applies_to_payroll_types: concept.applies_to_payroll_types || ["Mensual"],
+      notes: concept.notes || "",
+    });
+    setShowForm(true);
+    toast.info("Concepto copiado. Modifica y guarda.");
+  };
+
   const resetForm = () => {
     setFormData({
       concept_type: "Ingreso",
+      concept_category: "Bonificaciones",
       concept_name: "",
+      concept_code: "",
+      description: "",
       amount: "",
       is_dynamic: false,
       calculation_formula: "",
       is_recurring: false,
+      is_mandatory: false,
+      applies_to_payroll_types: ["Mensual"],
       notes: "",
     });
+    setEditingConcept(null);
     setShowForm(false);
   };
 
@@ -889,21 +943,18 @@ export default function PayrollConcepts() {
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => {
-                                      setFormData({
-                                        concept_type: concept.concept_type,
-                                        concept_name: concept.concept_name,
-                                        amount: concept.amount?.toString() || "0",
-                                        is_dynamic: concept.is_dynamic || false,
-                                        calculation_formula: concept.calculation_formula || "",
-                                        is_recurring: concept.is_recurring,
-                                        notes: concept.notes || "",
-                                      });
-                                      setShowForm(true);
-                                    }}
+                                    onClick={() => handleEdit(concept)}
                                     className="h-7 w-7 p-0 text-slate-600 hover:text-indigo-600"
                                   >
                                     <Edit2 className="w-3 h-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleCopy(concept)}
+                                    className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700"
+                                  >
+                                    <Copy className="w-3 h-3" />
                                   </Button>
                                   <Button
                                     size="sm"
@@ -1157,21 +1208,18 @@ export default function PayrollConcepts() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => {
-                                    setFormData({
-                                      concept_type: concept.concept_type,
-                                      concept_name: concept.concept_name,
-                                      amount: concept.amount?.toString() || "0",
-                                      is_dynamic: concept.is_dynamic || false,
-                                      calculation_formula: concept.calculation_formula || "",
-                                      is_recurring: concept.is_recurring,
-                                      notes: concept.notes || "",
-                                    });
-                                    setShowForm(true);
-                                  }}
+                                  onClick={() => handleEdit(concept)}
                                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                                 >
                                   <Edit2 className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleCopy(concept)}
+                                  className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                                >
+                                  <Copy className="w-4 h-4" />
                                 </Button>
                                 <Button
                                   size="sm"
@@ -1227,31 +1275,79 @@ export default function PayrollConcepts() {
           >
             <CardHeader className="border-b">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-xl font-bold">Agregar Concepto</CardTitle>
+                <CardTitle className="text-xl font-bold">
+                  {editingConcept ? "Editar Concepto" : "Agregar Concepto"}
+                </CardTitle>
                 <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
-              <div>
-                <Label>Tipo de Concepto</Label>
-                <Select value={formData.concept_type} onValueChange={(v) => setFormData({...formData, concept_type: v})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Ingreso">Ingreso</SelectItem>
-                    <SelectItem value="Descuento">Descuento</SelectItem>
-                    <SelectItem value="Aportación">Aportación</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Tipo de Concepto *</Label>
+                  <Select value={formData.concept_type} onValueChange={(v) => setFormData({...formData, concept_type: v})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Ingreso">Ingreso</SelectItem>
+                      <SelectItem value="Descuento">Descuento</SelectItem>
+                      <SelectItem value="Aportación">Aportación</SelectItem>
+                      <SelectItem value="Otros">Otros</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Categoría</Label>
+                  <Select value={formData.concept_category} onValueChange={(v) => setFormData({...formData, concept_category: v})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Remuneración Base">Remuneración Base</SelectItem>
+                      <SelectItem value="Bonificaciones">Bonificaciones</SelectItem>
+                      <SelectItem value="Horas Extras">Horas Extras</SelectItem>
+                      <SelectItem value="Asignaciones">Asignaciones</SelectItem>
+                      <SelectItem value="AFP/ONP">AFP/ONP</SelectItem>
+                      <SelectItem value="Impuestos">Impuestos</SelectItem>
+                      <SelectItem value="Préstamos">Préstamos</SelectItem>
+                      <SelectItem value="Descuentos Varios">Descuentos Varios</SelectItem>
+                      <SelectItem value="EsSalud">EsSalud</SelectItem>
+                      <SelectItem value="SCTR">SCTR</SelectItem>
+                      <SelectItem value="Otros">Otros</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Nombre del Concepto *</Label>
+                  <Input
+                    value={formData.concept_name}
+                    onChange={(e) => setFormData({...formData, concept_name: e.target.value})}
+                    placeholder="Ej: Bono productividad"
+                  />
+                </div>
+
+                <div>
+                  <Label>Código</Label>
+                  <Input
+                    value={formData.concept_code}
+                    onChange={(e) => setFormData({...formData, concept_code: e.target.value})}
+                    placeholder="Ej: ING001"
+                  />
+                </div>
               </div>
 
               <div>
-                <Label>Nombre del Concepto</Label>
-                <Input
-                  value={formData.concept_name}
-                  onChange={(e) => setFormData({...formData, concept_name: e.target.value})}
-                  placeholder="Ej: Bono productividad"
+                <Label>Descripción</Label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  placeholder="Descripción detallada del concepto..."
+                  rows={2}
                 />
               </div>
 
@@ -1308,26 +1404,69 @@ export default function PayrollConcepts() {
                 </div>
               )}
 
-              <div>
-                <Label>Notas</Label>
-                <Input
-                  value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  placeholder="Detalles adicionales..."
-                />
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="recurring"
+                    checked={formData.is_recurring}
+                    onChange={(e) => setFormData({...formData, is_recurring: e.target.checked})}
+                    className="w-4 h-4 rounded"
+                  />
+                  <label htmlFor="recurring" className="text-sm text-slate-600">
+                    Concepto recurrente (se aplica todos los meses)
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="mandatory"
+                    checked={formData.is_mandatory}
+                    onChange={(e) => setFormData({...formData, is_mandatory: e.target.checked})}
+                    className="w-4 h-4 rounded"
+                  />
+                  <label htmlFor="mandatory" className="text-sm font-semibold text-indigo-700">
+                    Concepto obligatorio (debe aplicarse siempre)
+                  </label>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="recurring"
-                  checked={formData.is_recurring}
-                  onChange={(e) => setFormData({...formData, is_recurring: e.target.checked})}
-                  className="w-4 h-4 rounded"
+              <div>
+                <Label>Aplica a Tipos de Planilla</Label>
+                <div className="flex gap-3 mt-2">
+                  {["Quincenal", "Mensual", "Adicional"].map(type => (
+                    <div key={type} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`type_${type}`}
+                        checked={formData.applies_to_payroll_types?.includes(type)}
+                        onChange={(e) => {
+                          const current = formData.applies_to_payroll_types || [];
+                          if (e.target.checked) {
+                            setFormData({...formData, applies_to_payroll_types: [...current, type]});
+                          } else {
+                            setFormData({...formData, applies_to_payroll_types: current.filter(t => t !== type)});
+                          }
+                        }}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor={`type_${type}`} className="text-sm">
+                        {type}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label>Notas Adicionales</Label>
+                <Textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                  placeholder="Información adicional sobre este concepto..."
+                  rows={2}
                 />
-                <label htmlFor="recurring" className="text-sm text-slate-600">
-                  Aplicar automáticamente todos los meses
-                </label>
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -1339,7 +1478,7 @@ export default function PayrollConcepts() {
                   onClick={handleSubmit}
                   disabled={createConceptMutation.isPending}
                 >
-                  {createConceptMutation.isPending ? "Guardando..." : "Guardar Concepto"}
+                  {createConceptMutation.isPending ? "Guardando..." : editingConcept ? "Actualizar" : "Guardar Concepto"}
                 </Button>
               </div>
             </CardContent>
