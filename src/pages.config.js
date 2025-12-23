@@ -21,10 +21,10 @@ import Reports from './pages/Reports';
 import RoleManagement from './pages/RoleManagement';
 import ScheduleManagement from './pages/ScheduleManagement';
 import SystemRoleInitializer from './pages/SystemRoleInitializer';
+import UserManagement from './pages/UserManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
-import UserManagement from './pages/UserManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -52,10 +52,10 @@ export const PAGES = {
     "RoleManagement": RoleManagement,
     "ScheduleManagement": ScheduleManagement,
     "SystemRoleInitializer": SystemRoleInitializer,
+    "UserManagement": UserManagement,
     "VacationCalendar": VacationCalendar,
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
-    "UserManagement": UserManagement,
 }
 
 export const pagesConfig = {

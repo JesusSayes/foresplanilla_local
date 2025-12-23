@@ -65,14 +65,26 @@ export default function ImportEmployees() {
         department: { type: "string" },
         position: { type: "string" },
         department_name: { type: "string" },
+        site: { type: "string" },
         hire_date: { type: "string" },
         contract_type: { type: "string" },
         base_salary: { type: "number" },
+        afp_id: { type: "string" },
+        pension_system: { type: "string" },
+        cuspp: { type: "string" },
+        worker_type: { type: "string" },
+        tax_residence: { type: "string" },
         bank_name: { type: "string" },
         bank_account: { type: "string" },
+        photo_url: { type: "string" },
         status: { type: "string" },
         role: { type: "string" },
+        managed_team_ids: { type: "string" },
+        supervisor_id: { type: "string" },
         supervisor_name: { type: "string" },
+        emergency_contact_name: { type: "string" },
+        emergency_contact_phone: { type: "string" },
+        emergency_contact_relationship: { type: "string" },
       },
       required: ["employee_code", "document_number", "first_name", "last_name"]
     }
@@ -145,9 +157,9 @@ export default function ImportEmployees() {
   };
 
   const downloadTemplate = () => {
-    const template = `employee_code,document_type,document_number,first_name,last_name,birth_date,gender,personal_email,work_email,mobile,phone,address,district,province,department,position,department_name,hire_date,contract_type,base_salary,bank_name,bank_account,status,role,supervisor_name
-EMP001,DNI,12345678,Juan,Pérez,1990-05-15,M,juan.perez@email.com,juan.perez@empresa.com,987654321,014567890,Av. Principal 123,San Isidro,Lima,Lima,Analista,Sistemas,2023-01-15,Indeterminado,3500,BCP,19100012345678,Activo,empleado,Carlos Manager
-EMP002,DNI,23456789,María,García,1988-08-20,F,maria.garcia@email.com,maria.garcia@empresa.com,987654322,014567891,Jr. Secundaria 456,Miraflores,Lima,Lima,Diseñadora,Marketing,2023-03-10,Indeterminado,3800,Interbank,20012345678901,Activo,empleado,Ana Supervisor`;
+    const template = `employee_code,document_type,document_number,first_name,last_name,birth_date,gender,personal_email,work_email,mobile,phone,address,district,province,department,position,department_name,site,hire_date,contract_type,base_salary,afp_id,pension_system,cuspp,worker_type,tax_residence,bank_name,bank_account,photo_url,status,role,managed_team_ids,supervisor_id,supervisor_name,emergency_contact_name,emergency_contact_phone,emergency_contact_relationship
+EMP001,DNI,12345678,Juan,Pérez,1990-05-15,M,juan.perez@email.com,juan.perez@empresa.com,987654321,014567890,Av. Principal 123,San Isidro,Lima,Lima,Analista,Sistemas,Sede Central,2023-01-15,Indeterminado,3500,,AFP,1234567890123,Empleado,Domiciliado,BCP,19100012345678,,Activo,empleado,,,Carlos Manager,Rosa Pérez,987654320,Madre
+EMP002,DNI,23456789,María,García,1988-08-20,F,maria.garcia@email.com,maria.garcia@empresa.com,987654322,014567891,Jr. Secundaria 456,Miraflores,Lima,Lima,Diseñadora,Marketing,Sede Central,2023-03-10,Indeterminado,3800,,ONP,,Empleado,Domiciliado,Interbank,20012345678901,,Activo,empleado,,,Ana Supervisor,Pedro García,987654323,Esposo`;
 
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -204,8 +216,12 @@ EMP002,DNI,23456789,María,García,1988-08-20,F,maria.garcia@email.com,maria.gar
                   <ul className="text-sm text-slate-600 space-y-1 mb-4">
                     <li>• <strong>Campos requeridos:</strong> employee_code, document_number, first_name, last_name</li>
                     <li>• <strong>Formato de fechas:</strong> YYYY-MM-DD (ej: 2023-01-15)</li>
-                    <li>• <strong>Roles válidos:</strong> empleado, manager, admin</li>
+                    <li>• <strong>Roles válidos:</strong> empleado, manager, admin, super_admin, hr_readonly</li>
                     <li>• <strong>Estados válidos:</strong> Activo, Suspendido, Cesado</li>
+                    <li>• <strong>Tipos de documento:</strong> DNI, CE, Pasaporte</li>
+                    <li>• <strong>Sistemas de pensión:</strong> AFP, ONP, Ninguno</li>
+                    <li>• <strong>Tipos de trabajador:</strong> Empleado, Obrero, Practicante, Directivo</li>
+                    <li>• <strong>Residencia tributaria:</strong> Domiciliado, No Domiciliado</li>
                   </ul>
                 </div>
                 <Button
