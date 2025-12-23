@@ -116,7 +116,6 @@ export default function Layout({ children, currentPageName }) {
       },
       { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
       { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
-      { name: "Inicializar Roles Sistema", icon: Shield, path: "SystemRoleInitializer" },
       ];
 
       const superAdminMenu = [
@@ -292,6 +291,13 @@ export default function Layout({ children, currentPageName }) {
                           >
                             <Users className="w-4 h-4" />
                             Usuarios Corporativos
+                          </Link>
+                          <Link
+                            to={createPageUrl("SystemRoleInitializer")}
+                            className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            <Shield className="w-4 h-4" />
+                            Inicializar Roles Sistema
                           </Link>
                           </>
                           )}
