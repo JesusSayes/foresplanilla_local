@@ -17,13 +17,13 @@ import PayrollConcepts from './pages/PayrollConcepts';
 import PayrollManagement from './pages/PayrollManagement';
 import PayslipTemplateConfig from './pages/PayslipTemplateConfig';
 import Payslips from './pages/Payslips';
+import Reports from './pages/Reports';
 import RoleManagement from './pages/RoleManagement';
 import ScheduleManagement from './pages/ScheduleManagement';
 import SystemRoleInitializer from './pages/SystemRoleInitializer';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
-import Reports from './pages/Reports';
 import __Layout from './Layout.jsx';
 
 
@@ -47,17 +47,17 @@ export const PAGES = {
     "PayrollManagement": PayrollManagement,
     "PayslipTemplateConfig": PayslipTemplateConfig,
     "Payslips": Payslips,
+    "Reports": Reports,
     "RoleManagement": RoleManagement,
     "ScheduleManagement": ScheduleManagement,
     "SystemRoleInitializer": SystemRoleInitializer,
     "VacationCalendar": VacationCalendar,
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
-    "Reports": Reports,
 }
 
 export const pagesConfig = {
-    mainPage: "Dashboard",
+    mainPage: "Home",
     Pages: PAGES,
     Layout: __Layout,
 };
