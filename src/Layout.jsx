@@ -102,6 +102,7 @@ export default function Layout({ children, currentPageName }) {
       },
       { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
       { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
+      { name: "Usuarios Corporativos", icon: Users, path: "UserManagement" },
       { name: "Inicializar Roles Sistema", icon: Shield, path: "SystemRoleInitializer" },
       ];
 
