@@ -676,27 +676,49 @@ export default function PayrollConcepts() {
                             Ingresos
                           </h4>
                           <div className="space-y-2">
-                            {PREDEFINED_CONCEPTS.ingresos
-                              .filter(concept => !generalConcepts.find(c => c.concept_name === concept.name))
-                              .map((concept, idx) => (
-                                <div key={idx} className="p-2 bg-white border border-slate-200 rounded hover:shadow-sm transition-all">
-                                  <div className="flex items-start justify-between gap-2">
+                            {PREDEFINED_CONCEPTS.ingresos.map((concept, idx) => {
+                              const isAdded = generalConcepts.find(c => c.concept_name === concept.name);
+                              return (
+                                <div key={idx} className={`p-2 border rounded transition-all ${isAdded ? 'bg-green-50 border-green-300 opacity-60' : 'bg-white border-slate-200 hover:shadow-sm'}`}>
+                                  <div className="flex items-start justify-between gap-1">
                                     <div className="flex-1 min-w-0">
                                       <h5 className="font-medium text-slate-900 text-xs truncate">{concept.name}</h5>
                                       {concept.description && (
                                         <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{concept.description}</p>
                                       )}
                                     </div>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleAddPredefined(concept, "ingresos")}
-                                      className="h-7 w-7 p-0 flex-shrink-0"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </Button>
+                                    {isAdded ? (
+                                      <div className="flex gap-1">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleEdit(isAdded)}
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <Edit2 className="w-3 h-3" />
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleCopy(isAdded)}
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <Copy className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleAddPredefined(concept, "ingresos")}
+                                        className="h-7 w-7 p-0 flex-shrink-0"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
-                              ))}
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -781,11 +803,11 @@ export default function PayrollConcepts() {
                             Otros Descuentos
                           </h4>
                           <div className="space-y-2">
-                            {PREDEFINED_CONCEPTS.descuentos
-                              .filter(concept => !generalConcepts.find(c => c.concept_name === concept.name))
-                              .map((concept, idx) => (
-                                <div key={idx} className="p-2 bg-white border border-slate-200 rounded hover:shadow-sm transition-all">
-                                  <div className="flex items-start justify-between gap-2">
+                            {PREDEFINED_CONCEPTS.descuentos.map((concept, idx) => {
+                              const isAdded = generalConcepts.find(c => c.concept_name === concept.name);
+                              return (
+                                <div key={idx} className={`p-2 border rounded transition-all ${isAdded ? 'bg-green-50 border-green-300 opacity-60' : 'bg-white border-slate-200 hover:shadow-sm'}`}>
+                                  <div className="flex items-start justify-between gap-1">
                                     <div className="flex-1 min-w-0">
                                       <h5 className="font-medium text-slate-900 text-xs truncate">{concept.name}</h5>
                                       {concept.description && (
@@ -795,16 +817,38 @@ export default function PayrollConcepts() {
                                         <Badge className="bg-red-100 text-red-700 text-xs mt-1">{concept.percentage}%</Badge>
                                       )}
                                     </div>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleAddPredefined(concept, "descuentos")}
-                                      className="h-7 w-7 p-0 flex-shrink-0"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </Button>
+                                    {isAdded ? (
+                                      <div className="flex gap-1">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleEdit(isAdded)}
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <Edit2 className="w-3 h-3" />
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleCopy(isAdded)}
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <Copy className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleAddPredefined(concept, "descuentos")}
+                                        className="h-7 w-7 p-0 flex-shrink-0"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
-                              ))}
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -815,11 +859,11 @@ export default function PayrollConcepts() {
                             Aportaciones
                           </h4>
                           <div className="space-y-2">
-                            {PREDEFINED_CONCEPTS.aportaciones
-                              .filter(concept => !generalConcepts.find(c => c.concept_name === concept.name))
-                              .map((concept, idx) => (
-                                <div key={idx} className="p-2 bg-blue-50 border border-blue-200 rounded hover:shadow-sm transition-all">
-                                  <div className="flex items-start justify-between gap-2">
+                            {PREDEFINED_CONCEPTS.aportaciones.map((concept, idx) => {
+                              const isAdded = generalConcepts.find(c => c.concept_name === concept.name);
+                              return (
+                                <div key={idx} className={`p-2 border rounded transition-all ${isAdded ? 'bg-green-50 border-green-300 opacity-60' : 'bg-blue-50 border-blue-200 hover:shadow-sm'}`}>
+                                  <div className="flex items-start justify-between gap-1">
                                     <div className="flex-1 min-w-0">
                                       <h5 className="font-medium text-slate-900 text-xs truncate">{concept.name}</h5>
                                       {concept.description && (
@@ -829,16 +873,38 @@ export default function PayrollConcepts() {
                                         <Badge className="bg-blue-100 text-blue-700 text-xs mt-1">{concept.percentage}%</Badge>
                                       )}
                                     </div>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleAddPredefined(concept, "aportaciones")}
-                                      className="h-7 w-7 p-0 flex-shrink-0"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </Button>
+                                    {isAdded ? (
+                                      <div className="flex gap-1">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleEdit(isAdded)}
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <Edit2 className="w-3 h-3" />
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleCopy(isAdded)}
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <Copy className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleAddPredefined(concept, "aportaciones")}
+                                        className="h-7 w-7 p-0 flex-shrink-0"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
-                              ))}
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -849,27 +915,49 @@ export default function PayrollConcepts() {
                             Otros
                           </h4>
                           <div className="space-y-2">
-                            {PREDEFINED_CONCEPTS.otros
-                              .filter(concept => !generalConcepts.find(c => c.concept_name === concept.name))
-                              .map((concept, idx) => (
-                                <div key={idx} className="p-2 bg-white border border-slate-200 rounded hover:shadow-sm transition-all">
-                                  <div className="flex items-start justify-between gap-2">
+                            {PREDEFINED_CONCEPTS.otros.map((concept, idx) => {
+                              const isAdded = generalConcepts.find(c => c.concept_name === concept.name);
+                              return (
+                                <div key={idx} className={`p-2 border rounded transition-all ${isAdded ? 'bg-green-50 border-green-300 opacity-60' : 'bg-white border-slate-200 hover:shadow-sm'}`}>
+                                  <div className="flex items-start justify-between gap-1">
                                     <div className="flex-1 min-w-0">
                                       <h5 className="font-medium text-slate-900 text-xs truncate">{concept.name}</h5>
                                       {concept.description && (
                                         <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{concept.description}</p>
                                       )}
                                     </div>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleAddPredefined(concept, "ingresos")}
-                                      className="h-7 w-7 p-0 flex-shrink-0"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </Button>
+                                    {isAdded ? (
+                                      <div className="flex gap-1">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleEdit(isAdded)}
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <Edit2 className="w-3 h-3" />
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleCopy(isAdded)}
+                                          className="h-6 w-6 p-0"
+                                        >
+                                          <Copy className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleAddPredefined(concept, "ingresos")}
+                                        className="h-7 w-7 p-0 flex-shrink-0"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
-                              ))}
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
