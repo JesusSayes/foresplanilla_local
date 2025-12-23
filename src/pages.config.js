@@ -25,6 +25,7 @@ import UserManagement from './pages/UserManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
+import DatabaseConfig from './pages/DatabaseConfig';
 import __Layout from './Layout.jsx';
 
 
@@ -56,6 +57,7 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
+    "DatabaseConfig": DatabaseConfig,
 }
 
 export const pagesConfig = {
