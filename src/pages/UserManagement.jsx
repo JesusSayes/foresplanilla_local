@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { 
   Users, Mail, UserPlus, Search, Shield, 
-  CheckCircle2, XCircle, AlertCircle, Send
+  CheckCircle2, XCircle, AlertCircle, Send, Edit2, Trash2, Ban
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,6 +18,13 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showInviteModal, setShowInviteModal] = useState(null);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [userFormData, setUserFormData] = useState({
+    email: "",
+    full_name: "",
+    role: "user",
+  });
 
   const queryClient = useQueryClient();
 
@@ -85,6 +92,62 @@ export default function UserManagement() {
     },
   });
 
+  const createUserMutation = useMutation({
+    mutationFn: async (userData) => {
+      // Note: User entity creation is handled by Base44 platform
+      // This would typically be done through an admin API
+      throw new Error("La creación de usuarios se maneja a través del sistema de invitaciones");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["allUsers"]);
+      toast.success("Usuario creado correctamente");
+      resetUserForm();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Error al crear usuario");
+    },
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ userId, userData }) => {
+      return await base44.entities.User.update(userId, userData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["allUsers"]);
+      toast.success("Usuario actualizado correctamente");
+      resetUserForm();
+    },
+    onError: () => {
+      toast.error("Error al actualizar usuario");
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId) => {
+      return await base44.entities.User.delete(userId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["allUsers"]);
+      toast.success("Usuario eliminado del sistema");
+    },
+    onError: () => {
+      toast.error("Error al eliminar usuario");
+    },
+  });
+
+  const updateEmployeeRoleMutation = useMutation({
+    mutationFn: async ({ employeeId, role }) => {
+      return await base44.entities.Employee.update(employeeId, { role });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["allEmployees"]);
+      toast.success("Rol actualizado correctamente");
+    },
+    onError: () => {
+      toast.error("Error al actualizar rol");
+    },
+  });
+
   const handleSendInvite = (emp) => {
     if (!emp.work_email) {
       toast.error("El empleado no tiene email corporativo");
@@ -109,6 +172,68 @@ export default function UserManagement() {
       email: inviteEmail,
       name: emp ? `${emp.first_name} ${emp.last_name}` : "Usuario",
     });
+  };
+
+  const handleEditUser = (user, emp) => {
+    setEditingUser({ ...user, employee: emp });
+    setUserFormData({
+      email: user.email,
+      full_name: user.full_name,
+      role: emp?.role || "empleado",
+    });
+    setShowUserModal(true);
+  };
+
+  const handleSaveUser = async () => {
+    if (!userFormData.email || !userFormData.full_name) {
+      toast.error("Complete todos los campos obligatorios");
+      return;
+    }
+
+    if (editingUser) {
+      // Update user info
+      await updateUserMutation.mutateAsync({
+        userId: editingUser.id,
+        userData: {
+          full_name: userFormData.full_name,
+        },
+      });
+
+      // Update employee role if changed
+      if (editingUser.employee && editingUser.employee.role !== userFormData.role) {
+        await updateEmployeeRoleMutation.mutateAsync({
+          employeeId: editingUser.employee.id,
+          role: userFormData.role,
+        });
+      }
+    }
+  };
+
+  const handleDeleteUser = (userId, userName) => {
+    if (confirm(`¿Está seguro de eliminar el acceso de ${userName}? Esta acción no se puede deshacer.`)) {
+      deleteUserMutation.mutate(userId);
+    }
+  };
+
+  const handleSuspendUser = async (emp, currentStatus) => {
+    const newStatus = currentStatus === "Activo" ? "Suspendido" : "Activo";
+    try {
+      await base44.entities.Employee.update(emp.id, { status: newStatus });
+      queryClient.invalidateQueries(["allEmployees"]);
+      toast.success(`Usuario ${newStatus === "Suspendido" ? "suspendido" : "reactivado"} correctamente`);
+    } catch (error) {
+      toast.error("Error al cambiar estado del usuario");
+    }
+  };
+
+  const resetUserForm = () => {
+    setUserFormData({
+      email: "",
+      full_name: "",
+      role: "user",
+    });
+    setEditingUser(null);
+    setShowUserModal(false);
   };
 
   const getUserForEmployee = (workEmail) => {
@@ -321,9 +446,15 @@ export default function UserManagement() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className="bg-green-100 text-green-700">
-                          Acceso Activo
+                      <div className="flex items-center gap-3">
+                        <Badge 
+                          className={
+                            emp.status === "Suspendido"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-green-100 text-green-700"
+                          }
+                        >
+                          {emp.status === "Suspendido" ? "Suspendido" : "Acceso Activo"}
                         </Badge>
                         <Badge 
                           className={
@@ -340,6 +471,36 @@ export default function UserManagement() {
                            emp.role === "hr_readonly" ? "RRHH" :
                            "Empleado"}
                         </Badge>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditUser(user, emp)}
+                            className="h-8"
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSuspendUser(emp, emp.status)}
+                            className={`h-8 ${
+                              emp.status === "Suspendido"
+                                ? "text-green-600 hover:text-green-700"
+                                : "text-orange-600 hover:text-orange-700"
+                            }`}
+                          >
+                            {emp.status === "Suspendido" ? "Reactivar" : "Suspender"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteUser(user.id, `${emp.first_name} ${emp.last_name}`)}
+                            className="h-8 text-red-600 hover:text-red-700"
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -349,6 +510,113 @@ export default function UserManagement() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit User Modal */}
+      {showUserModal && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+          onClick={() => resetUserForm()}
+        >
+          <Card 
+            className="max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl font-bold">
+                  {editingUser ? "Editar Usuario" : "Nuevo Usuario"}
+                </CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => resetUserForm()}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div>
+                <Label>Email Corporativo *</Label>
+                <Input
+                  type="email"
+                  placeholder="usuario@empresa.com"
+                  value={userFormData.email}
+                  onChange={(e) => setUserFormData({...userFormData, email: e.target.value})}
+                  className="mt-2"
+                  disabled={!!editingUser}
+                />
+              </div>
+
+              <div>
+                <Label>Nombre Completo *</Label>
+                <Input
+                  placeholder="Nombre completo del usuario"
+                  value={userFormData.full_name}
+                  onChange={(e) => setUserFormData({...userFormData, full_name: e.target.value})}
+                  className="mt-2"
+                />
+              </div>
+
+              <div>
+                <Label>Rol en el Sistema *</Label>
+                <select
+                  value={userFormData.role}
+                  onChange={(e) => setUserFormData({...userFormData, role: e.target.value})}
+                  className="w-full mt-2 h-10 px-3 rounded-md border border-slate-200 bg-white text-slate-900"
+                >
+                  <option value="empleado">Empleado</option>
+                  <option value="manager">Manager</option>
+                  <option value="hr_readonly">RRHH (Solo Lectura)</option>
+                  <option value="admin">Administrador</option>
+                  {employee?.role === "super_admin" && (
+                    <option value="super_admin">Super Administrador</option>
+                  )}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">
+                  Define el nivel de acceso del usuario en el sistema
+                </p>
+              </div>
+
+              {editingUser && (
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-blue-900">
+                      <p className="font-semibold mb-1">Información:</p>
+                      <p>
+                        Los cambios se aplicarán inmediatamente. 
+                        El usuario verá reflejado su nuevo rol en el próximo inicio de sesión.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <Button 
+                  variant="outline" 
+                  className="flex-1" 
+                  onClick={() => resetUserForm()}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                  onClick={handleSaveUser}
+                  disabled={updateUserMutation.isPending || createUserMutation.isPending}
+                >
+                  {updateUserMutation.isPending || createUserMutation.isPending ? (
+                    "Guardando..."
+                  ) : (
+                    editingUser ? "Actualizar Usuario" : "Crear Usuario"
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Manual Invite Modal */}
       {showInviteModal && (
