@@ -907,21 +907,55 @@ export default function PayrollConcepts() {
                                     )}
                                     <span className="font-semibold text-slate-900 text-sm">{concept.concept_name}</span>
                                   </div>
-                                  <Badge className={
-                                    concept.concept_type === "Ingreso" 
-                                      ? "bg-green-100 text-green-700 text-xs" 
-                                      : concept.concept_type === "Aportación"
-                                      ? "bg-blue-100 text-blue-700 text-xs"
-                                      : "bg-red-100 text-red-700 text-xs"
-                                  }>
-                                    {concept.concept_type}
-                                  </Badge>
+                                  <div className="flex flex-wrap gap-1 mb-2">
+                                    <Badge className={
+                                      concept.concept_type === "Ingreso" 
+                                        ? "bg-green-100 text-green-700 text-xs" 
+                                        : concept.concept_type === "Aportación"
+                                        ? "bg-blue-100 text-blue-700 text-xs"
+                                        : "bg-red-100 text-red-700 text-xs"
+                                    }>
+                                      {concept.concept_type}
+                                    </Badge>
+                                    {concept.concept_category && (
+                                      <Badge variant="outline" className="text-xs bg-slate-50">
+                                        {concept.concept_category}
+                                      </Badge>
+                                    )}
+                                    {concept.concept_code && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {concept.concept_code}
+                                      </Badge>
+                                    )}
+                                    {concept.is_recurring && (
+                                      <Badge className="bg-indigo-100 text-indigo-700 text-xs">Recurrente</Badge>
+                                    )}
+                                    {concept.is_mandatory && (
+                                      <Badge className="bg-orange-100 text-orange-700 text-xs font-bold">⚠ Obligatorio</Badge>
+                                    )}
+                                  </div>
+
+                                  {concept.description && (
+                                    <p className="text-xs text-slate-600 mb-2 italic">{concept.description}</p>
+                                  )}
+
+                                  {concept.applies_to_payroll_types && concept.applies_to_payroll_types.length > 0 && (
+                                    <div className="flex gap-1 mb-2">
+                                      <span className="text-xs text-slate-500">Aplica a:</span>
+                                      {concept.applies_to_payroll_types.map(type => (
+                                        <Badge key={type} variant="outline" className="text-xs bg-blue-50">
+                                          {type}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  )}
+
                                   {concept.is_dynamic ? (
                                     <div className="mt-2">
                                       <Badge className="bg-purple-100 text-purple-700 text-xs">
                                         Dinámico
                                       </Badge>
-                                      <p className="text-xs text-slate-600 mt-1 font-mono">
+                                      <p className="text-xs text-slate-600 mt-1 font-mono bg-slate-50 p-1 rounded">
                                         {concept.calculation_formula}
                                       </p>
                                     </div>
@@ -933,10 +967,9 @@ export default function PayrollConcepts() {
                                     </p>
                                   )}
                                   {concept.notes && (
-                                    <p className="text-xs text-slate-600 mt-1">{concept.notes}</p>
-                                  )}
-                                  {concept.is_recurring && (
-                                    <Badge className="bg-indigo-100 text-indigo-700 text-xs mt-1">Recurrente</Badge>
+                                    <p className="text-xs text-slate-500 mt-1 bg-yellow-50 p-1 rounded border border-yellow-200">
+                                      📝 {concept.notes}
+                                    </p>
                                   )}
                                 </div>
                                 <div className="flex gap-1">
@@ -1085,7 +1118,8 @@ export default function PayrollConcepts() {
                               )}
                               <span className="font-semibold text-slate-900 text-sm">{concept.concept_name}</span>
                             </div>
-                            <div className="flex items-center gap-2">
+                            
+                            <div className="flex flex-wrap gap-1 mb-2">
                               <Badge className={
                                 concept.concept_type === "Ingreso" 
                                   ? "bg-green-100 text-green-700 text-xs" 
@@ -1095,14 +1129,43 @@ export default function PayrollConcepts() {
                               }>
                                 {concept.concept_type}
                               </Badge>
+                              {concept.concept_category && (
+                                <Badge variant="outline" className="text-xs bg-slate-50">
+                                  {concept.concept_category}
+                                </Badge>
+                              )}
+                              {concept.concept_code && (
+                                <Badge variant="outline" className="text-xs">
+                                  {concept.concept_code}
+                                </Badge>
+                              )}
                               {concept.is_dynamic && (
                                 <Badge className="bg-purple-100 text-purple-700 text-xs">
                                   Dinámico
                                 </Badge>
                               )}
+                              {concept.is_mandatory && (
+                                <Badge className="bg-orange-100 text-orange-700 text-xs font-bold">⚠ Obligatorio</Badge>
+                              )}
                             </div>
+                            
+                            {concept.description && (
+                              <p className="text-xs text-slate-600 mb-2 italic">{concept.description}</p>
+                            )}
+
+                            {concept.applies_to_payroll_types && concept.applies_to_payroll_types.length > 0 && (
+                              <div className="flex gap-1 mb-2 flex-wrap">
+                                <span className="text-xs text-slate-500">Aplica a:</span>
+                                {concept.applies_to_payroll_types.map(type => (
+                                  <Badge key={type} variant="outline" className="text-xs bg-blue-50">
+                                    {type}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                            
                             {concept.is_dynamic ? (
-                              <p className="text-xs text-slate-600 mt-2 font-mono">
+                              <p className="text-xs text-slate-600 mt-2 font-mono bg-slate-50 p-1 rounded">
                                 {concept.calculation_formula}
                               </p>
                             ) : (
@@ -1160,7 +1223,7 @@ export default function PayrollConcepts() {
                           <div key={concept.id} className="p-4 border-2 border-blue-200 bg-blue-50/30 rounded-lg hover:shadow-md transition-all">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
+                                <div className="flex items-center gap-2 mb-2 flex-wrap">
                                   {concept.concept_type === "Ingreso" ? (
                                     <TrendingUp className="w-5 h-5 text-green-600" />
                                   ) : concept.concept_type === "Aportación" ? (
@@ -1169,6 +1232,11 @@ export default function PayrollConcepts() {
                                     <TrendingDown className="w-5 h-5 text-red-600" />
                                   )}
                                   <span className="font-bold text-slate-900 text-base">{concept.concept_name}</span>
+                                  {concept.concept_code && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {concept.concept_code}
+                                    </Badge>
+                                  )}
                                   <Badge className={
                                     concept.concept_type === "Ingreso" 
                                       ? "bg-green-100 text-green-700" 
@@ -1178,10 +1246,33 @@ export default function PayrollConcepts() {
                                   }>
                                     {concept.concept_type}
                                   </Badge>
+                                  {concept.concept_category && (
+                                    <Badge variant="outline" className="bg-slate-50">
+                                      {concept.concept_category}
+                                    </Badge>
+                                  )}
                                   {concept.is_recurring && (
                                     <Badge className="bg-indigo-100 text-indigo-700">Recurrente</Badge>
                                   )}
+                                  {concept.is_mandatory && (
+                                    <Badge className="bg-orange-100 text-orange-700 font-bold">⚠ Obligatorio</Badge>
+                                  )}
                                 </div>
+
+                                {concept.description && (
+                                  <p className="text-sm text-slate-600 mb-2 italic">{concept.description}</p>
+                                )}
+
+                                {concept.applies_to_payroll_types && concept.applies_to_payroll_types.length > 0 && (
+                                  <div className="flex gap-1 mb-2 flex-wrap">
+                                    <span className="text-xs text-slate-500">Aplica a:</span>
+                                    {concept.applies_to_payroll_types.map(type => (
+                                      <Badge key={type} variant="outline" className="text-xs bg-blue-50">
+                                        {type}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
                                 {concept.is_dynamic ? (
                                   <div className="mt-2">
                                     <Badge className="bg-purple-100 text-purple-700 text-xs">
@@ -1199,8 +1290,8 @@ export default function PayrollConcepts() {
                                   </p>
                                 )}
                                 {concept.notes && (
-                                  <p className="text-sm text-slate-600 mt-2 bg-white p-2 rounded border">
-                                    {concept.notes}
+                                  <p className="text-sm text-slate-600 mt-2 bg-yellow-50 p-2 rounded border border-yellow-200">
+                                    📝 {concept.notes}
                                   </p>
                                 )}
                               </div>
