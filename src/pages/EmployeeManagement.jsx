@@ -37,6 +37,8 @@ export default function EmployeeManagement() {
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
+  const [selectedDepartamento, setSelectedDepartamento] = useState("");
+  const [selectedProvincia, setSelectedProvincia] = useState("");
 
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -106,6 +108,13 @@ export default function EmployeeManagement() {
     queryFn: async () => {
       const allAFPs = await base44.entities.AFP.list("name");
       return allAFPs.filter(a => a.is_active);
+    },
+  });
+
+  const { data: ubigeos = [] } = useQuery({
+    queryKey: ["ubigeos"],
+    queryFn: async () => {
+      return await base44.entities.Ubigeo.list("departamento");
     },
   });
 
@@ -382,6 +391,18 @@ export default function EmployeeManagement() {
       }
     }
 
+    // Inicializar selecciones de ubigeo
+    if (emp?.department) {
+      setSelectedDepartamento(emp.department);
+    } else {
+      setSelectedDepartamento("");
+    }
+    if (emp?.province) {
+      setSelectedProvincia(emp.province);
+    } else {
+      setSelectedProvincia("");
+    }
+
     setFormData({
       employee_code: emp?.employee_code || "",
       document_type: emp?.document_type || "DNI",
@@ -500,6 +521,15 @@ export default function EmployeeManagement() {
   };
 
   const departmentNames = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
+
+  // Obtener listas únicas de ubigeos
+  const departamentos = [...new Set(ubigeos.map(u => u.departamento))].sort();
+  const provincias = selectedDepartamento 
+    ? [...new Set(ubigeos.filter(u => u.departamento === selectedDepartamento).map(u => u.provincia))].sort()
+    : [];
+  const distritos = selectedProvincia 
+    ? [...new Set(ubigeos.filter(u => u.departamento === selectedDepartamento && u.provincia === selectedProvincia).map(u => u.distrito))].sort()
+    : [];
 
   const filteredEmployees = allEmployees.filter(emp => {
     const matchesSearch = emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -932,25 +962,55 @@ export default function EmployeeManagement() {
 
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <Label>Distrito</Label>
-                      <Input
-                        value={formData.district}
-                        onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                      />
+                      <Label>Departamento</Label>
+                      <Select 
+                        value={selectedDepartamento} 
+                        onValueChange={(val) => {
+                          setSelectedDepartamento(val);
+                          setSelectedProvincia("");
+                          setFormData({ ...formData, department: val, province: "", district: "" });
+                        }}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
+                        <SelectContent>
+                          {departamentos.map(dept => (
+                            <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label>Provincia</Label>
-                      <Input
-                        value={formData.province}
-                        onChange={(e) => setFormData({ ...formData, province: e.target.value })}
-                      />
+                      <Select 
+                        value={selectedProvincia} 
+                        onValueChange={(val) => {
+                          setSelectedProvincia(val);
+                          setFormData({ ...formData, province: val, district: "" });
+                        }}
+                        disabled={!selectedDepartamento}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Seleccionar provincia" /></SelectTrigger>
+                        <SelectContent>
+                          {provincias.map(prov => (
+                            <SelectItem key={prov} value={prov}>{prov}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
-                      <Label>Departamento</Label>
-                      <Input
-                        value={formData.department}
-                        onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                      />
+                      <Label>Distrito</Label>
+                      <Select 
+                        value={formData.district} 
+                        onValueChange={(val) => setFormData({ ...formData, district: val })}
+                        disabled={!selectedProvincia}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Seleccionar distrito" /></SelectTrigger>
+                        <SelectContent>
+                          {distritos.map(dist => (
+                            <SelectItem key={dist} value={dist}>{dist}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </TabsContent>
