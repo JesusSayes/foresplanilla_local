@@ -58,6 +58,7 @@ export default function DeviceEventMonitor({ deviceId }) {
       const mapping = mappings.find(m => m.identifier_value === event.identifier_value);
       
       if (!mapping) {
+        // No se encontró mapeo
         await base44.entities.DeviceEvent.update(event.id, {
           processing_status: "No Identificado",
           error_message: "No se encontró mapeo para este identificador"
@@ -74,105 +75,39 @@ export default function DeviceEventMonitor({ deviceId }) {
         throw new Error("Empleado no encontrado");
       }
 
-      // Obtener horario asignado del empleado
+      // Buscar o crear registro de asistencia para hoy
       const today = new Date().toISOString().split("T")[0];
-      const dayOfWeek = new Date(event.event_timestamp).toLocaleDateString("es", { weekday: "long" }).toLowerCase();
-      const dayMap = {
-        "lunes": "monday", "martes": "tuesday", "miércoles": "wednesday",
-        "jueves": "thursday", "viernes": "friday", "sábado": "saturday", "domingo": "sunday"
-      };
-      
-      const scheduleAssignments = await base44.entities.ScheduleAssignment.filter({
-        employee_id: employee.id,
-        is_active: true
-      });
-      
-      const activeAssignment = scheduleAssignments.find(a => 
-        a.valid_from <= today && (!a.valid_until || a.valid_until >= today)
-      );
-
-      let scheduledStart = null;
-      let scheduledEnd = null;
-      let toleranceIn = 10;
-      let toleranceOut = 10;
-
-      if (activeAssignment) {
-        const templates = await base44.entities.WorkScheduleTemplate.list();
-        const template = templates.find(t => t.id === activeAssignment.template_id);
-        
-        if (template) {
-          const daySchedule = template.weekly_schedule?.[dayMap[dayOfWeek]];
-          if (daySchedule?.enabled) {
-            scheduledStart = daySchedule.start;
-            scheduledEnd = daySchedule.end;
-            toleranceIn = template.tolerance_minutes_in || 10;
-            toleranceOut = template.tolerance_minutes_out || 10;
-          }
-        }
-      }
-
-      // Buscar o crear registro de asistencia
       const existingRecords = await base44.entities.AttendanceRecord.filter({
         employee_id: employee.id,
         date: today
       });
 
-      const eventTime = new Date(event.event_timestamp).toTimeString().slice(0, 5);
       let attendanceRecord;
-      let isLate = false;
-      let lateMinutes = 0;
       
       if (existingRecords.length === 0) {
-        // Validar tardanza en entrada
-        if (event.event_type === "Entrada" && scheduledStart) {
-          const [schedH, schedM] = scheduledStart.split(":").map(Number);
-          const [eventH, eventM] = eventTime.split(":").map(Number);
-          const schedMinutes = schedH * 60 + schedM;
-          const eventMinutes = eventH * 60 + eventM;
-          const diff = eventMinutes - schedMinutes;
-          
-          if (diff > toleranceIn) {
-            isLate = true;
-            lateMinutes = diff;
-          }
-        }
-
+        // Crear nuevo registro
         attendanceRecord = await base44.entities.AttendanceRecord.create({
           employee_id: employee.id,
           date: today,
-          clock_in: event.event_type === "Entrada" ? eventTime : null,
-          clock_out: event.event_type === "Salida" ? eventTime : null,
-          scheduled_start: scheduledStart,
-          scheduled_end: scheduledEnd,
-          is_late: isLate,
-          late_minutes: lateMinutes,
+          clock_in: event.event_type === "Entrada" ? new Date(event.event_timestamp).toTimeString().slice(0, 5) : null,
+          clock_out: event.event_type === "Salida" ? new Date(event.event_timestamp).toTimeString().slice(0, 5) : null,
           status: "Incompleto"
         });
       } else {
+        // Actualizar registro existente
         attendanceRecord = existingRecords[0];
-        const updateData = { scheduled_start: scheduledStart, scheduled_end: scheduledEnd };
+        const updateData = {};
         
         if (event.event_type === "Entrada" && !attendanceRecord.clock_in) {
-          updateData.clock_in = eventTime;
-          
-          // Validar tardanza
-          if (scheduledStart) {
-            const [schedH, schedM] = scheduledStart.split(":").map(Number);
-            const [eventH, eventM] = eventTime.split(":").map(Number);
-            const diff = (eventH * 60 + eventM) - (schedH * 60 + schedM);
-            
-            if (diff > toleranceIn) {
-              updateData.is_late = true;
-              updateData.late_minutes = diff;
-            }
-          }
+          updateData.clock_in = new Date(event.event_timestamp).toTimeString().slice(0, 5);
         } else if (event.event_type === "Salida") {
-          updateData.clock_out = eventTime;
+          updateData.clock_out = new Date(event.event_timestamp).toTimeString().slice(0, 5);
           
+          // Calcular horas trabajadas si hay entrada y salida
           if (attendanceRecord.clock_in) {
-            const [inH, inM] = attendanceRecord.clock_in.split(":").map(Number);
-            const [outH, outM] = eventTime.split(":").map(Number);
-            const totalMinutes = (outH * 60 + outM) - (inH * 60 + inM) - 60;
+            const [inHour, inMin] = attendanceRecord.clock_in.split(":").map(Number);
+            const [outHour, outMin] = updateData.clock_out.split(":").map(Number);
+            const totalMinutes = (outHour * 60 + outMin) - (inHour * 60 + inMin) - 60; // 60 min break
             updateData.worked_hours = totalMinutes / 60;
             updateData.status = "Completo";
           }
@@ -181,13 +116,14 @@ export default function DeviceEventMonitor({ deviceId }) {
         await base44.entities.AttendanceRecord.update(attendanceRecord.id, updateData);
       }
 
+      // Actualizar evento como procesado
       await base44.entities.DeviceEvent.update(event.id, {
         employee_id: employee.id,
         processing_status: "Procesado",
         attendance_record_id: attendanceRecord.id
       });
 
-      return { employee, attendanceRecord, isLate, lateMinutes };
+      return { employee, attendanceRecord };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries(["deviceEvents", deviceId]);
