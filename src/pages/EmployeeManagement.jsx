@@ -1050,6 +1050,7 @@ export default function EmployeeManagement() {
                           <SelectItem value="Plazo Fijo">Plazo Fijo</SelectItem>
                           <SelectItem value="Part-Time">Part-Time</SelectItem>
                           <SelectItem value="Prácticas">Prácticas</SelectItem>
+                          <SelectItem value="SNP">SNP - Servicios No Personales</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
