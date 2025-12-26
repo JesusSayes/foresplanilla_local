@@ -1525,8 +1525,8 @@ export default function PayrollConcepts() {
 
               <div>
                 <Label>Aplica a Tipos de Planilla</Label>
-                <div className="flex gap-3 mt-2">
-                  {["Quincenal", "Mensual", "Adicional"].map(type => (
+                <div className="flex gap-3 mt-2 flex-wrap">
+                  {["Quincenal", "Mensual", "Adicional", "SNP"].map(type => (
                     <div key={type} className="flex items-center gap-2">
                       <input
                         type="checkbox"
