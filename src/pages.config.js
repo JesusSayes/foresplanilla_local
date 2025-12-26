@@ -1,3 +1,4 @@
+import AccessDeviceConfig from './pages/AccessDeviceConfig';
 import Attendance from './pages/Attendance';
 import AttendanceManagement from './pages/AttendanceManagement';
 import AttendanceReports from './pages/AttendanceReports';
@@ -26,11 +27,11 @@ import UserManagement from './pages/UserManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
-import AccessDeviceConfig from './pages/AccessDeviceConfig';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "AccessDeviceConfig": AccessDeviceConfig,
     "Attendance": Attendance,
     "AttendanceManagement": AttendanceManagement,
     "AttendanceReports": AttendanceReports,
@@ -59,7 +60,6 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
-    "AccessDeviceConfig": AccessDeviceConfig,
 }
 
 export const pagesConfig = {
