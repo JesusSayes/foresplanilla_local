@@ -176,10 +176,15 @@ export default function PayrollManagement() {
   });
 
   const calculatePayroll = async () => {
-    const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
+    const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
     
     // Filtrar empleados según búsqueda y departamento
     let filteredEmployees = allEmployees;
+    
+    // Filtrar por tipo de contrato si es SNP
+    if (payrollType === "SNP") {
+      filteredEmployees = filteredEmployees.filter(emp => emp.contract_type === "SNP");
+    }
     
     if (searchTerm) {
       filteredEmployees = filteredEmployees.filter(emp => 
@@ -393,6 +398,7 @@ export default function PayrollManagement() {
     quincenal: existingPayslips.filter(p => p.payroll_type === "Quincenal").length,
     mensual: existingPayslips.filter(p => p.payroll_type === "Mensual").length,
     adicional: existingPayslips.filter(p => p.payroll_type === "Adicional").length,
+    snp: existingPayslips.filter(p => p.payroll_type === "SNP").length,
     total: existingPayslips.reduce((sum, p) => sum + (p.net_pay || 0), 0),
   };
 
@@ -498,6 +504,7 @@ export default function PayrollManagement() {
                       <SelectItem value="Quincenal">Quincenal (Adelanto)</SelectItem>
                       <SelectItem value="Mensual">Mensual (Final)</SelectItem>
                       <SelectItem value="Adicional">Adicional (Extraordinaria)</SelectItem>
+                      <SelectItem value="SNP">SNP (Servicios No Personales)</SelectItem>
                     </SelectContent>
                   </Select>
                   {payrollType === "Quincenal" && (
@@ -859,9 +866,10 @@ export default function PayrollManagement() {
                         <TabsTrigger value="Quincenal">Quincenales</TabsTrigger>
                         <TabsTrigger value="Mensual">Mensuales</TabsTrigger>
                         <TabsTrigger value="Adicional">Adicionales</TabsTrigger>
+                        <TabsTrigger value="SNP">SNP</TabsTrigger>
                       </TabsList>
 
-                      {["all", "Quincenal", "Mensual", "Adicional"].map(type => (
+                      {["all", "Quincenal", "Mensual", "Adicional", "SNP"].map(type => (
                         <TabsContent key={type} value={type}>
                           <div className="space-y-3">
                             {filteredPayslips
@@ -879,9 +887,10 @@ export default function PayrollManagement() {
                                             {emp.employee_code} - {emp.first_name} {emp.last_name}
                                           </h4>
                                           <Badge className={
-                                            payslip.payroll_type === "Quincenal" ? "bg-blue-100 text-blue-700" :
-                                            payslip.payroll_type === "Mensual" ? "bg-green-100 text-green-700" :
-                                            "bg-purple-100 text-purple-700"
+                                           payslip.payroll_type === "Quincenal" ? "bg-blue-100 text-blue-700" :
+                                           payslip.payroll_type === "Mensual" ? "bg-green-100 text-green-700" :
+                                           payslip.payroll_type === "SNP" ? "bg-orange-100 text-orange-700" :
+                                           "bg-purple-100 text-purple-700"
                                           }>
                                             {payslip.payroll_type}
                                           </Badge>
