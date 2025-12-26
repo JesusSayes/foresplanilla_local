@@ -27,6 +27,7 @@ import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
 import AccessDeviceConfig from './pages/AccessDeviceConfig';
+import AdvancedScheduleManagement from './pages/AdvancedScheduleManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -60,6 +61,7 @@ export const PAGES = {
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
     "AccessDeviceConfig": AccessDeviceConfig,
+    "AdvancedScheduleManagement": AdvancedScheduleManagement,
 }
 
 export const pagesConfig = {
