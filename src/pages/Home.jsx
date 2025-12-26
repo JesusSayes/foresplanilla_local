@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "../utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,11 +8,11 @@ import {
   ArrowRight, Shield, CheckCircle
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 
 export default function Home() {
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const loadEmployee = async () => {
@@ -224,14 +223,15 @@ export default function Home() {
             </div>
           )}
 
-          <Button
-            size="lg"
-            className="mt-8 bg-white text-[#1a5850] hover:bg-white/90 shadow-2xl text-lg px-8 py-6 hover:scale-105 transition-all duration-300 font-bold"
-            onClick={() => navigate(createPageUrl("Dashboard"))}
-          >
-            Ir al Dashboard
-            <ArrowRight className="w-5 h-5 ml-2" />
-          </Button>
+          <Link to={createPageUrl("Dashboard")}>
+            <Button
+              size="lg"
+              className="mt-8 bg-white text-[#1a5850] hover:bg-white/90 shadow-2xl text-lg px-8 py-6 hover:scale-105 transition-all duration-300 font-bold"
+            >
+              Ir al Dashboard
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+          </Link>
         </motion.div>
 
         {/* Features Grid */}
@@ -255,10 +255,10 @@ export default function Home() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: 0.3 + index * 0.1 }}
                 >
-                  <Card
-                    className="group cursor-pointer border-0 bg-white hover:shadow-2xl transition-all duration-300 hover:scale-105 overflow-hidden"
-                    onClick={() => navigate(createPageUrl(feature.link))}
-                  >
+                  <Link to={createPageUrl(feature.link)}>
+                    <Card
+                      className="group cursor-pointer border-0 bg-white hover:shadow-2xl transition-all duration-300 hover:scale-105 overflow-hidden"
+                    >
                     <CardContent className="p-6 relative">
                       <div className={`w-16 h-16 bg-gradient-to-br ${feature.color} rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-xl`}>
                         <Icon className="w-8 h-8 text-white" />
@@ -280,6 +280,7 @@ export default function Home() {
                       <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
                     </CardContent>
                   </Card>
+                  </Link>
                 </motion.div>
               );
             })}
