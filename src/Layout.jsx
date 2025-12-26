@@ -103,6 +103,7 @@ export default function Layout({ children, currentPageName }) {
           { name: "Reportes Asistencia", path: "AttendanceReports" },
           { name: "Gestión Horarios", path: "ScheduleManagement" },
           { name: "Base de Datos Externa", path: "DatabaseConfig" },
+          { name: "Control de Acceso Físico", path: "AccessDeviceConfig" },
           { name: "Mi Asistencia", path: "Attendance" },
         ]
       },
