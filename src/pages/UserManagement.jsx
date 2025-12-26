@@ -64,31 +64,42 @@ export default function UserManagement() {
   });
 
   const sendInviteMutation = useMutation({
-    mutationFn: async ({ email, name }) => {
-      return await base44.integrations.Core.SendEmail({
-        to: email,
-        subject: "Invitación al Sistema de RRHH",
-        body: `
-          Hola ${name},
-          
-          Has sido invitado a unirte al Sistema de Recursos Humanos de la empresa.
-          
-          Por favor, accede al sistema con tu correo corporativo: ${email}
-          
-          Si es tu primera vez, el sistema te pedirá crear una contraseña.
-          
-          Saludos,
-          Equipo de Recursos Humanos
-        `,
-      });
+    mutationFn: async ({ email, name, role }) => {
+      // Usar la función oficial de Base44 para invitar usuarios
+      await base44.users.inviteUser(email, role || "user");
+      
+      // Opcionalmente enviar email adicional con información
+      try {
+        await base44.integrations.Core.SendEmail({
+          to: email,
+          subject: "Invitación al Sistema de RRHH",
+          body: `
+Hola ${name},
+
+Has sido invitado a unirte al Sistema de Recursos Humanos de la empresa.
+
+Por favor, revisa tu correo electrónico para encontrar el enlace de invitación oficial y configurar tu cuenta.
+
+Tu email de acceso será: ${email}
+
+Saludos,
+Equipo de Recursos Humanos
+          `,
+        });
+      } catch (emailError) {
+        console.log("Email adicional no enviado:", emailError);
+      }
+      
+      return { email, name };
     },
-    onSuccess: (_, variables) => {
-      toast.success(`Invitación enviada a ${variables.email}`);
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(["allUsers"]);
+      toast.success(`✓ Invitación enviada exitosamente a ${data.email}`);
       setShowInviteModal(null);
       setInviteEmail("");
     },
-    onError: () => {
-      toast.error("Error al enviar la invitación");
+    onError: (error) => {
+      toast.error(`Error al enviar invitación: ${error.message || "Inténtelo de nuevo"}`);
     },
   });
 
@@ -154,9 +165,16 @@ export default function UserManagement() {
       return;
     }
 
+    // Determinar el rol a asignar basado en el rol del empleado
+    let inviteRole = "user"; // rol por defecto
+    if (emp.role === "admin" || emp.role === "super_admin") {
+      inviteRole = "admin";
+    }
+
     sendInviteMutation.mutate({
       email: emp.work_email,
       name: `${emp.first_name} ${emp.last_name}`,
+      role: inviteRole,
     });
   };
 
@@ -168,9 +186,21 @@ export default function UserManagement() {
 
     const emp = allEmployees.find(e => e.work_email === inviteEmail);
     
+    if (!emp) {
+      toast.error("El email no corresponde a ningún empleado registrado en el sistema");
+      return;
+    }
+
+    // Determinar el rol a asignar
+    let inviteRole = "user";
+    if (emp.role === "admin" || emp.role === "super_admin") {
+      inviteRole = "admin";
+    }
+    
     sendInviteMutation.mutate({
       email: inviteEmail,
-      name: emp ? `${emp.first_name} ${emp.last_name}` : "Usuario",
+      name: `${emp.first_name} ${emp.last_name}`,
+      role: inviteRole,
     });
   };
 
@@ -391,9 +421,16 @@ export default function UserManagement() {
                         onClick={() => handleSendInvite(emp)}
                         disabled={sendInviteMutation.isPending}
                         className="bg-orange-600 hover:bg-orange-700"
+                        size="sm"
                       >
-                        <Send className="w-4 h-4 mr-2" />
-                        Enviar Invitación
+                        {sendInviteMutation.isPending ? (
+                          <>Enviando...</>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4 mr-2" />
+                            Enviar Invitación
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -642,17 +679,30 @@ export default function UserManagement() {
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               <div>
-                <Label>Email Corporativo</Label>
+                <Label>Email Corporativo *</Label>
                 <Input
                   type="email"
                   placeholder="usuario@empresa.com"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   className="mt-2"
+                  autoFocus
                 />
                 <p className="text-xs text-slate-500 mt-1">
                   El email debe corresponder a un empleado registrado en el sistema
                 </p>
+                {inviteEmail && !allEmployees.find(e => e.work_email === inviteEmail) && (
+                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                    <XCircle className="w-3 h-3" />
+                    Este email no pertenece a ningún empleado registrado
+                  </p>
+                )}
+                {inviteEmail && allEmployees.find(e => e.work_email === inviteEmail) && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Empleado: {allEmployees.find(e => e.work_email === inviteEmail).first_name} {allEmployees.find(e => e.work_email === inviteEmail).last_name}
+                  </p>
+                )}
               </div>
 
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
