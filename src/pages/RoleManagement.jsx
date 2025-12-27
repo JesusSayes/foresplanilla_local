@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { AVAILABLE_PERMISSIONS } from "../components/hooks/usePermissions";
 import PermissionGuard from "../components/PermissionGuard";
+import PermissionMatrix from "../components/roles/PermissionMatrix";
 
 export default function RoleManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -189,10 +190,7 @@ export default function RoleManagement() {
     setShowRoleForm(false);
   };
 
-  const togglePermission = (permission) => {
-    const newPermissions = roleFormData.permissions.includes(permission)
-      ? roleFormData.permissions.filter(p => p !== permission)
-      : [...roleFormData.permissions, permission];
+  const handlePermissionsChange = (newPermissions) => {
     setRoleFormData({ ...roleFormData, permissions: newPermissions });
   };
 
@@ -548,28 +546,10 @@ export default function RoleManagement() {
                     <label className="block text-sm font-semibold text-slate-900 mb-3">
                       Permisos ({roleFormData.permissions.length} seleccionados)
                     </label>
-                    <div className="space-y-4">
-                      {Object.entries(permissionCategories).map(([category, perms]) => (
-                        <div key={category} className="p-4 bg-slate-50 rounded-lg">
-                          <h4 className="font-semibold text-slate-900 mb-3">{category}</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {perms.map(perm => (
-                              <label key={perm} className="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded">
-                                <input
-                                  type="checkbox"
-                                  checked={roleFormData.permissions.includes(perm)}
-                                  onChange={() => togglePermission(perm)}
-                                  className="w-4 h-4 rounded"
-                                />
-                                <span className="text-sm text-slate-700">
-                                  {AVAILABLE_PERMISSIONS[perm]}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <PermissionMatrix
+                      permissions={roleFormData.permissions}
+                      onChange={handlePermissionsChange}
+                    />
                   </div>
 
                   <div className="flex gap-3">
