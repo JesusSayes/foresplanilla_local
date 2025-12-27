@@ -184,19 +184,35 @@ export default function AttendanceManagement() {
 
     const clockIn = editingRecord.clock_in;
     const clockOut = editingRecord.clock_out;
+    const scheduledStart = editingRecord.scheduled_start || "09:00";
 
     let workedHours = 0;
+    let lateMinutes = 0;
+    let isLate = false;
+
     if (clockIn && clockOut) {
       const [inHour, inMin] = clockIn.split(":").map(Number);
       const [outHour, outMin] = clockOut.split(":").map(Number);
-      const totalMinutes = (outHour * 60 + outMin) - (inHour * 60 + inMin) - 60; // 60 min break
-      workedHours = totalMinutes / 60;
+      
+      // Calcular horas trabajadas (descontando 60 minutos de break)
+      const totalMinutes = (outHour * 60 + outMin) - (inHour * 60 + inMin) - 60;
+      workedHours = Math.max(0, totalMinutes / 60);
+
+      // Calcular tardanza
+      const [schedHour, schedMin] = scheduledStart.split(":").map(Number);
+      const scheduledMinutes = schedHour * 60 + schedMin;
+      const actualMinutes = inHour * 60 + inMin;
+      
+      lateMinutes = Math.max(0, actualMinutes - scheduledMinutes);
+      isLate = lateMinutes > 0;
     }
 
     const updatedData = {
       clock_in: clockIn || null,
       clock_out: clockOut || null,
       worked_hours: workedHours,
+      is_late: isLate,
+      late_minutes: lateMinutes,
       notes: editingRecord.notes,
       status: editingRecord.status,
       is_absent: editingRecord.status === "Ausente",
