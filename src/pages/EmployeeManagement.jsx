@@ -848,14 +848,14 @@ export default function EmployeeManagement() {
                 <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
               </div>
             </CardHeader>
-            <CardContent className="p-6 max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              <Tabs defaultValue="personal" className="space-y-6" onClick={(e) => e.stopPropagation()}>
+            <CardContent className="p-6 max-h-[70vh] overflow-y-auto">
+              <Tabs defaultValue="personal" className="space-y-6">
                 <TabsList className="grid w-full grid-cols-5">
-                  <TabsTrigger value="personal" onClick={(e) => e.stopPropagation()}>Personal</TabsTrigger>
-                  <TabsTrigger value="contact" onClick={(e) => e.stopPropagation()}>Contacto</TabsTrigger>
-                  <TabsTrigger value="work" onClick={(e) => e.stopPropagation()}>Laboral</TabsTrigger>
-                  <TabsTrigger value="financial" onClick={(e) => e.stopPropagation()}>Financiero</TabsTrigger>
-                  <TabsTrigger value="emergency" onClick={(e) => e.stopPropagation()}>Emergencia</TabsTrigger>
+                  <TabsTrigger value="personal">Personal</TabsTrigger>
+                  <TabsTrigger value="contact">Contacto</TabsTrigger>
+                  <TabsTrigger value="work">Laboral</TabsTrigger>
+                  <TabsTrigger value="financial">Financiero</TabsTrigger>
+                  <TabsTrigger value="emergency">Emergencia</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="personal" className="space-y-4">
@@ -881,6 +881,7 @@ export default function EmployeeManagement() {
                     <div>
                       <Label>Número de Documento *</Label>
                       <Input
+                        type="number"
                         value={formData.document_number}
                         onChange={(e) => setFormData({ ...formData, document_number: e.target.value })}
                       />
@@ -958,6 +959,7 @@ export default function EmployeeManagement() {
                     <div>
                       <Label>Teléfono Fijo</Label>
                       <Input
+                        type="number"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       />
@@ -965,6 +967,7 @@ export default function EmployeeManagement() {
                     <div>
                       <Label>Celular</Label>
                       <Input
+                        type="number"
                         value={formData.mobile}
                         onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
                       />
@@ -1278,6 +1281,7 @@ export default function EmployeeManagement() {
                       <div>
                         <Label>N° de Cuenta</Label>
                         <Input
+                          type="number"
                           value={formData.bank_account}
                           onChange={(e) => setFormData({ ...formData, bank_account: e.target.value })}
                           placeholder="Número de cuenta"
@@ -1286,6 +1290,7 @@ export default function EmployeeManagement() {
                       <div>
                         <Label>CCI</Label>
                         <Input
+                          type="number"
                           value={formData.cci_account}
                           onChange={(e) => setFormData({ ...formData, cci_account: e.target.value })}
                           placeholder="Código CCI (20 dígitos)"
@@ -1314,6 +1319,7 @@ export default function EmployeeManagement() {
                       <div>
                         <Label>N° de Cuenta CTS</Label>
                         <Input
+                          type="number"
                           value={formData.cts_account_number}
                           onChange={(e) => setFormData({ ...formData, cts_account_number: e.target.value })}
                           placeholder="Número de cuenta"
@@ -1346,6 +1352,7 @@ export default function EmployeeManagement() {
                     <div>
                       <Label>Teléfono de Contacto</Label>
                       <Input
+                        type="number"
                         value={formData.emergency_contact_phone}
                         onChange={(e) => setFormData({ ...formData, emergency_contact_phone: e.target.value })}
                       />
