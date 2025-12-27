@@ -12,12 +12,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle, 
-  AlertCircle, Users, Search, FileText, Download, Database
+  AlertCircle, Users, Search, FileText, Download, Database, History, Eye
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
+import IncidentHistory from "../components/attendance/IncidentHistory";
 
 export default function AttendanceManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -30,6 +31,8 @@ export default function AttendanceManagement() {
   const [reviewingIncident, setReviewingIncident] = useState(null);
   const [showIncidentModal, setShowIncidentModal] = useState(false);
   const [reviewComments, setReviewComments] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
 
   const queryClient = useQueryClient();
 
@@ -104,6 +107,18 @@ export default function AttendanceManagement() {
         "-created_date"
       );
     },
+  });
+
+  const { data: employeeIncidents = [] } = useQuery({
+    queryKey: ["employeeIncidents", historyEmployeeId],
+    queryFn: async () => {
+      if (!historyEmployeeId) return [];
+      return await base44.entities.AttendanceIncident.filter(
+        { employee_id: historyEmployeeId },
+        "-created_date"
+      );
+    },
+    enabled: !!historyEmployeeId,
   });
 
   const updateRecordMutation = useMutation({
@@ -535,6 +550,18 @@ export default function AttendanceManagement() {
                                     Editar
                                   </Button>
                                 )}
+
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setHistoryEmployeeId(emp.id);
+                                    setShowHistory(true);
+                                  }}
+                                  title="Ver historial de incidencias"
+                                >
+                                  <History className="w-4 h-4" />
+                                </Button>
                               </div>
                             </div>
                           </div>
@@ -598,14 +625,17 @@ export default function AttendanceManagement() {
                             </div>
 
                             {incident.supporting_document_url && (
-                              <a
-                                href={incident.supporting_document_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-indigo-600 hover:underline mb-4 inline-block"
-                              >
-                                📎 Ver documento adjunto
-                              </a>
+                              <div className="mb-4">
+                                <a
+                                  href={incident.supporting_document_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:underline bg-indigo-50 px-3 py-2 rounded-lg"
+                                >
+                                  <Download className="w-4 h-4" />
+                                  Ver documento adjunto
+                                </a>
+                              </div>
                             )}
 
                             <div className="flex gap-3">
@@ -837,6 +867,38 @@ export default function AttendanceManagement() {
           </div>
         )}
       </div>
-    </PermissionGuard>
-  );
-}
+
+      {/* History Modal */}
+      {showHistory && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+          onClick={() => {
+            setShowHistory(false);
+            setHistoryEmployeeId(null);
+          }}
+        >
+          <div 
+            className="max-w-4xl w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <IncidentHistory 
+              incidents={employeeIncidents} 
+              isLoading={false}
+              employeeName={historyEmployeeId ? allEmployees.find(e => e.id === historyEmployeeId)?.first_name + ' ' + allEmployees.find(e => e.id === historyEmployeeId)?.last_name : ""}
+            />
+            <Button
+              onClick={() => {
+                setShowHistory(false);
+                setHistoryEmployeeId(null);
+              }}
+              className="w-full mt-4"
+              variant="outline"
+            >
+              Cerrar
+            </Button>
+          </div>
+        </div>
+      )}
+      </PermissionGuard>
+      );
+      }

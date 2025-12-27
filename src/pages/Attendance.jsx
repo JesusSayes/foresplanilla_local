@@ -11,12 +11,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   Clock, Calendar as CalendarIcon, AlertCircle, CheckCircle, 
-  XCircle, TrendingUp, FileText, Upload, Filter, ChevronDown
+  XCircle, TrendingUp, FileText, Upload, Filter, ChevronDown, History
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInMinutes, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import ClockInOutWidget from "../components/attendance/ClockInOutWidget";
+import IncidentHistory from "../components/attendance/IncidentHistory";
 
 export default function Attendance() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -30,6 +31,8 @@ export default function Attendance() {
     justification: "",
     supporting_document_url: null,
   });
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -152,6 +155,7 @@ export default function Attendance() {
     const file = e.target.files[0];
     if (!file) return;
 
+    setUploadingFile(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       setJustificationForm({ ...justificationForm, supporting_document_url: file_url });
@@ -159,6 +163,8 @@ export default function Attendance() {
     } catch (error) {
       toast.error("Error al cargar el archivo");
       console.error(error);
+    } finally {
+      setUploadingFile(false);
     }
   };
 
@@ -556,9 +562,19 @@ export default function Attendance() {
           <div className="space-y-6">
             <Card className="border-0 shadow-lg">
               <CardHeader className="border-b bg-slate-50/50">
-                <CardTitle className="text-xl font-bold">
-                  Mis Justificaciones
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-bold">
+                    Mis Justificaciones
+                  </CardTitle>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowHistory(true)}
+                  >
+                    <History className="w-4 h-4 mr-2" />
+                    Ver Historial
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-6">
                 {incidents.length === 0 ? (
@@ -568,7 +584,7 @@ export default function Attendance() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {incidents.map((incident) => {
+                    {incidents.slice(0, 5).map((incident) => {
                       const StatusIcon = getIncidentStatusConfig(incident.status).icon;
                       return (
                         <div 
@@ -594,9 +610,15 @@ export default function Attendance() {
                             {incident.justification}
                           </p>
 
+                          {incident.status === "Aprobada" && incident.review_comments && (
+                            <div className="p-2 bg-green-50 border border-green-200 rounded text-xs text-green-800">
+                              <strong>Aprobada:</strong> {incident.review_comments}
+                            </div>
+                          )}
+
                           {incident.status === "Rechazada" && incident.review_comments && (
                             <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
-                              <strong>Motivo:</strong> {incident.review_comments}
+                              <strong>Rechazada:</strong> {incident.review_comments}
                             </div>
                           )}
 
@@ -607,18 +629,54 @@ export default function Attendance() {
                               rel="noopener noreferrer"
                               className="text-xs text-indigo-600 hover:underline mt-2 inline-block"
                             >
-                              Ver documento adjunto
+                              📎 Ver documento
                             </a>
                           )}
                         </div>
                       );
                     })}
+                    {incidents.length > 5 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setShowHistory(true)}
+                      >
+                        Ver todas ({incidents.length})
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
         </div>
+
+        {/* History Modal */}
+        {showHistory && (
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+            onClick={() => setShowHistory(false)}
+          >
+            <div 
+              className="max-w-4xl w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <IncidentHistory 
+                incidents={incidents} 
+                isLoading={false}
+                employeeName={`${employee.first_name} ${employee.last_name}`}
+              />
+              <Button
+                onClick={() => setShowHistory(false)}
+                className="w-full mt-4"
+                variant="outline"
+              >
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Justification Modal */}
         {showJustifyForm && (
@@ -706,16 +764,31 @@ export default function Attendance() {
 
                   <div>
                     <label className="block text-sm font-semibold text-slate-900 mb-2">
-                      Documento de Sustento
+                      Documento de Sustento (Opcional)
                     </label>
-                    <Input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={handleFileUpload}
-                    />
-                    {justificationForm.supporting_document_url && (
-                      <p className="text-sm text-green-600 mt-2">
-                        ✓ Archivo cargado correctamente
+                    <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-indigo-400 transition-colors">
+                      <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                      <Input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={handleFileUpload}
+                        disabled={uploadingFile}
+                        className="max-w-xs mx-auto"
+                      />
+                      <p className="text-xs text-slate-500 mt-2">
+                        PDF, JPG, PNG (Ej: certificado médico)
+                      </p>
+                    </div>
+                    {uploadingFile && (
+                      <p className="text-sm text-blue-600 mt-2 flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                        Cargando archivo...
+                      </p>
+                    )}
+                    {justificationForm.supporting_document_url && !uploadingFile && (
+                      <p className="text-sm text-green-600 mt-2 flex items-center justify-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        Archivo cargado correctamente
                       </p>
                     )}
                   </div>
