@@ -78,6 +78,11 @@ export default function MasterDataManagement() {
     queryFn: async () => await base44.entities.AFP.list("name"),
   });
 
+  const { data: professions = [] } = useQuery({
+    queryKey: ["professions"],
+    queryFn: async () => await base44.entities.Profession.list("name"),
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ entity, data }) => {
       return await base44.entities[entity].create(data);
@@ -141,6 +146,7 @@ export default function MasterDataManagement() {
       banks: "Bank",
       rmv: "RMV",
       afp: "AFP",
+      professions: "Profession",
     };
     const entity = entityMap[activeTab];
 
@@ -202,6 +208,11 @@ export default function MasterDataManagement() {
     a.code?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const filteredProfessions = professions.filter(p => 
+    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (!employee || permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -241,7 +252,7 @@ export default function MasterDataManagement() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-6 mb-8">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
@@ -252,7 +263,7 @@ export default function MasterDataManagement() {
               <div className="text-2xl font-bold text-slate-900 mb-1">
                 {sites.length}
               </div>
-              <p className="text-slate-600 text-sm">Sedes registradas</p>
+              <p className="text-slate-600 text-sm">Sedes</p>
             </CardContent>
           </Card>
 
@@ -266,7 +277,7 @@ export default function MasterDataManagement() {
               <div className="text-2xl font-bold text-slate-900 mb-1">
                 {positions.length}
               </div>
-              <p className="text-slate-600 text-sm">Cargos definidos</p>
+              <p className="text-slate-600 text-sm">Cargos</p>
             </CardContent>
           </Card>
 
@@ -294,7 +305,7 @@ export default function MasterDataManagement() {
               <div className="text-2xl font-bold text-slate-900 mb-1">
                 {banks.length}
               </div>
-              <p className="text-slate-600 text-sm">Bancos activos</p>
+              <p className="text-slate-600 text-sm">Bancos</p>
             </CardContent>
           </Card>
 
@@ -308,7 +319,7 @@ export default function MasterDataManagement() {
               <div className="text-2xl font-bold text-slate-900 mb-1">
                 {activeRMV ? `S/ ${activeRMV.amount.toFixed(2)}` : "N/A"}
               </div>
-              <p className="text-slate-600 text-sm">RMV Vigente</p>
+              <p className="text-slate-600 text-sm">RMV</p>
             </CardContent>
           </Card>
 
@@ -322,19 +333,34 @@ export default function MasterDataManagement() {
               <div className="text-2xl font-bold text-slate-900 mb-1">
                 {afps.length}
               </div>
-              <p className="text-slate-600 text-sm">AFPs registradas</p>
+              <p className="text-slate-600 text-sm">AFPs</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-cyan-100 rounded-xl">
+                  <Briefcase className="w-6 h-6 text-cyan-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">
+                {professions.length}
+              </div>
+              <p className="text-slate-600 text-sm">Profesiones</p>
             </CardContent>
           </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-4xl grid-cols-6">
+          <TabsList className="grid w-full max-w-5xl grid-cols-7">
             <TabsTrigger value="sites">Sedes</TabsTrigger>
             <TabsTrigger value="positions">Cargos</TabsTrigger>
             <TabsTrigger value="departments">Departamentos</TabsTrigger>
             <TabsTrigger value="banks">Bancos</TabsTrigger>
             <TabsTrigger value="rmv">RMV</TabsTrigger>
             <TabsTrigger value="afp">AFP</TabsTrigger>
+            <TabsTrigger value="professions">Profesiones</TabsTrigger>
           </TabsList>
 
           <TabsContent value="sites" className="space-y-6">
@@ -823,8 +849,86 @@ export default function MasterDataManagement() {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
-      </div>
+
+          <TabsContent value="professions" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Profesiones</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Catálogo de profesiones para registro de empleados
+                    </p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button
+                      onClick={() => handleCreate("professions")}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nueva Profesión
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <Input
+                      placeholder="Buscar profesión..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {filteredProfessions.map(prof => (
+                    <div key={prof.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-bold text-slate-900 text-lg">{prof.name}</h4>
+                            {prof.category && (
+                              <Badge className="bg-cyan-100 text-cyan-700">{prof.category}</Badge>
+                            )}
+                            {!prof.is_active && (
+                              <Badge className="bg-red-100 text-red-700">Inactiva</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEdit(prof, "professions")}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => handleDelete(prof, "Profession")}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          </Tabs>
+          </div>
 
       {/* Form Modal */}
       {showForm && (
@@ -1133,6 +1237,37 @@ export default function MasterDataManagement() {
                         className="w-4 h-4 rounded"
                       />
                       <label htmlFor="is_active_afp" className="text-sm">Activa</label>
+                    </div>
+                  </>
+                )}
+
+                {activeTab === "professions" && (
+                  <>
+                    <div>
+                      <Label>Nombre de la Profesión *</Label>
+                      <Input
+                        value={formData.name || ""}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Ej: Ingeniero Civil"
+                      />
+                    </div>
+                    <div>
+                      <Label>Categoría</Label>
+                      <Input
+                        value={formData.category || ""}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        placeholder="Ej: Ingeniería"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_active_profession"
+                        checked={formData.is_active !== false}
+                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="is_active_profession" className="text-sm">Activa</label>
                     </div>
                   </>
                 )}

@@ -35,6 +35,7 @@ export default function EmployeeManagement() {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [formData, setFormData] = useState({});
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
+  const [professionSearchTerm, setProfessionSearchTerm] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
   const [selectedDepartamento, setSelectedDepartamento] = useState("");
@@ -115,6 +116,14 @@ export default function EmployeeManagement() {
     queryKey: ["ubigeos"],
     queryFn: async () => {
       return await base44.entities.Ubigeo.list("departamento");
+    },
+  });
+
+  const { data: professions = [] } = useQuery({
+    queryKey: ["professions"],
+    queryFn: async () => {
+      const allProfessions = await base44.entities.Profession.list("name");
+      return allProfessions.filter(p => p.is_active);
     },
   });
 
@@ -929,11 +938,28 @@ export default function EmployeeManagement() {
                     </div>
                     <div>
                       <Label>Profesión</Label>
-                      <Input
-                        value={formData.profession}
-                        onChange={(e) => setFormData({ ...formData, profession: e.target.value })}
-                        placeholder="Profesión"
-                      />
+                      <Select value={formData.profession} onValueChange={(val) => setFormData({ ...formData, profession: val })}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar profesión" /></SelectTrigger>
+                        <SelectContent>
+                          <div className="p-2 border-b sticky top-0 bg-white z-10">
+                            <Input
+                              placeholder="Buscar profesión..."
+                              value={professionSearchTerm}
+                              onChange={(e) => setProfessionSearchTerm(e.target.value)}
+                              className="h-8"
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          {professions
+                            .filter(prof => prof.name.toLowerCase().includes(professionSearchTerm.toLowerCase()))
+                            .map(prof => (
+                              <SelectItem key={prof.id} value={prof.name}>
+                                {prof.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </TabsContent>
