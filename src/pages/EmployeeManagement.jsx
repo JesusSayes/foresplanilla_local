@@ -1183,18 +1183,7 @@ export default function EmployeeManagement() {
                 </TabsContent>
 
                 <TabsContent value="financial" className="space-y-4">
-                  <div>
-                    <Label>Salario Base</Label>
-                    <Input
-                      type="number"
-                      value={formData.base_salary}
-                      readOnly
-                      className="bg-slate-100 cursor-not-allowed"
-                    />
-                    <p className="text-xs text-slate-500 mt-1">Se obtiene del último contrato vigente</p>
-                  </div>
-
-                  <div className="border-t pt-4">
+                  <div className="border-b pb-4">
                     <h3 className="font-semibold text-slate-900 mb-4">Sistema de Pensiones</h3>
                     <div className="grid grid-cols-3 gap-4">
                       <div>
@@ -1241,19 +1230,31 @@ export default function EmployeeManagement() {
                     </div>
 
                     {(formData.pension_system === "AFP" || formData.pension_system === "ONP") && (
-                      <div className="mt-4">
-                        <Label>CUSPP{formData.pension_system === "AFP" ? " (Código Único de Identificación)" : " / N° de Afiliación"}</Label>
-                        <Input
-                          value={formData.cuspp}
-                          onChange={(e) => setFormData({ ...formData, cuspp: e.target.value })}
-                          placeholder={formData.pension_system === "AFP" ? "Ingrese CUSPP de 12 dígitos" : "Ingrese número de afiliación ONP"}
-                          maxLength={formData.pension_system === "AFP" ? 12 : 20}
-                        />
-                        <p className="text-xs text-slate-500 mt-1">
-                          {formData.pension_system === "AFP" 
-                            ? "Código único de 12 dígitos del Sistema Privado de Pensiones" 
-                            : "Número de afiliación al Sistema Nacional de Pensiones"}
-                        </p>
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                          <Label>CUSPP{formData.pension_system === "AFP" ? " (Código Único de Identificación)" : " / N° de Afiliación"}</Label>
+                          <Input
+                            value={formData.cuspp}
+                            onChange={(e) => setFormData({ ...formData, cuspp: e.target.value })}
+                            placeholder={formData.pension_system === "AFP" ? "Ingrese CUSPP de 12 dígitos" : "Ingrese número de afiliación ONP"}
+                            maxLength={formData.pension_system === "AFP" ? 12 : 20}
+                          />
+                          <p className="text-xs text-slate-500 mt-1">
+                            {formData.pension_system === "AFP" 
+                              ? "Código único de 12 dígitos del Sistema Privado de Pensiones" 
+                              : "Número de afiliación al Sistema Nacional de Pensiones"}
+                          </p>
+                        </div>
+                        <div>
+                          <Label>Salario Base</Label>
+                          <Input
+                            type="number"
+                            value={formData.base_salary}
+                            readOnly
+                            className="bg-slate-100 cursor-not-allowed"
+                          />
+                          <p className="text-xs text-slate-500 mt-1">Se obtiene del último contrato vigente</p>
+                        </div>
                       </div>
                     )}
                   </div>
