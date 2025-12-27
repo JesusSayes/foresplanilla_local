@@ -106,12 +106,16 @@ export default function AttendanceReports() {
 
   const calculateEmployeeStats = (employeeId) => {
     const empRecords = filteredRecords.filter(r => r.employee_id === employeeId);
-    const totalDays = empRecords.length;
-    const presentDays = empRecords.filter(r => !r.is_absent).length;
-    const lateDays = empRecords.filter(r => r.is_late).length;
+    
+    // Solo contar días donde hay marcación (clock_in no nulo)
+    const recordsWithClockIn = empRecords.filter(r => r.clock_in);
+    
+    const totalDays = recordsWithClockIn.length;
+    const presentDays = recordsWithClockIn.filter(r => !r.is_absent && r.clock_in).length;
+    const lateDays = recordsWithClockIn.filter(r => r.is_late && r.late_minutes > 0).length;
     const absentDays = empRecords.filter(r => r.is_absent && !isHoliday(new Date(r.date))).length;
-    const totalHours = empRecords.reduce((sum, r) => sum + (r.worked_hours || 0), 0);
-    const totalLateMinutes = empRecords.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
+    const totalHours = recordsWithClockIn.reduce((sum, r) => sum + (r.worked_hours || 0), 0);
+    const totalLateMinutes = recordsWithClockIn.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
     const holidaysInPeriod = empRecords.filter(r => isHoliday(new Date(r.date))).length;
 
     return { totalDays, presentDays, lateDays, absentDays, totalHours, totalLateMinutes, holidaysInPeriod };
@@ -123,10 +127,13 @@ export default function AttendanceReports() {
       deptEmployees.some(e => e.id === r.employee_id)
     );
     
-    const lateDays = deptRecords.filter(r => r.is_late).length;
+    // Solo contar registros con marcación
+    const recordsWithClockIn = deptRecords.filter(r => r.clock_in);
+    
+    const lateDays = recordsWithClockIn.filter(r => r.is_late && r.late_minutes > 0).length;
     const absentDays = deptRecords.filter(r => r.is_absent).length;
-    const avgAttendance = deptRecords.length > 0 
-      ? ((deptRecords.filter(r => !r.is_absent).length / deptRecords.length) * 100).toFixed(1)
+    const avgAttendance = recordsWithClockIn.length > 0 
+      ? ((recordsWithClockIn.filter(r => !r.is_absent && r.clock_in).length / recordsWithClockIn.length) * 100).toFixed(1)
       : 0;
 
     return { dept, employees: deptEmployees.length, lateDays, absentDays, avgAttendance };
