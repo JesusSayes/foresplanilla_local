@@ -419,17 +419,32 @@ export default function EmployeeManagement() {
       district: emp?.district || "",
       province: emp?.province || "",
       department: emp?.department || "",
+      company: emp?.company || "",
       position: emp?.position || "",
+      position_level: emp?.position_level || "",
+      profession: emp?.profession || "",
       department_name: emp?.department_name || "",
+      work_area: emp?.work_area || "",
+      work_unit: emp?.work_unit || "",
       site: emp?.site || "",
       hire_date: emp?.hire_date || "",
+      termination_date: emp?.termination_date || "",
       contract_type: emp?.contract_type || "Indeterminado",
+      contract_number: emp?.contract_number || "",
+      contract_end_date: emp?.contract_end_date || "",
+      employment_condition: emp?.employment_condition || "Planilla",
+      payroll_type: emp?.payroll_type || "Planilla",
       base_salary: baseSalary,
       pension_system: emp?.pension_system || "Ninguno",
       afp_id: emp?.afp_id || "",
+      afp_affiliation_date: emp?.afp_affiliation_date || "",
       cuspp: emp?.cuspp || "",
       bank_name: emp?.bank_name || "",
       bank_account: emp?.bank_account || "",
+      cci_account: emp?.cci_account || "",
+      cts_bank: emp?.cts_bank || "",
+      cts_account_number: emp?.cts_account_number || "",
+      cts_currency: emp?.cts_currency || "Soles",
       status: emp?.status || "Activo",
       role: emp?.role || "empleado",
       supervisor_name: emp?.supervisor_name || "",
@@ -1017,7 +1032,15 @@ export default function EmployeeManagement() {
                 </TabsContent>
 
                 <TabsContent value="work" className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label>Empresa</Label>
+                      <Input
+                        value={formData.company}
+                        onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                        placeholder="Empresa del grupo"
+                      />
+                    </div>
                     <div>
                       <Label>Cargo</Label>
                       <Select value={formData.position} onValueChange={(val) => setFormData({ ...formData, position: val })}>
@@ -1044,6 +1067,25 @@ export default function EmployeeManagement() {
                       </Select>
                     </div>
                     <div>
+                      <Label>Nivel</Label>
+                      <Input
+                        value={formData.position_level}
+                        onChange={(e) => setFormData({ ...formData, position_level: e.target.value })}
+                        placeholder="Nivel del cargo"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label>Profesión</Label>
+                      <Input
+                        value={formData.profession}
+                        onChange={(e) => setFormData({ ...formData, profession: e.target.value })}
+                        placeholder="Profesión"
+                      />
+                    </div>
+                    <div>
                       <Label>Área/Departamento</Label>
                       <Select value={formData.department_name} onValueChange={(val) => setFormData({ ...formData, department_name: val })}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
@@ -1068,9 +1110,25 @@ export default function EmployeeManagement() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label>Área de Trabajo</Label>
+                      <Input
+                        value={formData.work_area}
+                        onChange={(e) => setFormData({ ...formData, work_area: e.target.value })}
+                        placeholder="Área de trabajo"
+                      />
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label>Unidad de Trabajo</Label>
+                      <Input
+                        value={formData.work_unit}
+                        onChange={(e) => setFormData({ ...formData, work_unit: e.target.value })}
+                        placeholder="Unidad de trabajo"
+                      />
+                    </div>
                     <div>
                       <Label>Sede</Label>
                       <Select value={formData.site} onValueChange={(val) => setFormData({ ...formData, site: val })}>
@@ -1093,7 +1151,7 @@ export default function EmployeeManagement() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label>Fecha de Ingreso</Label>
                       <Input
@@ -1102,6 +1160,28 @@ export default function EmployeeManagement() {
                         onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
                       />
                     </div>
+                    <div>
+                      <Label>Fecha de Cese</Label>
+                      <Input
+                        type="date"
+                        value={formData.termination_date}
+                        onChange={(e) => setFormData({ ...formData, termination_date: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Estado</Label>
+                      <Select value={formData.status} onValueChange={(val) => setFormData({ ...formData, status: val })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Activo">Activo</SelectItem>
+                          <SelectItem value="Suspendido">Suspendido</SelectItem>
+                          <SelectItem value="Cesado">Cesado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label>Tipo de Contrato</Label>
                       <Select value={formData.contract_type} onValueChange={(val) => setFormData({ ...formData, contract_type: val })}>
@@ -1115,33 +1195,61 @@ export default function EmployeeManagement() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label>Número de Contrato</Label>
+                      <Input
+                        value={formData.contract_number}
+                        onChange={(e) => setFormData({ ...formData, contract_number: e.target.value })}
+                        placeholder="N° de contrato"
+                      />
+                    </div>
+                    <div>
+                      <Label>Fecha Término Contrato</Label>
+                      <Input
+                        type="date"
+                        value={formData.contract_end_date}
+                        onChange={(e) => setFormData({ ...formData, contract_end_date: e.target.value })}
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label>Estado</Label>
-                      <Select value={formData.status} onValueChange={(val) => setFormData({ ...formData, status: val })}>
+                      <Label>Condición Laboral</Label>
+                      <Select value={formData.employment_condition} onValueChange={(val) => setFormData({ ...formData, employment_condition: val })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Activo">Activo</SelectItem>
-                          <SelectItem value="Suspendido">Suspendido</SelectItem>
-                          <SelectItem value="Cesado">Cesado</SelectItem>
+                          <SelectItem value="Planilla">Planilla</SelectItem>
+                          <SelectItem value="Recibo por Honorarios">Recibo por Honorarios</SelectItem>
+                          <SelectItem value="Locación de Servicios">Locación de Servicios</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
-                      <Label>Salario Base</Label>
-                      <Input
-                        type="number"
-                        value={formData.base_salary}
-                        readOnly
-                        className="bg-slate-100 cursor-not-allowed"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Se obtiene del último contrato vigente</p>
+                      <Label>Tipo de Planilla</Label>
+                      <Select value={formData.payroll_type} onValueChange={(val) => setFormData({ ...formData, payroll_type: val })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Planilla">Planilla</SelectItem>
+                          <SelectItem value="Honorarios">Honorarios</SelectItem>
+                          <SelectItem value="Cuarta Categoría">Cuarta Categoría</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Salario Base</Label>
+                    <Input
+                      type="number"
+                      value={formData.base_salary}
+                      readOnly
+                      className="bg-slate-100 cursor-not-allowed"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Se obtiene del último contrato vigente</p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label>Sistema de Pensiones</Label>
                       <Select value={formData.pension_system || "Ninguno"} onValueChange={(val) => {
@@ -1156,22 +1264,32 @@ export default function EmployeeManagement() {
                       </Select>
                     </div>
                     {formData.pension_system === "AFP" && (
-                      <div>
-                        <Label>AFP Afiliada</Label>
-                        <Select value={formData.afp_id || ""} onValueChange={(val) => setFormData({ ...formData, afp_id: val })}>
-                          <SelectTrigger><SelectValue placeholder="Seleccionar AFP" /></SelectTrigger>
-                          <SelectContent>
-                            {afps.map(afp => (
-                              <SelectItem key={afp.id} value={afp.id}>
-                                {afp.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Los descuentos AFP se agregarán automáticamente
-                        </p>
-                      </div>
+                      <>
+                        <div>
+                          <Label>AFP Afiliada</Label>
+                          <Select value={formData.afp_id || ""} onValueChange={(val) => setFormData({ ...formData, afp_id: val })}>
+                            <SelectTrigger><SelectValue placeholder="Seleccionar AFP" /></SelectTrigger>
+                            <SelectContent>
+                              {afps.map(afp => (
+                                <SelectItem key={afp.id} value={afp.id}>
+                                  {afp.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Los descuentos AFP se agregarán automáticamente
+                          </p>
+                        </div>
+                        <div>
+                          <Label>Fecha Afiliación AFP</Label>
+                          <Input
+                            type="date"
+                            value={formData.afp_affiliation_date}
+                            onChange={(e) => setFormData({ ...formData, afp_affiliation_date: e.target.value })}
+                          />
+                        </div>
+                      </>
                     )}
                   </div>
 
@@ -1192,9 +1310,9 @@ export default function EmployeeManagement() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <Label>Banco</Label>
+                      <Label>Banco Sueldo</Label>
                       <Select value={formData.bank_name} onValueChange={(val) => setFormData({ ...formData, bank_name: val })}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar banco" /></SelectTrigger>
                         <SelectContent>
@@ -1207,11 +1325,55 @@ export default function EmployeeManagement() {
                       </Select>
                     </div>
                     <div>
-                      <Label>Número de Cuenta</Label>
+                      <Label>N° Cuenta Sueldo</Label>
                       <Input
                         value={formData.bank_account}
                         onChange={(e) => setFormData({ ...formData, bank_account: e.target.value })}
+                        placeholder="N° de cuenta"
                       />
+                    </div>
+                    <div>
+                      <Label>CCI Sueldo</Label>
+                      <Input
+                        value={formData.cci_account}
+                        onChange={(e) => setFormData({ ...formData, cci_account: e.target.value })}
+                        placeholder="Código CCI"
+                        maxLength={20}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <Label>Banco CTS</Label>
+                      <Select value={formData.cts_bank} onValueChange={(val) => setFormData({ ...formData, cts_bank: val })}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar banco" /></SelectTrigger>
+                        <SelectContent>
+                          {banks.map(bank => (
+                            <SelectItem key={bank.id} value={bank.name}>
+                              {bank.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>N° Cuenta CTS</Label>
+                      <Input
+                        value={formData.cts_account_number}
+                        onChange={(e) => setFormData({ ...formData, cts_account_number: e.target.value })}
+                        placeholder="N° cuenta CTS"
+                      />
+                    </div>
+                    <div>
+                      <Label>Moneda CTS</Label>
+                      <Select value={formData.cts_currency} onValueChange={(val) => setFormData({ ...formData, cts_currency: val })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Soles">Soles</SelectItem>
+                          <SelectItem value="Dólares">Dólares</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </TabsContent>
