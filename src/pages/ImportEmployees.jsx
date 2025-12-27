@@ -154,13 +154,75 @@ export default function ImportEmployees() {
     },
   });
 
+  const validateEmployeeData = (employees) => {
+    const errors = [];
+    const validatedEmployees = employees.map((emp, index) => {
+      const validated = { ...emp };
+      
+      // Validar y limpiar número de documento
+      if (validated.document_number) {
+        validated.document_number = String(validated.document_number).replace(/\D/g, '');
+        const maxLength = validated.document_type === 'DNI' ? 8 : 20;
+        validated.document_number = validated.document_number.slice(0, maxLength);
+        
+        if (validated.document_type === 'DNI' && validated.document_number.length !== 8) {
+          errors.push(`Fila ${index + 1}: DNI debe tener 8 dígitos`);
+        }
+      }
+      
+      // Validar y limpiar teléfonos
+      if (validated.mobile) {
+        validated.mobile = String(validated.mobile).replace(/\D/g, '').slice(0, 9);
+      }
+      if (validated.phone) {
+        validated.phone = String(validated.phone).replace(/\D/g, '').slice(0, 9);
+      }
+      if (validated.emergency_contact_phone) {
+        validated.emergency_contact_phone = String(validated.emergency_contact_phone).replace(/\D/g, '').slice(0, 9);
+      }
+      
+      // Validar y limpiar cuentas bancarias
+      if (validated.bank_account) {
+        validated.bank_account = String(validated.bank_account).replace(/\D/g, '').slice(0, 20);
+      }
+      if (validated.cci_account) {
+        validated.cci_account = String(validated.cci_account).replace(/\D/g, '').slice(0, 20);
+        if (validated.cci_account.length > 0 && validated.cci_account.length !== 20) {
+          errors.push(`Fila ${index + 1}: CCI debe tener 20 dígitos`);
+        }
+      }
+      if (validated.cts_account_number) {
+        validated.cts_account_number = String(validated.cts_account_number).replace(/\D/g, '').slice(0, 20);
+      }
+      
+      // Validar CUSPP
+      if (validated.cuspp) {
+        validated.cuspp = String(validated.cuspp).replace(/\D/g, '');
+        if (validated.pension_system === 'AFP' && validated.cuspp.length !== 12) {
+          errors.push(`Fila ${index + 1}: CUSPP de AFP debe tener 12 dígitos`);
+        }
+      }
+      
+      return validated;
+    });
+    
+    return { validatedEmployees, errors };
+  };
+
   const handleImport = () => {
     if (!previewData || previewData.length === 0) {
       toast.error("No hay datos para importar");
       return;
     }
 
-    importMutation.mutate(previewData);
+    const { validatedEmployees, errors } = validateEmployeeData(previewData);
+    
+    if (errors.length > 0) {
+      toast.error(`Errores de validación encontrados:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n... y ${errors.length - 5} más` : ''}`);
+      return;
+    }
+
+    importMutation.mutate(validatedEmployees);
   };
 
   const downloadTemplate = () => {
@@ -232,9 +294,12 @@ EMP003,DNI,34567890,Carlos,Rodríguez,1985-12-10,M,carlos.rodriguez@email.com,ca
                     <li>• <strong>Tipos de trabajador:</strong> Empleado, Obrero, Practicante, Directivo</li>
                     <li>• <strong>Residencia tributaria:</strong> Domiciliado, No Domiciliado</li>
                     <li>• <strong>Moneda CTS:</strong> Soles, Dólares</li>
-                    <li>• <strong>CCI:</strong> Código de 20 dígitos</li>
-                    <li>• <strong>CUSPP:</strong> 12 dígitos para AFP, variable para ONP</li>
-                    <li>• <strong>Nota:</strong> Los campos distrito, provincia y department se refieren a la ubicación geográfica</li>
+                    <li>• <strong>DNI:</strong> Exactamente 8 dígitos</li>
+                    <li>• <strong>Celulares/Teléfonos:</strong> Máximo 9 dígitos</li>
+                    <li>• <strong>CCI:</strong> Exactamente 20 dígitos</li>
+                    <li>• <strong>CUSPP AFP:</strong> Exactamente 12 dígitos</li>
+                    <li>• <strong>Cuentas bancarias:</strong> Máximo 20 dígitos</li>
+                    <li>• <strong>Nota:</strong> Todos los campos numéricos se validarán automáticamente</li>
                   </ul>
                 </div>
                 <Button
