@@ -1229,8 +1229,8 @@ export default function EmployeeManagement() {
                       )}
                     </div>
 
-                    {(formData.pension_system === "AFP" || formData.pension_system === "ONP") && (
-                      <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      {(formData.pension_system === "AFP" || formData.pension_system === "ONP") && (
                         <div>
                           <Label>CUSPP{formData.pension_system === "AFP" ? " (Código Único de Identificación)" : " / N° de Afiliación"}</Label>
                           <Input
@@ -1245,18 +1245,18 @@ export default function EmployeeManagement() {
                               : "Número de afiliación al Sistema Nacional de Pensiones"}
                           </p>
                         </div>
-                        <div>
-                          <Label>Salario Base</Label>
-                          <Input
-                            type="number"
-                            value={formData.base_salary}
-                            readOnly
-                            className="bg-slate-100 cursor-not-allowed"
-                          />
-                          <p className="text-xs text-slate-500 mt-1">Se obtiene del último contrato vigente</p>
-                        </div>
+                      )}
+                      <div>
+                        <Label>Salario Base</Label>
+                        <Input
+                          type="number"
+                          value={formData.base_salary}
+                          readOnly
+                          className="bg-slate-100 cursor-not-allowed"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Se obtiene del último contrato vigente</p>
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   <div className="border-t pt-4">
