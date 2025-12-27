@@ -427,6 +427,7 @@ export default function EmployeeManagement() {
       base_salary: baseSalary,
       pension_system: emp?.pension_system || "Ninguno",
       afp_id: emp?.afp_id || "",
+      cuspp: emp?.cuspp || "",
       bank_name: emp?.bank_name || "",
       bank_account: emp?.bank_account || "",
       status: emp?.status || "Activo",
@@ -1174,6 +1175,23 @@ export default function EmployeeManagement() {
                     )}
                   </div>
 
+                  {(formData.pension_system === "AFP" || formData.pension_system === "ONP") && (
+                    <div>
+                      <Label>CUSPP{formData.pension_system === "AFP" ? " (Código Único de Identificación)" : " / N° de Afiliación"}</Label>
+                      <Input
+                        value={formData.cuspp}
+                        onChange={(e) => setFormData({ ...formData, cuspp: e.target.value })}
+                        placeholder={formData.pension_system === "AFP" ? "Ingrese CUSPP de 12 dígitos" : "Ingrese número de afiliación ONP"}
+                        maxLength={formData.pension_system === "AFP" ? 12 : 20}
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        {formData.pension_system === "AFP" 
+                          ? "Código único de 12 dígitos del Sistema Privado de Pensiones" 
+                          : "Número de afiliación al Sistema Nacional de Pensiones"}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Banco</Label>
@@ -1321,6 +1339,8 @@ export default function EmployeeManagement() {
                     <p><strong>Sede:</strong> {selectedEmployee.site || "N/A"}</p>
                     <p><strong>Fecha Ingreso:</strong> {selectedEmployee.hire_date ? format(new Date(selectedEmployee.hire_date), "dd/MM/yyyy") : "N/A"}</p>
                     <p><strong>Contrato:</strong> {selectedEmployee.contract_type}</p>
+                    <p><strong>Sistema Pensión:</strong> {selectedEmployee.pension_system || "N/A"}</p>
+                    {selectedEmployee.cuspp && <p><strong>CUSPP:</strong> {selectedEmployee.cuspp}</p>}
                     <p><strong>Estado:</strong> <Badge className={getStatusConfig(selectedEmployee.status).color}>{selectedEmployee.status}</Badge></p>
                   </div>
                 </div>
