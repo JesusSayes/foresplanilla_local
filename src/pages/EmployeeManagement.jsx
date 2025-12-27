@@ -834,11 +834,9 @@ export default function EmployeeManagement() {
       {showForm && (
         <div 
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
-          onClick={resetForm}
         >
           <Card 
             className="max-w-5xl w-full my-8"
-            onClick={(e) => e.stopPropagation()}
           >
             <CardHeader className="border-b">
               <div className="flex items-center justify-between">
@@ -881,9 +879,14 @@ export default function EmployeeManagement() {
                     <div>
                       <Label>Número de Documento *</Label>
                       <Input
-                        type="number"
                         value={formData.document_number}
-                        onChange={(e) => setFormData({ ...formData, document_number: e.target.value })}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          const maxLength = formData.document_type === 'DNI' ? 8 : 20;
+                          setFormData({ ...formData, document_number: value.slice(0, maxLength) });
+                        }}
+                        placeholder={formData.document_type === 'DNI' ? '8 dígitos' : 'Número de documento'}
+                        maxLength={formData.document_type === 'DNI' ? 8 : 20}
                       />
                     </div>
                   </div>
@@ -959,17 +962,25 @@ export default function EmployeeManagement() {
                     <div>
                       <Label>Teléfono Fijo</Label>
                       <Input
-                        type="number"
                         value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          setFormData({ ...formData, phone: value.slice(0, 9) });
+                        }}
+                        placeholder="Máx. 9 dígitos"
+                        maxLength={9}
                       />
                     </div>
                     <div>
                       <Label>Celular</Label>
                       <Input
-                        type="number"
                         value={formData.mobile}
-                        onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          setFormData({ ...formData, mobile: value.slice(0, 9) });
+                        }}
+                        placeholder="9 dígitos"
+                        maxLength={9}
                       />
                     </div>
                   </div>
@@ -1281,18 +1292,23 @@ export default function EmployeeManagement() {
                       <div>
                         <Label>N° de Cuenta</Label>
                         <Input
-                          type="number"
                           value={formData.bank_account}
-                          onChange={(e) => setFormData({ ...formData, bank_account: e.target.value })}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            setFormData({ ...formData, bank_account: value.slice(0, 20) });
+                          }}
                           placeholder="Número de cuenta"
+                          maxLength={20}
                         />
                       </div>
                       <div>
                         <Label>CCI</Label>
                         <Input
-                          type="number"
                           value={formData.cci_account}
-                          onChange={(e) => setFormData({ ...formData, cci_account: e.target.value })}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            setFormData({ ...formData, cci_account: value.slice(0, 20) });
+                          }}
                           placeholder="Código CCI (20 dígitos)"
                           maxLength={20}
                         />
@@ -1319,10 +1335,13 @@ export default function EmployeeManagement() {
                       <div>
                         <Label>N° de Cuenta CTS</Label>
                         <Input
-                          type="number"
                           value={formData.cts_account_number}
-                          onChange={(e) => setFormData({ ...formData, cts_account_number: e.target.value })}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            setFormData({ ...formData, cts_account_number: value.slice(0, 20) });
+                          }}
                           placeholder="Número de cuenta"
+                          maxLength={20}
                         />
                       </div>
                       <div>
@@ -1352,9 +1371,13 @@ export default function EmployeeManagement() {
                     <div>
                       <Label>Teléfono de Contacto</Label>
                       <Input
-                        type="number"
                         value={formData.emergency_contact_phone}
-                        onChange={(e) => setFormData({ ...formData, emergency_contact_phone: e.target.value })}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          setFormData({ ...formData, emergency_contact_phone: value.slice(0, 9) });
+                        }}
+                        placeholder="9 dígitos"
+                        maxLength={9}
                       />
                     </div>
                     <div>
