@@ -63,18 +63,29 @@ export default function ImportEmployees() {
         district: { type: "string" },
         province: { type: "string" },
         department: { type: "string" },
+        company: { type: "string" },
         position: { type: "string" },
+        position_level: { type: "string" },
+        profession: { type: "string" },
         department_name: { type: "string" },
+        work_unit: { type: "string" },
         site: { type: "string" },
         hire_date: { type: "string" },
+        termination_date: { type: "string" },
         contract_type: { type: "string" },
         base_salary: { type: "number" },
         pension_system: { type: "string" },
+        afp_id: { type: "string" },
+        afp_affiliation_date: { type: "string" },
         cuspp: { type: "string" },
         worker_type: { type: "string" },
         tax_residence: { type: "string" },
         bank_name: { type: "string" },
         bank_account: { type: "string" },
+        cci_account: { type: "string" },
+        cts_bank: { type: "string" },
+        cts_account_number: { type: "string" },
+        cts_currency: { type: "string" },
         status: { type: "string" },
         role: { type: "string" },
         supervisor_name: { type: "string" },
@@ -153,10 +164,10 @@ export default function ImportEmployees() {
   };
 
   const downloadTemplate = () => {
-    const template = `employee_code,document_type,document_number,first_name,last_name,birth_date,gender,personal_email,work_email,mobile,phone,address,district,province,department,position,department_name,site,hire_date,contract_type,base_salary,pension_system,cuspp,worker_type,tax_residence,bank_name,bank_account,status,role,supervisor_name,emergency_contact_name,emergency_contact_phone,emergency_contact_relationship
-EMP001,DNI,12345678,Juan,Pérez,1990-05-15,M,juan.perez@email.com,juan.perez@empresa.com,987654321,014567890,Av. Principal 123,San Isidro,Lima,Lima,Analista de Sistemas,Sistemas,Sede Central,2023-01-15,Indeterminado,3500,AFP,1234567890123,Empleado,Domiciliado,BCP,19100012345678,Activo,empleado,Carlos Manager,Rosa Pérez,987654320,Madre
-EMP002,DNI,23456789,María,García,1988-08-20,F,maria.garcia@email.com,maria.garcia@empresa.com,987654322,014567891,Jr. Secundaria 456,Miraflores,Lima,Lima,Diseñadora Gráfica,Marketing,Sede Central,2023-03-10,Indeterminado,3800,ONP,,Empleado,Domiciliado,Interbank,20012345678901,Activo,empleado,Ana Supervisor,Pedro García,987654323,Esposo
-EMP003,DNI,34567890,Carlos,Rodríguez,1985-12-10,M,carlos.rodriguez@email.com,carlos.rodriguez@empresa.com,987654324,014567892,Calle Comercio 789,Surco,Lima,Lima,Gerente de Ventas,Ventas,Sede Central,2022-06-01,Indeterminado,5500,AFP,9876543210987,Empleado,Domiciliado,BBVA,20123456789012,Activo,manager,Director General,Ana Rodríguez,987654325,Esposa`;
+    const template = `employee_code,document_type,document_number,first_name,last_name,birth_date,gender,personal_email,work_email,mobile,phone,address,district,province,department,company,position,position_level,profession,department_name,work_unit,site,hire_date,termination_date,contract_type,base_salary,pension_system,afp_id,afp_affiliation_date,cuspp,worker_type,tax_residence,bank_name,bank_account,cci_account,cts_bank,cts_account_number,cts_currency,status,role,supervisor_name,emergency_contact_name,emergency_contact_phone,emergency_contact_relationship
+EMP001,DNI,12345678,Juan,Pérez,1990-05-15,M,juan.perez@email.com,juan.perez@empresa.com,987654321,014567890,Av. Principal 123,San Isidro,Lima,Lima,Empresa Principal,Analista de Sistemas,Junior,Ingeniero de Sistemas,Sistemas,Desarrollo,Sede Central,2023-01-15,,Indeterminado,3500,AFP,afp-id-123,2023-01-10,123456789012,Empleado,Domiciliado,BCP,19100012345678,00219100012345678901,BCP,19100012345679,Soles,Activo,empleado,Carlos Manager,Rosa Pérez,987654320,Madre
+EMP002,DNI,23456789,María,García,1988-08-20,F,maria.garcia@email.com,maria.garcia@empresa.com,987654322,014567891,Jr. Secundaria 456,Miraflores,Lima,Lima,Empresa Principal,Diseñadora Gráfica,Senior,Diseñadora,Marketing,Comunicaciones,Sede Central,2023-03-10,,Indeterminado,3800,ONP,,,098765432101,Empleado,Domiciliado,Interbank,20012345678901,00220012345678901234,Interbank,20012345678902,Soles,Activo,empleado,Ana Supervisor,Pedro García,987654323,Esposo
+EMP003,DNI,34567890,Carlos,Rodríguez,1985-12-10,M,carlos.rodriguez@email.com,carlos.rodriguez@empresa.com,987654324,014567892,Calle Comercio 789,Surco,Lima,Lima,Empresa Principal,Gerente de Ventas,Gerente,Administrador,Ventas,Ventas Lima,Sede Central,2022-06-01,,Indeterminado,5500,AFP,afp-id-456,2022-05-25,987654321098,Empleado,Domiciliado,BBVA,20123456789012,00220123456789012345,BBVA,20123456789013,Dólares,Activo,manager,Director General,Ana Rodríguez,987654325,Esposa`;
 
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
@@ -220,6 +231,9 @@ EMP003,DNI,34567890,Carlos,Rodríguez,1985-12-10,M,carlos.rodriguez@email.com,ca
                     <li>• <strong>Tipos de contrato:</strong> Indeterminado, Plazo Fijo, Part-Time, Prácticas, SNP</li>
                     <li>• <strong>Tipos de trabajador:</strong> Empleado, Obrero, Practicante, Directivo</li>
                     <li>• <strong>Residencia tributaria:</strong> Domiciliado, No Domiciliado</li>
+                    <li>• <strong>Moneda CTS:</strong> Soles, Dólares</li>
+                    <li>• <strong>CCI:</strong> Código de 20 dígitos</li>
+                    <li>• <strong>CUSPP:</strong> 12 dígitos para AFP, variable para ONP</li>
                     <li>• <strong>Nota:</strong> Los campos distrito, provincia y department se refieren a la ubicación geográfica</li>
                   </ul>
                 </div>
