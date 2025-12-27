@@ -76,7 +76,8 @@ export default function Layout({ children, currentPageName }) {
     ];
 
     const adminMenu = [
-      { name: "Dashboard", icon: LayoutDashboard, path: "Dashboard" },
+      { name: "Dashboard Personal", icon: LayoutDashboard, path: "Dashboard" },
+      { name: "Dashboard RRHH", icon: Shield, path: "HRDashboard" },
       { 
         name: "Gestión Empleados", 
         icon: Users, 
