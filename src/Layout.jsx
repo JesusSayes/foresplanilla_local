@@ -12,6 +12,7 @@ import NotificationCenter from "./components/notifications/NotificationCenter";
 
 export default function Layout({ children, currentPageName }) {
   const [employee, setEmployee] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -32,10 +33,11 @@ export default function Layout({ children, currentPageName }) {
         }
 
         const user = await base44.auth.me();
+        setCurrentUser(user);
         const employees = await base44.entities.Employee.filter({ 
           work_email: user.email 
         });
-        
+
         if (employees && employees.length > 0) {
           setEmployee(employees[0]);
         }
