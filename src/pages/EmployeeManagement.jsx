@@ -424,16 +424,11 @@ export default function EmployeeManagement() {
       position_level: emp?.position_level || "",
       profession: emp?.profession || "",
       department_name: emp?.department_name || "",
-      work_area: emp?.work_area || "",
       work_unit: emp?.work_unit || "",
       site: emp?.site || "",
       hire_date: emp?.hire_date || "",
       termination_date: emp?.termination_date || "",
       contract_type: emp?.contract_type || "Indeterminado",
-      contract_number: emp?.contract_number || "",
-      contract_end_date: emp?.contract_end_date || "",
-      employment_condition: emp?.employment_condition || "Planilla",
-      payroll_type: emp?.payroll_type || "Planilla",
       base_salary: baseSalary,
       pension_system: emp?.pension_system || "Ninguno",
       afp_id: emp?.afp_id || "",
@@ -1076,7 +1071,7 @@ export default function EmployeeManagement() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Profesión</Label>
                       <Input
@@ -1109,14 +1104,6 @@ export default function EmployeeManagement() {
                             ))}
                         </SelectContent>
                       </Select>
-                    </div>
-                    <div>
-                      <Label>Área de Trabajo</Label>
-                      <Input
-                        value={formData.work_area}
-                        onChange={(e) => setFormData({ ...formData, work_area: e.target.value })}
-                        placeholder="Área de trabajo"
-                      />
                     </div>
                   </div>
 
@@ -1181,61 +1168,18 @@ export default function EmployeeManagement() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <Label>Tipo de Contrato</Label>
-                      <Select value={formData.contract_type} onValueChange={(val) => setFormData({ ...formData, contract_type: val })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Indeterminado">Indeterminado</SelectItem>
-                          <SelectItem value="Plazo Fijo">Plazo Fijo</SelectItem>
-                          <SelectItem value="Part-Time">Part-Time</SelectItem>
-                          <SelectItem value="Prácticas">Prácticas</SelectItem>
-                          <SelectItem value="SNP">SNP - Servicios No Personales</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Número de Contrato</Label>
-                      <Input
-                        value={formData.contract_number}
-                        onChange={(e) => setFormData({ ...formData, contract_number: e.target.value })}
-                        placeholder="N° de contrato"
-                      />
-                    </div>
-                    <div>
-                      <Label>Fecha Término Contrato</Label>
-                      <Input
-                        type="date"
-                        value={formData.contract_end_date}
-                        onChange={(e) => setFormData({ ...formData, contract_end_date: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Condición Laboral</Label>
-                      <Select value={formData.employment_condition} onValueChange={(val) => setFormData({ ...formData, employment_condition: val })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Planilla">Planilla</SelectItem>
-                          <SelectItem value="Recibo por Honorarios">Recibo por Honorarios</SelectItem>
-                          <SelectItem value="Locación de Servicios">Locación de Servicios</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Tipo de Planilla</Label>
-                      <Select value={formData.payroll_type} onValueChange={(val) => setFormData({ ...formData, payroll_type: val })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Planilla">Planilla</SelectItem>
-                          <SelectItem value="Honorarios">Honorarios</SelectItem>
-                          <SelectItem value="Cuarta Categoría">Cuarta Categoría</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <Label>Tipo de Contrato</Label>
+                    <Select value={formData.contract_type} onValueChange={(val) => setFormData({ ...formData, contract_type: val })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Indeterminado">Indeterminado</SelectItem>
+                        <SelectItem value="Plazo Fijo">Plazo Fijo</SelectItem>
+                        <SelectItem value="Part-Time">Part-Time</SelectItem>
+                        <SelectItem value="Prácticas">Prácticas</SelectItem>
+                        <SelectItem value="SNP">SNP - Servicios No Personales</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div>
