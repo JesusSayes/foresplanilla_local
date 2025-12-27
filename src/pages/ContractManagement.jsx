@@ -134,12 +134,23 @@ export default function ContractManagement() {
   });
 
   const initializeForm = (contract = null, emp = null) => {
+    // Normalizar fechas para asegurar formato consistente (YYYY-MM-DD)
+    const normalizeDate = (dateStr) => {
+      if (!dateStr) return "";
+      const date = new Date(dateStr);
+      // Obtener la fecha local sin conversión de zona horaria
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     setFormData({
       employee_id: contract?.employee_id || emp?.id || "",
       contract_number: contract?.contract_number || "",
       contract_type: contract?.contract_type || "Indeterminado",
-      start_date: contract?.start_date || "",
-      end_date: contract?.end_date || "",
+      start_date: normalizeDate(contract?.start_date),
+      end_date: normalizeDate(contract?.end_date),
       position: contract?.position || emp?.position || "",
       department: contract?.department || emp?.department_name || "",
       work_location: contract?.work_location || emp?.site || "",
@@ -151,7 +162,7 @@ export default function ContractManagement() {
       trial_period_days: contract?.trial_period_days || 90,
       renewable: contract?.renewable || false,
       status: contract?.status || "Vigente",
-      signed_date: contract?.signed_date || new Date().toISOString().split('T')[0],
+      signed_date: normalizeDate(contract?.signed_date) || new Date().toISOString().split('T')[0],
       notes: contract?.notes || "",
     });
   };
