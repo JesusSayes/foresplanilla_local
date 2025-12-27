@@ -91,6 +91,14 @@ export default function AttendanceManagement() {
     },
   });
 
+  const { data: sites = [] } = useQuery({
+    queryKey: ["sites"],
+    queryFn: async () => {
+      const allSites = await base44.entities.Site.list("name");
+      return allSites.filter(s => s.is_active);
+    },
+  });
+
   const isHoliday = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
     return holidays.some(h => h.date === dateStr && h.is_mandatory);
@@ -271,7 +279,8 @@ export default function AttendanceManagement() {
                           emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDept = selectedDepartment === "all" || emp.department_name === selectedDepartment;
-    return matchesSearch && matchesDept;
+    const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
+    return matchesSearch && matchesDept && matchesSite;
   });
 
   const employeesWithRecords = filteredEmployees.map(emp => {
@@ -454,6 +463,19 @@ export default function AttendanceManagement() {
                         <SelectItem value="all">Todos</SelectItem>
                         {departments.map(dept => (
                           <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={selectedSite} onValueChange={setSelectedSite}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Sede" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="sin_sede">Sin sede</SelectItem>
+                        {sites.map(site => (
+                          <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
