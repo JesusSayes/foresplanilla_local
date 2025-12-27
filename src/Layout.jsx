@@ -8,6 +8,7 @@ import {
   LayoutDashboard, FileText, Calendar, Clock, 
   User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown
 } from "lucide-react";
+import NotificationCenter from "./components/notifications/NotificationCenter";
 
 export default function Layout({ children, currentPageName }) {
   const [employee, setEmployee] = useState(null);
@@ -251,6 +252,9 @@ export default function Layout({ children, currentPageName }) {
 
             {/* Right Side Actions */}
             <div className="flex items-center gap-3">
+              {currentUser && (
+                <NotificationCenter userEmail={currentUser.email} />
+              )}
               {employee && (
                 <div className="hidden md:block relative group">
                   <button className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-slate-50 transition-all">

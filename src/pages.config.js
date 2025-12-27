@@ -28,6 +28,7 @@ import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
 import HRDashboard from './pages/HRDashboard';
+import NotificationSettings from './pages/NotificationSettings';
 import __Layout from './Layout.jsx';
 
 
@@ -62,6 +63,7 @@ export const PAGES = {
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
     "HRDashboard": HRDashboard,
+    "NotificationSettings": NotificationSettings,
 }
 
 export const pagesConfig = {
