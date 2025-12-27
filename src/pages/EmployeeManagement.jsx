@@ -848,14 +848,14 @@ export default function EmployeeManagement() {
                 <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
               </div>
             </CardHeader>
-            <CardContent className="p-6 max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              <Tabs defaultValue="personal" className="space-y-6" onClick={(e) => e.stopPropagation()}>
+            <CardContent className="p-6 max-h-[70vh] overflow-y-auto">
+              <Tabs defaultValue="personal" className="space-y-6">
                 <TabsList className="grid w-full grid-cols-5">
-                  <TabsTrigger value="personal">Personal</TabsTrigger>
-                  <TabsTrigger value="contact">Contacto</TabsTrigger>
-                  <TabsTrigger value="work">Laboral</TabsTrigger>
-                  <TabsTrigger value="financial">Financiero</TabsTrigger>
-                  <TabsTrigger value="emergency">Emergencia</TabsTrigger>
+                  <TabsTrigger value="personal" onClick={(e) => e.stopPropagation()}>Personal</TabsTrigger>
+                  <TabsTrigger value="contact" onClick={(e) => e.stopPropagation()}>Contacto</TabsTrigger>
+                  <TabsTrigger value="work" onClick={(e) => e.stopPropagation()}>Laboral</TabsTrigger>
+                  <TabsTrigger value="financial" onClick={(e) => e.stopPropagation()}>Financiero</TabsTrigger>
+                  <TabsTrigger value="emergency" onClick={(e) => e.stopPropagation()}>Emergencia</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="personal" className="space-y-4">
