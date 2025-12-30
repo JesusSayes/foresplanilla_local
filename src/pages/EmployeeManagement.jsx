@@ -484,6 +484,17 @@ export default function EmployeeManagement() {
   };
 
   const handleSubmit = () => {
+    // Si está editando, permitir actualización parcial
+    if (editingEmployee) {
+      updateEmployeeMutation.mutate({ 
+        id: editingEmployee.id, 
+        data: formData,
+        oldData: editingEmployee 
+      });
+      return;
+    }
+    
+    // Solo validar campos obligatorios al crear un nuevo empleado
     const missingFields = [];
     
     if (!formData.employee_code) missingFields.push("Código de Empleado");
@@ -506,21 +517,13 @@ export default function EmployeeManagement() {
       return;
     }
 
-    // Validaciones adicionales
+    // Validaciones adicionales solo al crear
     if (formData.document_type === 'DNI' && formData.document_number.length !== 8) {
       toast.error("El DNI debe tener exactamente 8 dígitos");
       return;
     }
 
-    if (editingEmployee) {
-      updateEmployeeMutation.mutate({ 
-        id: editingEmployee.id, 
-        data: formData,
-        oldData: editingEmployee 
-      });
-    } else {
-      createEmployeeMutation.mutate(formData);
-    }
+    createEmployeeMutation.mutate(formData);
   };
 
   const handleStatusChange = async (emp, newStatus) => {
@@ -1013,6 +1016,12 @@ export default function EmployeeManagement() {
                 </TabsContent>
 
                 <TabsContent value="contact" className="space-y-4">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Información de contacto</strong> - Todos los campos son opcionales
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Email Personal</Label>
@@ -1123,6 +1132,12 @@ export default function EmployeeManagement() {
                 </TabsContent>
 
                 <TabsContent value="work" className="space-y-4">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Información laboral</strong> - Todos los campos son opcionales
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Empresa</Label>
@@ -1271,6 +1286,12 @@ export default function EmployeeManagement() {
                 </TabsContent>
 
                 <TabsContent value="financial" className="space-y-4">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Información financiera</strong> - Todos los campos son opcionales
+                    </p>
+                  </div>
+
                   <div className="border-b pb-4">
                     <h3 className="font-semibold text-slate-900 mb-4">Sistema de Pensiones</h3>
                     <div className="grid grid-cols-3 gap-4">
@@ -1433,6 +1454,12 @@ export default function EmployeeManagement() {
                 </TabsContent>
 
                 <TabsContent value="emergency" className="space-y-4">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Contacto de emergencia</strong> - Todos los campos son opcionales
+                    </p>
+                  </div>
+
                   <div>
                     <Label>Nombre del Contacto</Label>
                     <Input
