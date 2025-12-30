@@ -136,26 +136,38 @@ export default function ImportEmployees() {
 
   const importMutation = useMutation({
     mutationFn: async (data) => {
-      toast.loading(`Importando ${data.length} empleados...`, { id: "import" });
-      return await base44.entities.Employee.bulkCreate(data);
+      console.log("Ejecutando importación de", data.length, "empleados");
+      toast.loading(`Importando ${data.length} empleados, por favor espera...`, { id: "import" });
+      const result = await base44.entities.Employee.bulkCreate(data);
+      console.log("Importación completada:", result);
+      return result;
     },
     onSuccess: (result) => {
+      console.log("Importación exitosa, resultado:", result);
+      const count = Array.isArray(result) ? result.length : (result ? 1 : 0);
+      
       queryClient.invalidateQueries(["allEmployees"]);
+      
       setImportResult({
         success: true,
-        count: result.length
+        count: count
       });
-      toast.success(`✓ ${result.length} empleados importados correctamente`, { id: "import" });
-      setPreviewData(null);
-      setFile(null);
+      
+      toast.success(`✓ ${count} empleados importados exitosamente`, { id: "import", duration: 5000 });
+      
+      // Limpiar vista previa después de un breve delay
+      setTimeout(() => {
+        setPreviewData(null);
+        setFile(null);
+      }, 1000);
     },
     onError: (error) => {
+      console.error("Error en importación:", error);
       setImportResult({
         success: false,
-        error: error.message
+        error: error.message || "Error desconocido"
       });
-      toast.error("Error al importar empleados: " + error.message, { id: "import" });
-      console.error(error);
+      toast.error(`Error al importar: ${error.message || "Error desconocido"}`, { id: "import", duration: 7000 });
     },
   });
 
@@ -164,6 +176,20 @@ export default function ImportEmployees() {
     const validatedEmployees = employees.map((emp, index) => {
       const validated = { ...emp };
       
+      // Validar campos requeridos
+      if (!validated.employee_code) {
+        errors.push(`Fila ${index + 1}: Falta código de empleado`);
+      }
+      if (!validated.document_number) {
+        errors.push(`Fila ${index + 1}: Falta número de documento`);
+      }
+      if (!validated.first_name) {
+        errors.push(`Fila ${index + 1}: Falta nombre`);
+      }
+      if (!validated.last_name) {
+        errors.push(`Fila ${index + 1}: Falta apellido`);
+      }
+      
       // Validar y limpiar número de documento
       if (validated.document_number) {
         validated.document_number = String(validated.document_number).replace(/\D/g, '');
@@ -171,11 +197,11 @@ export default function ImportEmployees() {
         validated.document_number = validated.document_number.slice(0, maxLength);
         
         if (validated.document_type === 'DNI' && validated.document_number.length !== 8) {
-          errors.push(`Fila ${index + 1}: DNI debe tener 8 dígitos`);
+          errors.push(`Fila ${index + 1}: DNI debe tener 8 dígitos (tiene ${validated.document_number.length})`);
         }
       }
       
-      // Validar y limpiar teléfonos
+      // Validar y limpiar teléfonos (no son obligatorios, solo si existen)
       if (validated.mobile) {
         validated.mobile = String(validated.mobile).replace(/\D/g, '').slice(0, 9);
       }
@@ -186,29 +212,36 @@ export default function ImportEmployees() {
         validated.emergency_contact_phone = String(validated.emergency_contact_phone).replace(/\D/g, '').slice(0, 9);
       }
       
-      // Validar y limpiar cuentas bancarias
+      // Validar y limpiar cuentas bancarias (no obligatorias)
       if (validated.bank_account) {
         validated.bank_account = String(validated.bank_account).replace(/\D/g, '').slice(0, 20);
       }
       if (validated.cci_account) {
         validated.cci_account = String(validated.cci_account).replace(/\D/g, '').slice(0, 20);
+        // Solo validar longitud si hay datos
         if (validated.cci_account.length > 0 && validated.cci_account.length !== 20) {
-          errors.push(`Fila ${index + 1}: CCI debe tener 20 dígitos`);
+          errors.push(`Fila ${index + 1}: CCI debe tener 20 dígitos (tiene ${validated.cci_account.length})`);
         }
       }
       if (validated.cts_account_number) {
         validated.cts_account_number = String(validated.cts_account_number).replace(/\D/g, '').slice(0, 20);
       }
       
-      // Validar CUSPP
+      // Validar CUSPP solo si hay sistema de pensiones AFP
       if (validated.cuspp) {
         validated.cuspp = String(validated.cuspp).replace(/\D/g, '');
-        if (validated.pension_system === 'AFP' && validated.cuspp.length !== 12) {
-          errors.push(`Fila ${index + 1}: CUSPP de AFP debe tener 12 dígitos`);
+        if (validated.pension_system === 'AFP' && validated.cuspp.length > 0 && validated.cuspp.length !== 12) {
+          errors.push(`Fila ${index + 1}: CUSPP de AFP debe tener 12 dígitos (tiene ${validated.cuspp.length})`);
         }
       }
       
       return validated;
+    });
+    
+    console.log("Validación completada:", {
+      total: employees.length,
+      errores: errors.length,
+      validados: validatedEmployees.length
     });
     
     return { validatedEmployees, errors };
@@ -220,13 +253,18 @@ export default function ImportEmployees() {
       return;
     }
 
+    console.log("Iniciando importación de", previewData.length, "empleados");
+    
     const { validatedEmployees, errors } = validateEmployeeData(previewData);
     
     if (errors.length > 0) {
-      toast.error(`Errores de validación encontrados:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n... y ${errors.length - 5} más` : ''}`);
+      console.warn("Errores de validación:", errors);
+      const errorMsg = errors.slice(0, 3).join('\n') + (errors.length > 3 ? `\n... y ${errors.length - 3} errores más` : '');
+      toast.error(errorMsg, { duration: 5000 });
       return;
     }
 
+    console.log("Validación exitosa, iniciando importación...");
     importMutation.mutate(validatedEmployees);
   };
 
