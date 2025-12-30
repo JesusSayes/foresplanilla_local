@@ -1398,11 +1398,23 @@ export default function EmployeeManagement() {
                         <Select value={formData.bank_name} onValueChange={(val) => setFormData({ ...formData, bank_name: val })}>
                           <SelectTrigger><SelectValue placeholder="Seleccionar banco" /></SelectTrigger>
                           <SelectContent>
-                            {banks.map(bank => (
-                              <SelectItem key={bank.id} value={bank.name}>
-                                {bank.name}
-                              </SelectItem>
-                            ))}
+                            <div className="p-2 border-b sticky top-0 bg-white z-10">
+                              <Input
+                                placeholder="Buscar banco..."
+                                value={bankSearchTerm}
+                                onChange={(e) => setBankSearchTerm(e.target.value)}
+                                className="h-8"
+                                onClick={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            {banks
+                              .filter(bank => bank.name.toLowerCase().includes(bankSearchTerm.toLowerCase()))
+                              .map(bank => (
+                                <SelectItem key={bank.id} value={bank.name}>
+                                  {bank.name}
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1441,11 +1453,23 @@ export default function EmployeeManagement() {
                         <Select value={formData.cts_bank} onValueChange={(val) => setFormData({ ...formData, cts_bank: val })}>
                           <SelectTrigger><SelectValue placeholder="Seleccionar banco" /></SelectTrigger>
                           <SelectContent>
-                            {banks.map(bank => (
-                              <SelectItem key={bank.id} value={bank.name}>
-                                {bank.name}
-                              </SelectItem>
-                            ))}
+                            <div className="p-2 border-b sticky top-0 bg-white z-10">
+                              <Input
+                                placeholder="Buscar banco..."
+                                value={ctsBankSearchTerm}
+                                onChange={(e) => setCtsBankSearchTerm(e.target.value)}
+                                className="h-8"
+                                onClick={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            {banks
+                              .filter(bank => bank.name.toLowerCase().includes(ctsBankSearchTerm.toLowerCase()))
+                              .map(bank => (
+                                <SelectItem key={bank.id} value={bank.name}>
+                                  {bank.name}
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       </div>
