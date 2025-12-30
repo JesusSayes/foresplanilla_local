@@ -247,25 +247,29 @@ export default function ImportEmployees() {
     return { validatedEmployees, errors };
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     if (!previewData || previewData.length === 0) {
       toast.error("No hay datos para importar");
       return;
     }
 
-    console.log("Iniciando importación de", previewData.length, "empleados");
+    console.log("🚀 Botón clickeado - Iniciando importación de", previewData.length, "empleados");
     
     const { validatedEmployees, errors } = validateEmployeeData(previewData);
     
     if (errors.length > 0) {
-      console.warn("Errores de validación:", errors);
+      console.warn("❌ Errores de validación encontrados:", errors);
       const errorMsg = errors.slice(0, 3).join('\n') + (errors.length > 3 ? `\n... y ${errors.length - 3} errores más` : '');
       toast.error(errorMsg, { duration: 5000 });
       return;
     }
 
-    console.log("Validación exitosa, iniciando importación...");
-    importMutation.mutate(validatedEmployees);
+    console.log("✅ Validación exitosa, ejecutando mutación...");
+    try {
+      await importMutation.mutateAsync(validatedEmployees);
+    } catch (error) {
+      console.error("❌ Error al ejecutar mutación:", error);
+    }
   };
 
   const downloadTemplate = () => {
@@ -402,9 +406,13 @@ EMP003,DNI,34567890,Carlos,Rodríguez,1985-12-10,M,carlos.rodriguez@email.com,ca
                     Vista Previa ({previewData.length} empleados)
                   </CardTitle>
                   <Button
-                    onClick={handleImport}
-                    disabled={importMutation.isPending}
-                    className="bg-indigo-600 hover:bg-indigo-700"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      console.log("🔘 Click en botón de importación");
+                      handleImport();
+                    }}
+                    disabled={importMutation.isPending || !previewData || previewData.length === 0}
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {importMutation.isPending ? (
                       <>
