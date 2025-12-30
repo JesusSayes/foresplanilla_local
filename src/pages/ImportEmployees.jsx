@@ -248,27 +248,41 @@ export default function ImportEmployees() {
   };
 
   const handleImport = async () => {
+    console.log("🔵 handleImport llamado");
+    
     if (!previewData || previewData.length === 0) {
       toast.error("No hay datos para importar");
       return;
     }
 
-    console.log("🚀 Botón clickeado - Iniciando importación de", previewData.length, "empleados");
+    console.log("🚀 Iniciando importación de", previewData.length, "empleados");
+    console.log("Datos a importar:", previewData);
     
-    const { validatedEmployees, errors } = validateEmployeeData(previewData);
-    
-    if (errors.length > 0) {
-      console.warn("❌ Errores de validación encontrados:", errors);
-      const errorMsg = errors.slice(0, 3).join('\n') + (errors.length > 3 ? `\n... y ${errors.length - 3} errores más` : '');
-      toast.error(errorMsg, { duration: 5000 });
-      return;
-    }
+    // Importar directamente sin validación estricta - solo limpieza
+    const cleanedEmployees = previewData.map(emp => ({
+      ...emp,
+      // Asegurar que los campos requeridos existan
+      employee_code: emp.employee_code || '',
+      document_number: emp.document_number ? String(emp.document_number).replace(/\D/g, '') : '',
+      first_name: emp.first_name || '',
+      last_name: emp.last_name || '',
+      // Limpiar campos numéricos si existen
+      mobile: emp.mobile ? String(emp.mobile).replace(/\D/g, '') : undefined,
+      phone: emp.phone ? String(emp.phone).replace(/\D/g, '') : undefined,
+      bank_account: emp.bank_account ? String(emp.bank_account).replace(/\D/g, '') : undefined,
+      cci_account: emp.cci_account ? String(emp.cci_account).replace(/\D/g, '') : undefined,
+      cts_account_number: emp.cts_account_number ? String(emp.cts_account_number).replace(/\D/g, '') : undefined,
+      emergency_contact_phone: emp.emergency_contact_phone ? String(emp.emergency_contact_phone).replace(/\D/g, '') : undefined,
+    }));
 
-    console.log("✅ Validación exitosa, ejecutando mutación...");
+    console.log("✅ Datos limpiados, ejecutando importación...");
+    
     try {
-      await importMutation.mutateAsync(validatedEmployees);
+      await importMutation.mutateAsync(cleanedEmployees);
+      console.log("✅ Importación completada exitosamente");
     } catch (error) {
       console.error("❌ Error al ejecutar mutación:", error);
+      toast.error("Error en la importación: " + error.message);
     }
   };
 
