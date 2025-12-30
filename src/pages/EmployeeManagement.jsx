@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Users, Plus, Edit, Eye, UserX, UserCheck, Search, 
-  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History
+  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History, Loader2
 } from "lucide-react";
 import { createPageUrl } from "../utils";
 import { format } from "date-fns";
@@ -484,8 +484,31 @@ export default function EmployeeManagement() {
   };
 
   const handleSubmit = () => {
-    if (!formData.employee_code || !formData.document_number || !formData.first_name || !formData.last_name) {
-      toast.error("Completa los campos obligatorios");
+    const missingFields = [];
+    
+    if (!formData.employee_code) missingFields.push("Código de Empleado");
+    if (!formData.document_number) missingFields.push("Número de Documento");
+    if (!formData.first_name) missingFields.push("Nombres");
+    if (!formData.last_name) missingFields.push("Apellidos");
+    
+    if (missingFields.length > 0) {
+      toast.error(
+        <div>
+          <p className="font-bold">Campos obligatorios faltantes:</p>
+          <ul className="mt-1 ml-4 list-disc">
+            {missingFields.map((field, idx) => (
+              <li key={idx}>{field}</li>
+            ))}
+          </ul>
+        </div>,
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    // Validaciones adicionales
+    if (formData.document_type === 'DNI' && formData.document_number.length !== 8) {
+      toast.error("El DNI debe tener exactamente 8 dígitos");
       return;
     }
 
@@ -866,16 +889,26 @@ export default function EmployeeManagement() {
                 </TabsList>
 
                 <TabsContent value="personal" className="space-y-4">
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
+                    <p className="text-sm text-amber-800">
+                      <strong>Los campos marcados con <span className="text-red-600">*</span> son obligatorios</strong>
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <Label>Código de Empleado *</Label>
+                      <Label>Código de Empleado <span className="text-red-600">*</span></Label>
                       <Input
                         value={formData.employee_code}
                         onChange={(e) => setFormData({ ...formData, employee_code: e.target.value })}
+                        className={!formData.employee_code ? "border-red-300 focus:border-red-500" : ""}
                       />
+                      {!formData.employee_code && (
+                        <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
+                      )}
                     </div>
                     <div>
-                      <Label>Tipo de Documento *</Label>
+                      <Label>Tipo de Documento <span className="text-red-600">*</span></Label>
                       <Select value={formData.document_type} onValueChange={(val) => setFormData({ ...formData, document_type: val })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -886,7 +919,7 @@ export default function EmployeeManagement() {
                       </Select>
                     </div>
                     <div>
-                      <Label>Número de Documento *</Label>
+                      <Label>Número de Documento <span className="text-red-600">*</span></Label>
                       <Input
                         value={formData.document_number}
                         onChange={(e) => {
@@ -896,24 +929,39 @@ export default function EmployeeManagement() {
                         }}
                         placeholder={formData.document_type === 'DNI' ? '8 dígitos' : 'Número de documento'}
                         maxLength={formData.document_type === 'DNI' ? 8 : 20}
+                        className={!formData.document_number ? "border-red-300 focus:border-red-500" : ""}
                       />
+                      {!formData.document_number && (
+                        <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
+                      )}
+                      {formData.document_number && formData.document_type === 'DNI' && formData.document_number.length !== 8 && (
+                        <p className="text-xs text-amber-600 mt-1">DNI debe tener 8 dígitos ({formData.document_number.length}/8)</p>
+                      )}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <Label>Nombres *</Label>
+                      <Label>Nombres <span className="text-red-600">*</span></Label>
                       <Input
                         value={formData.first_name}
                         onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                        className={!formData.first_name ? "border-red-300 focus:border-red-500" : ""}
                       />
+                      {!formData.first_name && (
+                        <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
+                      )}
                     </div>
                     <div>
-                      <Label>Apellidos *</Label>
+                      <Label>Apellidos <span className="text-red-600">*</span></Label>
                       <Input
                         value={formData.last_name}
                         onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                        className={!formData.last_name ? "border-red-300 focus:border-red-500" : ""}
                       />
+                      {!formData.last_name && (
+                        <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
+                      )}
                     </div>
                     <div>
                       <Label>Género</Label>
@@ -1427,7 +1475,16 @@ export default function EmployeeManagement() {
                   onClick={handleSubmit}
                   disabled={createEmployeeMutation.isPending || updateEmployeeMutation.isPending}
                 >
-                  {editingEmployee ? "Actualizar" : "Crear"} Empleado
+                  {(createEmployeeMutation.isPending || updateEmployeeMutation.isPending) ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {editingEmployee ? "Actualizando..." : "Creando..."}
+                    </>
+                  ) : (
+                    <>
+                      {editingEmployee ? "Actualizar" : "Crear"} Empleado
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>
