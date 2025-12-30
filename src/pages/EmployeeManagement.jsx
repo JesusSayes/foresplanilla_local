@@ -36,6 +36,8 @@ export default function EmployeeManagement() {
   const [formData, setFormData] = useState({});
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
   const [professionSearchTerm, setProfessionSearchTerm] = useState("");
+  const [bankSearchTerm, setBankSearchTerm] = useState("");
+  const [ctsBankSearchTerm, setCtsBankSearchTerm] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
   const [selectedDepartamento, setSelectedDepartamento] = useState("");
