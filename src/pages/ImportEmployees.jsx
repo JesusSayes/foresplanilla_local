@@ -107,9 +107,13 @@ export default function ImportEmployees() {
     setProcessing(true);
 
     try {
+      toast.loading("Subiendo archivo...", { id: "upload" });
+      
       const { file_url } = await base44.integrations.Core.UploadFile({ 
         file: selectedFile 
       });
+
+      toast.loading("Procesando y extrayendo datos...", { id: "upload" });
 
       const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
         file_url: file_url,
@@ -118,12 +122,12 @@ export default function ImportEmployees() {
 
       if (result.status === "success" && result.output) {
         setPreviewData(result.output);
-        toast.success(`${result.output.length} empleados encontrados en el archivo`);
+        toast.success(`✓ ${result.output.length} empleados encontrados en el archivo`, { id: "upload" });
       } else {
-        toast.error("Error al procesar el archivo: " + (result.details || "Formato inválido"));
+        toast.error("Error al procesar el archivo: " + (result.details || "Formato inválido"), { id: "upload" });
       }
     } catch (error) {
-      toast.error("Error al cargar el archivo");
+      toast.error("Error al cargar el archivo", { id: "upload" });
       console.error(error);
     } finally {
       setProcessing(false);
@@ -132,6 +136,7 @@ export default function ImportEmployees() {
 
   const importMutation = useMutation({
     mutationFn: async (data) => {
+      toast.loading(`Importando ${data.length} empleados...`, { id: "import" });
       return await base44.entities.Employee.bulkCreate(data);
     },
     onSuccess: (result) => {
@@ -140,7 +145,7 @@ export default function ImportEmployees() {
         success: true,
         count: result.length
       });
-      toast.success(`${result.length} empleados importados correctamente`);
+      toast.success(`✓ ${result.length} empleados importados correctamente`, { id: "import" });
       setPreviewData(null);
       setFile(null);
     },
@@ -149,7 +154,7 @@ export default function ImportEmployees() {
         success: false,
         error: error.message
       });
-      toast.error("Error al importar empleados");
+      toast.error("Error al importar empleados: " + error.message, { id: "import" });
       console.error(error);
     },
   });
@@ -366,12 +371,12 @@ EMP003,DNI,34567890,Carlos,Rodríguez,1985-12-10,M,carlos.rodriguez@email.com,ca
                     {importMutation.isPending ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Importando...
+                        Importando {previewData?.length} empleados...
                       </>
                     ) : (
                       <>
                         <CheckCircle className="w-4 h-4 mr-2" />
-                        Confirmar Importación
+                        Confirmar Importación ({previewData?.length} empleados)
                       </>
                     )}
                   </Button>

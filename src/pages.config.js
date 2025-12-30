@@ -8,12 +8,14 @@ import ContractManagement from './pages/ContractManagement';
 import Dashboard from './pages/Dashboard';
 import DatabaseConfig from './pages/DatabaseConfig';
 import EmployeeManagement from './pages/EmployeeManagement';
+import HRDashboard from './pages/HRDashboard';
 import HolidayManagement from './pages/HolidayManagement';
 import Home from './pages/Home';
 import ImportEmployees from './pages/ImportEmployees';
 import ManagerApprovals from './pages/ManagerApprovals';
 import MasterDataManagement from './pages/MasterDataManagement';
 import MyProfile from './pages/MyProfile';
+import NotificationSettings from './pages/NotificationSettings';
 import OrgChart from './pages/OrgChart';
 import PayrollConcepts from './pages/PayrollConcepts';
 import PayrollManagement from './pages/PayrollManagement';
@@ -27,8 +29,6 @@ import UserManagement from './pages/UserManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
-import HRDashboard from './pages/HRDashboard';
-import NotificationSettings from './pages/NotificationSettings';
 import __Layout from './Layout.jsx';
 
 
@@ -43,12 +43,14 @@ export const PAGES = {
     "Dashboard": Dashboard,
     "DatabaseConfig": DatabaseConfig,
     "EmployeeManagement": EmployeeManagement,
+    "HRDashboard": HRDashboard,
     "HolidayManagement": HolidayManagement,
     "Home": Home,
     "ImportEmployees": ImportEmployees,
     "ManagerApprovals": ManagerApprovals,
     "MasterDataManagement": MasterDataManagement,
     "MyProfile": MyProfile,
+    "NotificationSettings": NotificationSettings,
     "OrgChart": OrgChart,
     "PayrollConcepts": PayrollConcepts,
     "PayrollManagement": PayrollManagement,
@@ -62,8 +64,6 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
-    "HRDashboard": HRDashboard,
-    "NotificationSettings": NotificationSettings,
 }
 
 export const pagesConfig = {
