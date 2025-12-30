@@ -198,63 +198,79 @@ export default function EmployeeManagement() {
 
   const updateEmployeeMutation = useMutation({
     mutationFn: async ({ id, data, oldData }) => {
-      const updatedEmployee = await base44.entities.Employee.update(id, data);
+      console.log("🔄 Actualizando empleado ID:", id);
+      console.log("📝 Datos a actualizar:", data);
+      
+      // Limpiar datos vacíos y undefined antes de enviar
+      const cleanData = {};
+      Object.keys(data).forEach(key => {
+        if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
+          cleanData[key] = data[key];
+        }
+      });
+      
+      console.log("✅ Datos limpios a enviar:", cleanData);
+      
+      const updatedEmployee = await base44.entities.Employee.update(id, cleanData);
+      console.log("✅ Empleado actualizado:", updatedEmployee);
       
       // Si cambió la AFP, actualizar conceptos de planilla
-      if (data.afp_id && data.afp_id !== oldData.afp_id && data.pension_system === "AFP") {
-        const selectedAFP = afps.find(a => a.id === data.afp_id);
+      if (cleanData.afp_id && cleanData.afp_id !== oldData.afp_id && cleanData.pension_system === "AFP") {
+        const selectedAFP = afps.find(a => a.id === cleanData.afp_id);
         if (selectedAFP) {
           await syncAFPConcepts(id, selectedAFP);
         }
       }
       
       // Si cambió el sistema de pensiones a AFP, agregar conceptos
-      if (data.pension_system === "AFP" && oldData.pension_system !== "AFP" && data.afp_id) {
-        const selectedAFP = afps.find(a => a.id === data.afp_id);
+      if (cleanData.pension_system === "AFP" && oldData.pension_system !== "AFP" && cleanData.afp_id) {
+        const selectedAFP = afps.find(a => a.id === cleanData.afp_id);
         if (selectedAFP) {
           await syncAFPConcepts(id, selectedAFP);
         }
       }
       
       // Si cambió a ONP o Ninguno, eliminar conceptos AFP
-      if ((data.pension_system === "ONP" || data.pension_system === "Ninguno") && oldData.pension_system === "AFP") {
+      if ((cleanData.pension_system === "ONP" || cleanData.pension_system === "Ninguno") && oldData.pension_system === "AFP") {
         await removeAFPConcepts(id);
       }
       
       // Si cambió a ONP, agregar concepto ONP y eliminar AFP
-      if (data.pension_system === "ONP" && oldData.pension_system !== "ONP") {
+      if (cleanData.pension_system === "ONP" && oldData.pension_system !== "ONP") {
         await removeAFPConcepts(id);
         await addONPConcept(id);
       }
       
       // Si cambió de ONP a otro sistema, eliminar concepto ONP
-      if (data.pension_system !== "ONP" && oldData.pension_system === "ONP") {
+      if (cleanData.pension_system !== "ONP" && oldData.pension_system === "ONP") {
         await removeONPConcept(id);
       }
       
-      // Registrar cambios en el historial
+      // Registrar cambios en el historial solo de campos modificados
       const changedFields = [];
-      Object.keys(data).forEach(key => {
-        if (oldData[key] !== data[key] && data[key] !== undefined) {
+      Object.keys(cleanData).forEach(key => {
+        if (oldData[key] !== cleanData[key]) {
           changedFields.push({
             field: key,
             oldValue: oldData[key] || "",
-            newValue: data[key] || ""
+            newValue: cleanData[key] || ""
           });
         }
       });
       
       // Crear registros de cambio
-      for (const change of changedFields) {
-        await createChangeLogMutation.mutateAsync({
-          employee_id: id,
-          field_changed: change.field,
-          old_value: String(change.oldValue),
-          new_value: String(change.newValue),
-          change_type: "Actualización",
-          changed_by: currentUser?.email || "Sistema",
-          change_date: new Date().toISOString(),
-        });
+      if (changedFields.length > 0) {
+        for (const change of changedFields) {
+          await createChangeLogMutation.mutateAsync({
+            employee_id: id,
+            field_changed: change.field,
+            old_value: String(change.oldValue),
+            new_value: String(change.newValue),
+            change_type: "Actualización",
+            changed_by: currentUser?.email || "Sistema",
+            change_date: new Date().toISOString(),
+          });
+        }
       }
       
       return updatedEmployee;
@@ -262,12 +278,12 @@ export default function EmployeeManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries(["allEmployees"]);
       queryClient.invalidateQueries(["employeeChanges"]);
-      toast.success("Empleado actualizado correctamente");
+      toast.success("✅ Empleado actualizado correctamente");
       resetForm();
     },
     onError: (error) => {
-      toast.error("Error al actualizar el empleado");
-      console.error(error);
+      console.error("❌ Error al actualizar empleado:", error);
+      toast.error("Error al actualizar: " + (error.message || "Error desconocido"));
     },
   });
 
@@ -484,8 +500,13 @@ export default function EmployeeManagement() {
   };
 
   const handleSubmit = () => {
+    console.log("🔘 handleSubmit llamado");
+    console.log("Editando:", editingEmployee ? "Sí" : "No");
+    console.log("Datos del formulario:", formData);
+    
     // Si está editando, permitir actualización parcial
     if (editingEmployee) {
+      console.log("✏️ Actualizando empleado existente");
       updateEmployeeMutation.mutate({ 
         id: editingEmployee.id, 
         data: formData,
