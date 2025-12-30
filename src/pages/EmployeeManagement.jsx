@@ -939,6 +939,7 @@ export default function EmployeeManagement() {
                           <SelectItem value="DNI">DNI</SelectItem>
                           <SelectItem value="CE">CE</SelectItem>
                           <SelectItem value="Pasaporte">Pasaporte</SelectItem>
+                          <SelectItem value="CPP">CPP</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
