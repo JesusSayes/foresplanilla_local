@@ -19,6 +19,8 @@ export default function ImportEmployees() {
   const [previewData, setPreviewData] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [uploadError, setUploadError] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState("");
 
   const queryClient = useQueryClient();
 
@@ -108,43 +110,49 @@ export default function ImportEmployees() {
 
     // Validar tamaño del archivo (max 10MB)
     if (selectedFile.size > 10 * 1024 * 1024) {
-      toast.error("El archivo es demasiado grande. Tamaño máximo: 10MB");
+      const errorMsg = "El archivo es demasiado grande. Tamaño máximo: 10MB";
+      setUploadError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
     setFile(selectedFile);
     setPreviewData(null);
     setImportResult(null);
+    setUploadError(null);
     setProcessing(true);
+    setUploadProgress("Iniciando...");
 
     let currentStep = "inicio";
 
     try {
       // Paso 1: Subir archivo
       currentStep = "subiendo archivo";
+      setUploadProgress("Paso 1/2: Subiendo archivo al servidor...");
       console.log("📤 PASO 1: Iniciando subida de archivo...");
-      toast.loading("Paso 1/2: Subiendo archivo...", { id: "upload" });
+      toast.loading("Subiendo archivo al servidor...", { id: "upload" });
       
       const uploadResult = await Promise.race([
         base44.integrations.Core.UploadFile({ file: selectedFile }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Timeout: La subida del archivo tardó más de 2 minutos")), 120000)
+          setTimeout(() => reject(new Error("Timeout: La subida tardó más de 2 minutos")), 120000)
         )
       ]);
       
       console.log("✅ PASO 1 COMPLETADO - Archivo subido:", uploadResult);
 
       if (!uploadResult || !uploadResult.file_url) {
-        throw new Error("El servidor no devolvió la URL del archivo. Respuesta: " + JSON.stringify(uploadResult));
+        throw new Error("Error del servidor: No se recibió la URL del archivo");
       }
 
       const { file_url } = uploadResult;
       console.log("🔗 URL del archivo obtenida:", file_url);
 
       // Paso 2: Extraer datos
-      currentStep = "extrayendo datos";
+      currentStep = "extrayendo datos del archivo";
+      setUploadProgress("Paso 2/2: Extrayendo datos de empleados...");
       console.log("🔄 PASO 2: Iniciando extracción de datos...");
-      toast.loading("Paso 2/2: Procesando y extrayendo datos del archivo...", { id: "upload" });
+      toast.loading("Extrayendo datos de empleados...", { id: "upload" });
 
       const result = await Promise.race([
         base44.integrations.Core.ExtractDataFromUploadedFile({
@@ -152,53 +160,61 @@ export default function ImportEmployees() {
           json_schema: employeeSchema
         }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Timeout: La extracción de datos tardó más de 3 minutos")), 180000)
+          setTimeout(() => reject(new Error("Timeout: La extracción tardó más de 3 minutos")), 180000)
         )
       ]);
 
-      console.log("📊 PASO 2 COMPLETADO - Resultado de extracción:", result);
+      console.log("📊 PASO 2 COMPLETADO - Resultado:", result);
 
       if (result.status === "success" && result.output) {
-        if (!Array.isArray(result.output) || result.output.length === 0) {
-          throw new Error("El archivo no contiene datos válidos o está vacío");
+        if (!Array.isArray(result.output)) {
+          throw new Error("El formato de respuesta no es válido");
+        }
+        
+        if (result.output.length === 0) {
+          throw new Error("El archivo está vacío o no contiene empleados válidos");
         }
 
-        console.log("✅ Extracción exitosa:", result.output.length, "empleados encontrados");
-        console.log("Muestra de datos:", result.output.slice(0, 2));
+        console.log("✅ Extracción exitosa:", result.output.length, "empleados");
+        console.log("Muestra:", result.output.slice(0, 2));
         
         setPreviewData(result.output);
-        toast.success(`✓ Proceso completado: ${result.output.length} empleados encontrados`, { id: "upload", duration: 5000 });
+        setUploadProgress("");
+        toast.success(`✓ ${result.output.length} empleados listos para importar`, { id: "upload", duration: 5000 });
       } else {
-        const errorMsg = result.details || result.error || "El archivo tiene un formato inválido o no se pudo procesar";
+        const errorMsg = result.details || result.error || "No se pudo procesar el archivo. Verifica el formato.";
         console.error("❌ Error en extracción:", result);
         throw new Error(errorMsg);
       }
     } catch (error) {
       console.error("❌ ERROR EN:", currentStep);
-      console.error("❌ Detalles del error:", error);
+      console.error("❌ Error completo:", error);
       console.error("❌ Stack:", error.stack);
       
-      let userMessage = `Error en ${currentStep}: `;
+      let userMessage = "";
       
       if (error.message.includes("Timeout")) {
-        userMessage += error.message + ". Intenta con un archivo más pequeño.";
-      } else if (error.message.includes("network") || error.message.includes("fetch")) {
-        userMessage += "Error de conexión. Verifica tu internet e intenta nuevamente.";
-      } else if (error.message.includes("formato")) {
-        userMessage += "El formato del archivo no es válido. Asegúrate de usar la plantilla CSV correcta.";
+        userMessage = "El proceso está tardando demasiado. Intenta con un archivo más pequeño o con menos empleados.";
+      } else if (error.message.includes("network") || error.message.includes("fetch") || error.message.includes("Failed to fetch")) {
+        userMessage = "Error de conexión. Verifica tu internet e intenta de nuevo.";
+      } else if (error.message.includes("formato") || error.message.includes("válido")) {
+        userMessage = "Formato de archivo incorrecto. Descarga y usa la plantilla CSV proporcionada.";
+      } else if (error.message.includes("vacío")) {
+        userMessage = error.message;
       } else {
-        userMessage += error.message || "Error desconocido";
+        userMessage = `Error: ${error.message || "Ocurrió un problema desconocido"}`;
       }
       
+      setUploadError(userMessage);
+      setUploadProgress("");
       toast.error(userMessage, { id: "upload", duration: 10000 });
       setPreviewData(null);
     } finally {
       setProcessing(false);
-      // Reiniciar el input para permitir seleccionar el mismo archivo nuevamente
       if (e.target) {
         e.target.value = '';
       }
-      console.log("✅ Proceso de carga finalizado");
+      console.log("✅ Proceso finalizado");
     }
   };
 
@@ -469,9 +485,36 @@ EMP003,DNI,34567890,Carlos,Rodríguez,1985-12-10,M,carlos.rodriguez@email.com,ca
                 {processing && (
                   <div className="flex items-center justify-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                    <span className="text-blue-900 font-semibold">
-                      Procesando archivo...
-                    </span>
+                    <div>
+                      <p className="text-blue-900 font-semibold">
+                        {uploadProgress || "Procesando archivo..."}
+                      </p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Esto puede tardar varios segundos dependiendo del tamaño
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {uploadError && !processing && (
+                  <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-red-900 font-semibold mb-1">
+                        Error al procesar archivo
+                      </p>
+                      <p className="text-sm text-red-700">
+                        {uploadError}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUploadError(null)}
+                        className="mt-3 text-red-700 border-red-300 hover:bg-red-100"
+                      >
+                        Intentar nuevamente
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
