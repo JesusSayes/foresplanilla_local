@@ -29,6 +29,7 @@ export default function ContractManagement() {
   const [positionSearchTerm, setPositionSearchTerm] = useState("");
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
   const [siteSearchTerm, setSiteSearchTerm] = useState("");
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [conflictingContract, setConflictingContract] = useState(null);
 
   const queryClient = useQueryClient();
@@ -529,11 +530,27 @@ export default function ContractManagement() {
                         <SelectValue placeholder="Seleccionar empleado" />
                       </SelectTrigger>
                       <SelectContent>
-                        {allEmployees.map(emp => (
-                          <SelectItem key={emp.id} value={emp.id}>
-                            {emp.employee_code} - {emp.first_name} {emp.last_name}
-                          </SelectItem>
-                        ))}
+                        <div className="p-2 border-b sticky top-0 bg-white z-10">
+                          <Input
+                            placeholder="Buscar empleado..."
+                            value={employeeSearchTerm}
+                            onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                            className="h-8"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        {allEmployees
+                          .filter(emp => 
+                            emp.first_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+                            emp.last_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+                            emp.employee_code.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+                          )
+                          .map(emp => (
+                            <SelectItem key={emp.id} value={emp.id}>
+                              {emp.employee_code} - {emp.first_name} {emp.last_name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
