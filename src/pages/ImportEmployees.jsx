@@ -104,52 +104,93 @@ export default function ImportEmployees() {
       return;
     }
 
-    console.log("📁 Archivo seleccionado:", selectedFile.name, selectedFile.size, "bytes");
+    console.log("📁 Archivo seleccionado:", selectedFile.name, selectedFile.size, "bytes", "tipo:", selectedFile.type);
+
+    // Validar tamaño del archivo (max 10MB)
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      toast.error("El archivo es demasiado grande. Tamaño máximo: 10MB");
+      return;
+    }
 
     setFile(selectedFile);
     setPreviewData(null);
     setImportResult(null);
     setProcessing(true);
 
+    let currentStep = "inicio";
+
     try {
-      console.log("📤 Iniciando subida de archivo...");
-      toast.loading("Subiendo archivo...", { id: "upload" });
+      // Paso 1: Subir archivo
+      currentStep = "subiendo archivo";
+      console.log("📤 PASO 1: Iniciando subida de archivo...");
+      toast.loading("Paso 1/2: Subiendo archivo...", { id: "upload" });
       
-      const uploadResult = await base44.integrations.Core.UploadFile({ 
-        file: selectedFile 
-      });
+      const uploadResult = await Promise.race([
+        base44.integrations.Core.UploadFile({ file: selectedFile }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Timeout: La subida del archivo tardó más de 2 minutos")), 120000)
+        )
+      ]);
       
-      console.log("✅ Archivo subido:", uploadResult);
+      console.log("✅ PASO 1 COMPLETADO - Archivo subido:", uploadResult);
 
       if (!uploadResult || !uploadResult.file_url) {
-        throw new Error("No se recibió URL del archivo subido");
+        throw new Error("El servidor no devolvió la URL del archivo. Respuesta: " + JSON.stringify(uploadResult));
       }
 
       const { file_url } = uploadResult;
-      console.log("🔗 URL del archivo:", file_url);
+      console.log("🔗 URL del archivo obtenida:", file_url);
 
-      toast.loading("Procesando y extrayendo datos del archivo...", { id: "upload" });
-      console.log("🔄 Iniciando extracción de datos...");
+      // Paso 2: Extraer datos
+      currentStep = "extrayendo datos";
+      console.log("🔄 PASO 2: Iniciando extracción de datos...");
+      toast.loading("Paso 2/2: Procesando y extrayendo datos del archivo...", { id: "upload" });
 
-      const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
-        file_url: file_url,
-        json_schema: employeeSchema
-      });
+      const result = await Promise.race([
+        base44.integrations.Core.ExtractDataFromUploadedFile({
+          file_url: file_url,
+          json_schema: employeeSchema
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Timeout: La extracción de datos tardó más de 3 minutos")), 180000)
+        )
+      ]);
 
-      console.log("📊 Resultado de extracción:", result);
+      console.log("📊 PASO 2 COMPLETADO - Resultado de extracción:", result);
 
       if (result.status === "success" && result.output) {
-        console.log("✅ Extracción exitosa:", result.output.length, "empleados");
+        if (!Array.isArray(result.output) || result.output.length === 0) {
+          throw new Error("El archivo no contiene datos válidos o está vacío");
+        }
+
+        console.log("✅ Extracción exitosa:", result.output.length, "empleados encontrados");
+        console.log("Muestra de datos:", result.output.slice(0, 2));
+        
         setPreviewData(result.output);
-        toast.success(`✓ ${result.output.length} empleados encontrados en el archivo`, { id: "upload", duration: 5000 });
+        toast.success(`✓ Proceso completado: ${result.output.length} empleados encontrados`, { id: "upload", duration: 5000 });
       } else {
+        const errorMsg = result.details || result.error || "El archivo tiene un formato inválido o no se pudo procesar";
         console.error("❌ Error en extracción:", result);
-        toast.error("Error al procesar el archivo: " + (result.details || "Formato inválido"), { id: "upload", duration: 7000 });
-        setPreviewData(null);
+        throw new Error(errorMsg);
       }
     } catch (error) {
-      console.error("❌ Error completo:", error);
-      toast.error("Error al cargar el archivo: " + (error.message || "Error desconocido"), { id: "upload", duration: 7000 });
+      console.error("❌ ERROR EN:", currentStep);
+      console.error("❌ Detalles del error:", error);
+      console.error("❌ Stack:", error.stack);
+      
+      let userMessage = `Error en ${currentStep}: `;
+      
+      if (error.message.includes("Timeout")) {
+        userMessage += error.message + ". Intenta con un archivo más pequeño.";
+      } else if (error.message.includes("network") || error.message.includes("fetch")) {
+        userMessage += "Error de conexión. Verifica tu internet e intenta nuevamente.";
+      } else if (error.message.includes("formato")) {
+        userMessage += "El formato del archivo no es válido. Asegúrate de usar la plantilla CSV correcta.";
+      } else {
+        userMessage += error.message || "Error desconocido";
+      }
+      
+      toast.error(userMessage, { id: "upload", duration: 10000 });
       setPreviewData(null);
     } finally {
       setProcessing(false);
