@@ -182,7 +182,13 @@ export default function ImportEmployees() {
         setUploadProgress("");
         toast.success(`✓ ${result.output.length} empleados listos para importar`, { id: "upload", duration: 5000 });
       } else {
-        const errorMsg = result.details || result.error || "No se pudo procesar el archivo. Verifica el formato.";
+        let errorMsg = result.details || result.error || "No se pudo procesar el archivo. Verifica el formato.";
+        
+        // Detectar problema de delimitador
+        if (errorMsg.includes("delimiter") || errorMsg.includes("CSV Error") || errorMsg.includes("byte sequence")) {
+          errorMsg = "El archivo CSV tiene un formato incorrecto. Por favor, descarga y usa la plantilla proporcionada. Asegúrate de usar comas (,) como separadores, no punto y coma (;).";
+        }
+        
         console.error("❌ Error en extracción:", result);
         throw new Error(errorMsg);
       }
@@ -371,12 +377,14 @@ export default function ImportEmployees() {
   };
 
   const downloadTemplate = () => {
+    // Crear el CSV con UTF-8 BOM para asegurar compatibilidad
+    const BOM = '\uFEFF';
     const template = `employee_code,document_type,document_number,first_name,last_name,birth_date,gender,personal_email,work_email,mobile,phone,address,district,province,department,company,position,position_level,profession,department_name,work_unit,site,hire_date,termination_date,contract_type,base_salary,pension_system,afp_id,afp_affiliation_date,cuspp,worker_type,tax_residence,bank_name,bank_account,cci_account,cts_bank,cts_account_number,cts_currency,status,role,supervisor_name,emergency_contact_name,emergency_contact_phone,emergency_contact_relationship
 EMP001,DNI,12345678,Juan,Pérez,1990-05-15,M,juan.perez@email.com,juan.perez@empresa.com,987654321,014567890,Av. Principal 123,San Isidro,Lima,Lima,Empresa Principal,Analista de Sistemas,Junior,Ingeniero de Sistemas,Sistemas,Desarrollo,Sede Central,2023-01-15,,Indeterminado,3500,AFP,afp-id-123,2023-01-10,123456789012,Empleado,Domiciliado,BCP,19100012345678,00219100012345678901,BCP,19100012345679,Soles,Activo,empleado,Carlos Manager,Rosa Pérez,987654320,Madre
 EMP002,DNI,23456789,María,García,1988-08-20,F,maria.garcia@email.com,maria.garcia@empresa.com,987654322,014567891,Jr. Secundaria 456,Miraflores,Lima,Lima,Empresa Principal,Diseñadora Gráfica,Senior,Diseñadora,Marketing,Comunicaciones,Sede Central,2023-03-10,,Indeterminado,3800,ONP,,,098765432101,Empleado,Domiciliado,Interbank,20012345678901,00220012345678901234,Interbank,20012345678902,Soles,Activo,empleado,Ana Supervisor,Pedro García,987654323,Esposo
 EMP003,DNI,34567890,Carlos,Rodríguez,1985-12-10,M,carlos.rodriguez@email.com,carlos.rodriguez@empresa.com,987654324,014567892,Calle Comercio 789,Surco,Lima,Lima,Empresa Principal,Gerente de Ventas,Gerente,Administrador,Ventas,Ventas Lima,Sede Central,2022-06-01,,Indeterminado,5500,AFP,afp-id-456,2022-05-25,987654321098,Empleado,Domiciliado,BBVA,20123456789012,00220123456789012345,BBVA,20123456789013,Dólares,Activo,manager,Director General,Ana Rodríguez,987654325,Esposa`;
 
-    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([BOM + template], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -385,7 +393,7 @@ EMP003,DNI,34567890,Carlos,Rodríguez,1985-12-10,M,carlos.rodriguez@email.com,ca
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-    toast.success("Plantilla descargada");
+    toast.success("Plantilla descargada correctamente");
   };
 
   if (!employee) {
@@ -431,20 +439,14 @@ EMP003,DNI,34567890,Carlos,Rodríguez,1985-12-10,M,carlos.rodriguez@email.com,ca
                   <ul className="text-sm text-slate-600 space-y-1 mb-4">
                     <li>• <strong>Campos requeridos:</strong> employee_code, document_number, first_name, last_name</li>
                     <li>• <strong>Formato de fechas:</strong> YYYY-MM-DD (ej: 2023-01-15)</li>
+                    <li>• <strong>Separador:</strong> Usa COMAS (,) no punto y coma (;)</li>
+                    <li>• <strong>Codificación:</strong> UTF-8 (la plantilla ya está en el formato correcto)</li>
                     <li>• <strong>Roles válidos:</strong> empleado, manager, admin, super_admin, hr_readonly</li>
                     <li>• <strong>Estados válidos:</strong> Activo, Suspendido, Cesado</li>
-                    <li>• <strong>Tipos de documento:</strong> DNI, CE, Pasaporte</li>
+                    <li>• <strong>Tipos de documento:</strong> DNI, CE, Pasaporte, CPP</li>
                     <li>• <strong>Sistemas de pensión:</strong> AFP, ONP, Ninguno</li>
                     <li>• <strong>Tipos de contrato:</strong> Indeterminado, Plazo Fijo, Part-Time, Prácticas, SNP</li>
-                    <li>• <strong>Tipos de trabajador:</strong> Empleado, Obrero, Practicante, Directivo</li>
-                    <li>• <strong>Residencia tributaria:</strong> Domiciliado, No Domiciliado</li>
-                    <li>• <strong>Moneda CTS:</strong> Soles, Dólares</li>
-                    <li>• <strong>DNI:</strong> Exactamente 8 dígitos</li>
-                    <li>• <strong>Celulares/Teléfonos:</strong> Máximo 9 dígitos</li>
-                    <li>• <strong>CCI:</strong> Exactamente 20 dígitos</li>
-                    <li>• <strong>CUSPP AFP:</strong> Exactamente 12 dígitos</li>
-                    <li>• <strong>Cuentas bancarias:</strong> Máximo 20 dígitos</li>
-                    <li>• <strong>Nota:</strong> Todos los campos numéricos se validarán automáticamente</li>
+                    <li>• <strong>Nota:</strong> Si editas en Excel, guarda como "CSV UTF-8" al exportar</li>
                   </ul>
                 </div>
                 <Button
