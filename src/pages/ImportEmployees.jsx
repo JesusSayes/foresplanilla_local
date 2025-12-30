@@ -99,7 +99,12 @@ export default function ImportEmployees() {
 
   const handleFileChange = async (e) => {
     const selectedFile = e.target.files[0];
-    if (!selectedFile) return;
+    if (!selectedFile) {
+      console.log("❌ No se seleccionó archivo");
+      return;
+    }
+
+    console.log("📁 Archivo seleccionado:", selectedFile.name, selectedFile.size, "bytes");
 
     setFile(selectedFile);
     setPreviewData(null);
@@ -107,30 +112,52 @@ export default function ImportEmployees() {
     setProcessing(true);
 
     try {
+      console.log("📤 Iniciando subida de archivo...");
       toast.loading("Subiendo archivo...", { id: "upload" });
       
-      const { file_url } = await base44.integrations.Core.UploadFile({ 
+      const uploadResult = await base44.integrations.Core.UploadFile({ 
         file: selectedFile 
       });
+      
+      console.log("✅ Archivo subido:", uploadResult);
 
-      toast.loading("Procesando y extrayendo datos...", { id: "upload" });
+      if (!uploadResult || !uploadResult.file_url) {
+        throw new Error("No se recibió URL del archivo subido");
+      }
+
+      const { file_url } = uploadResult;
+      console.log("🔗 URL del archivo:", file_url);
+
+      toast.loading("Procesando y extrayendo datos del archivo...", { id: "upload" });
+      console.log("🔄 Iniciando extracción de datos...");
 
       const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
         file_url: file_url,
         json_schema: employeeSchema
       });
 
+      console.log("📊 Resultado de extracción:", result);
+
       if (result.status === "success" && result.output) {
+        console.log("✅ Extracción exitosa:", result.output.length, "empleados");
         setPreviewData(result.output);
-        toast.success(`✓ ${result.output.length} empleados encontrados en el archivo`, { id: "upload" });
+        toast.success(`✓ ${result.output.length} empleados encontrados en el archivo`, { id: "upload", duration: 5000 });
       } else {
-        toast.error("Error al procesar el archivo: " + (result.details || "Formato inválido"), { id: "upload" });
+        console.error("❌ Error en extracción:", result);
+        toast.error("Error al procesar el archivo: " + (result.details || "Formato inválido"), { id: "upload", duration: 7000 });
+        setPreviewData(null);
       }
     } catch (error) {
-      toast.error("Error al cargar el archivo", { id: "upload" });
-      console.error(error);
+      console.error("❌ Error completo:", error);
+      toast.error("Error al cargar el archivo: " + (error.message || "Error desconocido"), { id: "upload", duration: 7000 });
+      setPreviewData(null);
     } finally {
       setProcessing(false);
+      // Reiniciar el input para permitir seleccionar el mismo archivo nuevamente
+      if (e.target) {
+        e.target.value = '';
+      }
+      console.log("✅ Proceso de carga finalizado");
     }
   };
 
