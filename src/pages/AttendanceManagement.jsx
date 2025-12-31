@@ -38,6 +38,16 @@ export default function AttendanceManagement() {
   const [reviewComments, setReviewComments] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
+  const [dateFilterMode, setDateFilterMode] = useState("single"); // "single" o "range"
+  
+  // Filtros aplicados
+  const [appliedDate, setAppliedDate] = useState(new Date());
+  const [appliedStartDate, setAppliedStartDate] = useState(null);
+  const [appliedEndDate, setAppliedEndDate] = useState(null);
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
+  const [appliedSite, setAppliedSite] = useState("all");
+  const [appliedDepartment, setAppliedDepartment] = useState("all");
+  const [appliedAttendanceFilter, setAppliedAttendanceFilter] = useState("all");
 
   const queryClient = useQueryClient();
 
@@ -70,19 +80,19 @@ export default function AttendanceManagement() {
   });
 
   const { data: todayRecords = [] } = useQuery({
-    queryKey: ["todayAttendance", selectedDate, startDate, endDate],
+    queryKey: ["todayAttendance", appliedDate, appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      // Si hay rango de fechas, obtener todos los registros del rango
-      if (startDate && endDate) {
+      // Si hay rango de fechas aplicado, obtener todos los registros del rango
+      if (appliedStartDate && appliedEndDate) {
         const allRecords = await base44.entities.AttendanceRecord.list("-date");
         return allRecords.filter(r => {
           const recordDate = new Date(r.date);
-          return recordDate >= startDate && recordDate <= endDate;
+          return recordDate >= appliedStartDate && recordDate <= appliedEndDate;
         });
       }
       
-      // Si no hay rango, usar fecha seleccionada
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      // Si no hay rango, usar fecha aplicada
+      const dateStr = format(appliedDate, "yyyy-MM-dd");
       const records = await base44.entities.AttendanceRecord.filter(
         { date: dateStr },
         "-created_date"
@@ -90,6 +100,29 @@ export default function AttendanceManagement() {
       return records;
     },
   });
+
+  const applyFilters = () => {
+    if (dateFilterMode === "range") {
+      if (!startDate || !endDate) {
+        toast.error("Selecciona ambas fechas para el rango");
+        return;
+      }
+      setAppliedStartDate(startDate);
+      setAppliedEndDate(endDate);
+      setAppliedDate(null);
+    } else {
+      setAppliedDate(selectedDate);
+      setAppliedStartDate(null);
+      setAppliedEndDate(null);
+    }
+    
+    setAppliedSearchTerm(searchTerm);
+    setAppliedSite(selectedSite);
+    setAppliedDepartment(selectedDepartment);
+    setAppliedAttendanceFilter(attendanceFilter);
+    
+    toast.success("✓ Filtros aplicados");
+  };
 
   const { data: holidays = [] } = useQuery({
     queryKey: ["holidays"],
@@ -290,11 +323,11 @@ export default function AttendanceManagement() {
   const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
 
   const filteredEmployees = allEmployees.filter(emp => {
-    const matchesSearch = emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = selectedDepartment === "all" || emp.department_name === selectedDepartment;
-    const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
+    const matchesSearch = emp.first_name.toLowerCase().includes(appliedSearchTerm.toLowerCase()) ||
+                          emp.last_name.toLowerCase().includes(appliedSearchTerm.toLowerCase()) ||
+                          emp.employee_code.toLowerCase().includes(appliedSearchTerm.toLowerCase());
+    const matchesDept = appliedDepartment === "all" || emp.department_name === appliedDepartment;
+    const matchesSite = appliedSite === "all" || emp.site === appliedSite || (appliedSite === "sin_sede" && !emp.site);
     return matchesSearch && matchesDept && matchesSite;
   });
 
@@ -302,11 +335,11 @@ export default function AttendanceManagement() {
     const record = todayRecords.find(r => r.employee_id === emp.id);
     return { ...emp, record };
   }).filter(emp => {
-    // Aplicar filtros de asistencia
-    if (attendanceFilter === "all") return true;
-    if (attendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
-    if (attendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
-    if (attendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
+    // Aplicar filtros de asistencia aplicados
+    if (appliedAttendanceFilter === "all") return true;
+    if (appliedAttendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
+    if (appliedAttendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
+    if (appliedAttendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
     return true;
   });
 
@@ -329,12 +362,16 @@ export default function AttendanceManagement() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Asistencia');
     
-    const filterText = attendanceFilter === "all" ? "Todos" :
-                      attendanceFilter === "sin_entrada" ? "Sin_Entrada" :
-                      attendanceFilter === "sin_salida" ? "Sin_Salida" :
-                      attendanceFilter === "con_tardanza" ? "Con_Tardanza" : "Filtrado";
+    const filterText = appliedAttendanceFilter === "all" ? "Todos" :
+                      appliedAttendanceFilter === "sin_entrada" ? "Sin_Entrada" :
+                      appliedAttendanceFilter === "sin_salida" ? "Sin_Salida" :
+                      appliedAttendanceFilter === "con_tardanza" ? "Con_Tardanza" : "Filtrado";
     
-    const fileName = `Asistencia_${format(selectedDate, "yyyy-MM-dd")}_${filterText}.xlsx`;
+    const dateText = appliedStartDate && appliedEndDate 
+      ? `${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}`
+      : format(appliedDate, "yyyy-MM-dd");
+    
+    const fileName = `Asistencia_${dateText}_${filterText}.xlsx`;
     XLSX.writeFile(wb, fileName);
     
     toast.success('✓ Archivo Excel generado correctamente');
@@ -347,10 +384,10 @@ export default function AttendanceManagement() {
       return;
     }
 
-    const filterText = attendanceFilter === "all" ? "Todos los empleados" :
-                      attendanceFilter === "sin_entrada" ? "Sin marcar entrada" :
-                      attendanceFilter === "sin_salida" ? "Sin marcar salida" :
-                      attendanceFilter === "con_tardanza" ? "Con tardanza" : "Filtrado";
+    const filterText = appliedAttendanceFilter === "all" ? "Todos los empleados" :
+                      appliedAttendanceFilter === "sin_entrada" ? "Sin marcar entrada" :
+                      appliedAttendanceFilter === "sin_salida" ? "Sin marcar salida" :
+                      appliedAttendanceFilter === "con_tardanza" ? "Con tardanza" : "Filtrado";
 
     const printContent = `
       <!DOCTYPE html>
@@ -405,7 +442,10 @@ export default function AttendanceManagement() {
       <body>
         <div class="header">
           <h1>Reporte de Asistencia</h1>
-          <p><strong>Fecha:</strong> ${format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}</p>
+          <p><strong>Fecha:</strong> ${appliedStartDate && appliedEndDate 
+            ? `${format(appliedStartDate, "dd/MM/yyyy")} - ${format(appliedEndDate, "dd/MM/yyyy")}`
+            : format(appliedDate, "dd 'de' MMMM, yyyy", { locale: es })
+          }</p>
           <p><strong>Filtro aplicado:</strong> ${filterText}</p>
           <p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p>
         </div>
@@ -623,89 +663,97 @@ export default function AttendanceManagement() {
                   <div className="space-y-4">
                     {/* Primera fila: Filtros de fecha */}
                     <div className="flex flex-wrap items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-700">Fecha única:</span>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {format(selectedDate, "dd MMM yyyy", { locale: es })}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={selectedDate}
-                              onSelect={(date) => {
-                                if (date) {
-                                  setSelectedDate(date);
-                                  setStartDate(null);
-                                  setEndDate(null);
-                                }
-                              }}
-                              locale={es}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-
-                      <div className="h-6 w-px bg-slate-300" />
-
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-700">Desde:</span>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {startDate ? format(startDate, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={startDate}
-                              onSelect={(date) => date && setStartDate(date)}
-                              locale={es}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-700">Hasta:</span>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {endDate ? format(endDate, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={endDate}
-                              onSelect={(date) => date && setEndDate(date)}
-                              locale={es}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-
-                      {startDate && endDate && (
+                      {!startDate && !endDate ? (
                         <>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-slate-700">Fecha:</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {format(selectedDate, "dd MMM yyyy", { locale: es })}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                  mode="single"
+                                  selected={selectedDate}
+                                  onSelect={(date) => date && setSelectedDate(date)}
+                                  locale={es}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setDateFilterMode("range");
+                              setStartDate(new Date());
+                              setEndDate(new Date());
+                            }}
+                          >
+                            📅 Usar rango de fechas
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-slate-700">Desde:</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {startDate ? format(startDate, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                  mode="single"
+                                  selected={startDate}
+                                  onSelect={(date) => date && setStartDate(date)}
+                                  locale={es}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-slate-700">Hasta:</span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {endDate ? format(endDate, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                  mode="single"
+                                  selected={endDate}
+                                  onSelect={(date) => date && setEndDate(date)}
+                                  locale={es}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
                           <Badge className="bg-blue-100 text-blue-700">
-                            {Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1} días
+                            {startDate && endDate ? Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1 : 0} días
                           </Badge>
+                          
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => {
                               setStartDate(null);
                               setEndDate(null);
+                              setDateFilterMode("single");
                             }}
                             className="text-red-600 hover:text-red-700"
                           >
-                            Limpiar rango
+                            Usar fecha única
                           </Button>
                         </>
                       )}
@@ -778,6 +826,14 @@ export default function AttendanceManagement() {
                       </Select>
 
                       <Button
+                        onClick={applyFilters}
+                        className="bg-indigo-600 hover:bg-indigo-700"
+                      >
+                        <Search className="w-4 h-4 mr-2" />
+                        Buscar
+                      </Button>
+
+                      <Button
                         onClick={handleExportToExcel}
                         variant="outline"
                         className="bg-green-600 text-white hover:bg-green-700"
@@ -800,12 +856,12 @@ export default function AttendanceManagement() {
                     <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <p className="text-sm text-blue-900">
                         <strong>Mostrando {employeesWithRecords.length} empleados</strong>
-                        {attendanceFilter !== "all" && (
+                        {appliedAttendanceFilter !== "all" && (
                           <span className="ml-2">
                             - Filtro: {
-                              attendanceFilter === "sin_entrada" ? "Sin marcar entrada" :
-                              attendanceFilter === "sin_salida" ? "Sin marcar salida" :
-                              attendanceFilter === "con_tardanza" ? "Con tardanza" : ""
+                              appliedAttendanceFilter === "sin_entrada" ? "Sin marcar entrada" :
+                              appliedAttendanceFilter === "sin_salida" ? "Sin marcar salida" :
+                              appliedAttendanceFilter === "con_tardanza" ? "Con tardanza" : ""
                             }
                           </span>
                         )}
