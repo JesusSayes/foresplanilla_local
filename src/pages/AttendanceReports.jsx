@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,6 +38,10 @@ export default function AttendanceReports() {
   const [appliedDepartment, setAppliedDepartment] = useState("all");
   const [appliedEmployee, setAppliedEmployee] = useState("all");
   const [appliedReportType, setAppliedReportType] = useState("general");
+  
+  // Estados para búsqueda
+  const [employeeSearchOpen, setEmployeeSearchOpen] = useState(false);
+  const [departmentSearchOpen, setDepartmentSearchOpen] = useState(false);
 
   const applyFilters = () => {
     setAppliedStartDate(startDate);
@@ -630,32 +635,92 @@ export default function AttendanceReports() {
 
                 <div className="flex flex-wrap items-center gap-4">
                   {employee?.role === "admin" && (
-                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Departamento" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos los departamentos</SelectItem>
-                        {departments.map(dept => (
-                          <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={departmentSearchOpen} onOpenChange={setDepartmentSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-48 justify-between">
+                          {selectedDepartment === "all" ? "Todos los departamentos" : selectedDepartment}
+                          <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Buscar departamento..." />
+                          <CommandEmpty>No se encontró departamento</CommandEmpty>
+                          <CommandGroup className="max-h-64 overflow-auto">
+                            <CommandItem
+                              value="all"
+                              onSelect={() => {
+                                setSelectedDepartment("all");
+                                setDepartmentSearchOpen(false);
+                              }}
+                            >
+                              <CheckCircle className={`mr-2 h-4 w-4 ${selectedDepartment === "all" ? "opacity-100" : "opacity-0"}`} />
+                              Todos los departamentos
+                            </CommandItem>
+                            {departments.map(dept => (
+                              <CommandItem
+                                key={dept}
+                                value={dept}
+                                onSelect={() => {
+                                  setSelectedDepartment(dept);
+                                  setDepartmentSearchOpen(false);
+                                }}
+                              >
+                                <CheckCircle className={`mr-2 h-4 w-4 ${selectedDepartment === dept ? "opacity-100" : "opacity-0"}`} />
+                                {dept}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   )}
 
-                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Empleado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los empleados</SelectItem>
-                      {filteredEmployees.map(emp => (
-                        <SelectItem key={emp.id} value={emp.id}>
-                          {emp.first_name} {emp.last_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={employeeSearchOpen} onOpenChange={setEmployeeSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-48 justify-between">
+                        {selectedEmployee === "all" 
+                          ? "Todos los empleados" 
+                          : (() => {
+                              const emp = filteredEmployees.find(e => e.id === selectedEmployee);
+                              return emp ? `${emp.first_name} ${emp.last_name}` : "Seleccionar empleado";
+                            })()
+                        }
+                        <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar empleado..." />
+                        <CommandEmpty>No se encontró empleado</CommandEmpty>
+                        <CommandGroup className="max-h-64 overflow-auto">
+                          <CommandItem
+                            value="all"
+                            onSelect={() => {
+                              setSelectedEmployee("all");
+                              setEmployeeSearchOpen(false);
+                            }}
+                          >
+                            <CheckCircle className={`mr-2 h-4 w-4 ${selectedEmployee === "all" ? "opacity-100" : "opacity-0"}`} />
+                            Todos los empleados
+                          </CommandItem>
+                          {filteredEmployees.map(emp => (
+                            <CommandItem
+                              key={emp.id}
+                              value={`${emp.first_name} ${emp.last_name} ${emp.employee_code}`}
+                              onSelect={() => {
+                                setSelectedEmployee(emp.id);
+                                setEmployeeSearchOpen(false);
+                              }}
+                            >
+                              <CheckCircle className={`mr-2 h-4 w-4 ${selectedEmployee === emp.id ? "opacity-100" : "opacity-0"}`} />
+                              {emp.first_name} {emp.last_name} ({emp.employee_code})
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
 
                   <Select value={reportType} onValueChange={setReportType}>
                     <SelectTrigger className="w-48">
@@ -708,61 +773,69 @@ export default function AttendanceReports() {
             </CardContent>
           </Card>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          {/* Summary Cards - Compact Horizontal Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <Users className="w-6 h-6 text-blue-600" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-100 rounded-xl shrink-0">
+                    <Users className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {filteredEmployees.length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Empleados activos</p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {filteredEmployees.length}
-                </div>
-                <p className="text-slate-600 text-sm">Empleados activos</p>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-green-100 rounded-xl">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-green-100 rounded-xl shrink-0">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {filteredRecords.filter(r => !r.is_absent).length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Asistencias</p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {filteredRecords.filter(r => !r.is_absent).length}
-                </div>
-                <p className="text-slate-600 text-sm">Asistencias</p>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-yellow-100 rounded-xl">
-                    <Clock className="w-6 h-6 text-yellow-600" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-yellow-100 rounded-xl shrink-0">
+                    <Clock className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {filteredRecords.filter(r => r.is_late).length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Tardanzas</p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {filteredRecords.filter(r => r.is_late).length}
-                </div>
-                <p className="text-slate-600 text-sm">Tardanzas</p>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-orange-100 rounded-xl">
-                    <AlertCircle className="w-6 h-6 text-orange-600" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-orange-100 rounded-xl shrink-0">
+                    <AlertCircle className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {pendingIncidents.length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Justif. pendientes</p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {pendingIncidents.length}
-                </div>
-                <p className="text-slate-600 text-sm">Justificaciones pendientes</p>
               </CardContent>
             </Card>
           </div>
