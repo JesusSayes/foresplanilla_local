@@ -818,7 +818,7 @@ export default function AttendanceManagement() {
                                 </p>
                               </div>
 
-                              <div className="grid grid-cols-4 gap-4 text-sm">
+                              <div className="grid grid-cols-6 gap-3 text-sm">
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Entrada</p>
                                   <p className="font-semibold text-slate-900">
@@ -841,6 +841,28 @@ export default function AttendanceManagement() {
                                   <p className="text-xs text-slate-600 mb-1">Tardanza</p>
                                   <p className={`font-semibold ${emp.record?.late_minutes > 0 ? 'text-orange-600' : 'text-green-600'}`}>
                                     {emp.record?.late_minutes || 0} min
+                                  </p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-xs text-slate-600 mb-1">HE 25%</p>
+                                  <p className="font-semibold text-blue-600">
+                                    {(() => {
+                                      const workedHours = emp.record?.worked_hours || 0;
+                                      const overtimeHours = Math.max(0, workedHours - 8);
+                                      const he25 = Math.min(overtimeHours, 2);
+                                      return he25.toFixed(2);
+                                    })()}h
+                                  </p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-xs text-slate-600 mb-1">HE 35%</p>
+                                  <p className="font-semibold text-purple-600">
+                                    {(() => {
+                                      const workedHours = emp.record?.worked_hours || 0;
+                                      const overtimeHours = Math.max(0, workedHours - 8);
+                                      const he35 = Math.max(0, overtimeHours - 2);
+                                      return he35.toFixed(2);
+                                    })()}h
                                   </p>
                                 </div>
                               </div>
