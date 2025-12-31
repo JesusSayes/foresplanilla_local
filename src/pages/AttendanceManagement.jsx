@@ -36,6 +36,13 @@ export default function AttendanceManagement() {
   const [reviewComments, setReviewComments] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
+  const [showJustifyModal, setShowJustifyModal] = useState(false);
+  const [justifyingEmployee, setJustifyingEmployee] = useState(null);
+  const [justificationData, setJustificationData] = useState({
+    incident_type: "Olvido de Marcación",
+    justification: "",
+    supporting_document_url: "",
+  });
 
   const queryClient = useQueryClient();
 
@@ -165,6 +172,28 @@ export default function AttendanceManagement() {
     },
   });
 
+  const createJustificationMutation = useMutation({
+    mutationFn: async (data) => {
+      return await base44.entities.AttendanceIncident.create(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["pendingIncidents"]);
+      queryClient.invalidateQueries(["todayAttendance"]);
+      toast.success("Justificación creada correctamente");
+      setShowJustifyModal(false);
+      setJustifyingEmployee(null);
+      setJustificationData({
+        incident_type: "Olvido de Marcación",
+        justification: "",
+        supporting_document_url: "",
+      });
+    },
+    onError: (error) => {
+      toast.error("Error al crear la justificación");
+      console.error(error);
+    },
+  });
+
   const importAttendanceMutation = useMutation({
     mutationFn: async (connectionId) => {
       const connection = dbConnections.find(c => c.id === connectionId);
@@ -272,6 +301,45 @@ export default function AttendanceManagement() {
         review_date: format(new Date(), "yyyy-MM-dd"),
         review_comments: reviewComments,
       }
+    });
+  };
+
+  const handleJustifyClick = (emp, record) => {
+    setJustifyingEmployee(emp);
+    
+    // Determinar el tipo de incidente basado en el estado del registro
+    let incidentType = "Olvido de Marcación";
+    if (record) {
+      if (record.is_absent) {
+        incidentType = "Falta";
+      } else if (record.is_late) {
+        incidentType = "Tardanza";
+      } else if (record.clock_in && !record.clock_out) {
+        incidentType = "Olvido de Marcación";
+      }
+    }
+    
+    setJustificationData({
+      incident_type: incidentType,
+      justification: "",
+      supporting_document_url: "",
+    });
+    setShowJustifyModal(true);
+  };
+
+  const handleSubmitJustification = () => {
+    if (!justificationData.justification.trim()) {
+      toast.error("Debes ingresar una justificación");
+      return;
+    }
+
+    createJustificationMutation.mutate({
+      employee_id: justifyingEmployee.id,
+      incident_date: format(selectedDate, "yyyy-MM-dd"),
+      incident_type: justificationData.incident_type,
+      justification: justificationData.justification,
+      supporting_document_url: justificationData.supporting_document_url,
+      status: "Pendiente",
     });
   };
 
@@ -531,60 +599,68 @@ export default function AttendanceManagement() {
           )}
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <Users className="w-6 h-6 text-blue-600" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-100 rounded-xl shrink-0">
+                    <Users className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {allEmployees.length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Total empleados</p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {allEmployees.length}
-                </div>
-                <p className="text-slate-600 text-sm">Total empleados</p>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-green-100 rounded-xl">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-green-100 rounded-xl shrink-0">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {todayRecords.filter(r => r.clock_in).length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Han marcado hoy</p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {todayRecords.filter(r => r.clock_in).length}
-                </div>
-                <p className="text-slate-600 text-sm">Han marcado hoy</p>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-yellow-100 rounded-xl">
-                    <Clock className="w-6 h-6 text-yellow-600" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-yellow-100 rounded-xl shrink-0">
+                    <Clock className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {todayRecords.filter(r => r.is_late).length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Tardanzas hoy</p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {todayRecords.filter(r => r.is_late).length}
-                </div>
-                <p className="text-slate-600 text-sm">Tardanzas hoy</p>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-orange-100 rounded-xl">
-                    <AlertCircle className="w-6 h-6 text-orange-600" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-orange-100 rounded-xl shrink-0">
+                    <AlertCircle className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {pendingIncidents.length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Justificaciones pendientes</p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {pendingIncidents.length}
-                </div>
-                <p className="text-slate-600 text-sm">Justificaciones pendientes</p>
               </CardContent>
             </Card>
           </div>
@@ -791,6 +867,17 @@ export default function AttendanceManagement() {
                                     Editar
                                   </Button>
                                 )}
+
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                                  onClick={() => handleJustifyClick(emp, emp.record)}
+                                  title="Justificar asistencia"
+                                >
+                                  <FileText className="w-4 h-4 mr-1" />
+                                  Justificar
+                                </Button>
 
                                 <Button
                                   size="sm"
@@ -1138,6 +1225,112 @@ export default function AttendanceManagement() {
               Cerrar
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Justify Modal */}
+      {showJustifyModal && justifyingEmployee && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+          onClick={() => {
+            setShowJustifyModal(false);
+            setJustifyingEmployee(null);
+          }}
+        >
+          <Card 
+            className="max-w-2xl w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl font-bold">Justificar Asistencia</CardTitle>
+                  <p className="text-sm text-slate-600 mt-1">
+                    {justifyingEmployee.first_name} {justifyingEmployee.last_name} • {format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}
+                  </p>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => {
+                    setShowJustifyModal(false);
+                    setJustifyingEmployee(null);
+                  }}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Tipo de Incidente
+                  </label>
+                  <Select 
+                    value={justificationData.incident_type}
+                    onValueChange={(value) => setJustificationData({ ...justificationData, incident_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Tardanza">Tardanza</SelectItem>
+                      <SelectItem value="Falta">Falta</SelectItem>
+                      <SelectItem value="Salida Temprana">Salida Temprana</SelectItem>
+                      <SelectItem value="Olvido de Marcación">Olvido de Marcación</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Justificación *
+                  </label>
+                  <Textarea
+                    value={justificationData.justification}
+                    onChange={(e) => setJustificationData({ ...justificationData, justification: e.target.value })}
+                    placeholder="Explica el motivo de la incidencia..."
+                    rows={4}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    URL del Documento de Sustento (opcional)
+                  </label>
+                  <Input
+                    value={justificationData.supporting_document_url}
+                    onChange={(e) => setJustificationData({ ...justificationData, supporting_document_url: e.target.value })}
+                    placeholder="https://..."
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Puedes subir un archivo usando la función "Subir Archivo" y pegar el URL aquí
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setShowJustifyModal(false);
+                      setJustifyingEmployee(null);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                    onClick={handleSubmitJustification}
+                    disabled={createJustificationMutation.isPending}
+                  >
+                    {createJustificationMutation.isPending ? "Guardando..." : "Crear Justificación"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
       </PermissionGuard>
