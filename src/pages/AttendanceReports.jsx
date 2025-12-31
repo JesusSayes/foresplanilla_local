@@ -190,7 +190,7 @@ export default function AttendanceReports() {
     let headers = [];
     let fileName = '';
 
-    if (reportType === "ausentismo") {
+    if (appliedReportType === "ausentismo") {
       headers = ['Código', 'Empleado', 'Departamento', 'Cargo', 'Días Ausentes', 'Días Esperados', '% Ausentismo'];
       dataToExport = filteredEmployees
         .map(emp => {
@@ -418,7 +418,7 @@ export default function AttendanceReports() {
     let headers = [];
     let fileName = '';
 
-    if (reportType === "ausentismo") {
+    if (appliedReportType === "ausentismo") {
       title = 'Reporte de Ausentismo';
       headers = [['Código', 'Empleado', 'Departamento', 'Días Ausentes', '% Ausentismo']];
       tableData = filteredEmployees
@@ -1209,7 +1209,7 @@ export default function AttendanceReports() {
                     <CardContent className="p-6">
                       <ResponsiveContainer width="100%" height={300}>
                         <BarChart 
-                          data={filteredEmployees
+                          data={displayEmployees
                             .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
                             .filter(item => item.stats.absentDays > 0)
                             .sort((a, b) => b.stats.absentDays - a.stats.absentDays)
