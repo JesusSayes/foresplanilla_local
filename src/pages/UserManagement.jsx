@@ -16,6 +16,7 @@ export default function UserManagement() {
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showInviteModal, setShowInviteModal] = useState(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [showUserModal, setShowUserModal] = useState(false);
@@ -274,17 +275,34 @@ Equipo de Recursos Humanos
 
   const allCorporateEmployees = allEmployees.filter(emp => emp.work_email);
   
-  const filteredEmployees = allCorporateEmployees.filter(emp => 
-    !searchTerm || (
-      emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.work_email.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  const applyFilters = (employees) => {
+    let filtered = employees;
+    
+    // Aplicar filtro de búsqueda
+    if (searchTerm) {
+      filtered = filtered.filter(emp => 
+        emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.work_email.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Aplicar filtro de estado
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(emp => emp.status === statusFilter);
+    }
+    
+    return filtered;
+  };
 
-  const employeesWithUsers = filteredEmployees.filter(emp => getUserForEmployee(emp.work_email));
-  const employeesWithoutUsers = filteredEmployees.filter(emp => !getUserForEmployee(emp.work_email) && emp.status === "Activo");
+  const employeesWithUsers = applyFilters(
+    allCorporateEmployees.filter(emp => getUserForEmployee(emp.work_email))
+  );
+  
+  const employeesWithoutUsers = applyFilters(
+    allCorporateEmployees.filter(emp => !getUserForEmployee(emp.work_email))
+  );
 
   const stats = {
     total: allCorporateEmployees.length,
@@ -395,7 +413,7 @@ Equipo de Recursos Humanos
           </Card>
         </div>
 
-        {/* Search and Manual Invite */}
+        {/* Search and Filters */}
         <Card className="border-0 shadow-lg mb-6">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row gap-4">
@@ -408,6 +426,17 @@ Equipo de Recursos Humanos
                   className="pl-10 h-12"
                 />
               </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-48 h-12">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="Activo">Activos</SelectItem>
+                  <SelectItem value="Suspendido">Suspendidos</SelectItem>
+                  <SelectItem value="Cesado">Cesados</SelectItem>
+                </SelectContent>
+              </Select>
               <Button
                 onClick={() => setShowInviteModal(true)}
                 className="bg-indigo-600 hover:bg-indigo-700 h-12"
@@ -419,174 +448,241 @@ Equipo de Recursos Humanos
           </CardContent>
         </Card>
 
-        {/* Pending Invitations */}
-        {employeesWithoutUsers.length > 0 && (
-          <Card className="border-0 shadow-lg mb-6">
-            <CardHeader className="border-b bg-orange-50/50">
-              <CardTitle className="text-xl font-bold flex items-center gap-2">
-                <AlertCircle className="w-6 h-6 text-orange-600" />
-                Empleados Pendientes de Invitar ({employeesWithoutUsers.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-3">
-                {employeesWithoutUsers.map(emp => (
-                  <div
-                    key={emp.id}
-                    className="flex items-center justify-between p-4 border-2 border-orange-200 bg-orange-50/30 rounded-lg hover:shadow-md transition-all"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                        <Users className="w-6 h-6 text-orange-600" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-900">
-                          {emp.first_name} {emp.last_name}
-                        </p>
-                        <p className="text-sm text-slate-600">
-                          {emp.employee_code} • {emp.position}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Mail className="w-3 h-3 text-slate-500" />
-                          <p className="text-xs text-slate-600">{emp.work_email}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-orange-100 text-orange-700">
-                        Sin Acceso
-                      </Badge>
-                      <Button
-                        onClick={() => handleSendInvite(emp)}
-                        disabled={sendInviteMutation.isPending}
-                        className="bg-orange-600 hover:bg-orange-700"
-                        size="sm"
-                      >
-                        {sendInviteMutation.isPending ? (
-                          <>Enviando...</>
-                        ) : (
-                          <>
-                            <Send className="w-4 h-4 mr-2" />
-                            Enviar Invitación
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Tabs for better organization */}
+        <Tabs defaultValue="with-access" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 h-12">
+            <TabsTrigger value="with-access" className="text-base">
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              Con Acceso ({employeesWithUsers.length})
+            </TabsTrigger>
+            <TabsTrigger value="pending" className="text-base">
+              <AlertCircle className="w-4 h-4 mr-2" />
+              Pendientes de Invitar ({employeesWithoutUsers.length})
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Users with Access */}
-        <Card className="border-0 shadow-lg">
-          <CardHeader className="border-b bg-green-50/50">
-            <CardTitle className="text-xl font-bold flex items-center gap-2">
-              <CheckCircle2 className="w-6 h-6 text-green-600" />
-              Empleados con Acceso al Sistema ({employeesWithUsers.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            {employeesWithUsers.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
-                <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                <p className="text-lg font-semibold mb-2">No hay usuarios registrados</p>
-                <p className="text-sm">
-                  Los empleados con email corporativo aparecerán aquí una vez que acepten su invitación
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {employeesWithUsers.map(emp => {
-                  const user = getUserForEmployee(emp.work_email);
-                  return (
-                    <div
-                      key={emp.id}
-                      className="flex items-center justify-between p-4 border border-slate-200 bg-white rounded-lg hover:shadow-md transition-all"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                          <CheckCircle2 className="w-6 h-6 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-900">
-                            {emp.first_name} {emp.last_name}
-                          </p>
-                          <p className="text-sm text-slate-600">
-                            {emp.employee_code} • {emp.position}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Mail className="w-3 h-3 text-slate-500" />
-                            <p className="text-xs text-slate-600">{emp.work_email}</p>
+          {/* Users with Access Tab */}
+          <TabsContent value="with-access">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-green-50/50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <CheckCircle2 className="w-6 h-6 text-green-600" />
+                    Empleados con Acceso al Sistema
+                  </CardTitle>
+                  <Badge className="bg-green-100 text-green-700 text-base px-4 py-1">
+                    {employeesWithUsers.length} usuarios
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                {employeesWithUsers.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">
+                    <CheckCircle2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                    <p className="text-lg font-semibold mb-2">No hay usuarios con acceso</p>
+                    <p className="text-sm">
+                      Los empleados aparecerán aquí una vez que acepten su invitación
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {employeesWithUsers.map(emp => {
+                      const user = getUserForEmployee(emp.work_email);
+                      return (
+                        <div
+                          key={emp.id}
+                          className="flex items-center justify-between p-4 border border-slate-200 bg-white rounded-lg hover:shadow-md transition-all"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                              <CheckCircle2 className="w-6 h-6 text-green-600" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900">
+                                {emp.first_name} {emp.last_name}
+                              </p>
+                              <p className="text-sm text-slate-600">
+                                {emp.employee_code} • {emp.position} • {emp.department_name}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Mail className="w-3 h-3 text-slate-500" />
+                                <p className="text-xs text-slate-600">{emp.work_email}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge 
+                              className={
+                                emp.status === "Cesado"
+                                  ? "bg-red-100 text-red-700 border-red-200"
+                                  : emp.status === "Suspendido"
+                                  ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                                  : "bg-green-100 text-green-700 border-green-200"
+                              }
+                            >
+                              {emp.status}
+                            </Badge>
+                            <Badge 
+                              className={
+                                emp.role === "admin" || emp.role === "super_admin"
+                                  ? "bg-purple-100 text-purple-700"
+                                  : emp.role === "manager"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-slate-100 text-slate-700"
+                              }
+                            >
+                              {emp.role === "super_admin" ? "Super Admin" :
+                               emp.role === "admin" ? "Admin" :
+                               emp.role === "manager" ? "Manager" :
+                               emp.role === "hr_readonly" ? "RRHH" :
+                               "Empleado"}
+                            </Badge>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditUser(user, emp)}
+                                className="h-8"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                              {emp.status === "Activo" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleSuspendUser(emp, emp.status)}
+                                  className="h-8 text-orange-600 hover:text-orange-700"
+                                  title="Suspender acceso"
+                                >
+                                  <Ban className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {emp.status === "Suspendido" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleSuspendUser(emp, emp.status)}
+                                  className="h-8 text-green-600 hover:text-green-700"
+                                  title="Reactivar acceso"
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteUser(user.id, `${emp.first_name} ${emp.last_name}`)}
+                                className="h-8 text-red-600 hover:text-red-700"
+                                title="Eliminar usuario"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Badge 
-                          className={
-                            emp.status === "Cesado"
-                              ? "bg-red-100 text-red-700 border-red-200"
-                              : emp.status === "Suspendido"
-                              ? "bg-yellow-100 text-yellow-700 border-yellow-200"
-                              : "bg-green-100 text-green-700 border-green-200"
-                          }
-                        >
-                          {emp.status}
-                        </Badge>
-                        <Badge 
-                          className={
-                            emp.role === "admin" || emp.role === "super_admin"
-                              ? "bg-purple-100 text-purple-700"
-                              : emp.role === "manager"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-slate-100 text-slate-700"
-                          }
-                        >
-                          {emp.role === "super_admin" ? "Super Admin" :
-                           emp.role === "admin" ? "Admin" :
-                           emp.role === "manager" ? "Manager" :
-                           emp.role === "hr_readonly" ? "RRHH" :
-                           "Empleado"}
-                        </Badge>
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEditUser(user, emp)}
-                            className="h-8"
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Pending Invitations Tab */}
+          <TabsContent value="pending">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-orange-50/50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <AlertCircle className="w-6 h-6 text-orange-600" />
+                    Empleados Pendientes de Invitar
+                  </CardTitle>
+                  <Badge className="bg-orange-100 text-orange-700 text-base px-4 py-1">
+                    {employeesWithoutUsers.length} pendientes
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                {employeesWithoutUsers.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">
+                    <CheckCircle2 className="w-16 h-16 text-green-300 mx-auto mb-4" />
+                    <p className="text-lg font-semibold mb-2 text-green-700">
+                      ¡Excelente! Todos los empleados han sido invitados
+                    </p>
+                    <p className="text-sm">
+                      No hay empleados pendientes de invitar al sistema
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {employeesWithoutUsers.map(emp => (
+                      <div
+                        key={emp.id}
+                        className="flex items-center justify-between p-4 border-2 border-orange-200 bg-orange-50/30 rounded-lg hover:shadow-md transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                            <AlertCircle className="w-6 h-6 text-orange-600" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900">
+                              {emp.first_name} {emp.last_name}
+                            </p>
+                            <p className="text-sm text-slate-600">
+                              {emp.employee_code} • {emp.position} • {emp.department_name}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Mail className="w-3 h-3 text-slate-500" />
+                              <p className="text-xs text-slate-600">{emp.work_email}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge 
+                            className={
+                              emp.status === "Cesado"
+                                ? "bg-red-100 text-red-700 border-red-200"
+                                : emp.status === "Suspendido"
+                                ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                                : "bg-orange-100 text-orange-700 border-orange-200"
+                            }
                           >
-                            Editar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSuspendUser(emp, emp.status)}
-                            className={`h-8 ${
-                              emp.status === "Suspendido"
-                                ? "text-green-600 hover:text-green-700"
-                                : "text-orange-600 hover:text-orange-700"
-                            }`}
-                          >
-                            {emp.status === "Suspendido" ? "Reactivar" : "Suspender"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteUser(user.id, `${emp.first_name} ${emp.last_name}`)}
-                            className="h-8 text-red-600 hover:text-red-700"
-                          >
-                            Eliminar
-                          </Button>
+                            {emp.status}
+                          </Badge>
+                          <Badge className="bg-orange-100 text-orange-700">
+                            Sin Acceso
+                          </Badge>
+                          {emp.status === "Activo" && (
+                            <Button
+                              onClick={() => handleSendInvite(emp)}
+                              disabled={sendInviteMutation.isPending}
+                              className="bg-orange-600 hover:bg-orange-700"
+                              size="sm"
+                            >
+                              {sendInviteMutation.isPending ? (
+                                <>Enviando...</>
+                              ) : (
+                                <>
+                                  <Send className="w-4 h-4 mr-2" />
+                                  Enviar Invitación
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          {emp.status !== "Activo" && (
+                            <p className="text-xs text-slate-500 italic">
+                              No disponible ({emp.status})
+                            </p>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Edit User Modal */}
