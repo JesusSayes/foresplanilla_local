@@ -25,6 +25,8 @@ export default function AttendanceManagement() {
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSite, setSelectedSite] = useState("all");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
@@ -68,8 +70,18 @@ export default function AttendanceManagement() {
   });
 
   const { data: todayRecords = [] } = useQuery({
-    queryKey: ["todayAttendance", selectedDate],
+    queryKey: ["todayAttendance", selectedDate, startDate, endDate],
     queryFn: async () => {
+      // Si hay rango de fechas, obtener todos los registros del rango
+      if (startDate && endDate) {
+        const allRecords = await base44.entities.AttendanceRecord.list("-date");
+        return allRecords.filter(r => {
+          const recordDate = new Date(r.date);
+          return recordDate >= startDate && recordDate <= endDate;
+        });
+      }
+      
+      // Si no hay rango, usar fecha seleccionada
       const dateStr = format(selectedDate, "yyyy-MM-dd");
       const records = await base44.entities.AttendanceRecord.filter(
         { date: dateStr },
@@ -530,61 +542,69 @@ export default function AttendanceManagement() {
             </Card>
           )}
 
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          {/* Stats - Compact Horizontal Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <Users className="w-6 h-6 text-blue-600" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-100 rounded-xl shrink-0">
+                    <Users className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {allEmployees.length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Total empleados</p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {allEmployees.length}
-                </div>
-                <p className="text-slate-600 text-sm">Total empleados</p>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-green-100 rounded-xl">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-green-100 rounded-xl shrink-0">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {todayRecords.filter(r => r.clock_in).length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Han marcado hoy</p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {todayRecords.filter(r => r.clock_in).length}
-                </div>
-                <p className="text-slate-600 text-sm">Han marcado hoy</p>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-yellow-100 rounded-xl">
-                    <Clock className="w-6 h-6 text-yellow-600" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-yellow-100 rounded-xl shrink-0">
+                    <Clock className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {todayRecords.filter(r => r.is_late).length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Tardanzas hoy</p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {todayRecords.filter(r => r.is_late).length}
-                </div>
-                <p className="text-slate-600 text-sm">Tardanzas hoy</p>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-orange-100 rounded-xl">
-                    <AlertCircle className="w-6 h-6 text-orange-600" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-orange-100 rounded-xl shrink-0">
+                    <AlertCircle className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {pendingIncidents.length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Justif. pendientes</p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {pendingIncidents.length}
-                </div>
-                <p className="text-slate-600 text-sm">Justificaciones pendientes</p>
               </CardContent>
             </Card>
           </div>
@@ -600,104 +620,180 @@ export default function AttendanceManagement() {
             <TabsContent value="attendance" className="space-y-6">
               <Card className="border-0 shadow-lg">
                 <CardContent className="p-6">
-                  <div className="flex flex-wrap items-center gap-4 mb-6">
-                    <div className="flex-1 min-w-64">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                        <Input
-                          placeholder="Buscar empleado..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10"
-                        />
+                  <div className="space-y-4">
+                    {/* Primera fila: Filtros de fecha */}
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-700">Fecha única:</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {format(selectedDate, "dd MMM yyyy", { locale: es })}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={selectedDate}
+                              onSelect={(date) => {
+                                if (date) {
+                                  setSelectedDate(date);
+                                  setStartDate(null);
+                                  setEndDate(null);
+                                }
+                              }}
+                              locale={es}
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
+
+                      <div className="h-6 w-px bg-slate-300" />
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-700">Desde:</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {startDate ? format(startDate, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={startDate}
+                              onSelect={(date) => date && setStartDate(date)}
+                              locale={es}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-700">Hasta:</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {endDate ? format(endDate, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={endDate}
+                              onSelect={(date) => date && setEndDate(date)}
+                              locale={es}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      {startDate && endDate && (
+                        <>
+                          <Badge className="bg-blue-100 text-blue-700">
+                            {Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1} días
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setStartDate(null);
+                              setEndDate(null);
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            Limpiar rango
+                          </Button>
+                        </>
+                      )}
                     </div>
 
-                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Departamento" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {departments.map(dept => (
-                          <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {/* Segunda fila: Filtros generales */}
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="flex-1 min-w-64">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                          <Input
+                            placeholder="Buscar empleado..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                      </div>
 
-                    <Select value={selectedSite} onValueChange={setSelectedSite}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Sede" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas</SelectItem>
-                        <SelectItem value="sin_sede">Sin sede</SelectItem>
-                        {sites.map(site => (
-                          <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                        <SelectTrigger className="w-48">
+                          <SelectValue placeholder="Departamento" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          {departments.map(dept => (
+                            <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
 
-                    <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
-                      <SelectTrigger className="w-52">
-                        <SelectValue placeholder="Filtro de asistencia" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="sin_entrada">
-                          <div className="flex items-center gap-2">
-                            <XCircle className="w-4 h-4 text-red-600" />
-                            Sin marcar entrada
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="sin_salida">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-yellow-600" />
-                            Sin marcar salida
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="con_tardanza">
-                          <div className="flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4 text-orange-600" />
-                            Con tardanza
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <Select value={selectedSite} onValueChange={setSelectedSite}>
+                        <SelectTrigger className="w-40">
+                          <SelectValue placeholder="Sede" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todas</SelectItem>
+                          <SelectItem value="sin_sede">Sin sede</SelectItem>
+                          {sites.map(site => (
+                            <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
 
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline">
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {format(selectedDate, "dd MMM yyyy", { locale: es })}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={(date) => date && setSelectedDate(date)}
-                          locale={es}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                      <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
+                        <SelectTrigger className="w-52">
+                          <SelectValue placeholder="Filtro de asistencia" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="sin_entrada">
+                            <div className="flex items-center gap-2">
+                              <XCircle className="w-4 h-4 text-red-600" />
+                              Sin marcar entrada
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="sin_salida">
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4 text-yellow-600" />
+                              Sin marcar salida
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="con_tardanza">
+                            <div className="flex items-center gap-2">
+                              <AlertCircle className="w-4 h-4 text-orange-600" />
+                              Con tardanza
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
 
-                    <Button
-                      onClick={handleExportToExcel}
-                      variant="outline"
-                      className="bg-green-600 text-white hover:bg-green-700"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Exportar Excel
-                    </Button>
+                      <Button
+                        onClick={handleExportToExcel}
+                        variant="outline"
+                        className="bg-green-600 text-white hover:bg-green-700"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Exportar Excel
+                      </Button>
 
-                    <Button
-                      onClick={handlePrint}
-                      variant="outline"
-                    >
-                      <Printer className="w-4 h-4 mr-2" />
-                      Imprimir
-                    </Button>
+                      <Button
+                        onClick={handlePrint}
+                        variant="outline"
+                      >
+                        <Printer className="w-4 h-4 mr-2" />
+                        Imprimir
+                      </Button>
+                    </div>
                   </div>
 
                   {employeesWithRecords.length > 0 && (
