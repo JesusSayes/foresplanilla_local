@@ -642,9 +642,7 @@ export default function AttendanceReports() {
                   <Badge className="bg-blue-100 text-blue-700">
                     {differenceInDays(endDate, startDate) + 1} días
                   </Badge>
-                </div>
 
-                <div className="flex flex-wrap items-center gap-4">
                   {employee?.role === "admin" && (
                     <Popover open={departmentSearchOpen} onOpenChange={setDepartmentSearchOpen}>
                       <PopoverTrigger asChild>
@@ -689,7 +687,7 @@ export default function AttendanceReports() {
 
                   <Popover open={employeeSearchOpen} onOpenChange={setEmployeeSearchOpen}>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-64 justify-between">
+                      <Button variant="outline" className="flex-1 min-w-[320px] justify-between">
                         {selectedEmployee === "all" 
                           ? "Todos los empleados" 
                           : (() => {
@@ -700,31 +698,36 @@ export default function AttendanceReports() {
                         <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-96 p-0" align="start">
-                      <Command shouldFilter={true}>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command filter={(value, search) => {
+                        const lowerSearch = search.toLowerCase();
+                        const lowerValue = value.toLowerCase();
+                        if (lowerValue.includes(lowerSearch)) return 1;
+                        return 0;
+                      }}>
                         <CommandInput placeholder="Buscar empleado..." className="h-9" />
                         <CommandEmpty>No se encontró empleado</CommandEmpty>
                         <CommandGroup className="max-h-64 overflow-auto">
                           <CommandItem
-                            keywords={["todos", "empleados"]}
+                            value="todos los empleados"
                             onSelect={() => {
                               setSelectedEmployee("all");
                               setEmployeeSearchOpen(false);
                             }}
                           >
-                            <CheckCircle className={`mr-2 h-4 w-4 ${selectedEmployee === "all" ? "opacity-100" : "opacity-0"}`} />
+                            <CheckCircle className={`mr-2 h-4 w-4 shrink-0 ${selectedEmployee === "all" ? "opacity-100" : "opacity-0"}`} />
                             Todos los empleados
                           </CommandItem>
                           {filteredEmployees.map(emp => (
                             <CommandItem
                               key={emp.id}
-                              keywords={[emp.first_name, emp.last_name, emp.employee_code]}
+                              value={`${emp.first_name} ${emp.last_name} ${emp.employee_code}`}
                               onSelect={() => {
                                 setSelectedEmployee(emp.id);
                                 setEmployeeSearchOpen(false);
                               }}
                             >
-                              <CheckCircle className={`mr-2 h-4 w-4 ${selectedEmployee === emp.id ? "opacity-100" : "opacity-0"}`} />
+                              <CheckCircle className={`mr-2 h-4 w-4 shrink-0 ${selectedEmployee === emp.id ? "opacity-100" : "opacity-0"}`} />
                               <span className="truncate">{emp.first_name} {emp.last_name} ({emp.employee_code})</span>
                             </CommandItem>
                           ))}
@@ -744,41 +747,41 @@ export default function AttendanceReports() {
                       <SelectItem value="horas_extras">Horas Extras</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
 
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={applyFilters}
-                      className="bg-indigo-600 hover:bg-indigo-700"
-                    >
-                      <Search className="w-4 h-4 mr-2" />
-                      Buscar
-                    </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    onClick={applyFilters}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    <Search className="w-4 h-4 mr-2" />
+                    Buscar
+                  </Button>
 
-                    <Button 
-                      onClick={exportToCSV}
-                      variant="outline"
-                      className="bg-blue-600 text-white hover:bg-blue-700"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      CSV
-                    </Button>
-                    <Button 
-                      onClick={exportToExcel}
-                      variant="outline"
-                      className="bg-green-600 text-white hover:bg-green-700"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Excel
-                    </Button>
-                    <Button 
-                      onClick={exportToPDF}
-                      variant="outline"
-                      className="bg-red-600 text-white hover:bg-red-700"
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      PDF
-                    </Button>
-                  </div>
+                  <Button 
+                    onClick={exportToCSV}
+                    variant="outline"
+                    className="bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    CSV
+                  </Button>
+                  <Button 
+                    onClick={exportToExcel}
+                    variant="outline"
+                    className="bg-green-600 text-white hover:bg-green-700"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Excel
+                  </Button>
+                  <Button 
+                    onClick={exportToPDF}
+                    variant="outline"
+                    className="bg-red-600 text-white hover:bg-red-700"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    PDF
+                  </Button>
                 </div>
               </div>
             </CardContent>
