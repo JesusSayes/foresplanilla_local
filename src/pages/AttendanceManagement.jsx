@@ -385,19 +385,28 @@ export default function AttendanceManagement() {
   });
 
   const handleExportToExcel = () => {
-    const dataToExport = employeesWithRecords.map(emp => ({
-      'Código': emp.employee_code,
-      'Nombres': emp.first_name,
-      'Apellidos': emp.last_name,
-      'Cargo': emp.position,
-      'Departamento': emp.department_name,
-      'Sede': emp.site || 'Sin sede',
-      'Entrada': emp.record?.clock_in || '--:--',
-      'Salida': emp.record?.clock_out || '--:--',
-      'Horas Trabajadas': emp.record?.worked_hours?.toFixed(2) || '0.00',
-      'Tardanza (min)': emp.record?.late_minutes || 0,
-      'Estado': emp.record?.status || 'Sin marcar'
-    }));
+    const dataToExport = employeesWithRecords.map(emp => {
+      const workedHours = emp.record?.worked_hours || 0;
+      const overtimeHours = Math.max(0, workedHours - 8);
+      const he25 = Math.min(overtimeHours, 2);
+      const he35 = Math.max(0, overtimeHours - 2);
+      
+      return {
+        'Código': emp.employee_code,
+        'Nombres': emp.first_name,
+        'Apellidos': emp.last_name,
+        'Cargo': emp.position,
+        'Departamento': emp.department_name,
+        'Sede': emp.site || 'Sin sede',
+        'Entrada': emp.record?.clock_in || '--:--',
+        'Salida': emp.record?.clock_out || '--:--',
+        'Horas Trabajadas': workedHours.toFixed(2),
+        'Tardanza (min)': emp.record?.late_minutes || 0,
+        'HE 25%': he25.toFixed(2),
+        'HE 35%': he35.toFixed(2),
+        'Estado': emp.record?.status || 'Sin marcar'
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
@@ -495,11 +504,19 @@ export default function AttendanceManagement() {
               <th>Salida</th>
               <th>Horas</th>
               <th>Tardanza</th>
+              <th>HE 25%</th>
+              <th>HE 35%</th>
               <th>Estado</th>
             </tr>
           </thead>
           <tbody>
-            ${employeesWithRecords.map(emp => `
+            ${employeesWithRecords.map(emp => {
+              const workedHours = emp.record?.worked_hours || 0;
+              const overtimeHours = Math.max(0, workedHours - 8);
+              const he25 = Math.min(overtimeHours, 2);
+              const he35 = Math.max(0, overtimeHours - 2);
+
+              return `
               <tr>
                 <td>${emp.employee_code}</td>
                 <td>${emp.first_name} ${emp.last_name}</td>
@@ -507,11 +524,14 @@ export default function AttendanceManagement() {
                 <td>${emp.department_name}</td>
                 <td>${emp.record?.clock_in || '--:--'}</td>
                 <td>${emp.record?.clock_out || '--:--'}</td>
-                <td>${emp.record?.worked_hours?.toFixed(2) || '0.00'}h</td>
+                <td>${workedHours.toFixed(2)}h</td>
                 <td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td>
+                <td>${he25.toFixed(2)}h</td>
+                <td>${he35.toFixed(2)}h</td>
                 <td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td>
               </tr>
-            `).join('')}
+            `;
+            }).join('')}
           </tbody>
         </table>
         
