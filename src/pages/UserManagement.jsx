@@ -11,6 +11,8 @@ import {
   CheckCircle2, XCircle, AlertCircle, Send, Edit2, Trash2, Ban
 } from "lucide-react";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function UserManagement() {
   const [currentUser, setCurrentUser] = useState(null);
