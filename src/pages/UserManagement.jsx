@@ -20,6 +20,7 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showInviteModal, setShowInviteModal] = useState(null);
+  const [sendingInviteFor, setSendingInviteFor] = useState(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -68,10 +69,27 @@ export default function UserManagement() {
     enabled: !!employee && ["admin", "super_admin"].includes(employee.role),
   });
 
+  const { data: allInvitations = [] } = useQuery({
+    queryKey: ["allInvitations"],
+    queryFn: async () => {
+      return await base44.entities.UserInvitation.list("-invited_at");
+    },
+    enabled: !!employee && ["admin", "super_admin"].includes(employee.role),
+  });
+
   const sendInviteMutation = useMutation({
-    mutationFn: async ({ email, name, role }) => {
+    mutationFn: async ({ email, name, role, employeeId }) => {
       // Usar la función oficial de Base44 para invitar usuarios
       await base44.users.inviteUser(email, role || "user");
+      
+      // Registrar la invitación en la base de datos
+      await base44.entities.UserInvitation.create({
+        employee_id: employeeId,
+        email: email,
+        invited_by: currentUser?.email || "Sistema",
+        invited_at: new Date().toISOString(),
+        status: "Enviada"
+      });
       
       // Opcionalmente enviar email adicional con información
       try {
@@ -95,16 +113,19 @@ Equipo de Recursos Humanos
         console.log("Email adicional no enviado:", emailError);
       }
       
-      return { email, name };
+      return { email, name, employeeId };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries(["allUsers"]);
+      queryClient.invalidateQueries(["allInvitations"]);
       toast.success(`✓ Invitación enviada exitosamente a ${data.email}`);
+      setSendingInviteFor(null);
       setShowInviteModal(null);
       setInviteEmail("");
     },
     onError: (error) => {
       toast.error(`Error al enviar invitación: ${error.message || "Inténtelo de nuevo"}`);
+      setSendingInviteFor(null);
     },
   });
 
@@ -170,6 +191,8 @@ Equipo de Recursos Humanos
       return;
     }
 
+    setSendingInviteFor(emp.id);
+
     // Determinar el rol a asignar basado en el rol del empleado
     let inviteRole = "user"; // rol por defecto
     if (emp.role === "admin" || emp.role === "super_admin") {
@@ -180,6 +203,7 @@ Equipo de Recursos Humanos
       email: emp.work_email,
       name: `${emp.first_name} ${emp.last_name}`,
       role: inviteRole,
+      employeeId: emp.id,
     });
   };
 
@@ -196,6 +220,8 @@ Equipo de Recursos Humanos
       return;
     }
 
+    setSendingInviteFor(emp.id);
+
     // Determinar el rol a asignar
     let inviteRole = "user";
     if (emp.role === "admin" || emp.role === "super_admin") {
@@ -206,6 +232,7 @@ Equipo de Recursos Humanos
       email: inviteEmail,
       name: `${emp.first_name} ${emp.last_name}`,
       role: inviteRole,
+      employeeId: emp.id,
     });
   };
 
@@ -273,6 +300,10 @@ Equipo de Recursos Humanos
 
   const getUserForEmployee = (workEmail) => {
     return allUsers.find(u => u.email === workEmail);
+  };
+
+  const getInvitationForEmployee = (employeeId) => {
+    return allInvitations.find(inv => inv.employee_id === employeeId);
   };
 
   const allCorporateEmployees = allEmployees.filter(emp => emp.work_email);
@@ -617,68 +648,97 @@ Equipo de Recursos Humanos
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {employeesWithoutUsers.map(emp => (
-                      <div
-                        key={emp.id}
-                        className="flex items-center justify-between p-4 border-2 border-orange-200 bg-orange-50/30 rounded-lg hover:shadow-md transition-all"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                            <AlertCircle className="w-6 h-6 text-orange-600" />
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900">
-                              {emp.first_name} {emp.last_name}
-                            </p>
-                            <p className="text-sm text-slate-600">
-                              {emp.employee_code} • {emp.position} • {emp.department_name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Mail className="w-3 h-3 text-slate-500" />
-                              <p className="text-xs text-slate-600">{emp.work_email}</p>
+                    {employeesWithoutUsers.map(emp => {
+                      const invitation = getInvitationForEmployee(emp.id);
+                      const hasBeenInvited = !!invitation;
+                      const isSending = sendingInviteFor === emp.id;
+
+                      return (
+                        <div
+                          key={emp.id}
+                          className={`flex items-center justify-between p-4 border-2 rounded-lg hover:shadow-md transition-all ${
+                            hasBeenInvited 
+                              ? 'border-blue-200 bg-blue-50/30'
+                              : 'border-orange-200 bg-orange-50/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                              hasBeenInvited ? 'bg-blue-100' : 'bg-orange-100'
+                            }`}>
+                              {hasBeenInvited ? (
+                                <Mail className="w-6 h-6 text-blue-600" />
+                              ) : (
+                                <AlertCircle className="w-6 h-6 text-orange-600" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900">
+                                {emp.first_name} {emp.last_name}
+                              </p>
+                              <p className="text-sm text-slate-600">
+                                {emp.employee_code} • {emp.position} • {emp.department_name}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Mail className="w-3 h-3 text-slate-500" />
+                                <p className="text-xs text-slate-600">{emp.work_email}</p>
+                              </div>
+                              {hasBeenInvited && invitation.invited_at && (
+                                <p className="text-xs text-blue-600 mt-1">
+                                  Invitado el {new Date(invitation.invited_at).toLocaleDateString('es-PE')} a las {new Date(invitation.invited_at).toLocaleTimeString('es-PE', {hour: '2-digit', minute: '2-digit'})}
+                                </p>
+                              )}
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Badge 
-                            className={
-                              emp.status === "Cesado"
-                                ? "bg-red-100 text-red-700 border-red-200"
-                                : emp.status === "Suspendido"
-                                ? "bg-yellow-100 text-yellow-700 border-yellow-200"
-                                : "bg-orange-100 text-orange-700 border-orange-200"
-                            }
-                          >
-                            {emp.status}
-                          </Badge>
-                          <Badge className="bg-orange-100 text-orange-700">
-                            Sin Acceso
-                          </Badge>
-                          {emp.status === "Activo" && (
-                            <Button
-                              onClick={() => handleSendInvite(emp)}
-                              disabled={sendInviteMutation.isPending}
-                              className="bg-orange-600 hover:bg-orange-700"
-                              size="sm"
+                          <div className="flex items-center gap-3">
+                            <Badge 
+                              className={
+                                emp.status === "Cesado"
+                                  ? "bg-red-100 text-red-700 border-red-200"
+                                  : emp.status === "Suspendido"
+                                  ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                                  : hasBeenInvited
+                                  ? "bg-blue-100 text-blue-700 border-blue-200"
+                                  : "bg-orange-100 text-orange-700 border-orange-200"
+                              }
                             >
-                              {sendInviteMutation.isPending ? (
-                                <>Enviando...</>
-                              ) : (
-                                <>
-                                  <Send className="w-4 h-4 mr-2" />
-                                  Enviar Invitación
-                                </>
-                              )}
-                            </Button>
-                          )}
-                          {emp.status !== "Activo" && (
-                            <p className="text-xs text-slate-500 italic">
-                              No disponible ({emp.status})
-                            </p>
-                          )}
+                              {emp.status}
+                            </Badge>
+                            {hasBeenInvited ? (
+                              <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                                Invitación Enviada
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-orange-100 text-orange-700 border-orange-200">
+                                Sin Invitar
+                              </Badge>
+                            )}
+                            {emp.status === "Activo" && (
+                              <Button
+                                onClick={() => handleSendInvite(emp)}
+                                disabled={isSending}
+                                className={hasBeenInvited ? "bg-blue-600 hover:bg-blue-700" : "bg-orange-600 hover:bg-orange-700"}
+                                size="sm"
+                              >
+                                {isSending ? (
+                                  <>Enviando...</>
+                                ) : (
+                                  <>
+                                    <Send className="w-4 h-4 mr-2" />
+                                    {hasBeenInvited ? 'Reenviar Invitación' : 'Enviar Invitación'}
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                            {emp.status !== "Activo" && (
+                              <p className="text-xs text-slate-500 italic">
+                                No disponible ({emp.status})
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
