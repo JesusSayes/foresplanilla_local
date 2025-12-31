@@ -767,54 +767,121 @@ export default function AttendanceReports() {
             </Card>
           </div>
 
-          {/* Department Stats */}
-          {employee?.role === "admin" && (
-            <Card className="border-0 shadow-lg mb-8">
-              <CardHeader className="border-b bg-slate-50/50">
-                <CardTitle className="text-xl font-bold">
-                  Estadísticas por Departamento
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-3 font-semibold text-slate-700">Departamento</th>
-                        <th className="text-center p-3 font-semibold text-slate-700">Empleados</th>
-                        <th className="text-center p-3 font-semibold text-slate-700">% Asistencia</th>
-                        <th className="text-center p-3 font-semibold text-slate-700">Tardanzas</th>
-                        <th className="text-center p-3 font-semibold text-slate-700">Ausencias</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {departmentStats.map((stat, index) => (
-                        <tr key={index} className="border-b hover:bg-slate-50">
-                          <td className="p-3 font-semibold">{stat.dept}</td>
-                          <td className="p-3 text-center">{stat.employees}</td>
+          {/* Listado Individual de Empleados */}
+          <Card className="border-0 shadow-lg mb-8">
+            <CardHeader className="border-b bg-slate-50/50">
+              <CardTitle className="text-xl font-bold">
+                Detalle de Asistencia por Empleado
+              </CardTitle>
+              <p className="text-sm text-slate-600 mt-1">
+                {displayEmployees.length} empleado(s) según filtros aplicados
+              </p>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-slate-50">
+                      <th className="text-left p-3 font-semibold text-slate-700">Empleado</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Departamento</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">% Asistencia</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Días Trabajados</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Tardanzas</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Ausencias</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Horas Trabajadas</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Horas Extras</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Justif. Pendientes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayEmployees.map((emp) => {
+                      const stats = calculateEmployeeStats(emp.id);
+                      const empIncidents = incidents.filter(i => i.employee_id === emp.id && i.status === "Pendiente");
+                      
+                      return (
+                        <tr key={emp.id} className="border-b hover:bg-slate-50 transition-colors">
+                          <td className="p-3">
+                            <div>
+                              <p className="font-semibold text-slate-900">
+                                {emp.first_name} {emp.last_name}
+                              </p>
+                              <p className="text-xs text-slate-500">{emp.employee_code}</p>
+                            </div>
+                          </td>
+                          <td className="p-3 text-center text-sm">{emp.department_name}</td>
                           <td className="p-3 text-center">
                             <Badge className={
-                              stat.avgAttendance >= 95 ? "bg-green-100 text-green-700" :
-                              stat.avgAttendance >= 85 ? "bg-yellow-100 text-yellow-700" :
-                              "bg-red-100 text-red-700"
+                              stats.attendanceRate >= 95 ? "bg-green-100 text-green-700 border-green-200" :
+                              stats.attendanceRate >= 85 ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
+                              "bg-red-100 text-red-700 border-red-200"
                             }>
-                              {stat.avgAttendance}%
+                              {stats.attendanceRate}%
                             </Badge>
                           </td>
-                          <td className="p-3 text-center text-yellow-600 font-semibold">
-                            {stat.lateDays}
+                          <td className="p-3 text-center">
+                            <div className="flex flex-col items-center">
+                              <span className="font-semibold text-slate-900">{stats.presentDays}</span>
+                              <span className="text-xs text-slate-500">de {stats.expectedDays}</span>
+                            </div>
                           </td>
-                          <td className="p-3 text-center text-red-600 font-semibold">
-                            {stat.absentDays}
+                          <td className="p-3 text-center">
+                            {stats.lateDays > 0 ? (
+                              <div className="flex flex-col items-center">
+                                <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
+                                  {stats.lateDays}
+                                </Badge>
+                                <span className="text-xs text-yellow-600 mt-1">{stats.totalLateMinutes} min</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            {stats.absentDays > 0 ? (
+                              <Badge className="bg-red-100 text-red-700 border-red-200">
+                                {stats.absentDays}
+                              </Badge>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className="font-semibold text-blue-700">
+                              {stats.totalHours.toFixed(1)}h
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            {stats.overtimeHours > 0 ? (
+                              <Badge className="bg-purple-100 text-purple-700 border-purple-200">
+                                {stats.overtimeHours.toFixed(1)}h
+                              </Badge>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            {empIncidents.length > 0 ? (
+                              <Badge className="bg-orange-100 text-orange-700 border-orange-200">
+                                {empIncidents.length}
+                              </Badge>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {displayEmployees.length === 0 && (
+                <div className="text-center py-12">
+                  <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-600">No hay empleados que coincidan con los filtros aplicados</p>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
 
           {/* Tabs for different views */}
           <Tabs defaultValue="summary" className="space-y-6">
