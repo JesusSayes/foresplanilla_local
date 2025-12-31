@@ -43,6 +43,7 @@ export default function AttendanceManagement() {
     justification: "",
     supporting_document_url: "",
   });
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -325,6 +326,23 @@ export default function AttendanceManagement() {
       supporting_document_url: "",
     });
     setShowJustifyModal(true);
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setJustificationData({ ...justificationData, supporting_document_url: file_url });
+      toast.success("Archivo subido correctamente");
+    } catch (error) {
+      toast.error("Error al subir el archivo");
+      console.error(error);
+    } finally {
+      setUploadingFile(false);
+    }
   };
 
   const handleSubmitJustification = () => {
@@ -1319,16 +1337,39 @@ export default function AttendanceManagement() {
 
                 <div>
                   <label className="block text-sm font-semibold text-slate-900 mb-2">
-                    URL del Documento de Sustento (opcional)
+                    Documento de Sustento (opcional)
                   </label>
-                  <Input
-                    value={justificationData.supporting_document_url}
-                    onChange={(e) => setJustificationData({ ...justificationData, supporting_document_url: e.target.value })}
-                    placeholder="https://..."
-                  />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Puedes subir un archivo usando la función "Subir Archivo" y pegar el URL aquí
-                  </p>
+                  <div className="space-y-2">
+                    <Input
+                      type="file"
+                      onChange={handleFileUpload}
+                      disabled={uploadingFile}
+                      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    />
+                    {uploadingFile && (
+                      <p className="text-xs text-blue-600">Subiendo archivo...</p>
+                    )}
+                    {justificationData.supporting_document_url && (
+                      <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                        <FileText className="w-4 h-4 text-green-600" />
+                        <a 
+                          href={justificationData.supporting_document_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-green-700 hover:underline flex-1"
+                        >
+                          Archivo adjunto
+                        </a>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setJustificationData({ ...justificationData, supporting_document_url: "" })}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex gap-3">
