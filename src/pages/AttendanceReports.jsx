@@ -29,6 +29,7 @@ export default function AttendanceReports() {
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [selectedEmployee, setSelectedEmployee] = useState("all");
   const [reportType, setReportType] = useState("general");
+  const [chartType, setChartType] = useState("line");
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -164,31 +165,227 @@ export default function AttendanceReports() {
 
   const pendingIncidents = incidents.filter(i => i.status === "Pendiente");
 
+  const exportToCSV = () => {
+    let dataToExport = [];
+    let headers = [];
+    let fileName = '';
+
+    if (reportType === "ausentismo") {
+      headers = ['Código', 'Empleado', 'Departamento', 'Cargo', 'Días Ausentes', 'Días Esperados', '% Ausentismo'];
+      dataToExport = filteredEmployees
+        .map(emp => {
+          const stats = calculateEmployeeStats(emp.id);
+          return {
+            emp,
+            ausencias: stats.absentDays,
+            esperados: stats.expectedDays,
+            porcentaje: stats.expectedDays > 0 ? ((stats.absentDays / stats.expectedDays) * 100).toFixed(1) : 0
+          };
+        })
+        .filter(item => item.ausencias > 0)
+        .sort((a, b) => b.ausencias - a.ausencias)
+        .map(item => [
+          item.emp.employee_code,
+          `${item.emp.first_name} ${item.emp.last_name}`,
+          item.emp.department_name,
+          item.emp.position,
+          item.ausencias,
+          item.esperados,
+          `${item.porcentaje}%`
+        ]);
+      fileName = `Reporte_Ausentismo_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.csv`;
+    } else if (reportType === "tardanzas") {
+      headers = ['Código', 'Empleado', 'Departamento', 'Cargo', 'Días con Tardanza', 'Total Minutos', 'Promedio Min/Día'];
+      dataToExport = filteredEmployees
+        .map(emp => {
+          const stats = calculateEmployeeStats(emp.id);
+          return {
+            emp,
+            dias: stats.lateDays,
+            minutos: stats.totalLateMinutes,
+            promedio: stats.lateDays > 0 ? (stats.totalLateMinutes / stats.lateDays).toFixed(1) : 0
+          };
+        })
+        .filter(item => item.dias > 0)
+        .sort((a, b) => b.minutos - a.minutos)
+        .map(item => [
+          item.emp.employee_code,
+          `${item.emp.first_name} ${item.emp.last_name}`,
+          item.emp.department_name,
+          item.emp.position,
+          item.dias,
+          item.minutos,
+          item.promedio
+        ]);
+      fileName = `Reporte_Tardanzas_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.csv`;
+    } else if (reportType === "horas_extras") {
+      headers = ['Código', 'Empleado', 'Departamento', 'Cargo', 'Horas Extras', 'Días con HE', 'Promedio HE/Día'];
+      dataToExport = filteredEmployees
+        .map(emp => {
+          const stats = calculateEmployeeStats(emp.id);
+          const empRecords = filteredRecords.filter(r => r.employee_id === emp.id);
+          const diasConHE = empRecords.filter(r => (r.worked_hours || 0) > 8).length;
+          return {
+            emp,
+            horas: stats.overtimeHours,
+            dias: diasConHE,
+            promedio: diasConHE > 0 ? (stats.overtimeHours / diasConHE).toFixed(2) : 0
+          };
+        })
+        .filter(item => item.horas > 0)
+        .sort((a, b) => b.horas - a.horas)
+        .map(item => [
+          item.emp.employee_code,
+          `${item.emp.first_name} ${item.emp.last_name}`,
+          item.emp.department_name,
+          item.emp.position,
+          item.horas.toFixed(2),
+          item.dias,
+          item.promedio
+        ]);
+      fileName = `Reporte_Horas_Extras_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.csv`;
+    } else {
+      headers = ['Código', 'Empleado', 'Departamento', 'Cargo', 'Días Trabajados', 'Días Esperados', '% Asistencia', 'Tardanzas', 'Ausencias', 'Horas Trabajadas', 'Horas Extras'];
+      dataToExport = filteredEmployees.map(emp => {
+        const stats = calculateEmployeeStats(emp.id);
+        return [
+          emp.employee_code,
+          `${emp.first_name} ${emp.last_name}`,
+          emp.department_name,
+          emp.position,
+          stats.presentDays,
+          stats.expectedDays,
+          `${stats.attendanceRate}%`,
+          stats.lateDays,
+          stats.absentDays,
+          stats.totalHours.toFixed(2),
+          stats.overtimeHours.toFixed(2)
+        ];
+      });
+      fileName = `Reporte_General_Asistencia_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.csv`;
+    }
+
+    const csv = [headers, ...dataToExport].map(row => row.join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+    toast.success('✓ Reporte CSV generado correctamente');
+  };
+
   const exportToExcel = () => {
-    const dataToExport = filteredEmployees.map(emp => {
-      const stats = calculateEmployeeStats(emp.id);
-      return {
-        'Código': emp.employee_code,
-        'Empleado': `${emp.first_name} ${emp.last_name}`,
-        'Departamento': emp.department_name,
-        'Cargo': emp.position,
-        'Días Trabajados': stats.presentDays,
-        'Días Esperados': stats.expectedDays,
-        '% Asistencia': stats.attendanceRate,
-        'Tardanzas': stats.lateDays,
-        'Min. Tardanza Total': stats.totalLateMinutes,
-        'Ausencias': stats.absentDays,
-        'Horas Trabajadas': stats.totalHours.toFixed(2),
-        'Horas Extras': stats.overtimeHours.toFixed(2),
-        'Feriados': stats.holidaysInPeriod
-      };
-    });
+    let dataToExport = [];
+    let sheetName = '';
+    let fileName = '';
+
+    if (reportType === "ausentismo") {
+      dataToExport = filteredEmployees
+        .map(emp => {
+          const stats = calculateEmployeeStats(emp.id);
+          return {
+            emp,
+            stats,
+            porcentaje: stats.expectedDays > 0 ? ((stats.absentDays / stats.expectedDays) * 100).toFixed(1) : 0
+          };
+        })
+        .filter(item => item.stats.absentDays > 0)
+        .sort((a, b) => b.stats.absentDays - a.stats.absentDays)
+        .map(item => ({
+          'Código': item.emp.employee_code,
+          'Empleado': `${item.emp.first_name} ${item.emp.last_name}`,
+          'Departamento': item.emp.department_name,
+          'Cargo': item.emp.position,
+          'Días Ausentes': item.stats.absentDays,
+          'Días Esperados': item.stats.expectedDays,
+          '% Ausentismo': item.porcentaje,
+          'Feriados en Período': item.stats.holidaysInPeriod
+        }));
+      sheetName = 'Reporte Ausentismo';
+      fileName = `Reporte_Ausentismo_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.xlsx`;
+    } else if (reportType === "tardanzas") {
+      dataToExport = filteredEmployees
+        .map(emp => {
+          const stats = calculateEmployeeStats(emp.id);
+          return {
+            emp,
+            stats,
+            promedio: stats.lateDays > 0 ? (stats.totalLateMinutes / stats.lateDays).toFixed(1) : 0
+          };
+        })
+        .filter(item => item.stats.lateDays > 0)
+        .sort((a, b) => b.stats.totalLateMinutes - a.stats.totalLateMinutes)
+        .map(item => ({
+          'Código': item.emp.employee_code,
+          'Empleado': `${item.emp.first_name} ${item.emp.last_name}`,
+          'Departamento': item.emp.department_name,
+          'Cargo': item.emp.position,
+          'Días con Tardanza': item.stats.lateDays,
+          'Total Minutos': item.stats.totalLateMinutes,
+          'Promedio Min/Día': item.promedio,
+          'Horas Trabajadas': item.stats.totalHours.toFixed(2)
+        }));
+      sheetName = 'Reporte Tardanzas';
+      fileName = `Reporte_Tardanzas_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.xlsx`;
+    } else if (reportType === "horas_extras") {
+      dataToExport = filteredEmployees
+        .map(emp => {
+          const stats = calculateEmployeeStats(emp.id);
+          const empRecords = filteredRecords.filter(r => r.employee_id === emp.id);
+          const diasConHE = empRecords.filter(r => (r.worked_hours || 0) > 8).length;
+          return {
+            emp,
+            stats,
+            dias: diasConHE,
+            promedio: diasConHE > 0 ? (stats.overtimeHours / diasConHE).toFixed(2) : 0
+          };
+        })
+        .filter(item => item.stats.overtimeHours > 0)
+        .sort((a, b) => b.stats.overtimeHours - a.stats.overtimeHours)
+        .map(item => ({
+          'Código': item.emp.employee_code,
+          'Empleado': `${item.emp.first_name} ${item.emp.last_name}`,
+          'Departamento': item.emp.department_name,
+          'Cargo': item.emp.position,
+          'Horas Extras': item.stats.overtimeHours.toFixed(2),
+          'Días con HE': item.dias,
+          'Promedio HE/Día': item.promedio,
+          'Total Horas Trabajadas': item.stats.totalHours.toFixed(2)
+        }));
+      sheetName = 'Reporte Horas Extras';
+      fileName = `Reporte_Horas_Extras_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.xlsx`;
+    } else {
+      dataToExport = filteredEmployees.map(emp => {
+        const stats = calculateEmployeeStats(emp.id);
+        return {
+          'Código': emp.employee_code,
+          'Empleado': `${emp.first_name} ${emp.last_name}`,
+          'Departamento': emp.department_name,
+          'Cargo': emp.position,
+          'Días Trabajados': stats.presentDays,
+          'Días Esperados': stats.expectedDays,
+          '% Asistencia': stats.attendanceRate,
+          'Tardanzas': stats.lateDays,
+          'Min. Tardanza Total': stats.totalLateMinutes,
+          'Ausencias': stats.absentDays,
+          'Horas Trabajadas': stats.totalHours.toFixed(2),
+          'Horas Extras': stats.overtimeHours.toFixed(2),
+          'Feriados': stats.holidaysInPeriod
+        };
+      });
+      sheetName = 'Reporte General';
+      fileName = `Reporte_General_Asistencia_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.xlsx`;
+    }
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Reporte Asistencia');
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
     
-    const fileName = `Reporte_Asistencia_${format(startDate, "yyyy-MM-dd")}_a_${format(endDate, "yyyy-MM-dd")}.xlsx`;
     XLSX.writeFile(wb, fileName);
     
     toast.success('✓ Reporte Excel generado correctamente');
@@ -196,9 +393,104 @@ export default function AttendanceReports() {
 
   const exportToPDF = () => {
     const doc = new jsPDF();
+    let title = '';
+    let tableData = [];
+    let headers = [];
+    let fileName = '';
+
+    if (reportType === "ausentismo") {
+      title = 'Reporte de Ausentismo';
+      headers = [['Código', 'Empleado', 'Departamento', 'Días Ausentes', '% Ausentismo']];
+      tableData = filteredEmployees
+        .map(emp => {
+          const stats = calculateEmployeeStats(emp.id);
+          return {
+            emp,
+            stats,
+            porcentaje: stats.expectedDays > 0 ? ((stats.absentDays / stats.expectedDays) * 100).toFixed(1) : 0
+          };
+        })
+        .filter(item => item.stats.absentDays > 0)
+        .sort((a, b) => b.stats.absentDays - a.stats.absentDays)
+        .map(item => [
+          item.emp.employee_code,
+          `${item.emp.first_name} ${item.emp.last_name}`,
+          item.emp.department_name,
+          item.stats.absentDays,
+          `${item.porcentaje}%`
+        ]);
+      fileName = `Reporte_Ausentismo_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.pdf`;
+    } else if (reportType === "tardanzas") {
+      title = 'Reporte de Tardanzas';
+      headers = [['Código', 'Empleado', 'Departamento', 'Días Tard.', 'Total Min', 'Prom Min/Día']];
+      tableData = filteredEmployees
+        .map(emp => {
+          const stats = calculateEmployeeStats(emp.id);
+          return {
+            emp,
+            stats,
+            promedio: stats.lateDays > 0 ? (stats.totalLateMinutes / stats.lateDays).toFixed(1) : 0
+          };
+        })
+        .filter(item => item.stats.lateDays > 0)
+        .sort((a, b) => b.stats.totalLateMinutes - a.stats.totalLateMinutes)
+        .map(item => [
+          item.emp.employee_code,
+          `${item.emp.first_name} ${item.emp.last_name}`,
+          item.emp.department_name,
+          item.stats.lateDays,
+          item.stats.totalLateMinutes,
+          item.promedio
+        ]);
+      fileName = `Reporte_Tardanzas_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.pdf`;
+    } else if (reportType === "horas_extras") {
+      title = 'Reporte de Horas Extras';
+      headers = [['Código', 'Empleado', 'Departamento', 'Horas Extras', 'Días con HE', 'Prom HE/Día']];
+      tableData = filteredEmployees
+        .map(emp => {
+          const stats = calculateEmployeeStats(emp.id);
+          const empRecords = filteredRecords.filter(r => r.employee_id === emp.id);
+          const diasConHE = empRecords.filter(r => (r.worked_hours || 0) > 8).length;
+          return {
+            emp,
+            stats,
+            dias: diasConHE,
+            promedio: diasConHE > 0 ? (stats.overtimeHours / diasConHE).toFixed(2) : 0
+          };
+        })
+        .filter(item => item.stats.overtimeHours > 0)
+        .sort((a, b) => b.stats.overtimeHours - a.stats.overtimeHours)
+        .map(item => [
+          item.emp.employee_code,
+          `${item.emp.first_name} ${item.emp.last_name}`,
+          item.emp.department_name,
+          item.stats.overtimeHours.toFixed(2),
+          item.dias,
+          item.promedio
+        ]);
+      fileName = `Reporte_Horas_Extras_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.pdf`;
+    } else {
+      title = 'Reporte General de Asistencia';
+      headers = [['Código', 'Empleado', 'Depto', 'Días', '%', 'Tard.', 'Aus.', 'Hs', 'Hs.Ext']];
+      tableData = filteredEmployees.map(emp => {
+        const stats = calculateEmployeeStats(emp.id);
+        return [
+          emp.employee_code,
+          `${emp.first_name} ${emp.last_name}`,
+          emp.department_name,
+          stats.presentDays,
+          `${stats.attendanceRate}%`,
+          stats.lateDays,
+          stats.absentDays,
+          stats.totalHours.toFixed(1),
+          stats.overtimeHours.toFixed(1)
+        ];
+      });
+      fileName = `Reporte_General_Asistencia_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.pdf`;
+    }
     
     doc.setFontSize(18);
-    doc.text('Reporte de Asistencia', 14, 20);
+    doc.text(title, 14, 20);
     
     doc.setFontSize(11);
     doc.text(`Período: ${format(startDate, "dd/MM/yyyy")} - ${format(endDate, "dd/MM/yyyy")}`, 14, 30);
@@ -208,31 +500,16 @@ export default function AttendanceReports() {
       doc.text(`Departamento: ${selectedDepartment}`, 14, 42);
     }
 
-    const tableData = filteredEmployees.map(emp => {
-      const stats = calculateEmployeeStats(emp.id);
-      return [
-        emp.employee_code,
-        `${emp.first_name} ${emp.last_name}`,
-        emp.department_name,
-        stats.presentDays,
-        `${stats.attendanceRate}%`,
-        stats.lateDays,
-        stats.absentDays,
-        stats.totalHours.toFixed(1),
-        stats.overtimeHours.toFixed(1)
-      ];
-    });
-
     doc.autoTable({
       startY: selectedDepartment !== "all" ? 48 : 42,
-      head: [['Código', 'Empleado', 'Depto', 'Días', '%', 'Tard.', 'Aus.', 'Hs', 'Hs.Ext']],
+      head: headers,
       body: tableData,
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [249, 250, 251] }
     });
 
-    doc.save(`Reporte_Asistencia_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.pdf`);
+    doc.save(fileName);
     toast.success('✓ Reporte PDF generado correctamente');
   };
 
@@ -360,7 +637,27 @@ export default function AttendanceReports() {
                     </SelectContent>
                   </Select>
 
+                  <Select value={reportType} onValueChange={setReportType}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Tipo de reporte" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general">General</SelectItem>
+                      <SelectItem value="ausentismo">Ausentismo</SelectItem>
+                      <SelectItem value="tardanzas">Tardanzas</SelectItem>
+                      <SelectItem value="horas_extras">Horas Extras</SelectItem>
+                    </SelectContent>
+                  </Select>
+
                   <div className="ml-auto flex gap-2">
+                    <Button 
+                      onClick={exportToCSV}
+                      variant="outline"
+                      className="bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      CSV
+                    </Button>
                     <Button 
                       onClick={exportToExcel}
                       variant="outline"
@@ -628,52 +925,256 @@ export default function AttendanceReports() {
 
             {/* Charts Tab */}
             <TabsContent value="charts" className="space-y-6">
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="border-b bg-slate-50/50">
-                  <CardTitle className="text-xl font-bold flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5" />
-                    Tendencia de Asistencia Diaria
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={dailyAttendanceData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Line type="monotone" dataKey="presentes" stroke="#10b981" strokeWidth={2} name="Presentes" />
-                      <Line type="monotone" dataKey="tardanzas" stroke="#f59e0b" strokeWidth={2} name="Tardanzas" />
-                      <Line type="monotone" dataKey="ausentes" stroke="#ef4444" strokeWidth={2} name="Ausentes" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+              {reportType === "general" && (
+                <>
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xl font-bold flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5" />
+                          Tendencia de Asistencia Diaria
+                        </CardTitle>
+                        <Select value={chartType} onValueChange={setChartType}>
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="line">Líneas</SelectItem>
+                            <SelectItem value="bar">Barras</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <ResponsiveContainer width="100%" height={300}>
+                        {chartType === "line" ? (
+                          <LineChart data={dailyAttendanceData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Line type="monotone" dataKey="presentes" stroke="#10b981" strokeWidth={2} name="Presentes" />
+                            <Line type="monotone" dataKey="tardanzas" stroke="#f59e0b" strokeWidth={2} name="Tardanzas" />
+                            <Line type="monotone" dataKey="ausentes" stroke="#ef4444" strokeWidth={2} name="Ausentes" />
+                          </LineChart>
+                        ) : (
+                          <BarChart data={dailyAttendanceData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="presentes" fill="#10b981" name="Presentes" />
+                            <Bar dataKey="tardanzas" fill="#f59e0b" name="Tardanzas" />
+                            <Bar dataKey="ausentes" fill="#ef4444" name="Ausentes" />
+                          </BarChart>
+                        )}
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
 
-              {employee?.role === "admin" && (
-                <Card className="border-0 shadow-lg">
-                  <CardHeader className="border-b bg-slate-50/50">
-                    <CardTitle className="text-xl font-bold flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5" />
-                      Comparativa por Departamento
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={departmentChartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="asistencia" fill="#10b981" name="% Asistencia" />
-                        <Bar dataKey="tardanzas" fill="#f59e0b" name="Tardanzas" />
-                        <Bar dataKey="ausencias" fill="#ef4444" name="Ausencias" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
+                  {employee?.role === "admin" && (
+                    <Card className="border-0 shadow-lg">
+                      <CardHeader className="border-b bg-slate-50/50">
+                        <CardTitle className="text-xl font-bold flex items-center gap-2">
+                          <BarChart3 className="w-5 h-5" />
+                          Comparativa por Departamento
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-6">
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={departmentChartData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="asistencia" fill="#10b981" name="% Asistencia" />
+                            <Bar dataKey="tardanzas" fill="#f59e0b" name="Tardanzas" />
+                            <Bar dataKey="ausencias" fill="#ef4444" name="Ausencias" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              )}
+
+              {reportType === "ausentismo" && (
+                <>
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <CardTitle className="text-xl font-bold flex items-center gap-2">
+                        <XCircle className="w-5 h-5 text-red-600" />
+                        Tendencia de Ausentismo por Día
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={dailyAttendanceData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Line type="monotone" dataKey="ausentes" stroke="#ef4444" strokeWidth={3} name="Ausentes" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <CardTitle className="text-xl font-bold">Top 10 Empleados con Más Ausencias</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart 
+                          data={filteredEmployees
+                            .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
+                            .filter(item => item.stats.absentDays > 0)
+                            .sort((a, b) => b.stats.absentDays - a.stats.absentDays)
+                            .slice(0, 10)
+                            .map(item => ({
+                              name: `${item.emp.first_name.split(' ')[0]} ${item.emp.last_name.split(' ')[0]}`,
+                              ausencias: item.stats.absentDays
+                            }))}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="ausencias" fill="#ef4444" name="Días Ausentes" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+
+              {reportType === "tardanzas" && (
+                <>
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <CardTitle className="text-xl font-bold flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-yellow-600" />
+                        Tendencia de Tardanzas por Día
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={dailyAttendanceData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Line type="monotone" dataKey="tardanzas" stroke="#f59e0b" strokeWidth={3} name="Tardanzas" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <CardTitle className="text-xl font-bold">Top 10 Empleados con Más Tardanzas</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart 
+                          data={filteredEmployees
+                            .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
+                            .filter(item => item.stats.lateDays > 0)
+                            .sort((a, b) => b.stats.totalLateMinutes - a.stats.totalLateMinutes)
+                            .slice(0, 10)
+                            .map(item => ({
+                              name: `${item.emp.first_name.split(' ')[0]} ${item.emp.last_name.split(' ')[0]}`,
+                              minutos: item.stats.totalLateMinutes,
+                              dias: item.stats.lateDays
+                            }))}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="minutos" fill="#f59e0b" name="Total Minutos" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+
+              {reportType === "horas_extras" && (
+                <>
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <CardTitle className="text-xl font-bold flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-purple-600" />
+                        Horas Extras Acumuladas
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart 
+                          data={filteredEmployees
+                            .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
+                            .filter(item => item.stats.overtimeHours > 0)
+                            .sort((a, b) => b.stats.overtimeHours - a.stats.overtimeHours)
+                            .slice(0, 10)
+                            .map(item => ({
+                              name: `${item.emp.first_name.split(' ')[0]} ${item.emp.last_name.split(' ')[0]}`,
+                              horas: parseFloat(item.stats.overtimeHours.toFixed(2))
+                            }))}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="horas" fill="#8b5cf6" name="Horas Extras" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <CardTitle className="text-xl font-bold">Distribución de Horas Extras por Departamento</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={departments.map(dept => {
+                              const deptEmployees = filteredEmployees.filter(e => e.department_name === dept);
+                              const totalHE = deptEmployees.reduce((sum, emp) => {
+                                const stats = calculateEmployeeStats(emp.id);
+                                return sum + stats.overtimeHours;
+                              }, 0);
+                              return {
+                                name: dept,
+                                value: parseFloat(totalHE.toFixed(2))
+                              };
+                            }).filter(item => item.value > 0)}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, value }) => `${name}: ${value}h`}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {departments.map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </>
               )}
             </TabsContent>
 
