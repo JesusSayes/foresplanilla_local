@@ -272,9 +272,9 @@ Equipo de Recursos Humanos
     return allUsers.find(u => u.email === workEmail);
   };
 
-  const activeEmployees = allEmployees.filter(emp => emp.status === "Activo" && emp.work_email);
+  const allCorporateEmployees = allEmployees.filter(emp => emp.work_email);
   
-  const filteredEmployees = activeEmployees.filter(emp => 
+  const filteredEmployees = allCorporateEmployees.filter(emp => 
     !searchTerm || (
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -284,12 +284,15 @@ Equipo de Recursos Humanos
   );
 
   const employeesWithUsers = filteredEmployees.filter(emp => getUserForEmployee(emp.work_email));
-  const employeesWithoutUsers = filteredEmployees.filter(emp => !getUserForEmployee(emp.work_email));
+  const employeesWithoutUsers = filteredEmployees.filter(emp => !getUserForEmployee(emp.work_email) && emp.status === "Activo");
 
   const stats = {
-    total: activeEmployees.length,
-    withAccess: activeEmployees.filter(e => getUserForEmployee(e.work_email)).length,
-    pending: activeEmployees.filter(e => !getUserForEmployee(e.work_email)).length,
+    total: allCorporateEmployees.length,
+    active: allCorporateEmployees.filter(e => e.status === "Activo").length,
+    suspended: allCorporateEmployees.filter(e => e.status === "Suspendido").length,
+    ceased: allCorporateEmployees.filter(e => e.status === "Cesado").length,
+    withAccess: allCorporateEmployees.filter(e => getUserForEmployee(e.work_email)).length,
+    pending: allCorporateEmployees.filter(e => !getUserForEmployee(e.work_email) && e.status === "Activo").length,
   };
 
   if (!currentUser || !employee) {
@@ -330,7 +333,7 @@ Equipo de Recursos Humanos
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
@@ -339,7 +342,7 @@ Equipo de Recursos Humanos
                 </div>
               </div>
               <div className="text-2xl font-bold text-slate-900 mb-1">{stats.total}</div>
-              <p className="text-slate-600 text-sm">Total Empleados Corporativos</p>
+              <p className="text-slate-600 text-sm">Total Empleados</p>
             </CardContent>
           </Card>
 
@@ -350,8 +353,32 @@ Equipo de Recursos Humanos
                   <CheckCircle2 className="w-6 h-6 text-green-600" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.withAccess}</div>
-              <p className="text-slate-600 text-sm">Con Acceso al Sistema</p>
+              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.active}</div>
+              <p className="text-slate-600 text-sm">Activos</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-yellow-100 rounded-xl">
+                  <Ban className="w-6 h-6 text-yellow-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.suspended}</div>
+              <p className="text-slate-600 text-sm">Suspendidos</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-red-100 rounded-xl">
+                  <XCircle className="w-6 h-6 text-red-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.ceased}</div>
+              <p className="text-slate-600 text-sm">Cesados</p>
             </CardContent>
           </Card>
 
@@ -363,7 +390,7 @@ Equipo de Recursos Humanos
                 </div>
               </div>
               <div className="text-2xl font-bold text-slate-900 mb-1">{stats.pending}</div>
-              <p className="text-slate-600 text-sm">Pendientes de Invitar</p>
+              <p className="text-slate-600 text-sm">Pendientes</p>
             </CardContent>
           </Card>
         </div>
@@ -498,12 +525,14 @@ Equipo de Recursos Humanos
                       <div className="flex items-center gap-3">
                         <Badge 
                           className={
-                            emp.status === "Suspendido"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-green-100 text-green-700"
+                            emp.status === "Cesado"
+                              ? "bg-red-100 text-red-700 border-red-200"
+                              : emp.status === "Suspendido"
+                              ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+                              : "bg-green-100 text-green-700 border-green-200"
                           }
                         >
-                          {emp.status === "Suspendido" ? "Suspendido" : "Acceso Activo"}
+                          {emp.status}
                         </Badge>
                         <Badge 
                           className={
