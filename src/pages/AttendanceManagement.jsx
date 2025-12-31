@@ -27,6 +27,7 @@ export default function AttendanceManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSite, setSelectedSite] = useState("all");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
+  const [attendanceFilter, setAttendanceFilter] = useState("all");
   const [editingRecord, setEditingRecord] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [reviewingIncident, setReviewingIncident] = useState(null);
@@ -287,6 +288,13 @@ export default function AttendanceManagement() {
   const employeesWithRecords = filteredEmployees.map(emp => {
     const record = todayRecords.find(r => r.employee_id === emp.id);
     return { ...emp, record };
+  }).filter(emp => {
+    // Aplicar filtros de asistencia
+    if (attendanceFilter === "all") return true;
+    if (attendanceFilter === "sin_entrada") return !emp.record?.clock_in;
+    if (attendanceFilter === "sin_salida") return emp.record?.clock_in && !emp.record?.clock_out;
+    if (attendanceFilter === "con_tardanza") return emp.record?.is_late;
+    return true;
   });
 
   const getStatusConfig = (status, hasClockIn) => {
@@ -478,6 +486,33 @@ export default function AttendanceManagement() {
                         {sites.map(site => (
                           <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
+                      <SelectTrigger className="w-52">
+                        <SelectValue placeholder="Filtro de asistencia" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="sin_entrada">
+                          <div className="flex items-center gap-2">
+                            <XCircle className="w-4 h-4 text-red-600" />
+                            Sin marcar entrada
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="sin_salida">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-yellow-600" />
+                            Sin marcar salida
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="con_tardanza">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-orange-600" />
+                            Con tardanza
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
 
