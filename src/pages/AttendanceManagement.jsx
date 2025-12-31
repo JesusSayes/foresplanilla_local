@@ -12,8 +12,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle, 
-  AlertCircle, Users, Search, FileText, Download, Database, History, Eye
+  AlertCircle, Users, Search, FileText, Download, Database, History, Eye, Printer
 } from "lucide-react";
+import * as XLSX from 'xlsx';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -291,11 +292,159 @@ export default function AttendanceManagement() {
   }).filter(emp => {
     // Aplicar filtros de asistencia
     if (attendanceFilter === "all") return true;
-    if (attendanceFilter === "sin_entrada") return !emp.record?.clock_in;
-    if (attendanceFilter === "sin_salida") return emp.record?.clock_in && !emp.record?.clock_out;
-    if (attendanceFilter === "con_tardanza") return emp.record?.is_late;
+    if (attendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
+    if (attendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
+    if (attendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
     return true;
   });
+
+  const handleExportToExcel = () => {
+    const dataToExport = employeesWithRecords.map(emp => ({
+      'Código': emp.employee_code,
+      'Nombres': emp.first_name,
+      'Apellidos': emp.last_name,
+      'Cargo': emp.position,
+      'Departamento': emp.department_name,
+      'Sede': emp.site || 'Sin sede',
+      'Entrada': emp.record?.clock_in || '--:--',
+      'Salida': emp.record?.clock_out || '--:--',
+      'Horas Trabajadas': emp.record?.worked_hours?.toFixed(2) || '0.00',
+      'Tardanza (min)': emp.record?.late_minutes || 0,
+      'Estado': emp.record?.status || 'Sin marcar'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Asistencia');
+    
+    const filterText = attendanceFilter === "all" ? "Todos" :
+                      attendanceFilter === "sin_entrada" ? "Sin_Entrada" :
+                      attendanceFilter === "sin_salida" ? "Sin_Salida" :
+                      attendanceFilter === "con_tardanza" ? "Con_Tardanza" : "Filtrado";
+    
+    const fileName = `Asistencia_${format(selectedDate, "yyyy-MM-dd")}_${filterText}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    
+    toast.success('✓ Archivo Excel generado correctamente');
+  };
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Por favor, permite las ventanas emergentes para imprimir');
+      return;
+    }
+
+    const filterText = attendanceFilter === "all" ? "Todos los empleados" :
+                      attendanceFilter === "sin_entrada" ? "Sin marcar entrada" :
+                      attendanceFilter === "sin_salida" ? "Sin marcar salida" :
+                      attendanceFilter === "con_tardanza" ? "Con tardanza" : "Filtrado";
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Reporte de Asistencia</title>
+        <style>
+          body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px;
+            font-size: 12px;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
+          }
+          .header h1 { margin: 5px 0; font-size: 24px; }
+          .header p { margin: 3px 0; color: #666; }
+          table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px;
+          }
+          th, td { 
+            border: 1px solid #ddd; 
+            padding: 8px; 
+            text-align: left;
+          }
+          th { 
+            background-color: #4f46e5; 
+            color: white;
+            font-weight: bold;
+          }
+          tr:nth-child(even) { background-color: #f9fafb; }
+          .late { color: #ea580c; font-weight: bold; }
+          .absent { color: #dc2626; font-weight: bold; }
+          .complete { color: #16a34a; font-weight: bold; }
+          .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 11px;
+            color: #666;
+          }
+          @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Reporte de Asistencia</h1>
+          <p><strong>Fecha:</strong> ${format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}</p>
+          <p><strong>Filtro aplicado:</strong> ${filterText}</p>
+          <p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Empleado</th>
+              <th>Cargo</th>
+              <th>Departamento</th>
+              <th>Entrada</th>
+              <th>Salida</th>
+              <th>Horas</th>
+              <th>Tardanza</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${employeesWithRecords.map(emp => `
+              <tr>
+                <td>${emp.employee_code}</td>
+                <td>${emp.first_name} ${emp.last_name}</td>
+                <td>${emp.position}</td>
+                <td>${emp.department_name}</td>
+                <td>${emp.record?.clock_in || '--:--'}</td>
+                <td>${emp.record?.clock_out || '--:--'}</td>
+                <td>${emp.record?.worked_hours?.toFixed(2) || '0.00'}h</td>
+                <td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td>
+                <td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        
+        <div class="footer">
+          <p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p>
+        </div>
+        
+        <script>
+          window.onload = function() {
+            window.print();
+          }
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+  };
 
   const getStatusConfig = (status, hasClockIn) => {
     if (!hasClockIn) {
@@ -532,7 +681,41 @@ export default function AttendanceManagement() {
                         />
                       </PopoverContent>
                     </Popover>
+
+                    <Button
+                      onClick={handleExportToExcel}
+                      variant="outline"
+                      className="bg-green-600 text-white hover:bg-green-700"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar Excel
+                    </Button>
+
+                    <Button
+                      onClick={handlePrint}
+                      variant="outline"
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Imprimir
+                    </Button>
                   </div>
+
+                  {employeesWithRecords.length > 0 && (
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-900">
+                        <strong>Mostrando {employeesWithRecords.length} empleados</strong>
+                        {attendanceFilter !== "all" && (
+                          <span className="ml-2">
+                            - Filtro: {
+                              attendanceFilter === "sin_entrada" ? "Sin marcar entrada" :
+                              attendanceFilter === "sin_salida" ? "Sin marcar salida" :
+                              attendanceFilter === "con_tardanza" ? "Con tardanza" : ""
+                            }
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="space-y-3">
                     {employeesWithRecords.map(emp => {
