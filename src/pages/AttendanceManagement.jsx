@@ -25,8 +25,6 @@ export default function AttendanceManagement() {
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSite, setSelectedSite] = useState("all");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
@@ -38,16 +36,6 @@ export default function AttendanceManagement() {
   const [reviewComments, setReviewComments] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
-  const [dateFilterMode, setDateFilterMode] = useState("single"); // "single" o "range"
-  
-  // Filtros aplicados
-  const [appliedDate, setAppliedDate] = useState(new Date());
-  const [appliedStartDate, setAppliedStartDate] = useState(null);
-  const [appliedEndDate, setAppliedEndDate] = useState(null);
-  const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
-  const [appliedSite, setAppliedSite] = useState("all");
-  const [appliedDepartment, setAppliedDepartment] = useState("all");
-  const [appliedAttendanceFilter, setAppliedAttendanceFilter] = useState("all");
 
   const queryClient = useQueryClient();
 
@@ -80,19 +68,9 @@ export default function AttendanceManagement() {
   });
 
   const { data: todayRecords = [] } = useQuery({
-    queryKey: ["todayAttendance", appliedDate, appliedStartDate, appliedEndDate],
+    queryKey: ["todayAttendance", selectedDate],
     queryFn: async () => {
-      // Si hay rango de fechas aplicado, obtener todos los registros del rango
-      if (appliedStartDate && appliedEndDate) {
-        const allRecords = await base44.entities.AttendanceRecord.list("-date");
-        return allRecords.filter(r => {
-          const recordDate = new Date(r.date);
-          return recordDate >= appliedStartDate && recordDate <= appliedEndDate;
-        });
-      }
-      
-      // Si no hay rango, usar fecha aplicada
-      const dateStr = format(appliedDate, "yyyy-MM-dd");
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
       const records = await base44.entities.AttendanceRecord.filter(
         { date: dateStr },
         "-created_date"
@@ -100,29 +78,6 @@ export default function AttendanceManagement() {
       return records;
     },
   });
-
-  const applyFilters = () => {
-    if (dateFilterMode === "range") {
-      if (!startDate || !endDate) {
-        toast.error("Selecciona ambas fechas para el rango");
-        return;
-      }
-      setAppliedStartDate(startDate);
-      setAppliedEndDate(endDate);
-      setAppliedDate(null);
-    } else {
-      setAppliedDate(selectedDate);
-      setAppliedStartDate(null);
-      setAppliedEndDate(null);
-    }
-    
-    setAppliedSearchTerm(searchTerm);
-    setAppliedSite(selectedSite);
-    setAppliedDepartment(selectedDepartment);
-    setAppliedAttendanceFilter(attendanceFilter);
-    
-    toast.success("✓ Filtros aplicados");
-  };
 
   const { data: holidays = [] } = useQuery({
     queryKey: ["holidays"],
@@ -323,11 +278,11 @@ export default function AttendanceManagement() {
   const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
 
   const filteredEmployees = allEmployees.filter(emp => {
-    const matchesSearch = emp.first_name.toLowerCase().includes(appliedSearchTerm.toLowerCase()) ||
-                          emp.last_name.toLowerCase().includes(appliedSearchTerm.toLowerCase()) ||
-                          emp.employee_code.toLowerCase().includes(appliedSearchTerm.toLowerCase());
-    const matchesDept = appliedDepartment === "all" || emp.department_name === appliedDepartment;
-    const matchesSite = appliedSite === "all" || emp.site === appliedSite || (appliedSite === "sin_sede" && !emp.site);
+    const matchesSearch = emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDept = selectedDepartment === "all" || emp.department_name === selectedDepartment;
+    const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
     return matchesSearch && matchesDept && matchesSite;
   });
 
@@ -335,11 +290,11 @@ export default function AttendanceManagement() {
     const record = todayRecords.find(r => r.employee_id === emp.id);
     return { ...emp, record };
   }).filter(emp => {
-    // Aplicar filtros de asistencia aplicados
-    if (appliedAttendanceFilter === "all") return true;
-    if (appliedAttendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
-    if (appliedAttendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
-    if (appliedAttendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
+    // Aplicar filtros de asistencia
+    if (attendanceFilter === "all") return true;
+    if (attendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
+    if (attendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
+    if (attendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
     return true;
   });
 
@@ -362,16 +317,12 @@ export default function AttendanceManagement() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Asistencia');
     
-    const filterText = appliedAttendanceFilter === "all" ? "Todos" :
-                      appliedAttendanceFilter === "sin_entrada" ? "Sin_Entrada" :
-                      appliedAttendanceFilter === "sin_salida" ? "Sin_Salida" :
-                      appliedAttendanceFilter === "con_tardanza" ? "Con_Tardanza" : "Filtrado";
+    const filterText = attendanceFilter === "all" ? "Todos" :
+                      attendanceFilter === "sin_entrada" ? "Sin_Entrada" :
+                      attendanceFilter === "sin_salida" ? "Sin_Salida" :
+                      attendanceFilter === "con_tardanza" ? "Con_Tardanza" : "Filtrado";
     
-    const dateText = appliedStartDate && appliedEndDate 
-      ? `${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}`
-      : format(appliedDate, "yyyy-MM-dd");
-    
-    const fileName = `Asistencia_${dateText}_${filterText}.xlsx`;
+    const fileName = `Asistencia_${format(selectedDate, "yyyy-MM-dd")}_${filterText}.xlsx`;
     XLSX.writeFile(wb, fileName);
     
     toast.success('✓ Archivo Excel generado correctamente');
@@ -384,10 +335,10 @@ export default function AttendanceManagement() {
       return;
     }
 
-    const filterText = appliedAttendanceFilter === "all" ? "Todos los empleados" :
-                      appliedAttendanceFilter === "sin_entrada" ? "Sin marcar entrada" :
-                      appliedAttendanceFilter === "sin_salida" ? "Sin marcar salida" :
-                      appliedAttendanceFilter === "con_tardanza" ? "Con tardanza" : "Filtrado";
+    const filterText = attendanceFilter === "all" ? "Todos los empleados" :
+                      attendanceFilter === "sin_entrada" ? "Sin marcar entrada" :
+                      attendanceFilter === "sin_salida" ? "Sin marcar salida" :
+                      attendanceFilter === "con_tardanza" ? "Con tardanza" : "Filtrado";
 
     const printContent = `
       <!DOCTYPE html>
@@ -442,10 +393,7 @@ export default function AttendanceManagement() {
       <body>
         <div class="header">
           <h1>Reporte de Asistencia</h1>
-          <p><strong>Fecha:</strong> ${appliedStartDate && appliedEndDate 
-            ? `${format(appliedStartDate, "dd/MM/yyyy")} - ${format(appliedEndDate, "dd/MM/yyyy")}`
-            : format(appliedDate, "dd 'de' MMMM, yyyy", { locale: es })
-          }</p>
+          <p><strong>Fecha:</strong> ${format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}</p>
           <p><strong>Filtro aplicado:</strong> ${filterText}</p>
           <p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p>
         </div>
@@ -582,69 +530,61 @@ export default function AttendanceManagement() {
             </Card>
           )}
 
-          {/* Stats - Compact Horizontal Layout */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-100 rounded-xl shrink-0">
-                    <Users className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-2xl font-bold text-slate-900 leading-tight">
-                      {allEmployees.length}
-                    </div>
-                    <p className="text-slate-600 text-xs truncate">Total empleados</p>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="p-3 bg-blue-100 rounded-xl">
+                    <Users className="w-6 h-6 text-blue-600" />
                   </div>
                 </div>
+                <div className="text-2xl font-bold text-slate-900 mb-1">
+                  {allEmployees.length}
+                </div>
+                <p className="text-slate-600 text-sm">Total empleados</p>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-green-100 rounded-xl shrink-0">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-2xl font-bold text-slate-900 leading-tight">
-                      {todayRecords.filter(r => r.clock_in).length}
-                    </div>
-                    <p className="text-slate-600 text-xs truncate">Han marcado hoy</p>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="p-3 bg-green-100 rounded-xl">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
                   </div>
                 </div>
+                <div className="text-2xl font-bold text-slate-900 mb-1">
+                  {todayRecords.filter(r => r.clock_in).length}
+                </div>
+                <p className="text-slate-600 text-sm">Han marcado hoy</p>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-yellow-100 rounded-xl shrink-0">
-                    <Clock className="w-5 h-5 text-yellow-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-2xl font-bold text-slate-900 leading-tight">
-                      {todayRecords.filter(r => r.is_late).length}
-                    </div>
-                    <p className="text-slate-600 text-xs truncate">Tardanzas hoy</p>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="p-3 bg-yellow-100 rounded-xl">
+                    <Clock className="w-6 h-6 text-yellow-600" />
                   </div>
                 </div>
+                <div className="text-2xl font-bold text-slate-900 mb-1">
+                  {todayRecords.filter(r => r.is_late).length}
+                </div>
+                <p className="text-slate-600 text-sm">Tardanzas hoy</p>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-orange-100 rounded-xl shrink-0">
-                    <AlertCircle className="w-5 h-5 text-orange-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-2xl font-bold text-slate-900 leading-tight">
-                      {pendingIncidents.length}
-                    </div>
-                    <p className="text-slate-600 text-xs truncate">Justif. pendientes</p>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="p-3 bg-orange-100 rounded-xl">
+                    <AlertCircle className="w-6 h-6 text-orange-600" />
                   </div>
                 </div>
+                <div className="text-2xl font-bold text-slate-900 mb-1">
+                  {pendingIncidents.length}
+                </div>
+                <p className="text-slate-600 text-sm">Justificaciones pendientes</p>
               </CardContent>
             </Card>
           </div>
@@ -660,208 +600,116 @@ export default function AttendanceManagement() {
             <TabsContent value="attendance" className="space-y-6">
               <Card className="border-0 shadow-lg">
                 <CardContent className="p-6">
-                  <div className="space-y-4">
-                    {/* Primera fila: Filtros de fecha */}
-                    <div className="flex flex-wrap items-center gap-4">
-                      {!startDate && !endDate ? (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-700">Fecha:</span>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {format(selectedDate, "dd MMM yyyy", { locale: es })}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                  mode="single"
-                                  selected={selectedDate}
-                                  onSelect={(date) => date && setSelectedDate(date)}
-                                  locale={es}
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setDateFilterMode("range");
-                              setStartDate(new Date());
-                              setEndDate(new Date());
-                            }}
-                          >
-                            📅 Usar rango de fechas
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-700">Desde:</span>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {startDate ? format(startDate, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                  mode="single"
-                                  selected={startDate}
-                                  onSelect={(date) => date && setStartDate(date)}
-                                  locale={es}
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-700">Hasta:</span>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {endDate ? format(endDate, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                  mode="single"
-                                  selected={endDate}
-                                  onSelect={(date) => date && setEndDate(date)}
-                                  locale={es}
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-
-                          <Badge className="bg-blue-100 text-blue-700">
-                            {startDate && endDate ? Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1 : 0} días
-                          </Badge>
-                          
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setStartDate(null);
-                              setEndDate(null);
-                              setDateFilterMode("single");
-                            }}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            Usar fecha única
-                          </Button>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Segunda fila: Filtros generales */}
-                    <div className="flex flex-wrap items-center gap-4">
-                      <div className="flex-1 min-w-64">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                          <Input
-                            placeholder="Buscar empleado..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
+                  <div className="flex flex-wrap items-center gap-4 mb-6">
+                    <div className="flex-1 min-w-64">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                        <Input
+                          placeholder="Buscar empleado..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
                       </div>
-
-                      <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                        <SelectTrigger className="w-48">
-                          <SelectValue placeholder="Departamento" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos</SelectItem>
-                          {departments.map(dept => (
-                            <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Select value={selectedSite} onValueChange={setSelectedSite}>
-                        <SelectTrigger className="w-40">
-                          <SelectValue placeholder="Sede" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todas</SelectItem>
-                          <SelectItem value="sin_sede">Sin sede</SelectItem>
-                          {sites.map(site => (
-                            <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
-                        <SelectTrigger className="w-52">
-                          <SelectValue placeholder="Filtro de asistencia" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos</SelectItem>
-                          <SelectItem value="sin_entrada">
-                            <div className="flex items-center gap-2">
-                              <XCircle className="w-4 h-4 text-red-600" />
-                              Sin marcar entrada
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="sin_salida">
-                            <div className="flex items-center gap-2">
-                              <Clock className="w-4 h-4 text-yellow-600" />
-                              Sin marcar salida
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="con_tardanza">
-                            <div className="flex items-center gap-2">
-                              <AlertCircle className="w-4 h-4 text-orange-600" />
-                              Con tardanza
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-
-                      <Button
-                        onClick={applyFilters}
-                        className="bg-indigo-600 hover:bg-indigo-700"
-                      >
-                        <Search className="w-4 h-4 mr-2" />
-                        Buscar
-                      </Button>
-
-                      <Button
-                        onClick={handleExportToExcel}
-                        variant="outline"
-                        className="bg-green-600 text-white hover:bg-green-700"
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Exportar Excel
-                      </Button>
-
-                      <Button
-                        onClick={handlePrint}
-                        variant="outline"
-                      >
-                        <Printer className="w-4 h-4 mr-2" />
-                        Imprimir
-                      </Button>
                     </div>
+
+                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Departamento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {departments.map(dept => (
+                          <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={selectedSite} onValueChange={setSelectedSite}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Sede" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="sin_sede">Sin sede</SelectItem>
+                        {sites.map(site => (
+                          <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
+                      <SelectTrigger className="w-52">
+                        <SelectValue placeholder="Filtro de asistencia" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="sin_entrada">
+                          <div className="flex items-center gap-2">
+                            <XCircle className="w-4 h-4 text-red-600" />
+                            Sin marcar entrada
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="sin_salida">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-yellow-600" />
+                            Sin marcar salida
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="con_tardanza">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-orange-600" />
+                            Con tardanza
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {format(selectedDate, "dd MMM yyyy", { locale: es })}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => date && setSelectedDate(date)}
+                          locale={es}
+                        />
+                      </PopoverContent>
+                    </Popover>
+
+                    <Button
+                      onClick={handleExportToExcel}
+                      variant="outline"
+                      className="bg-green-600 text-white hover:bg-green-700"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar Excel
+                    </Button>
+
+                    <Button
+                      onClick={handlePrint}
+                      variant="outline"
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Imprimir
+                    </Button>
                   </div>
 
                   {employeesWithRecords.length > 0 && (
                     <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <p className="text-sm text-blue-900">
                         <strong>Mostrando {employeesWithRecords.length} empleados</strong>
-                        {appliedAttendanceFilter !== "all" && (
+                        {attendanceFilter !== "all" && (
                           <span className="ml-2">
                             - Filtro: {
-                              appliedAttendanceFilter === "sin_entrada" ? "Sin marcar entrada" :
-                              appliedAttendanceFilter === "sin_salida" ? "Sin marcar salida" :
-                              appliedAttendanceFilter === "con_tardanza" ? "Con tardanza" : ""
+                              attendanceFilter === "sin_entrada" ? "Sin marcar entrada" :
+                              attendanceFilter === "sin_salida" ? "Sin marcar salida" :
+                              attendanceFilter === "con_tardanza" ? "Con tardanza" : ""
                             }
                           </span>
                         )}
