@@ -131,10 +131,27 @@ export default function RoleManagement() {
         assigned_date: new Date().toISOString().split('T')[0],
       }));
       
-      return await Promise.all(assignments.map(a => base44.entities.UserRole.create(a)));
+      await Promise.all(assignments.map(a => base44.entities.UserRole.create(a)));
+
+      // Actualizar el campo role en Employee para mantener compatibilidad
+      const emp = allEmployees.find(e => e.id === employeeId);
+      if (emp && roleIds.length > 0) {
+        const primaryRole = roles.find(r => r.id === roleIds[0]);
+        if (primaryRole) {
+          // Mapear el nombre del rol al campo legacy 'role'
+          let legacyRole = "empleado";
+          if (primaryRole.name.toLowerCase().includes("admin") || primaryRole.name.toLowerCase().includes("administrador")) {
+            legacyRole = "admin";
+          } else if (primaryRole.name.toLowerCase().includes("manager") || primaryRole.name.toLowerCase().includes("gerente")) {
+            legacyRole = "manager";
+          }
+          await base44.entities.Employee.update(employeeId, { role: legacyRole });
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["userRoles"]);
+      queryClient.invalidateQueries(["allEmployees"]);
       toast.success("Roles asignados correctamente");
       setShowAssignModal(false);
       setSelectedEmployee(null);
@@ -420,7 +437,14 @@ export default function RoleManagement() {
             <TabsContent value="assignments" className="space-y-6">
               <Card className="border-0 shadow-lg">
                 <CardHeader className="border-b bg-slate-50/50">
-                  <CardTitle className="text-xl font-bold">Asignar Roles a Empleados</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold">Asignar Roles a Empleados</CardTitle>
+                      <p className="text-sm text-slate-600 mt-1">
+                        Los roles se sincronizan automáticamente con los usuarios corporativos
+                      </p>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="mb-6">
@@ -450,10 +474,10 @@ export default function RoleManagement() {
                                   {emp.first_name} {emp.last_name}
                                 </h4>
                                 <p className="text-sm text-slate-600">
-                                  {emp.employee_code} • {emp.position}
+                                  {emp.employee_code} • {emp.position} • {emp.department_name}
                                 </p>
                               </div>
-                              <div className="flex flex-wrap gap-2">
+                              <div className="flex flex-wrap gap-2 items-center">
                                 {empRoles.length > 0 ? (
                                   empRoles.map(role => (
                                     <Badge key={role.id} className="bg-indigo-100 text-indigo-700">
@@ -463,6 +487,11 @@ export default function RoleManagement() {
                                 ) : (
                                   <Badge variant="outline" className="text-slate-500">
                                     Sin roles asignados
+                                  </Badge>
+                                )}
+                                {emp.role && emp.role !== "empleado" && (
+                                  <Badge className="bg-slate-100 text-slate-600 text-xs">
+                                    Legacy: {emp.role}
                                   </Badge>
                                 )}
                               </div>
