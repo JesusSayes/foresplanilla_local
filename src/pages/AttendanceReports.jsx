@@ -689,7 +689,7 @@ export default function AttendanceReports() {
 
                   <Popover open={employeeSearchOpen} onOpenChange={setEmployeeSearchOpen}>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-48 justify-between">
+                      <Button variant="outline" className="w-64 justify-between">
                         {selectedEmployee === "all" 
                           ? "Todos los empleados" 
                           : (() => {
@@ -700,13 +700,13 @@ export default function AttendanceReports() {
                         <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-64 p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Buscar empleado..." />
+                    <PopoverContent className="w-96 p-0" align="start">
+                      <Command shouldFilter={true}>
+                        <CommandInput placeholder="Buscar empleado..." className="h-9" />
                         <CommandEmpty>No se encontró empleado</CommandEmpty>
                         <CommandGroup className="max-h-64 overflow-auto">
                           <CommandItem
-                            value="all"
+                            keywords={["todos", "empleados"]}
                             onSelect={() => {
                               setSelectedEmployee("all");
                               setEmployeeSearchOpen(false);
@@ -718,14 +718,14 @@ export default function AttendanceReports() {
                           {filteredEmployees.map(emp => (
                             <CommandItem
                               key={emp.id}
-                              value={`${emp.first_name} ${emp.last_name} ${emp.employee_code}`}
+                              keywords={[emp.first_name, emp.last_name, emp.employee_code]}
                               onSelect={() => {
                                 setSelectedEmployee(emp.id);
                                 setEmployeeSearchOpen(false);
                               }}
                             >
                               <CheckCircle className={`mr-2 h-4 w-4 ${selectedEmployee === emp.id ? "opacity-100" : "opacity-0"}`} />
-                              {emp.first_name} {emp.last_name} ({emp.employee_code})
+                              <span className="truncate">{emp.first_name} {emp.last_name} ({emp.employee_code})</span>
                             </CommandItem>
                           ))}
                         </CommandGroup>
@@ -745,15 +745,15 @@ export default function AttendanceReports() {
                     </SelectContent>
                   </Select>
 
-                  <Button 
-                    onClick={applyFilters}
-                    className="bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    <Search className="w-4 h-4 mr-2" />
-                    Buscar
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={applyFilters}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Search className="w-4 h-4 mr-2" />
+                      Buscar
+                    </Button>
 
-                  <div className="ml-auto flex gap-2">
                     <Button 
                       onClick={exportToCSV}
                       variant="outline"
