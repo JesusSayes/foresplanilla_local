@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Clock, Calendar as CalendarIcon, Download, Users, 
-  TrendingUp, AlertCircle, CheckCircle, XCircle, FileText, BarChart3
+  TrendingUp, AlertCircle, CheckCircle, XCircle, FileText, BarChart3, Search
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -30,6 +30,22 @@ export default function AttendanceReports() {
   const [selectedEmployee, setSelectedEmployee] = useState("all");
   const [reportType, setReportType] = useState("general");
   const [chartType, setChartType] = useState("line");
+  
+  // Filtros aplicados (se actualizan al hacer clic en Buscar)
+  const [appliedStartDate, setAppliedStartDate] = useState(startOfMonth(new Date()));
+  const [appliedEndDate, setAppliedEndDate] = useState(endOfMonth(new Date()));
+  const [appliedDepartment, setAppliedDepartment] = useState("all");
+  const [appliedEmployee, setAppliedEmployee] = useState("all");
+  const [appliedReportType, setAppliedReportType] = useState("general");
+
+  const applyFilters = () => {
+    setAppliedStartDate(startDate);
+    setAppliedEndDate(endDate);
+    setAppliedDepartment(selectedDepartment);
+    setAppliedEmployee(selectedEmployee);
+    setAppliedReportType(reportType);
+    toast.success('✓ Filtros aplicados correctamente');
+  };
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -60,12 +76,12 @@ export default function AttendanceReports() {
   });
 
   const { data: attendanceRecords = [] } = useQuery({
-    queryKey: ["allAttendanceRecords", startDate, endDate],
+    queryKey: ["allAttendanceRecords", appliedStartDate, appliedEndDate],
     queryFn: async () => {
       const records = await base44.entities.AttendanceRecord.list("-date");
       return records.filter(r => {
         const recordDate = new Date(r.date);
-        return recordDate >= startDate && recordDate <= endDate;
+        return recordDate >= appliedStartDate && recordDate <= appliedEndDate;
       });
     },
   });
@@ -95,18 +111,22 @@ export default function AttendanceReports() {
     if (employee?.role === "manager") {
       return emp.department_name === employee.department_name;
     }
-    if (selectedDepartment !== "all") {
-      return emp.department_name === selectedDepartment;
+    if (appliedDepartment !== "all") {
+      return emp.department_name === appliedDepartment;
     }
     return true;
   });
 
   const filteredRecords = attendanceRecords.filter(record => {
-    if (selectedEmployee !== "all") {
-      return record.employee_id === selectedEmployee;
+    if (appliedEmployee !== "all") {
+      return record.employee_id === appliedEmployee;
     }
     return filteredEmployees.some(e => e.id === record.employee_id);
   });
+
+  const displayEmployees = appliedEmployee !== "all" 
+    ? filteredEmployees.filter(e => e.id === appliedEmployee)
+    : filteredEmployees;
 
   const calculateEmployeeStats = (employeeId) => {
     const empRecords = filteredRecords.filter(r => r.employee_id === employeeId);
@@ -127,7 +147,7 @@ export default function AttendanceReports() {
     }, 0);
 
     // Calcular días laborables esperados
-    const allDaysInRange = eachDayOfInterval({ start: startDate, end: endDate });
+    const allDaysInRange = eachDayOfInterval({ start: appliedStartDate, end: appliedEndDate });
     const workDays = allDaysInRange.filter(day => !isWeekend(day) && !isHoliday(day)).length;
     const expectedDays = workDays;
 
@@ -193,8 +213,8 @@ export default function AttendanceReports() {
           item.esperados,
           `${item.porcentaje}%`
         ]);
-      fileName = `Reporte_Ausentismo_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.csv`;
-    } else if (reportType === "tardanzas") {
+      fileName = `Reporte_Ausentismo_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.csv`;
+    } else if (appliedReportType === "tardanzas") {
       headers = ['Código', 'Empleado', 'Departamento', 'Cargo', 'Días con Tardanza', 'Total Minutos', 'Promedio Min/Día'];
       dataToExport = filteredEmployees
         .map(emp => {
@@ -217,8 +237,8 @@ export default function AttendanceReports() {
           item.minutos,
           item.promedio
         ]);
-      fileName = `Reporte_Tardanzas_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.csv`;
-    } else if (reportType === "horas_extras") {
+      fileName = `Reporte_Tardanzas_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.csv`;
+    } else if (appliedReportType === "horas_extras") {
       headers = ['Código', 'Empleado', 'Departamento', 'Cargo', 'Horas Extras', 'Días con HE', 'Promedio HE/Día'];
       dataToExport = filteredEmployees
         .map(emp => {
@@ -243,7 +263,7 @@ export default function AttendanceReports() {
           item.dias,
           item.promedio
         ]);
-      fileName = `Reporte_Horas_Extras_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.csv`;
+      fileName = `Reporte_Horas_Extras_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.csv`;
     } else {
       headers = ['Código', 'Empleado', 'Departamento', 'Cargo', 'Días Trabajados', 'Días Esperados', '% Asistencia', 'Tardanzas', 'Ausencias', 'Horas Trabajadas', 'Horas Extras'];
       dataToExport = filteredEmployees.map(emp => {
@@ -262,7 +282,7 @@ export default function AttendanceReports() {
           stats.overtimeHours.toFixed(2)
         ];
       });
-      fileName = `Reporte_General_Asistencia_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.csv`;
+      fileName = `Reporte_General_Asistencia_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.csv`;
     }
 
     const csv = [headers, ...dataToExport].map(row => row.join(',')).join('\n');
@@ -284,7 +304,7 @@ export default function AttendanceReports() {
     let sheetName = '';
     let fileName = '';
 
-    if (reportType === "ausentismo") {
+    if (appliedReportType === "ausentismo") {
       dataToExport = filteredEmployees
         .map(emp => {
           const stats = calculateEmployeeStats(emp.id);
@@ -307,8 +327,8 @@ export default function AttendanceReports() {
           'Feriados en Período': item.stats.holidaysInPeriod
         }));
       sheetName = 'Reporte Ausentismo';
-      fileName = `Reporte_Ausentismo_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.xlsx`;
-    } else if (reportType === "tardanzas") {
+      fileName = `Reporte_Ausentismo_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.xlsx`;
+    } else if (appliedReportType === "tardanzas") {
       dataToExport = filteredEmployees
         .map(emp => {
           const stats = calculateEmployeeStats(emp.id);
@@ -331,8 +351,8 @@ export default function AttendanceReports() {
           'Horas Trabajadas': item.stats.totalHours.toFixed(2)
         }));
       sheetName = 'Reporte Tardanzas';
-      fileName = `Reporte_Tardanzas_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.xlsx`;
-    } else if (reportType === "horas_extras") {
+      fileName = `Reporte_Tardanzas_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.xlsx`;
+    } else if (appliedReportType === "horas_extras") {
       dataToExport = filteredEmployees
         .map(emp => {
           const stats = calculateEmployeeStats(emp.id);
@@ -358,7 +378,7 @@ export default function AttendanceReports() {
           'Total Horas Trabajadas': item.stats.totalHours.toFixed(2)
         }));
       sheetName = 'Reporte Horas Extras';
-      fileName = `Reporte_Horas_Extras_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.xlsx`;
+      fileName = `Reporte_Horas_Extras_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.xlsx`;
     } else {
       dataToExport = filteredEmployees.map(emp => {
         const stats = calculateEmployeeStats(emp.id);
@@ -379,7 +399,7 @@ export default function AttendanceReports() {
         };
       });
       sheetName = 'Reporte General';
-      fileName = `Reporte_General_Asistencia_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.xlsx`;
+      fileName = `Reporte_General_Asistencia_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.xlsx`;
     }
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
@@ -419,8 +439,8 @@ export default function AttendanceReports() {
           item.stats.absentDays,
           `${item.porcentaje}%`
         ]);
-      fileName = `Reporte_Ausentismo_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.pdf`;
-    } else if (reportType === "tardanzas") {
+      fileName = `Reporte_Ausentismo_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.pdf`;
+    } else if (appliedReportType === "tardanzas") {
       title = 'Reporte de Tardanzas';
       headers = [['Código', 'Empleado', 'Departamento', 'Días Tard.', 'Total Min', 'Prom Min/Día']];
       tableData = filteredEmployees
@@ -442,8 +462,8 @@ export default function AttendanceReports() {
           item.stats.totalLateMinutes,
           item.promedio
         ]);
-      fileName = `Reporte_Tardanzas_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.pdf`;
-    } else if (reportType === "horas_extras") {
+      fileName = `Reporte_Tardanzas_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.pdf`;
+    } else if (appliedReportType === "horas_extras") {
       title = 'Reporte de Horas Extras';
       headers = [['Código', 'Empleado', 'Departamento', 'Horas Extras', 'Días con HE', 'Prom HE/Día']];
       tableData = filteredEmployees
@@ -468,7 +488,7 @@ export default function AttendanceReports() {
           item.dias,
           item.promedio
         ]);
-      fileName = `Reporte_Horas_Extras_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.pdf`;
+      fileName = `Reporte_Horas_Extras_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.pdf`;
     } else {
       title = 'Reporte General de Asistencia';
       headers = [['Código', 'Empleado', 'Depto', 'Días', '%', 'Tard.', 'Aus.', 'Hs', 'Hs.Ext']];
@@ -486,22 +506,22 @@ export default function AttendanceReports() {
           stats.overtimeHours.toFixed(1)
         ];
       });
-      fileName = `Reporte_General_Asistencia_${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.pdf`;
+      fileName = `Reporte_General_Asistencia_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.pdf`;
     }
     
     doc.setFontSize(18);
     doc.text(title, 14, 20);
     
     doc.setFontSize(11);
-    doc.text(`Período: ${format(startDate, "dd/MM/yyyy")} - ${format(endDate, "dd/MM/yyyy")}`, 14, 30);
+    doc.text(`Período: ${format(appliedStartDate, "dd/MM/yyyy")} - ${format(appliedEndDate, "dd/MM/yyyy")}`, 14, 30);
     doc.text(`Generado: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 36);
     
-    if (selectedDepartment !== "all") {
-      doc.text(`Departamento: ${selectedDepartment}`, 14, 42);
+    if (appliedDepartment !== "all") {
+      doc.text(`Departamento: ${appliedDepartment}`, 14, 42);
     }
 
     doc.autoTable({
-      startY: selectedDepartment !== "all" ? 48 : 42,
+      startY: appliedDepartment !== "all" ? 48 : 42,
       head: headers,
       body: tableData,
       styles: { fontSize: 8, cellPadding: 2 },
@@ -514,7 +534,7 @@ export default function AttendanceReports() {
   };
 
   // Datos para gráficos
-  const dailyAttendanceData = eachDayOfInterval({ start: startDate, end: endDate })
+  const dailyAttendanceData = eachDayOfInterval({ start: appliedStartDate, end: appliedEndDate })
     .filter(day => !isWeekend(day))
     .map(day => {
       const dayStr = format(day, "yyyy-MM-dd");
@@ -648,6 +668,14 @@ export default function AttendanceReports() {
                       <SelectItem value="horas_extras">Horas Extras</SelectItem>
                     </SelectContent>
                   </Select>
+
+                  <Button 
+                    onClick={applyFilters}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    <Search className="w-4 h-4 mr-2" />
+                    Buscar
+                  </Button>
 
                   <div className="ml-auto flex gap-2">
                     <Button 
@@ -798,134 +826,284 @@ export default function AttendanceReports() {
 
             {/* Summary Tab */}
             <TabsContent value="summary" className="space-y-6">
-              {employee?.role === "admin" && (
-                <Card className="border-0 shadow-lg">
-                  <CardHeader className="border-b bg-slate-50/50">
-                    <CardTitle className="text-xl font-bold">
-                      Estadísticas por Departamento
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left p-3 font-semibold text-slate-700">Departamento</th>
-                            <th className="text-center p-3 font-semibold text-slate-700">Empleados</th>
-                            <th className="text-center p-3 font-semibold text-slate-700">% Asistencia</th>
-                            <th className="text-center p-3 font-semibold text-slate-700">Tardanzas</th>
-                            <th className="text-center p-3 font-semibold text-slate-700">Ausencias</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {departmentStats.map((stat, index) => (
-                            <tr key={index} className="border-b hover:bg-slate-50">
-                              <td className="p-3 font-semibold">{stat.dept}</td>
-                              <td className="p-3 text-center">{stat.employees}</td>
-                              <td className="p-3 text-center">
-                                <Badge className={
-                                  stat.avgAttendance >= 95 ? "bg-green-100 text-green-700" :
-                                  stat.avgAttendance >= 85 ? "bg-yellow-100 text-yellow-700" :
-                                  "bg-red-100 text-red-700"
-                                }>
-                                  {stat.avgAttendance}%
-                                </Badge>
-                              </td>
-                              <td className="p-3 text-center text-yellow-600 font-semibold">
-                                {stat.lateDays}
-                              </td>
-                              <td className="p-3 text-center text-red-600 font-semibold">
-                                {stat.absentDays}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
+              {/* Información de los Filtros Aplicados */}
               <Card className="border-0 shadow-lg">
-                <CardHeader className="border-b bg-slate-50/50">
-                  <CardTitle className="text-xl font-bold">
-                    Top Tardanzas y Ausencias
+                <CardHeader className="border-b bg-indigo-50/50">
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Detalle de la Búsqueda
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <h3 className="font-semibold text-slate-900 mb-4">Más Tardanzas</h3>
-                      <div className="space-y-2">
-                        {filteredEmployees
-                          .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
-                          .sort((a, b) => b.stats.lateDays - a.stats.lateDays)
-                          .slice(0, 5)
-                          .map(({ emp, stats }) => (
-                            <div key={emp.id} className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
-                              <span className="font-medium">{emp.first_name} {emp.last_name}</span>
-                              <Badge className="bg-yellow-100 text-yellow-700">
-                                {stats.lateDays} días ({stats.totalLateMinutes} min)
-                              </Badge>
-                            </div>
-                          ))}
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-sm text-slate-600 mb-1">Período</p>
+                        <p className="font-semibold text-slate-900">
+                          {format(appliedStartDate, "dd/MM/yyyy")} - {format(appliedEndDate, "dd/MM/yyyy")}
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          {differenceInDays(appliedEndDate, appliedStartDate) + 1} días totales
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600 mb-1">Tipo de Reporte</p>
+                        <Badge className="bg-indigo-100 text-indigo-700">
+                          {appliedReportType === "general" && "General"}
+                          {appliedReportType === "ausentismo" && "Ausentismo"}
+                          {appliedReportType === "tardanzas" && "Tardanzas"}
+                          {appliedReportType === "horas_extras" && "Horas Extras"}
+                        </Badge>
                       </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-slate-900 mb-4">Más Ausencias</h3>
-                      <div className="space-y-2">
-                        {filteredEmployees
-                          .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
-                          .sort((a, b) => b.stats.absentDays - a.stats.absentDays)
-                          .slice(0, 5)
-                          .map(({ emp, stats }) => (
-                            <div key={emp.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                              <span className="font-medium">{emp.first_name} {emp.last_name}</span>
-                              <Badge className="bg-red-100 text-red-700">
-                                {stats.absentDays} días
-                              </Badge>
-                            </div>
-                          ))}
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-sm text-slate-600 mb-1">Departamento</p>
+                        <p className="font-semibold text-slate-900">
+                          {appliedDepartment === "all" ? "Todos los departamentos" : appliedDepartment}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600 mb-1">Empleado</p>
+                        <p className="font-semibold text-slate-900">
+                          {appliedEmployee === "all" 
+                            ? "Todos los empleados" 
+                            : (() => {
+                                const emp = allEmployees.find(e => e.id === appliedEmployee);
+                                return emp ? `${emp.first_name} ${emp.last_name}` : "N/A";
+                              })()
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Resumen de Resultados */}
+                  <div className="mt-6 pt-6 border-t">
+                    <p className="text-sm text-slate-600 mb-3">Resumen de Resultados</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-3 bg-slate-50 rounded-lg">
+                        <p className="text-xs text-slate-600 mb-1">Total Empleados</p>
+                        <p className="text-2xl font-bold text-slate-900">{displayEmployees.length}</p>
+                      </div>
+                      <div className="p-3 bg-green-50 rounded-lg">
+                        <p className="text-xs text-slate-600 mb-1">Total Asistencias</p>
+                        <p className="text-2xl font-bold text-green-700">
+                          {filteredRecords.filter(r => !r.is_absent && r.clock_in).length}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-yellow-50 rounded-lg">
+                        <p className="text-xs text-slate-600 mb-1">Total Tardanzas</p>
+                        <p className="text-2xl font-bold text-yellow-700">
+                          {filteredRecords.filter(r => r.is_late).length}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-red-50 rounded-lg">
+                        <p className="text-xs text-slate-600 mb-1">Total Ausencias</p>
+                        <p className="text-2xl font-bold text-red-700">
+                          {filteredRecords.filter(r => r.is_absent).length}
+                        </p>
                       </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="border-b bg-slate-50/50">
-                  <CardTitle className="text-xl font-bold">
-                    Horas Extras por Empleado
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-2">
-                    {filteredEmployees
-                      .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
-                      .filter(({ stats }) => stats.overtimeHours > 0)
-                      .sort((a, b) => b.stats.overtimeHours - a.stats.overtimeHours)
-                      .map(({ emp, stats }) => (
-                        <div key={emp.id} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                          <div>
-                            <span className="font-medium">{emp.first_name} {emp.last_name}</span>
-                            <p className="text-xs text-slate-600">{emp.department_name}</p>
+              {/* Top Tardanzas y Ausencias - Solo si es "Todos" */}
+              {appliedEmployee === "all" && (
+                <>
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <CardTitle className="text-xl font-bold">
+                        Top Tardanzas y Ausencias
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div>
+                          <h3 className="font-semibold text-slate-900 mb-4">Más Tardanzas</h3>
+                          <div className="space-y-2">
+                            {displayEmployees
+                              .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
+                              .filter(({ stats }) => stats.lateDays > 0)
+                              .sort((a, b) => b.stats.lateDays - a.stats.lateDays)
+                              .slice(0, 5)
+                              .map(({ emp, stats }) => (
+                                <div key={emp.id} className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+                                  <span className="font-medium">{emp.first_name} {emp.last_name}</span>
+                                  <Badge className="bg-yellow-100 text-yellow-700">
+                                    {stats.lateDays} días ({stats.totalLateMinutes} min)
+                                  </Badge>
+                                </div>
+                              ))}
                           </div>
-                          <Badge className="bg-blue-100 text-blue-700">
-                            {stats.overtimeHours.toFixed(2)} horas extra
-                          </Badge>
                         </div>
-                      ))}
-                    {filteredEmployees.every(emp => calculateEmployeeStats(emp.id).overtimeHours === 0) && (
-                      <p className="text-center text-slate-500 py-8">No hay horas extras registradas en este período</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                        <div>
+                          <h3 className="font-semibold text-slate-900 mb-4">Más Ausencias</h3>
+                          <div className="space-y-2">
+                            {displayEmployees
+                              .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
+                              .filter(({ stats }) => stats.absentDays > 0)
+                              .sort((a, b) => b.stats.absentDays - a.stats.absentDays)
+                              .slice(0, 5)
+                              .map(({ emp, stats }) => (
+                                <div key={emp.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                                  <span className="font-medium">{emp.first_name} {emp.last_name}</span>
+                                  <Badge className="bg-red-100 text-red-700">
+                                    {stats.absentDays} días
+                                  </Badge>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <CardTitle className="text-xl font-bold">
+                        Horas Extras por Empleado
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="space-y-2">
+                        {displayEmployees
+                          .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
+                          .filter(({ stats }) => stats.overtimeHours > 0)
+                          .sort((a, b) => b.stats.overtimeHours - a.stats.overtimeHours)
+                          .map(({ emp, stats }) => (
+                            <div key={emp.id} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                              <div>
+                                <span className="font-medium">{emp.first_name} {emp.last_name}</span>
+                                <p className="text-xs text-slate-600">{emp.department_name}</p>
+                              </div>
+                              <Badge className="bg-blue-100 text-blue-700">
+                                {stats.overtimeHours.toFixed(2)} horas extra
+                              </Badge>
+                            </div>
+                          ))}
+                        {displayEmployees.every(emp => calculateEmployeeStats(emp.id).overtimeHours === 0) && (
+                          <p className="text-center text-slate-500 py-8">No hay horas extras registradas en este período</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+
+              {/* Detalle Individual del Empleado */}
+              {appliedEmployee !== "all" && displayEmployees.length > 0 && (() => {
+                const emp = displayEmployees[0];
+                const stats = calculateEmployeeStats(emp.id);
+                const empRecords = filteredRecords.filter(r => r.employee_id === emp.id).sort((a, b) => new Date(a.date) - new Date(b.date));
+                
+                return (
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-2xl font-bold">
+                            {emp.first_name} {emp.last_name}
+                          </CardTitle>
+                          <p className="text-slate-600 mt-1">
+                            {emp.position} • {emp.department_name} • {emp.employee_code}
+                          </p>
+                        </div>
+                        <Badge className={
+                          stats.attendanceRate >= 95 ? "bg-green-100 text-green-700" :
+                          stats.attendanceRate >= 85 ? "bg-yellow-100 text-yellow-700" :
+                          "bg-red-100 text-red-700"
+                        }>
+                          {stats.attendanceRate}% asistencia
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      {/* Estadísticas del Empleado */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div className="p-4 bg-slate-50 rounded-lg">
+                          <p className="text-xs text-slate-600 mb-1">Días Trabajados</p>
+                          <p className="text-2xl font-bold text-slate-900">{stats.presentDays}</p>
+                          <p className="text-xs text-slate-500">de {stats.expectedDays} esperados</p>
+                        </div>
+                        <div className="p-4 bg-yellow-50 rounded-lg">
+                          <p className="text-xs text-slate-600 mb-1">Tardanzas</p>
+                          <p className="text-2xl font-bold text-yellow-700">{stats.lateDays}</p>
+                          <p className="text-xs text-yellow-600">{stats.totalLateMinutes} minutos total</p>
+                        </div>
+                        <div className="p-4 bg-red-50 rounded-lg">
+                          <p className="text-xs text-slate-600 mb-1">Ausencias</p>
+                          <p className="text-2xl font-bold text-red-700">{stats.absentDays}</p>
+                        </div>
+                        <div className="p-4 bg-blue-50 rounded-lg">
+                          <p className="text-xs text-slate-600 mb-1">Horas Trabajadas</p>
+                          <p className="text-2xl font-bold text-blue-700">{stats.totalHours.toFixed(1)}</p>
+                          <p className="text-xs text-blue-600">{stats.overtimeHours.toFixed(1)}h extras</p>
+                        </div>
+                      </div>
+
+                      {/* Detalle Día por Día */}
+                      <div className="border-t pt-6">
+                        <h3 className="font-semibold text-slate-900 mb-4">Detalle Día por Día</h3>
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {empRecords.map((record, idx) => (
+                            <div key={idx} className={`p-3 rounded-lg border ${
+                              record.is_absent ? 'bg-red-50 border-red-200' :
+                              record.is_late ? 'bg-yellow-50 border-yellow-200' :
+                              'bg-green-50 border-green-200'
+                            }`}>
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-medium text-slate-900">
+                                    {format(new Date(record.date), "EEEE, dd 'de' MMMM", { locale: es })}
+                                  </p>
+                                  <div className="flex items-center gap-4 text-sm mt-1">
+                                    <span>Entrada: {record.clock_in || "---"}</span>
+                                    <span>Salida: {record.clock_out || "---"}</span>
+                                    {record.worked_hours && (
+                                      <span className="text-blue-600 font-medium">
+                                        {record.worked_hours.toFixed(2)}h trabajadas
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                  <Badge className={
+                                    record.status === "Completo" ? "bg-green-100 text-green-700" :
+                                    record.status === "Ausente" ? "bg-red-100 text-red-700" :
+                                    "bg-yellow-100 text-yellow-700"
+                                  }>
+                                    {record.status}
+                                  </Badge>
+                                  {record.is_late && record.late_minutes > 0 && (
+                                    <Badge className="bg-yellow-100 text-yellow-700">
+                                      {record.late_minutes} min tarde
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              {record.notes && (
+                                <p className="text-xs text-slate-600 mt-2 italic">{record.notes}</p>
+                              )}
+                            </div>
+                          ))}
+                          {empRecords.length === 0 && (
+                            <p className="text-center text-slate-500 py-8">
+                              No hay registros de asistencia en este período
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
             </TabsContent>
 
             {/* Charts Tab */}
             <TabsContent value="charts" className="space-y-6">
-              {reportType === "general" && (
+              {appliedReportType === "general" && (
                 <>
                   <Card className="border-0 shadow-lg">
                     <CardHeader className="border-b bg-slate-50/50">
@@ -1001,7 +1179,7 @@ export default function AttendanceReports() {
                 </>
               )}
 
-              {reportType === "ausentismo" && (
+              {appliedReportType === "ausentismo" && (
                 <>
                   <Card className="border-0 shadow-lg">
                     <CardHeader className="border-b bg-slate-50/50">
@@ -1053,7 +1231,7 @@ export default function AttendanceReports() {
                 </>
               )}
 
-              {reportType === "tardanzas" && (
+              {appliedReportType === "tardanzas" && (
                 <>
                   <Card className="border-0 shadow-lg">
                     <CardHeader className="border-b bg-slate-50/50">
@@ -1083,7 +1261,7 @@ export default function AttendanceReports() {
                     <CardContent className="p-6">
                       <ResponsiveContainer width="100%" height={300}>
                         <BarChart 
-                          data={filteredEmployees
+                          data={displayEmployees
                             .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
                             .filter(item => item.stats.lateDays > 0)
                             .sort((a, b) => b.stats.totalLateMinutes - a.stats.totalLateMinutes)
@@ -1106,7 +1284,7 @@ export default function AttendanceReports() {
                 </>
               )}
 
-              {reportType === "horas_extras" && (
+              {appliedReportType === "horas_extras" && (
                 <>
                   <Card className="border-0 shadow-lg">
                     <CardHeader className="border-b bg-slate-50/50">
@@ -1118,7 +1296,7 @@ export default function AttendanceReports() {
                     <CardContent className="p-6">
                       <ResponsiveContainer width="100%" height={300}>
                         <BarChart 
-                          data={filteredEmployees
+                          data={displayEmployees
                             .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
                             .filter(item => item.stats.overtimeHours > 0)
                             .sort((a, b) => b.stats.overtimeHours - a.stats.overtimeHours)
@@ -1147,7 +1325,7 @@ export default function AttendanceReports() {
                         <PieChart>
                           <Pie
                             data={departments.map(dept => {
-                              const deptEmployees = filteredEmployees.filter(e => e.department_name === dept);
+                              const deptEmployees = displayEmployees.filter(e => e.department_name === dept);
                               const totalHE = deptEmployees.reduce((sum, emp) => {
                                 const stats = calculateEmployeeStats(emp.id);
                                 return sum + stats.overtimeHours;
@@ -1188,7 +1366,7 @@ export default function AttendanceReports() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="space-y-4">
-                    {filteredEmployees.map(emp => {
+                    {displayEmployees.map(emp => {
                       const stats = calculateEmployeeStats(emp.id);
 
                       return (
