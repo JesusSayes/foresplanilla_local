@@ -110,6 +110,17 @@ export default function AttendanceReports() {
     return holidays.some(h => h.date === dateStr && h.is_mandatory);
   };
 
+  const getHolidayInfo = (date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return holidays.find(h => h.date === dateStr && h.is_mandatory);
+  };
+
+  // Calcular feriados en el rango de fechas aplicado
+  const holidaysInRange = holidays.filter(h => {
+    const holidayDate = new Date(h.date);
+    return holidayDate >= appliedStartDate && holidayDate <= appliedEndDate && h.is_mandatory;
+  });
+
   const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
 
   const filteredEmployees = allEmployees.filter(emp => {
@@ -1021,7 +1032,7 @@ export default function AttendanceReports() {
                   {/* Resumen de Resultados */}
                   <div className="mt-6 pt-6 border-t">
                     <p className="text-sm text-slate-600 mb-3">Resumen de Resultados</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                       <div className="p-3 bg-slate-50 rounded-lg">
                         <p className="text-xs text-slate-600 mb-1">Total Empleados</p>
                         <p className="text-2xl font-bold text-slate-900">{displayEmployees.length}</p>
@@ -1044,8 +1055,41 @@ export default function AttendanceReports() {
                           {filteredRecords.filter(r => r.is_absent).length}
                         </p>
                       </div>
+                      <div className="p-3 bg-purple-50 rounded-lg">
+                        <p className="text-xs text-slate-600 mb-1">Feriados</p>
+                        <p className="text-2xl font-bold text-purple-700">{holidaysInRange.length}</p>
+                        <p className="text-xs text-purple-600">en el período</p>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Lista de Feriados en el Período */}
+                  {holidaysInRange.length > 0 && (
+                    <div className="mt-6 pt-6 border-t">
+                      <p className="text-sm text-slate-600 mb-3">Feriados en el Período Seleccionado</p>
+                      <div className="grid md:grid-cols-2 gap-3">
+                        {holidaysInRange.map(holiday => (
+                          <div key={holiday.id} className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="font-semibold text-slate-900">{holiday.name}</p>
+                                <p className="text-xs text-slate-600">
+                                  {format(new Date(holiday.date), "EEEE, dd 'de' MMMM", { locale: es })}
+                                </p>
+                              </div>
+                              <Badge className={
+                                holiday.type === "Nacional" ? "bg-blue-100 text-blue-700" :
+                                holiday.type === "Regional" ? "bg-purple-100 text-purple-700" :
+                                "bg-green-100 text-green-700"
+                              }>
+                                {holiday.type}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1195,17 +1239,24 @@ export default function AttendanceReports() {
                             }`}>
                               <div className="flex items-center justify-between">
                                 <div>
-                                  <p className="font-medium text-slate-900">
-                                    {format(new Date(record.date), "EEEE, dd 'de' MMMM", { locale: es })}
-                                  </p>
+                                  <div className="flex items-center gap-2">
+                                   <p className="font-medium text-slate-900">
+                                     {format(new Date(record.date), "EEEE, dd 'de' MMMM", { locale: es })}
+                                   </p>
+                                   {getHolidayInfo(new Date(record.date)) && (
+                                     <Badge className="bg-purple-100 text-purple-700 border-purple-200">
+                                       🎉 {getHolidayInfo(new Date(record.date)).name}
+                                     </Badge>
+                                   )}
+                                  </div>
                                   <div className="flex items-center gap-4 text-sm mt-1">
-                                    <span>Entrada: {record.clock_in || "---"}</span>
-                                    <span>Salida: {record.clock_out || "---"}</span>
-                                    {record.worked_hours && (
-                                      <span className="text-blue-600 font-medium">
-                                        {record.worked_hours.toFixed(2)}h trabajadas
-                                      </span>
-                                    )}
+                                   <span>Entrada: {record.clock_in || "---"}</span>
+                                   <span>Salida: {record.clock_out || "---"}</span>
+                                   {record.worked_hours && (
+                                     <span className="text-blue-600 font-medium">
+                                       {record.worked_hours.toFixed(2)}h trabajadas
+                                     </span>
+                                   )}
                                   </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-1">

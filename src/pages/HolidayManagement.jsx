@@ -11,7 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   Calendar as CalendarIcon, Plus, Edit, Trash2, 
-  Sun, Building, Briefcase
+  Sun, Building, Briefcase, Download, Upload
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -110,6 +110,20 @@ export default function HolidayManagement() {
     },
   });
 
+  const importHolidaysMutation = useMutation({
+    mutationFn: async (holidaysData) => {
+      return await base44.entities.Holiday.bulkCreate(holidaysData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["holidays"]);
+      toast.success("Feriados importados correctamente");
+    },
+    onError: (error) => {
+      toast.error("Error al importar feriados");
+      console.error(error);
+    },
+  });
+
   const handleSubmit = () => {
     if (!formData.name || !formData.date) {
       toast.error("Completa todos los campos requeridos");
@@ -159,6 +173,103 @@ export default function HolidayManagement() {
     });
     setEditingHoliday(null);
     setShowForm(false);
+  };
+
+  const loadPeruHolidays = async () => {
+    const peruHolidays2025 = [
+      { name: "Año Nuevo", date: "2025-01-01", type: "Nacional", is_mandatory: true, description: "Celebración del Año Nuevo" },
+      { name: "Jueves Santo", date: "2025-04-17", type: "Nacional", is_mandatory: true, description: "Semana Santa" },
+      { name: "Viernes Santo", date: "2025-04-18", type: "Nacional", is_mandatory: true, description: "Semana Santa" },
+      { name: "Sábado Santo", date: "2025-04-19", type: "Nacional", is_mandatory: true, description: "Semana Santa" },
+      { name: "Día del Trabajo", date: "2025-05-01", type: "Nacional", is_mandatory: true, description: "Día Internacional del Trabajo" },
+      { name: "San Pedro y San Pablo", date: "2025-06-29", type: "Nacional", is_mandatory: true, description: "Feriado religioso" },
+      { name: "Día de la Independencia", date: "2025-07-28", type: "Nacional", is_mandatory: true, description: "Fiestas Patrias" },
+      { name: "Día de las Fuerzas Armadas", date: "2025-07-29", type: "Nacional", is_mandatory: true, description: "Fiestas Patrias" },
+      { name: "Santa Rosa de Lima", date: "2025-08-30", type: "Nacional", is_mandatory: true, description: "Patrona de la Policía Nacional" },
+      { name: "Combate de Angamos", date: "2025-10-08", type: "Nacional", is_mandatory: true, description: "Homenaje a Miguel Grau" },
+      { name: "Todos los Santos", date: "2025-11-01", type: "Nacional", is_mandatory: true, description: "Día de Todos los Santos" },
+      { name: "Inmaculada Concepción", date: "2025-12-08", type: "Nacional", is_mandatory: true, description: "Feriado religioso" },
+      { name: "Navidad", date: "2025-12-25", type: "Nacional", is_mandatory: true, description: "Celebración de Navidad" },
+    ];
+
+    try {
+      // Verificar si ya existen para no duplicar
+      const existingHolidays = await base44.entities.Holiday.list();
+      const existing2025 = existingHolidays.filter(h => new Date(h.date).getFullYear() === 2025);
+      
+      if (existing2025.length > 0) {
+        if (!confirm(`Ya existen ${existing2025.length} feriados del 2025. ¿Desea reemplazarlos?`)) {
+          return;
+        }
+        // Eliminar existentes
+        for (const holiday of existing2025) {
+          await base44.entities.Holiday.delete(holiday.id);
+        }
+      }
+
+      await importHolidaysMutation.mutateAsync(peruHolidays2025);
+      setSelectedYear(2025);
+    } catch (error) {
+      console.error("Error loading Peru holidays:", error);
+    }
+  };
+
+  const exportHolidaysTemplate = () => {
+    const headers = ['Nombre', 'Fecha (YYYY-MM-DD)', 'Tipo', 'Es Obligatorio', 'Descripción'];
+    const example = [
+      'Día de la Independencia', '2025-07-28', 'Nacional', 'SI', 'Fiestas Patrias',
+      'Día no laborable', '2025-12-24', 'Laboral', 'SI', 'Cierre de fin de año'
+    ];
+    
+    const csv = [headers, example].map(row => row.join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'plantilla_feriados.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    toast.success('✓ Plantilla descargada');
+  };
+
+  const handleImportCSV = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      // Saltar header
+      const dataLines = lines.slice(1);
+      
+      const holidaysToImport = dataLines.map(line => {
+        const [name, date, type, isMandatory, description] = line.split(',').map(s => s.trim());
+        return {
+          name,
+          date,
+          type: type || "Nacional",
+          is_mandatory: (isMandatory?.toLowerCase() === 'si' || isMandatory?.toLowerCase() === 'yes' || isMandatory === '1'),
+          description: description || ""
+        };
+      }).filter(h => h.name && h.date);
+
+      if (holidaysToImport.length === 0) {
+        toast.error("No se encontraron feriados válidos en el archivo");
+        return;
+      }
+
+      await importHolidaysMutation.mutateAsync(holidaysToImport);
+      toast.success(`✓ ${holidaysToImport.length} feriados importados`);
+    } catch (error) {
+      toast.error("Error al procesar el archivo CSV");
+      console.error(error);
+    }
+    
+    // Limpiar input
+    event.target.value = '';
   };
 
   const getTypeConfig = (type) => {
@@ -247,17 +358,64 @@ export default function HolidayManagement() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button
-                    onClick={() => setShowForm(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Nuevo Feriado
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setShowForm(true)}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nuevo
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          {/* Import/Export Actions */}
+          <Card className="border-0 shadow-lg mb-6">
+            <CardContent className="p-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={loadPeruHolidays}
+                  variant="outline"
+                  className="bg-blue-600 text-white hover:bg-blue-700"
+                  disabled={importHolidaysMutation.isPending}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Cargar Feriados Perú 2025
+                </Button>
+
+                <Button
+                  onClick={exportHolidaysTemplate}
+                  variant="outline"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Descargar Plantilla CSV
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => document.getElementById('csv-upload').click()}
+                  disabled={importHolidaysMutation.isPending}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Importar desde CSV
+                </Button>
+                <input
+                  id="csv-upload"
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  onChange={handleImportCSV}
+                />
+
+                <div className="ml-auto text-sm text-slate-600">
+                  💡 Importa múltiples feriados desde un archivo CSV
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Holidays List */}
           <Card className="border-0 shadow-lg">
@@ -430,7 +588,7 @@ export default function HolidayManagement() {
                         <SelectContent>
                           <SelectItem value="Nacional">Nacional</SelectItem>
                           <SelectItem value="Regional">Regional</SelectItem>
-                          <SelectItem value="Laboral">Laboral</SelectItem>
+                          <SelectItem value="Laboral">Laboral (día no laborable personalizado)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -445,8 +603,11 @@ export default function HolidayManagement() {
                       className="w-4 h-4 rounded border-slate-300"
                     />
                     <label htmlFor="is_mandatory" className="text-sm text-slate-700">
-                      Es un día no laborable (obligatorio)
+                      Es un día no laborable (no se trabaja)
                     </label>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Marcar si este día no se debe contar como día laboral en los reportes
+                    </p>
                   </div>
 
                   <div>
