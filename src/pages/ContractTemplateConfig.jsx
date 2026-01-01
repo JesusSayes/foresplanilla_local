@@ -83,6 +83,15 @@ export default function ContractTemplateConfig() {
   }, []);
 
   // Crear entidad para plantillas si no existe
+  const { data: companyInfo } = useQuery({
+    queryKey: ["companyInfo"],
+    queryFn: async () => {
+      const info = await base44.entities.CompanyInfo.list("-created_date");
+      return info.length > 0 ? info[0] : null;
+    },
+    enabled: !!employee,
+  });
+
   useEffect(() => {
     const loadTemplate = async () => {
       try {
@@ -99,6 +108,20 @@ export default function ContractTemplateConfig() {
       loadTemplate();
     }
   }, [employee]);
+
+  // Sincronizar datos de empresa automáticamente
+  useEffect(() => {
+    if (companyInfo) {
+      setTemplateData(prev => ({
+        ...prev,
+        company_name: companyInfo.company_name || "",
+        company_ruc: companyInfo.ruc || "",
+        company_address: companyInfo.address || "",
+        company_representative: companyInfo.legal_representative || "",
+        company_representative_doc: companyInfo.legal_representative_dni ? `DNI ${companyInfo.legal_representative_dni}` : "",
+      }));
+    }
+  }, [companyInfo]);
 
   const saveTemplateMutation = useMutation({
     mutationFn: async (data) => {
@@ -255,12 +278,20 @@ export default function ContractTemplateConfig() {
                 <CardTitle className="text-xl font-bold">Información de la Empresa</CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                  <p className="text-sm text-blue-900">
+                    ℹ️ Estos datos se sincronizan automáticamente desde <strong>Información de la Empresa</strong>. 
+                    Para modificarlos, dirígete a Configuración → Información Empresa.
+                  </p>
+                </div>
+
                 <div>
                   <Label>Razón Social *</Label>
                   <Input
                     value={templateData.company_name}
-                    onChange={(e) => setTemplateData({ ...templateData, company_name: e.target.value })}
-                    placeholder="Ej: EMPRESA EJEMPLO S.A.C."
+                    disabled
+                    className="bg-slate-50 cursor-not-allowed"
+                    placeholder="Configurar en Información Empresa"
                   />
                 </div>
 
@@ -269,16 +300,18 @@ export default function ContractTemplateConfig() {
                     <Label>RUC *</Label>
                     <Input
                       value={templateData.company_ruc}
-                      onChange={(e) => setTemplateData({ ...templateData, company_ruc: e.target.value })}
-                      placeholder="Ej: 20123456789"
+                      disabled
+                      className="bg-slate-50 cursor-not-allowed"
+                      placeholder="Configurar en Información Empresa"
                     />
                   </div>
                   <div>
                     <Label>Dirección *</Label>
                     <Input
                       value={templateData.company_address}
-                      onChange={(e) => setTemplateData({ ...templateData, company_address: e.target.value })}
-                      placeholder="Ej: Av. Principal 123, Lima"
+                      disabled
+                      className="bg-slate-50 cursor-not-allowed"
+                      placeholder="Configurar en Información Empresa"
                     />
                   </div>
                 </div>
@@ -288,16 +321,18 @@ export default function ContractTemplateConfig() {
                     <Label>Representante Legal *</Label>
                     <Input
                       value={templateData.company_representative}
-                      onChange={(e) => setTemplateData({ ...templateData, company_representative: e.target.value })}
-                      placeholder="Ej: Juan Pérez García"
+                      disabled
+                      className="bg-slate-50 cursor-not-allowed"
+                      placeholder="Configurar en Información Empresa"
                     />
                   </div>
                   <div>
                     <Label>Documento del Representante *</Label>
                     <Input
                       value={templateData.company_representative_doc}
-                      onChange={(e) => setTemplateData({ ...templateData, company_representative_doc: e.target.value })}
-                      placeholder="Ej: DNI 12345678"
+                      disabled
+                      className="bg-slate-50 cursor-not-allowed"
+                      placeholder="Configurar en Información Empresa"
                     />
                   </div>
                 </div>
