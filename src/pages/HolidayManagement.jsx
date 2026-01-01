@@ -175,40 +175,62 @@ export default function HolidayManagement() {
     setShowForm(false);
   };
 
-  const loadPeruHolidays = async () => {
-    const peruHolidays2025 = [
-      { name: "Año Nuevo", date: "2025-01-01", type: "Nacional", is_mandatory: true, description: "Celebración del Año Nuevo" },
-      { name: "Jueves Santo", date: "2025-04-17", type: "Nacional", is_mandatory: true, description: "Semana Santa" },
-      { name: "Viernes Santo", date: "2025-04-18", type: "Nacional", is_mandatory: true, description: "Semana Santa" },
-      { name: "Sábado Santo", date: "2025-04-19", type: "Nacional", is_mandatory: true, description: "Semana Santa" },
-      { name: "Día del Trabajo", date: "2025-05-01", type: "Nacional", is_mandatory: true, description: "Día Internacional del Trabajo" },
-      { name: "San Pedro y San Pablo", date: "2025-06-29", type: "Nacional", is_mandatory: true, description: "Feriado religioso" },
-      { name: "Día de la Independencia", date: "2025-07-28", type: "Nacional", is_mandatory: true, description: "Fiestas Patrias" },
-      { name: "Día de las Fuerzas Armadas", date: "2025-07-29", type: "Nacional", is_mandatory: true, description: "Fiestas Patrias" },
-      { name: "Santa Rosa de Lima", date: "2025-08-30", type: "Nacional", is_mandatory: true, description: "Patrona de la Policía Nacional" },
-      { name: "Combate de Angamos", date: "2025-10-08", type: "Nacional", is_mandatory: true, description: "Homenaje a Miguel Grau" },
-      { name: "Todos los Santos", date: "2025-11-01", type: "Nacional", is_mandatory: true, description: "Día de Todos los Santos" },
-      { name: "Inmaculada Concepción", date: "2025-12-08", type: "Nacional", is_mandatory: true, description: "Feriado religioso" },
-      { name: "Navidad", date: "2025-12-25", type: "Nacional", is_mandatory: true, description: "Celebración de Navidad" },
-    ];
+  const loadPeruHolidays = async (year = 2025) => {
+    const peruHolidays = {
+      2025: [
+        { name: "Año Nuevo", date: "2025-01-01", type: "Nacional", is_mandatory: true, description: "Celebración del Año Nuevo" },
+        { name: "Jueves Santo", date: "2025-04-17", type: "Nacional", is_mandatory: true, description: "Semana Santa" },
+        { name: "Viernes Santo", date: "2025-04-18", type: "Nacional", is_mandatory: true, description: "Semana Santa" },
+        { name: "Sábado Santo", date: "2025-04-19", type: "Nacional", is_mandatory: true, description: "Semana Santa" },
+        { name: "Día del Trabajo", date: "2025-05-01", type: "Nacional", is_mandatory: true, description: "Día Internacional del Trabajo" },
+        { name: "San Pedro y San Pablo", date: "2025-06-29", type: "Nacional", is_mandatory: true, description: "Feriado religioso" },
+        { name: "Día de la Independencia", date: "2025-07-28", type: "Nacional", is_mandatory: true, description: "Fiestas Patrias" },
+        { name: "Día de las Fuerzas Armadas", date: "2025-07-29", type: "Nacional", is_mandatory: true, description: "Fiestas Patrias" },
+        { name: "Santa Rosa de Lima", date: "2025-08-30", type: "Nacional", is_mandatory: true, description: "Patrona de la Policía Nacional" },
+        { name: "Combate de Angamos", date: "2025-10-08", type: "Nacional", is_mandatory: true, description: "Homenaje a Miguel Grau" },
+        { name: "Todos los Santos", date: "2025-11-01", type: "Nacional", is_mandatory: true, description: "Día de Todos los Santos" },
+        { name: "Inmaculada Concepción", date: "2025-12-08", type: "Nacional", is_mandatory: true, description: "Feriado religioso" },
+        { name: "Navidad", date: "2025-12-25", type: "Nacional", is_mandatory: true, description: "Celebración de Navidad" },
+      ],
+      2026: [
+        { name: "Año Nuevo", date: "2026-01-01", type: "Nacional", is_mandatory: true, description: "Celebración de Año Nuevo" },
+        { name: "Jueves Santo", date: "2026-04-02", type: "Nacional", is_mandatory: true, description: "Semana Santa - Jueves Santo" },
+        { name: "Viernes Santo", date: "2026-04-03", type: "Nacional", is_mandatory: true, description: "Semana Santa - Viernes Santo" },
+        { name: "Día del Trabajo", date: "2026-05-01", type: "Nacional", is_mandatory: true, description: "Día Internacional del Trabajo" },
+        { name: "San Pedro y San Pablo", date: "2026-06-29", type: "Nacional", is_mandatory: false, description: "Festividad de San Pedro y San Pablo (laborable)" },
+        { name: "Día de la Independencia", date: "2026-07-28", type: "Nacional", is_mandatory: true, description: "Fiestas Patrias - Proclamación de la Independencia" },
+        { name: "Día de las Fuerzas Armadas", date: "2026-07-29", type: "Nacional", is_mandatory: true, description: "Fiestas Patrias - Día de las Fuerzas Armadas" },
+        { name: "Santa Rosa de Lima", date: "2026-08-30", type: "Nacional", is_mandatory: false, description: "Patrona de la Policía Nacional del Perú y de América (laborable)" },
+        { name: "Combate de Angamos", date: "2026-10-08", type: "Nacional", is_mandatory: true, description: "Aniversario del Combate de Angamos" },
+        { name: "Día de Todos los Santos", date: "2026-11-01", type: "Nacional", is_mandatory: false, description: "Día de Todos los Santos (laborable)" },
+        { name: "Inmaculada Concepción", date: "2026-12-08", type: "Nacional", is_mandatory: true, description: "Día de la Inmaculada Concepción" },
+        { name: "Navidad", date: "2026-12-25", type: "Nacional", is_mandatory: true, description: "Celebración del nacimiento de Jesucristo" },
+      ]
+    };
+
+    const holidaysToLoad = peruHolidays[year];
+    if (!holidaysToLoad) {
+      toast.error(`No hay feriados predefinidos para el año ${year}`);
+      return;
+    }
 
     try {
       // Verificar si ya existen para no duplicar
       const existingHolidays = await base44.entities.Holiday.list();
-      const existing2025 = existingHolidays.filter(h => new Date(h.date).getFullYear() === 2025);
+      const existingForYear = existingHolidays.filter(h => new Date(h.date).getFullYear() === year);
       
-      if (existing2025.length > 0) {
-        if (!confirm(`Ya existen ${existing2025.length} feriados del 2025. ¿Desea reemplazarlos?`)) {
+      if (existingForYear.length > 0) {
+        if (!confirm(`Ya existen ${existingForYear.length} feriados del ${year}. ¿Desea reemplazarlos?`)) {
           return;
         }
         // Eliminar existentes
-        for (const holiday of existing2025) {
+        for (const holiday of existingForYear) {
           await base44.entities.Holiday.delete(holiday.id);
         }
       }
 
-      await importHolidaysMutation.mutateAsync(peruHolidays2025);
-      setSelectedYear(2025);
+      await importHolidaysMutation.mutateAsync(holidaysToLoad);
+      setSelectedYear(year);
     } catch (error) {
       console.error("Error loading Peru holidays:", error);
     }
@@ -377,13 +399,23 @@ export default function HolidayManagement() {
             <CardContent className="p-6">
               <div className="flex flex-wrap items-center gap-3">
                 <Button
-                  onClick={loadPeruHolidays}
+                  onClick={() => loadPeruHolidays(2025)}
                   variant="outline"
                   className="bg-blue-600 text-white hover:bg-blue-700"
                   disabled={importHolidaysMutation.isPending}
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Cargar Feriados Perú 2025
+                </Button>
+
+                <Button
+                  onClick={() => loadPeruHolidays(2026)}
+                  variant="outline"
+                  className="bg-indigo-600 text-white hover:bg-indigo-700"
+                  disabled={importHolidaysMutation.isPending}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Cargar Feriados Perú 2026
                 </Button>
 
                 <Button
