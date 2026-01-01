@@ -60,7 +60,7 @@ export default function HolidayManagement() {
     queryFn: async () => {
       const allHolidays = await base44.entities.Holiday.list("-date");
       return allHolidays.filter(h => {
-        const year = new Date(h.date).getFullYear();
+        const year = parseInt(h.date.split('-')[0]);
         return year === selectedYear;
       });
     },
@@ -217,7 +217,7 @@ export default function HolidayManagement() {
     try {
       // Verificar si ya existen para no duplicar
       const existingHolidays = await base44.entities.Holiday.list();
-      const existingForYear = existingHolidays.filter(h => new Date(h.date).getFullYear() === year);
+      const existingForYear = existingHolidays.filter(h => parseInt(h.date.split('-')[0]) === year);
       
       if (existingForYear.length > 0) {
         if (!confirm(`Ya existen ${existingForYear.length} feriados del ${year}. ¿Desea reemplazarlos?`)) {
@@ -399,19 +399,9 @@ export default function HolidayManagement() {
             <CardContent className="p-6">
               <div className="flex flex-wrap items-center gap-3">
                 <Button
-                  onClick={() => loadPeruHolidays(2025)}
-                  variant="outline"
-                  className="bg-blue-600 text-white hover:bg-blue-700"
-                  disabled={importHolidaysMutation.isPending}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Cargar Feriados Perú 2025
-                </Button>
-
-                <Button
                   onClick={() => loadPeruHolidays(2026)}
                   variant="outline"
-                  className="bg-indigo-600 text-white hover:bg-indigo-700"
+                  className="bg-blue-600 text-white hover:bg-blue-700"
                   disabled={importHolidaysMutation.isPending}
                 >
                   <Download className="w-4 h-4 mr-2" />
