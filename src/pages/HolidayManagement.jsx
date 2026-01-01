@@ -31,6 +31,8 @@ export default function HolidayManagement() {
     description: "",
   });
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [showLoadHolidaysModal, setShowLoadHolidaysModal] = useState(false);
+  const [yearToLoad, setYearToLoad] = useState(new Date().getFullYear());
 
   const queryClient = useQueryClient();
 
@@ -208,9 +210,40 @@ export default function HolidayManagement() {
       ]
     };
 
-    const holidaysToLoad = peruHolidays[year];
-    if (!holidaysToLoad) {
-      toast.error(`No hay feriados predefinidos para el año ${year}`);
+    // Generar feriados para años futuros basados en template
+    const generateHolidaysForYear = (targetYear) => {
+      if (peruHolidays[targetYear]) {
+        return peruHolidays[targetYear];
+      }
+
+      // Template de feriados fijos (usar 2026 como base)
+      const baseTemplate = [
+        { name: "Año Nuevo", month: 1, day: 1, type: "Nacional", is_mandatory: true, description: "Celebración de Año Nuevo" },
+        { name: "Día del Trabajo", month: 5, day: 1, type: "Nacional", is_mandatory: true, description: "Día Internacional del Trabajo" },
+        { name: "San Pedro y San Pablo", month: 6, day: 29, type: "Nacional", is_mandatory: false, description: "Festividad de San Pedro y San Pablo (laborable)" },
+        { name: "Día de la Independencia", month: 7, day: 28, type: "Nacional", is_mandatory: true, description: "Fiestas Patrias - Proclamación de la Independencia" },
+        { name: "Día de las Fuerzas Armadas", month: 7, day: 29, type: "Nacional", is_mandatory: true, description: "Fiestas Patrias - Día de las Fuerzas Armadas" },
+        { name: "Santa Rosa de Lima", month: 8, day: 30, type: "Nacional", is_mandatory: false, description: "Patrona de la Policía Nacional del Perú y de América (laborable)" },
+        { name: "Combate de Angamos", month: 10, day: 8, type: "Nacional", is_mandatory: true, description: "Aniversario del Combate de Angamos" },
+        { name: "Día de Todos los Santos", month: 11, day: 1, type: "Nacional", is_mandatory: false, description: "Día de Todos los Santos (laborable)" },
+        { name: "Inmaculada Concepción", month: 12, day: 8, type: "Nacional", is_mandatory: true, description: "Día de la Inmaculada Concepción" },
+        { name: "Navidad", month: 12, day: 25, type: "Nacional", is_mandatory: true, description: "Celebración del nacimiento de Jesucristo" },
+      ];
+
+      // Nota: Semana Santa es móvil, requeriría cálculo especial
+      return baseTemplate.map(h => ({
+        name: h.name,
+        date: `${targetYear}-${String(h.month).padStart(2, '0')}-${String(h.day).padStart(2, '0')}`,
+        type: h.type,
+        is_mandatory: h.is_mandatory,
+        description: h.description
+      }));
+    };
+
+    const holidaysToLoad = generateHolidaysForYear(year);
+
+    if (!holidaysToLoad || holidaysToLoad.length === 0) {
+      toast.error(`No se pudieron generar feriados para el año ${year}`);
       return;
     }
 
@@ -399,13 +432,13 @@ export default function HolidayManagement() {
             <CardContent className="p-6">
               <div className="flex flex-wrap items-center gap-3">
                 <Button
-                  onClick={() => loadPeruHolidays(2026)}
+                  onClick={() => setShowLoadHolidaysModal(true)}
                   variant="outline"
                   className="bg-blue-600 text-white hover:bg-blue-700"
                   disabled={importHolidaysMutation.isPending}
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Cargar Feriados Perú 2026
+                  Cargar Feriados Nacionales
                 </Button>
 
                 <Button
@@ -660,6 +693,91 @@ export default function HolidayManagement() {
                       {(createHolidayMutation.isPending || updateHolidayMutation.isPending) 
                         ? "Guardando..." 
                         : (editingHoliday ? "Actualizar" : "Crear Feriado")}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Load Holidays Modal */}
+        {showLoadHolidaysModal && (
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+            onClick={() => setShowLoadHolidaysModal(false)}
+          >
+            <Card 
+              className="max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <CardHeader className="border-b">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-bold">
+                    Cargar Feriados Nacionales
+                  </CardTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => setShowLoadHolidaysModal(false)}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">
+                      Seleccione el año
+                    </label>
+                    <Select 
+                      value={yearToLoad.toString()} 
+                      onValueChange={(val) => setYearToLoad(parseInt(val))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="2024">2024</SelectItem>
+                        <SelectItem value="2025">2025</SelectItem>
+                        <SelectItem value="2026">2026</SelectItem>
+                        <SelectItem value="2027">2027</SelectItem>
+                        <SelectItem value="2028">2028</SelectItem>
+                        <SelectItem value="2029">2029</SelectItem>
+                        <SelectItem value="2030">2030</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-900">
+                      Se cargarán los feriados oficiales del Perú para el año {yearToLoad}. 
+                      {yearToLoad > 2026 && (
+                        <span className="block mt-2 text-xs text-blue-700">
+                          ⚠️ Los feriados móviles como Semana Santa no se incluyen para años futuros sin fecha definida.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setShowLoadHolidaysModal(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      className="flex-1 bg-blue-600 hover:bg-blue-700"
+                      onClick={() => {
+                        loadPeruHolidays(yearToLoad);
+                        setShowLoadHolidaysModal(false);
+                      }}
+                      disabled={importHolidaysMutation.isPending}
+                    >
+                      {importHolidaysMutation.isPending ? "Cargando..." : "Cargar Feriados"}
                     </Button>
                   </div>
                 </div>
