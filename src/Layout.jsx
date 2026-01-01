@@ -104,7 +104,16 @@ export default function Layout({ children, currentPageName }) {
           { name: "Certificados", path: "Certificates" },
         ]
       },
-      { name: "Gestión Contratos", icon: FileText, path: "ContractManagement" },
+      { 
+        name: "Gestión Contratos", 
+        icon: FileText, 
+        path: "ContractManagement",
+        submenu: [
+          { name: "Ver Contratos", path: "ContractManagement" },
+          { name: "Plantillas Contratos", path: "ContractTemplateConfig" },
+          { name: "Automatización Renovación", path: "ContractRenewalAutomation" },
+        ]
+      },
       { 
         name: "Gestión Asistencia", 
         icon: CheckSquare, 
