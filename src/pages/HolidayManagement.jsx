@@ -13,7 +13,7 @@ import {
   Calendar as CalendarIcon, Plus, Edit, Trash2, 
   Sun, Building, Briefcase, Download, Upload
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
@@ -151,7 +151,7 @@ export default function HolidayManagement() {
     setEditingHoliday(holiday);
     setFormData({
       name: holiday.name,
-      date: new Date(holiday.date),
+      date: parseISO(holiday.date),
       type: holiday.type,
       is_mandatory: holiday.is_mandatory,
       description: holiday.description || "",
@@ -337,7 +337,7 @@ export default function HolidayManagement() {
   };
 
   const holidaysByMonth = holidays.reduce((acc, holiday) => {
-    const month = format(new Date(holiday.date), "MMMM", { locale: es });
+    const month = format(parseISO(holiday.date), "MMMM", { locale: es });
     if (!acc[month]) acc[month] = [];
     acc[month].push(holiday);
     return acc;
@@ -506,10 +506,10 @@ export default function HolidayManagement() {
                                 <div className="flex items-start gap-4 flex-1">
                                   <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl text-white text-center min-w-16">
                                     <div className="text-2xl font-bold">
-                                      {format(new Date(holiday.date), "dd")}
+                                      {format(parseISO(holiday.date), "dd")}
                                     </div>
                                     <div className="text-xs uppercase">
-                                      {format(new Date(holiday.date), "MMM", { locale: es })}
+                                      {format(parseISO(holiday.date), "MMM", { locale: es })}
                                     </div>
                                   </div>
 
@@ -528,7 +528,7 @@ export default function HolidayManagement() {
                                         </Badge>
                                       )}
                                       <span className="text-sm text-slate-600">
-                                        {format(new Date(holiday.date), "EEEE", { locale: es })}
+                                        {format(parseISO(holiday.date), "EEEE", { locale: es })}
                                       </span>
                                     </div>
                                     {holiday.description && (
