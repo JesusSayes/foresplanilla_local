@@ -30,6 +30,7 @@ import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
 import ContractTemplateConfig from './pages/ContractTemplateConfig';
+import ContractRenewalAutomation from './pages/ContractRenewalAutomation';
 import __Layout from './Layout.jsx';
 
 
@@ -66,6 +67,7 @@ export const PAGES = {
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
     "ContractTemplateConfig": ContractTemplateConfig,
+    "ContractRenewalAutomation": ContractRenewalAutomation,
 }
 
 export const pagesConfig = {
