@@ -529,8 +529,11 @@ export default function ContractRenewalAutomation() {
 
               <div>
                 <Label>Tipos de Contrato</Label>
+                <p className="text-xs text-slate-500 mb-2">
+                  No incluye contratos Indeterminados (sin fecha de vencimiento)
+                </p>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {["Plazo Fijo", "Part-Time", "Prácticas", "Obra o Servicio", "Temporal"].map(type => (
+                  {["Plazo Fijo", "Part-Time", "Prácticas", "SNP"].map(type => (
                     <Badge
                       key={type}
                       className={`cursor-pointer ${ruleData.contract_types?.includes(type) ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'}`}
