@@ -31,6 +31,7 @@ export default function AttendanceReports() {
   const [selectedEmployee, setSelectedEmployee] = useState("all");
   const [reportType, setReportType] = useState("general");
   const [chartType, setChartType] = useState("line");
+  const [incidentTypeFilter, setIncidentTypeFilter] = useState("all");
   
   // Filtros aplicados (se actualizan al hacer clic en Buscar)
   const [appliedStartDate, setAppliedStartDate] = useState(startOfMonth(new Date()));
@@ -38,6 +39,7 @@ export default function AttendanceReports() {
   const [appliedDepartment, setAppliedDepartment] = useState("all");
   const [appliedEmployee, setAppliedEmployee] = useState("all");
   const [appliedReportType, setAppliedReportType] = useState("general");
+  const [appliedIncidentType, setAppliedIncidentType] = useState("all");
   
   // Estados para búsqueda
   const [employeeSearchOpen, setEmployeeSearchOpen] = useState(false);
@@ -49,6 +51,7 @@ export default function AttendanceReports() {
     setAppliedDepartment(selectedDepartment);
     setAppliedEmployee(selectedEmployee);
     setAppliedReportType(reportType);
+    setAppliedIncidentType(incidentTypeFilter);
     toast.success('✓ Filtros aplicados correctamente');
   };
 
@@ -92,9 +95,13 @@ export default function AttendanceReports() {
   });
 
   const { data: incidents = [] } = useQuery({
-    queryKey: ["allIncidents"],
+    queryKey: ["allIncidents", appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      return await base44.entities.AttendanceIncident.list("-created_date");
+      const allIncidents = await base44.entities.AttendanceIncident.list("-created_date");
+      return allIncidents.filter(i => {
+        const incidentDate = new Date(i.incident_date);
+        return incidentDate >= appliedStartDate && incidentDate <= appliedEndDate;
+      });
     },
   });
 
@@ -199,7 +206,23 @@ export default function AttendanceReports() {
     return { dept, employees: deptEmployees.length, lateDays, absentDays, avgAttendance };
   });
 
-  const pendingIncidents = incidents.filter(i => i.status === "Pendiente");
+  const filteredIncidents = incidents.filter(incident => {
+    if (appliedIncidentType !== "all" && incident.incident_type !== appliedIncidentType) {
+      return false;
+    }
+    if (appliedEmployee !== "all" && incident.employee_id !== appliedEmployee) {
+      return false;
+    }
+    if (appliedDepartment !== "all") {
+      const emp = allEmployees.find(e => e.id === incident.employee_id);
+      if (!emp || emp.department_name !== appliedDepartment) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const pendingIncidents = filteredIncidents.filter(i => i.status === "Pendiente");
 
   const exportToCSV = () => {
     let dataToExport = [];
@@ -299,6 +322,21 @@ export default function AttendanceReports() {
         ];
       });
       fileName = `Reporte_General_Asistencia_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.csv`;
+    } else if (appliedReportType === "incidencias") {
+      headers = ['Código', 'Empleado', 'Departamento', 'Tipo Incidencia', 'Fecha', 'Estado', 'Justificación'];
+      dataToExport = filteredIncidents.map(inc => {
+        const emp = allEmployees.find(e => e.id === inc.employee_id);
+        return [
+          emp?.employee_code || "N/A",
+          emp ? `${emp.first_name} ${emp.last_name}` : "N/A",
+          emp?.department_name || "N/A",
+          inc.incident_type,
+          format(new Date(inc.incident_date), "dd/MM/yyyy"),
+          inc.status,
+          inc.justification || ""
+        ];
+      });
+      fileName = `Reporte_Incidencias_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.csv`;
     }
 
     const csv = [headers, ...dataToExport].map(row => row.join(',')).join('\n');
@@ -416,6 +454,23 @@ export default function AttendanceReports() {
       });
       sheetName = 'Reporte General';
       fileName = `Reporte_General_Asistencia_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.xlsx`;
+    } else if (appliedReportType === "incidencias") {
+      dataToExport = filteredIncidents.map(inc => {
+        const emp = allEmployees.find(e => e.id === inc.employee_id);
+        return {
+          'Código': emp?.employee_code || "N/A",
+          'Empleado': emp ? `${emp.first_name} ${emp.last_name}` : "N/A",
+          'Departamento': emp?.department_name || "N/A",
+          'Tipo de Incidencia': inc.incident_type,
+          'Fecha': format(new Date(inc.incident_date), "dd/MM/yyyy"),
+          'Estado': inc.status,
+          'Justificación': inc.justification || "",
+          'Revisado por': inc.reviewed_by || "Pendiente",
+          'Fecha de Revisión': inc.review_date ? format(new Date(inc.review_date), "dd/MM/yyyy") : ""
+        };
+      });
+      sheetName = 'Reporte Incidencias';
+      fileName = `Reporte_Incidencias_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.xlsx`;
     }
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
@@ -523,6 +578,21 @@ export default function AttendanceReports() {
         ];
       });
       fileName = `Reporte_General_Asistencia_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.pdf`;
+    } else if (appliedReportType === "incidencias") {
+      title = 'Reporte de Incidencias';
+      headers = [['Código', 'Empleado', 'Depto', 'Tipo', 'Fecha', 'Estado']];
+      tableData = filteredIncidents.map(inc => {
+        const emp = allEmployees.find(e => e.id === inc.employee_id);
+        return [
+          emp?.employee_code || "N/A",
+          emp ? `${emp.first_name} ${emp.last_name}` : "N/A",
+          emp?.department_name || "N/A",
+          inc.incident_type,
+          format(new Date(inc.incident_date), "dd/MM/yy"),
+          inc.status
+        ];
+      });
+      fileName = `Reporte_Incidencias_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.pdf`;
     }
     
     doc.setFontSize(18);
@@ -745,6 +815,20 @@ export default function AttendanceReports() {
                       <SelectItem value="ausentismo">Ausentismo</SelectItem>
                       <SelectItem value="tardanzas">Tardanzas</SelectItem>
                       <SelectItem value="horas_extras">Horas Extras</SelectItem>
+                      <SelectItem value="incidencias">Incidencias</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={incidentTypeFilter} onValueChange={setIncidentTypeFilter}>
+                    <SelectTrigger className="w-52">
+                      <SelectValue placeholder="Tipo de incidencia" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las incidencias</SelectItem>
+                      <SelectItem value="Tardanza">Tardanza</SelectItem>
+                      <SelectItem value="Falta">Falta</SelectItem>
+                      <SelectItem value="Salida Temprana">Salida Temprana</SelectItem>
+                      <SelectItem value="Olvido de Marcación">Olvido de Marcación</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -788,7 +872,7 @@ export default function AttendanceReports() {
           </Card>
 
           {/* Summary Cards - Compact Horizontal Layout */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
             <Card className="border-0 shadow-lg">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
@@ -848,6 +932,22 @@ export default function AttendanceReports() {
                       {pendingIncidents.length}
                     </div>
                     <p className="text-slate-600 text-xs truncate">Justif. pendientes</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-red-100 rounded-xl shrink-0">
+                    <XCircle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                      {filteredIncidents.length}
+                    </div>
+                    <p className="text-slate-600 text-xs truncate">Total incidencias</p>
                   </div>
                 </div>
               </CardContent>
@@ -970,13 +1070,93 @@ export default function AttendanceReports() {
             </CardContent>
           </Card>
 
+          {/* Reporte de Incidencias */}
+          {appliedReportType === "incidencias" && (
+          <Card className="border-0 shadow-lg mb-8">
+            <CardHeader className="border-b bg-red-50/50">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <AlertCircle className="w-6 h-6 text-red-600" />
+                  Reporte de Incidencias
+                </CardTitle>
+                <Badge className="bg-red-100 text-red-700 text-base px-4 py-1">
+                  {filteredIncidents.length} incidencias
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-slate-50">
+                      <th className="text-left p-3 font-semibold text-slate-700">Empleado</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Departamento</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Tipo</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Fecha</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Estado</th>
+                      <th className="text-left p-3 font-semibold text-slate-700">Justificación</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredIncidents.map(inc => {
+                      const emp = allEmployees.find(e => e.id === inc.employee_id);
+                      return (
+                        <tr key={inc.id} className="border-b hover:bg-slate-50">
+                          <td className="p-3">
+                            <p className="font-semibold text-slate-900">
+                              {emp ? `${emp.first_name} ${emp.last_name}` : "N/A"}
+                            </p>
+                            <p className="text-xs text-slate-500">{emp?.employee_code}</p>
+                          </td>
+                          <td className="p-3 text-center text-sm">{emp?.department_name}</td>
+                          <td className="p-3 text-center">
+                            <Badge className={
+                              inc.incident_type === "Tardanza" ? "bg-yellow-100 text-yellow-700" :
+                              inc.incident_type === "Falta" ? "bg-red-100 text-red-700" :
+                              inc.incident_type === "Salida Temprana" ? "bg-orange-100 text-orange-700" :
+                              "bg-purple-100 text-purple-700"
+                            }>
+                              {inc.incident_type}
+                            </Badge>
+                          </td>
+                          <td className="p-3 text-center text-sm">
+                            {format(new Date(inc.incident_date), "dd/MM/yyyy")}
+                          </td>
+                          <td className="p-3 text-center">
+                            <Badge className={
+                              inc.status === "Aprobada" ? "bg-green-100 text-green-700" :
+                              inc.status === "Rechazada" ? "bg-red-100 text-red-700" :
+                              "bg-orange-100 text-orange-700"
+                            }>
+                              {inc.status}
+                            </Badge>
+                          </td>
+                          <td className="p-3 text-sm text-slate-600">
+                            {inc.justification || "-"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {filteredIncidents.length === 0 && (
+                  <div className="text-center py-12">
+                    <AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                    <p className="text-slate-600">No hay incidencias que coincidan con los filtros aplicados</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          )}
+
           {/* Tabs for different views */}
           <Tabs defaultValue="summary" className="space-y-6">
-            <TabsList className="grid w-full max-w-3xl grid-cols-3">
-              <TabsTrigger value="summary">Resumen</TabsTrigger>
-              <TabsTrigger value="charts">Gráficos</TabsTrigger>
-              <TabsTrigger value="details">Detalles</TabsTrigger>
-            </TabsList>
+          <TabsList className="grid w-full max-w-3xl grid-cols-3">
+            <TabsTrigger value="summary">Resumen</TabsTrigger>
+            <TabsTrigger value="charts">Gráficos</TabsTrigger>
+            <TabsTrigger value="details">Detalles</TabsTrigger>
+          </TabsList>
 
             {/* Summary Tab */}
             <TabsContent value="summary" className="space-y-6">
@@ -1007,8 +1187,17 @@ export default function AttendanceReports() {
                           {appliedReportType === "ausentismo" && "Ausentismo"}
                           {appliedReportType === "tardanzas" && "Tardanzas"}
                           {appliedReportType === "horas_extras" && "Horas Extras"}
+                          {appliedReportType === "incidencias" && "Incidencias"}
                         </Badge>
                       </div>
+                      {appliedIncidentType !== "all" && (
+                        <div>
+                          <p className="text-sm text-slate-600 mb-1">Tipo de Incidencia</p>
+                          <Badge className="bg-purple-100 text-purple-700">
+                            {appliedIncidentType}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-4">
                       <div>
@@ -1035,7 +1224,7 @@ export default function AttendanceReports() {
                   {/* Resumen de Resultados */}
                   <div className="mt-6 pt-6 border-t">
                     <p className="text-sm text-slate-600 mb-3">Resumen de Resultados</p>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                       <div className="p-3 bg-slate-50 rounded-lg">
                         <p className="text-xs text-slate-600 mb-1">Total Empleados</p>
                         <p className="text-2xl font-bold text-slate-900">{displayEmployees.length}</p>
@@ -1062,6 +1251,13 @@ export default function AttendanceReports() {
                         <p className="text-xs text-slate-600 mb-1">Feriados</p>
                         <p className="text-2xl font-bold text-purple-700">{holidaysInRange.length}</p>
                         <p className="text-xs text-purple-600">en el período</p>
+                      </div>
+                      <div className="p-3 bg-orange-50 rounded-lg">
+                        <p className="text-xs text-slate-600 mb-1">Total Incidencias</p>
+                        <p className="text-2xl font-bold text-orange-700">
+                          {filteredIncidents.length}
+                        </p>
+                        <p className="text-xs text-orange-600">{pendingIncidents.length} pendientes</p>
                       </div>
                     </div>
                   </div>
@@ -1539,6 +1735,65 @@ export default function AttendanceReports() {
                           >
                             {departments.map((_, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+
+              {appliedReportType === "incidencias" && (
+                <>
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <CardTitle className="text-xl font-bold">Incidencias por Tipo</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart 
+                          data={[
+                            { name: "Tardanza", cantidad: filteredIncidents.filter(i => i.incident_type === "Tardanza").length },
+                            { name: "Falta", cantidad: filteredIncidents.filter(i => i.incident_type === "Falta").length },
+                            { name: "Salida Temprana", cantidad: filteredIncidents.filter(i => i.incident_type === "Salida Temprana").length },
+                            { name: "Olvido Marcación", cantidad: filteredIncidents.filter(i => i.incident_type === "Olvido de Marcación").length }
+                          ].filter(item => item.cantidad > 0)}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="cantidad" fill="#ef4444" name="Cantidad" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <CardTitle className="text-xl font-bold">Incidencias por Estado</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: "Pendiente", value: filteredIncidents.filter(i => i.status === "Pendiente").length },
+                              { name: "Aprobada", value: filteredIncidents.filter(i => i.status === "Aprobada").length },
+                              { name: "Rechazada", value: filteredIncidents.filter(i => i.status === "Rechazada").length }
+                            ].filter(item => item.value > 0)}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, value }) => `${name}: ${value}`}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {['#f59e0b', '#10b981', '#ef4444'].map((color, index) => (
+                              <Cell key={`cell-${index}`} fill={color} />
                             ))}
                           </Pie>
                           <Tooltip />
