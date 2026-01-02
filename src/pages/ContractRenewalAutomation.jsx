@@ -173,7 +173,7 @@ export default function ContractRenewalAutomation() {
       name: "",
       is_active: true,
       days_before_expiration: 30,
-      contract_types: ["Plazo Fijo"],
+      contract_types: contractTypeOptions.length > 0 ? [contractTypeOptions[0]] : [],
       send_notification: true,
       notification_emails: [],
       auto_create_draft: false,
