@@ -1034,10 +1034,10 @@ export default function AttendanceReports() {
                             </td>
                             <td className="p-3 text-center">
                               <p className="font-medium text-slate-900">
-                                {format(new Date(record.date), "dd/MM/yyyy")}
+                                {format(new Date(record.date + 'T12:00:00-05:00'), "dd/MM/yyyy")}
                               </p>
                               <p className="text-xs text-slate-500">
-                                {format(new Date(record.date), "EEEE", { locale: es })}
+                                {format(new Date(record.date + 'T12:00:00-05:00'), "EEEE", { locale: es })}
                               </p>
                             </td>
                             <td className="p-3 text-center text-sm">{emp.department_name}</td>
