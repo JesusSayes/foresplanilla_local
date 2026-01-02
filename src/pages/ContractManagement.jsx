@@ -215,16 +215,20 @@ export default function ContractManagement() {
     );
   };
 
-  const handleGeneratePDF = (contract) => {
+  const handleGeneratePDF = async (contract) => {
     const emp = allEmployees.find(e => e.id === contract.employee_id);
     if (!emp) {
       toast.error("Empleado no encontrado");
       return;
     }
 
-    const doc = generateContractPDF(emp, contract);
-    doc.save(`Contrato_${emp.employee_code}_${contract.contract_number || emp.first_name}.pdf`);
-    toast.success("PDF generado exitosamente");
+    try {
+      await generateContractPDF(emp, contract);
+      toast.success("PDF generado exitosamente");
+    } catch (error) {
+      console.error("Error generando PDF:", error);
+      toast.error("Error al generar el PDF");
+    }
   };
 
   const resetForm = () => {
