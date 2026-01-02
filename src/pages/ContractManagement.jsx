@@ -93,6 +93,24 @@ export default function ContractManagement() {
     },
   });
 
+  const { data: contractTemplate } = useQuery({
+    queryKey: ["contractTemplate"],
+    queryFn: async () => {
+      const templates = await base44.entities.ContractTemplate.list("-created_date");
+      return templates.length > 0 ? templates[0] : null;
+    },
+    enabled: !!employee,
+  });
+
+  const { data: companyInfo } = useQuery({
+    queryKey: ["companyInfo"],
+    queryFn: async () => {
+      const info = await base44.entities.CompanyInfo.list("-created_date");
+      return info.length > 0 ? info[0] : null;
+    },
+    enabled: !!employee,
+  });
+
   const createContractMutation = useMutation({
     mutationFn: async (data) => {
       return await base44.entities.Contract.create(data);
@@ -223,7 +241,13 @@ export default function ContractManagement() {
     }
 
     try {
-      await generateContractPDF(emp, contract);
+      // Recargar plantilla y datos de empresa antes de generar PDF
+      const templates = await base44.entities.ContractTemplate.list("-created_date");
+      const template = templates.length > 0 ? templates[0] : null;
+      
+      const companyData = companyInfo || {};
+      
+      await generateContractPDF(emp, contract, companyData, template);
       toast.success("PDF generado exitosamente");
     } catch (error) {
       console.error("Error generando PDF:", error);
