@@ -140,6 +140,10 @@ export default function AttendanceReports() {
     return true;
   });
 
+  const displayEmployees = appliedEmployee !== "all" 
+    ? filteredEmployees.filter(e => e.id === appliedEmployee)
+    : filteredEmployees;
+
   // Generar registros completos incluyendo días sin marcación
   const generateCompleteRecords = () => {
     const allRecords = [];
