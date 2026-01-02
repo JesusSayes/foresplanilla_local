@@ -322,7 +322,9 @@ export default function AttendanceReports() {
         ];
       });
       fileName = `Reporte_General_Asistencia_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.csv`;
-    } else if (appliedReportType === "incidencias") {
+    }
+    
+    if (appliedReportType === "incidencias") {
       headers = ['Código', 'Empleado', 'Departamento', 'Tipo Incidencia', 'Fecha', 'Estado', 'Justificación'];
       dataToExport = filteredIncidents.map(inc => {
         const emp = allEmployees.find(e => e.id === inc.employee_id);
@@ -454,7 +456,9 @@ export default function AttendanceReports() {
       });
       sheetName = 'Reporte General';
       fileName = `Reporte_General_Asistencia_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.xlsx`;
-    } else if (appliedReportType === "incidencias") {
+    }
+    
+    if (appliedReportType === "incidencias") {
       dataToExport = filteredIncidents.map(inc => {
         const emp = allEmployees.find(e => e.id === inc.employee_id);
         return {
@@ -578,7 +582,9 @@ export default function AttendanceReports() {
         ];
       });
       fileName = `Reporte_General_Asistencia_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.pdf`;
-    } else if (appliedReportType === "incidencias") {
+    }
+    
+    if (appliedReportType === "incidencias") {
       title = 'Reporte de Incidencias';
       headers = [['Código', 'Empleado', 'Depto', 'Tipo', 'Fecha', 'Estado']];
       tableData = filteredIncidents.map(inc => {
