@@ -222,6 +222,13 @@ export default function ContractTemplateConfig() {
           <div className="flex gap-3">
             <Button
               variant="outline"
+              onClick={() => setShowPreview(true)}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Vista Previa
+            </Button>
+            <Button
+              variant="outline"
               onClick={handleReset}
             >
               <RotateCcw className="w-4 h-4 mr-2" />
@@ -523,6 +530,187 @@ export default function ContractTemplateConfig() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Modal de Vista Previa */}
+      {showPreview && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+          onClick={() => setShowPreview(false)}
+        >
+          <Card 
+            className="max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader className="border-b sticky top-0 bg-white z-10">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl font-bold">Vista Previa del Contrato</CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => setShowPreview(false)}>✕</Button>
+              </div>
+              <p className="text-sm text-slate-600 mt-1">
+                Ejemplo con datos ficticios
+              </p>
+            </CardHeader>
+            <CardContent className="p-8 space-y-6">
+              <div className="space-y-8">
+                {/* Encabezado */}
+                <div className="text-center border-b pb-6">
+                  <h1 className="text-2xl font-bold text-slate-900 mb-2">CONTRATO DE TRABAJO</h1>
+                  <p className="text-slate-600">{templateData.company_name || "[Nombre de la Empresa]"}</p>
+                  <p className="text-sm text-slate-500">RUC: {templateData.company_ruc || "[RUC]"}</p>
+                </div>
+
+                {/* Texto Introductorio */}
+                <div>
+                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    {templateData.introduction_text
+                      .replace(/{contract_type}/g, "INDETERMINADO")
+                    }
+                  </p>
+                </div>
+
+                {/* Partes del Contrato */}
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-50 rounded-lg">
+                    <p className="font-semibold text-slate-900 mb-2">EL EMPLEADOR:</p>
+                    <p className="text-sm text-slate-700">{templateData.company_name || "[Nombre de la Empresa]"}</p>
+                    <p className="text-sm text-slate-700">RUC: {templateData.company_ruc || "[RUC]"}</p>
+                    <p className="text-sm text-slate-700">Dirección: {templateData.company_address || "[Dirección]"}</p>
+                    <p className="text-sm text-slate-700">Representante: {templateData.company_representative || "[Representante Legal]"}</p>
+                    <p className="text-sm text-slate-700">{templateData.company_representative_doc || "[Documento]"}</p>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 rounded-lg">
+                    <p className="font-semibold text-slate-900 mb-2">EL TRABAJADOR:</p>
+                    <p className="text-sm text-slate-700">Juan Carlos Pérez García</p>
+                    <p className="text-sm text-slate-700">DNI: 12345678</p>
+                    <p className="text-sm text-slate-700">Fecha de Nacimiento: 15/03/1990</p>
+                    <p className="text-sm text-slate-700">Dirección: Av. Los Olivos 456, Lima</p>
+                  </div>
+                </div>
+
+                {/* Cláusulas */}
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="font-bold text-slate-900 mb-2">PRIMERA: OBJETO DEL CONTRATO</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {templateData.contract_object_text
+                        .replace(/{position}/g, "Analista de Sistemas")
+                        .replace(/{department}/g, "Tecnología de la Información")
+                      }
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900 mb-2">SEGUNDA: FUNCIONES</h3>
+                    <p className="text-sm text-slate-700 mb-2">{templateData.functions_intro_text}</p>
+                    <ul className="list-disc list-inside text-sm text-slate-700 space-y-1 ml-4">
+                      <li>Desarrollar y mantener aplicaciones web</li>
+                      <li>Analizar requerimientos del negocio</li>
+                      <li>Brindar soporte técnico a usuarios</li>
+                      <li>Documentar procesos y procedimientos</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900 mb-2">TERCERA: VIGENCIA</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {templateData.duration_indeterminate_text
+                        .replace(/{start_date}/g, "01 de enero de 2026")
+                      }
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900 mb-2">CUARTA: PERÍODO DE PRUEBA</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {templateData.trial_period_text
+                        .replace(/{trial_period_days}/g, "90")
+                      }
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900 mb-2">QUINTA: REMUNERACIÓN</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {templateData.salary_text
+                        .replace(/{salary}/g, "3,500.00")
+                        .replace(/{salary_words}/g, "TRES MIL QUINIENTOS Y 00/100")
+                      }
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900 mb-2">SEXTA: JORNADA Y HORARIO</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {templateData.schedule_text
+                        .replace(/{weekly_hours}/g, "48")
+                        .replace(/{work_schedule}/g, "Lunes a Viernes de 9:00 AM a 6:00 PM, con 1 hora de refrigerio")
+                      }
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900 mb-2">SÉPTIMA: LUGAR DE TRABAJO</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {templateData.work_location_text
+                        .replace(/{work_location}/g, "Av. Javier Prado 1234, San Isidro, Lima")
+                      }
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900 mb-2">OCTAVA: OBLIGACIONES DEL TRABAJADOR</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                      {templateData.obligations_text}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900 mb-2">NOVENA: BENEFICIOS SOCIALES</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                      {templateData.benefits_text}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900 mb-2">DÉCIMA: TÉRMINO DEL CONTRATO</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {templateData.termination_text}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900 mb-2">DÉCIMA PRIMERA: DOMICILIO</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {templateData.domicile_text}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Firmas */}
+                <div className="grid grid-cols-2 gap-8 pt-12 mt-8 border-t">
+                  <div className="text-center">
+                    <div className="border-t border-slate-400 pt-2 mt-16">
+                      <p className="font-semibold text-slate-900">EL EMPLEADOR</p>
+                      <p className="text-sm text-slate-600">{templateData.company_representative || "[Representante]"}</p>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="border-t border-slate-400 pt-2 mt-16">
+                      <p className="font-semibold text-slate-900">EL TRABAJADOR</p>
+                      <p className="text-sm text-slate-600">Juan Carlos Pérez García</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-center text-sm text-slate-500 pt-4">
+                  Lima, 02 de enero de 2026
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
