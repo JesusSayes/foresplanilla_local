@@ -112,6 +112,19 @@ export default function AttendanceReports() {
     },
   });
 
+  const { data: vacationRequests = [] } = useQuery({
+    queryKey: ["vacationRequests", appliedStartDate, appliedEndDate],
+    queryFn: async () => {
+      const allRequests = await base44.entities.VacationRequest.list("-created_date");
+      return allRequests.filter(v => {
+        if (v.status !== "Aprobada") return false;
+        const startDate = new Date(v.start_date);
+        const endDate = new Date(v.end_date);
+        return !(endDate < appliedStartDate || startDate > appliedEndDate);
+      });
+    },
+  });
+
   const isHoliday = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
     return holidays.some(h => h.date === dateStr && h.is_mandatory);
@@ -120,6 +133,22 @@ export default function AttendanceReports() {
   const getHolidayInfo = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
     return holidays.find(h => h.date === dateStr && h.is_mandatory);
+  };
+
+  const isOnVacationOrLeave = (employeeId, date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return vacationRequests.some(v => {
+      if (v.employee_id !== employeeId || v.status !== "Aprobada") return false;
+      return dateStr >= v.start_date && dateStr <= v.end_date;
+    });
+  };
+
+  const getVacationOrLeaveInfo = (employeeId, date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return vacationRequests.find(v => {
+      if (v.employee_id !== employeeId || v.status !== "Aprobada") return false;
+      return dateStr >= v.start_date && dateStr <= v.end_date;
+    });
   };
 
   // Calcular feriados en el rango de fechas aplicado
@@ -158,6 +187,19 @@ export default function AttendanceReports() {
       if (existingRecord) {
         allRecords.push(existingRecord);
       } else if (!isWeekend(day)) {
+        // Determinar el estado del día
+        let status = "Sin marcación";
+        let isAbsent = true;
+
+        if (isHoliday(day)) {
+          status = "Feriado";
+          isAbsent = false;
+        } else if (isOnVacationOrLeave(emp.id, day)) {
+          const vacInfo = getVacationOrLeaveInfo(emp.id, day);
+          status = vacInfo?.request_type || "Vacaciones";
+          isAbsent = false;
+        }
+
         // Crear registro virtual para día sin marcación
         allRecords.push({
           id: `virtual-${emp.id}-${dayStr}`,
@@ -168,8 +210,8 @@ export default function AttendanceReports() {
           worked_hours: null,
           is_late: false,
           late_minutes: 0,
-          is_absent: true,
-          status: isHoliday(day) ? "Feriado" : "Sin marcación"
+          is_absent: isAbsent,
+          status: status
         });
       }
     });
@@ -184,7 +226,15 @@ export default function AttendanceReports() {
     const totalDays = recordsWithClockIn.length;
     const presentDays = recordsWithClockIn.filter(r => !r.is_absent && r.clock_in).length;
     const lateDays = recordsWithClockIn.filter(r => r.is_late && r.late_minutes > 0).length;
-    const absentDays = empRecords.filter(r => r.is_absent && !isHoliday(new Date(r.date))).length;
+    
+    // No contar como ausencias los días con vacaciones/permisos aprobados o feriados
+    const absentDays = empRecords.filter(r => {
+      const recordDate = new Date(r.date);
+      return r.is_absent 
+        && !isHoliday(recordDate) 
+        && !isOnVacationOrLeave(employeeId, recordDate);
+    }).length;
+    
     const totalHours = recordsWithClockIn.reduce((sum, r) => sum + (r.worked_hours || 0), 0);
     const totalLateMinutes = recordsWithClockIn.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
     const holidaysInPeriod = empRecords.filter(r => isHoliday(new Date(r.date))).length;
@@ -195,10 +245,19 @@ export default function AttendanceReports() {
       return sum + Math.max(0, hours - 8);
     }, 0);
 
-    // Calcular días laborables esperados
+    // Calcular días laborables esperados (excluyendo fines de semana, feriados, y vacaciones/permisos aprobados)
     const allDaysInRange = eachDayOfInterval({ start: appliedStartDate, end: appliedEndDate });
-    const workDays = allDaysInRange.filter(day => !isWeekend(day) && !isHoliday(day)).length;
+    const workDays = allDaysInRange.filter(day => 
+      !isWeekend(day) 
+      && !isHoliday(day) 
+      && !isOnVacationOrLeave(employeeId, day)
+    ).length;
     const expectedDays = workDays;
+    
+    // Contar días de vacaciones/permisos en el período
+    const vacationDaysInPeriod = allDaysInRange.filter(day => 
+      !isWeekend(day) && isOnVacationOrLeave(employeeId, day)
+    ).length;
 
     return { 
       totalDays, 
@@ -210,6 +269,7 @@ export default function AttendanceReports() {
       holidaysInPeriod,
       overtimeHours,
       expectedDays,
+      vacationDaysInPeriod,
       attendanceRate: expectedDays > 0 ? ((presentDays / expectedDays) * 100).toFixed(1) : 0
     };
   };
@@ -1063,13 +1123,17 @@ export default function AttendanceReports() {
                             </td>
                             <td className="p-3 text-center">
                               <Badge className={
-                                record.status === "Completo" ? "bg-green-100 text-green-700 border-green-200" :
-                                record.status === "Ausente" ? "bg-red-100 text-red-700 border-red-200" :
-                                record.status === "Incompleto" ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
-                                record.status === "Feriado" ? "bg-purple-100 text-purple-700 border-purple-200" :
-                                record.status === "Sin marcación" ? "bg-orange-100 text-orange-700 border-orange-200" :
-                                "bg-blue-100 text-blue-700 border-blue-200"
-                              }>
+                                  record.status === "Completo" ? "bg-green-100 text-green-700 border-green-200" :
+                                  record.status === "Ausente" ? "bg-red-100 text-red-700 border-red-200" :
+                                  record.status === "Incompleto" ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
+                                  record.status === "Feriado" ? "bg-purple-100 text-purple-700 border-purple-200" :
+                                  record.status === "Sin marcación" ? "bg-orange-100 text-orange-700 border-orange-200" :
+                                  record.status === "Vacaciones" ? "bg-cyan-100 text-cyan-700 border-cyan-200" :
+                                  record.status === "Permiso con goce" ? "bg-teal-100 text-teal-700 border-teal-200" :
+                                  record.status === "Permiso sin goce" ? "bg-rose-100 text-rose-700 border-rose-200" :
+                                  record.status === "Licencia médica" ? "bg-indigo-100 text-indigo-700 border-indigo-200" :
+                                  "bg-blue-100 text-blue-700 border-blue-200"
+                                }>
                                 {record.status}
                               </Badge>
                             </td>
@@ -1242,7 +1306,7 @@ export default function AttendanceReports() {
                   {/* Resumen de Resultados */}
                   <div className="mt-6 pt-6 border-t">
                     <p className="text-sm text-slate-600 mb-3">Resumen de Resultados</p>
-                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
                       <div className="p-3 bg-slate-50 rounded-lg">
                         <p className="text-xs text-slate-600 mb-1">Total Empleados</p>
                         <p className="text-2xl font-bold text-slate-900">{displayEmployees.length}</p>
@@ -1269,6 +1333,13 @@ export default function AttendanceReports() {
                         <p className="text-xs text-slate-600 mb-1">Feriados</p>
                         <p className="text-2xl font-bold text-purple-700">{holidaysInRange.length}</p>
                         <p className="text-xs text-purple-600">en el período</p>
+                      </div>
+                      <div className="p-3 bg-cyan-50 rounded-lg">
+                        <p className="text-xs text-slate-600 mb-1">Vacaciones/Permisos</p>
+                        <p className="text-2xl font-bold text-cyan-700">
+                          {vacationRequests.filter(v => v.status === "Aprobada").length}
+                        </p>
+                        <p className="text-xs text-cyan-600">aprobadas</p>
                       </div>
                       <div className="p-3 bg-orange-50 rounded-lg">
                         <p className="text-xs text-slate-600 mb-1">Total Incidencias</p>
@@ -1422,7 +1493,7 @@ export default function AttendanceReports() {
                     </CardHeader>
                     <CardContent className="p-6">
                       {/* Estadísticas del Empleado */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                         <div className="p-4 bg-slate-50 rounded-lg">
                           <p className="text-xs text-slate-600 mb-1">Días Trabajados</p>
                           <p className="text-2xl font-bold text-slate-900">{stats.presentDays}</p>
@@ -1441,6 +1512,11 @@ export default function AttendanceReports() {
                           <p className="text-xs text-slate-600 mb-1">Horas Trabajadas</p>
                           <p className="text-2xl font-bold text-blue-700">{stats.totalHours.toFixed(1)}</p>
                           <p className="text-xs text-blue-600">{stats.overtimeHours.toFixed(1)}h extras</p>
+                        </div>
+                        <div className="p-4 bg-cyan-50 rounded-lg">
+                          <p className="text-xs text-slate-600 mb-1">Vacaciones/Permisos</p>
+                          <p className="text-2xl font-bold text-cyan-700">{stats.vacationDaysInPeriod || 0}</p>
+                          <p className="text-xs text-cyan-600">días</p>
                         </div>
                       </div>
 
@@ -1881,6 +1957,10 @@ export default function AttendanceReports() {
                             <div className="p-3 bg-green-50 rounded-lg">
                               <p className="text-slate-600 text-xs mb-1">Feriados</p>
                               <p className="font-bold text-green-700">{stats.holidaysInPeriod}</p>
+                            </div>
+                            <div className="p-3 bg-cyan-50 rounded-lg">
+                              <p className="text-slate-600 text-xs mb-1">Vacaciones/Permisos</p>
+                              <p className="font-bold text-cyan-700">{stats.vacationDaysInPeriod || 0}</p>
                             </div>
                           </div>
                         </div>
