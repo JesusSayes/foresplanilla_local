@@ -544,7 +544,7 @@ export default function ContractRenewalAutomation() {
               <div>
                 <Label>Tipos de Contrato</Label>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {["Plazo Fijo", "Part-Time", "Prácticas", "Obra o Servicio", "Temporal"].map(type => (
+                  {contractTypeOptions.map(type => (
                     <Badge
                       key={type}
                       className={`cursor-pointer ${ruleData.contract_types?.includes(type) ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'}`}
