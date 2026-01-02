@@ -21,11 +21,12 @@ export default function ContractRenewalAutomation() {
   const [employee, setEmployee] = useState(null);
   const [showRuleForm, setShowRuleForm] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
+  const [contractTypeOptions, setContractTypeOptions] = useState([]);
   const [ruleData, setRuleData] = useState({
     name: "",
     is_active: true,
     days_before_expiration: 30,
-    contract_types: ["Plazo Fijo"],
+    contract_types: [],
     send_notification: true,
     notification_emails: [],
     auto_create_draft: false,
