@@ -967,7 +967,7 @@ export default function AttendanceReports() {
                 Detalle de Asistencia por Empleado
               </CardTitle>
               <p className="text-sm text-slate-600 mt-1">
-                {displayEmployees.length} empleado(s) según filtros aplicados
+                {filteredRecords.length} registro(s) según filtros aplicados
               </p>
             </CardHeader>
             <CardContent className="p-6">
@@ -976,101 +976,85 @@ export default function AttendanceReports() {
                   <thead>
                     <tr className="border-b bg-slate-50">
                       <th className="text-left p-3 font-semibold text-slate-700">Empleado</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Fecha</th>
                       <th className="text-center p-3 font-semibold text-slate-700">Departamento</th>
-                      <th className="text-center p-3 font-semibold text-slate-700">% Asistencia</th>
-                      <th className="text-center p-3 font-semibold text-slate-700">Días Trabajados</th>
-                      <th className="text-center p-3 font-semibold text-slate-700">Tardanzas</th>
-                      <th className="text-center p-3 font-semibold text-slate-700">Ausencias</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Entrada</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Salida</th>
                       <th className="text-center p-3 font-semibold text-slate-700">Horas Trabajadas</th>
-                      <th className="text-center p-3 font-semibold text-slate-700">Horas Extras</th>
-                      <th className="text-center p-3 font-semibold text-slate-700">Justif. Pendientes</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Tardanza</th>
+                      <th className="text-center p-3 font-semibold text-slate-700">Estado</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {displayEmployees.map((emp) => {
-                      const stats = calculateEmployeeStats(emp.id);
-                      const empIncidents = incidents.filter(i => i.employee_id === emp.id && i.status === "Pendiente");
-                      
-                      return (
-                        <tr key={emp.id} className="border-b hover:bg-slate-50 transition-colors">
-                          <td className="p-3">
-                            <div>
-                              <p className="font-semibold text-slate-900">
-                                {emp.first_name} {emp.last_name}
-                              </p>
-                              <p className="text-xs text-slate-500">{emp.employee_code}</p>
-                            </div>
-                          </td>
-                          <td className="p-3 text-center text-sm">{emp.department_name}</td>
-                          <td className="p-3 text-center">
-                            <Badge className={
-                              stats.attendanceRate >= 95 ? "bg-green-100 text-green-700 border-green-200" :
-                              stats.attendanceRate >= 85 ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
-                              "bg-red-100 text-red-700 border-red-200"
-                            }>
-                              {stats.attendanceRate}%
-                            </Badge>
-                          </td>
-                          <td className="p-3 text-center">
-                            <div className="flex flex-col items-center">
-                              <span className="font-semibold text-slate-900">{stats.presentDays}</span>
-                              <span className="text-xs text-slate-500">de {stats.expectedDays}</span>
-                            </div>
-                          </td>
-                          <td className="p-3 text-center">
-                            {stats.lateDays > 0 ? (
-                              <div className="flex flex-col items-center">
-                                <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
-                                  {stats.lateDays}
-                                </Badge>
-                                <span className="text-xs text-yellow-600 mt-1">{stats.totalLateMinutes} min</span>
+                    {filteredRecords
+                      .sort((a, b) => new Date(b.date) - new Date(a.date))
+                      .map((record) => {
+                        const emp = allEmployees.find(e => e.id === record.employee_id);
+                        if (!emp) return null;
+                        
+                        return (
+                          <tr key={record.id} className="border-b hover:bg-slate-50 transition-colors">
+                            <td className="p-3">
+                              <div>
+                                <p className="font-semibold text-slate-900">
+                                  {emp.first_name} {emp.last_name}
+                                </p>
+                                <p className="text-xs text-slate-500">{emp.employee_code}</p>
                               </div>
-                            ) : (
-                              <span className="text-slate-400">-</span>
-                            )}
-                          </td>
-                          <td className="p-3 text-center">
-                            {stats.absentDays > 0 ? (
-                              <Badge className="bg-red-100 text-red-700 border-red-200">
-                                {stats.absentDays}
+                            </td>
+                            <td className="p-3 text-center">
+                              <p className="font-medium text-slate-900">
+                                {format(new Date(record.date), "dd/MM/yyyy")}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {format(new Date(record.date), "EEEE", { locale: es })}
+                              </p>
+                            </td>
+                            <td className="p-3 text-center text-sm">{emp.department_name}</td>
+                            <td className="p-3 text-center text-sm font-medium">
+                              {record.clock_in || <span className="text-slate-400">---</span>}
+                            </td>
+                            <td className="p-3 text-center text-sm font-medium">
+                              {record.clock_out || <span className="text-slate-400">---</span>}
+                            </td>
+                            <td className="p-3 text-center">
+                              {record.worked_hours ? (
+                                <span className="font-semibold text-blue-700">
+                                  {record.worked_hours.toFixed(2)}h
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">-</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-center">
+                              {record.is_late && record.late_minutes > 0 ? (
+                                <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
+                                  {record.late_minutes} min
+                                </Badge>
+                              ) : (
+                                <span className="text-slate-400">-</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-center">
+                              <Badge className={
+                                record.status === "Completo" ? "bg-green-100 text-green-700 border-green-200" :
+                                record.status === "Ausente" ? "bg-red-100 text-red-700 border-red-200" :
+                                record.status === "Incompleto" ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
+                                "bg-blue-100 text-blue-700 border-blue-200"
+                              }>
+                                {record.status}
                               </Badge>
-                            ) : (
-                              <span className="text-slate-400">-</span>
-                            )}
-                          </td>
-                          <td className="p-3 text-center">
-                            <span className="font-semibold text-blue-700">
-                              {stats.totalHours.toFixed(1)}h
-                            </span>
-                          </td>
-                          <td className="p-3 text-center">
-                            {stats.overtimeHours > 0 ? (
-                              <Badge className="bg-purple-100 text-purple-700 border-purple-200">
-                                {stats.overtimeHours.toFixed(1)}h
-                              </Badge>
-                            ) : (
-                              <span className="text-slate-400">-</span>
-                            )}
-                          </td>
-                          <td className="p-3 text-center">
-                            {empIncidents.length > 0 ? (
-                              <Badge className="bg-orange-100 text-orange-700 border-orange-200">
-                                {empIncidents.length}
-                              </Badge>
-                            ) : (
-                              <span className="text-slate-400">-</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>
-              {displayEmployees.length === 0 && (
+              {filteredRecords.length === 0 && (
                 <div className="text-center py-12">
                   <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-600">No hay empleados que coincidan con los filtros aplicados</p>
+                  <p className="text-slate-600">No hay registros de asistencia que coincidan con los filtros aplicados</p>
                 </div>
               )}
             </CardContent>
