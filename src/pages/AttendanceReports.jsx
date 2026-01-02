@@ -1070,6 +1070,8 @@ export default function AttendanceReports() {
                                 record.status === "Completo" ? "bg-green-100 text-green-700 border-green-200" :
                                 record.status === "Ausente" ? "bg-red-100 text-red-700 border-red-200" :
                                 record.status === "Incompleto" ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
+                                record.status === "Feriado" ? "bg-purple-100 text-purple-700 border-purple-200" :
+                                record.status === "Sin marcación" ? "bg-orange-100 text-orange-700 border-orange-200" :
                                 "bg-blue-100 text-blue-700 border-blue-200"
                               }>
                                 {record.status}
