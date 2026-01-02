@@ -90,6 +90,8 @@ export default function ContractTemplateConfig() {
       return info.length > 0 ? info[0] : null;
     },
     enabled: !!employee,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   useEffect(() => {
