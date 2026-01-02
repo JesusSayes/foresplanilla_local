@@ -50,6 +50,19 @@ export default function ContractRenewalAutomation() {
         if (employees && employees.length > 0) {
           setEmployee(employees[0]);
         }
+
+        // Cargar tipos de contrato desde el schema de Employee
+        const schema = await base44.entities.Employee.schema();
+        const contractTypeEnum = schema?.properties?.contract_type?.enum || [];
+        setContractTypeOptions(contractTypeEnum);
+        
+        // Inicializar con el primer tipo disponible si existe
+        if (contractTypeEnum.length > 0) {
+          setRuleData(prev => ({
+            ...prev,
+            contract_types: [contractTypeEnum[0]]
+          }));
+        }
       } catch (error) {
         console.error("Error loading user:", error);
       }
