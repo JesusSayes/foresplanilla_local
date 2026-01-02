@@ -238,6 +238,9 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   doc.text(`${employee.first_name} ${employee.last_name}`, pageWidth - 55, sigY + 10, { align: "center" });
   doc.text(`${employee.document_type} ${employee.document_number}`, pageWidth - 55, sigY + 14, { align: "center" });
 
+  // Guardar PDF
+  doc.save(`Contrato_${employee.last_name}_${employee.first_name}_${contract.contract_number || contract.id}.pdf`);
+  
   return doc;
 };
 
