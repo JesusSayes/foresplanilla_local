@@ -5,8 +5,6 @@ import AttendanceReports from './pages/AttendanceReports';
 import Certificates from './pages/Certificates';
 import CompanySettings from './pages/CompanySettings';
 import ContractManagement from './pages/ContractManagement';
-import ContractRenewalAutomation from './pages/ContractRenewalAutomation';
-import ContractTemplateConfig from './pages/ContractTemplateConfig';
 import Dashboard from './pages/Dashboard';
 import DatabaseConfig from './pages/DatabaseConfig';
 import EmployeeManagement from './pages/EmployeeManagement';
@@ -31,6 +29,8 @@ import UserManagement from './pages/UserManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
+import ContractTemplateConfig from './pages/ContractTemplateConfig';
+import ContractRenewalAutomation from './pages/ContractRenewalAutomation';
 import __Layout from './Layout.jsx';
 
 
@@ -42,8 +42,6 @@ export const PAGES = {
     "Certificates": Certificates,
     "CompanySettings": CompanySettings,
     "ContractManagement": ContractManagement,
-    "ContractRenewalAutomation": ContractRenewalAutomation,
-    "ContractTemplateConfig": ContractTemplateConfig,
     "Dashboard": Dashboard,
     "DatabaseConfig": DatabaseConfig,
     "EmployeeManagement": EmployeeManagement,
@@ -68,6 +66,8 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
+    "ContractTemplateConfig": ContractTemplateConfig,
+    "ContractRenewalAutomation": ContractRenewalAutomation,
 }
 
 export const pagesConfig = {

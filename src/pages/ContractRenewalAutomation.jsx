@@ -21,12 +21,11 @@ export default function ContractRenewalAutomation() {
   const [employee, setEmployee] = useState(null);
   const [showRuleForm, setShowRuleForm] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
-  const [contractTypeOptions, setContractTypeOptions] = useState([]);
   const [ruleData, setRuleData] = useState({
     name: "",
     is_active: true,
     days_before_expiration: 30,
-    contract_types: [],
+    contract_types: ["Plazo Fijo"],
     send_notification: true,
     notification_emails: [],
     auto_create_draft: false,
@@ -49,19 +48,6 @@ export default function ContractRenewalAutomation() {
         
         if (employees && employees.length > 0) {
           setEmployee(employees[0]);
-        }
-
-        // Cargar tipos de contrato desde el schema de Employee
-        const schema = await base44.entities.Employee.schema();
-        const contractTypeEnum = schema?.properties?.contract_type?.enum || [];
-        setContractTypeOptions(contractTypeEnum);
-        
-        // Inicializar con el primer tipo disponible si existe
-        if (contractTypeEnum.length > 0) {
-          setRuleData(prev => ({
-            ...prev,
-            contract_types: [contractTypeEnum[0]]
-          }));
         }
       } catch (error) {
         console.error("Error loading user:", error);
@@ -173,7 +159,7 @@ export default function ContractRenewalAutomation() {
       name: "",
       is_active: true,
       days_before_expiration: 30,
-      contract_types: contractTypeOptions.length > 0 ? [contractTypeOptions[0]] : [],
+      contract_types: ["Plazo Fijo"],
       send_notification: true,
       notification_emails: [],
       auto_create_draft: false,
@@ -544,7 +530,7 @@ export default function ContractRenewalAutomation() {
               <div>
                 <Label>Tipos de Contrato</Label>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {contractTypeOptions.map(type => (
+                  {["Plazo Fijo", "Part-Time", "Prácticas", "Obra o Servicio", "Temporal"].map(type => (
                     <Badge
                       key={type}
                       className={`cursor-pointer ${ruleData.contract_types?.includes(type) ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'}`}
