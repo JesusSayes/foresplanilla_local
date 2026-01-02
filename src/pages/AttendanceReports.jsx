@@ -181,10 +181,6 @@ export default function AttendanceReports() {
 
   const filteredRecords = generateCompleteRecords();
 
-  const displayEmployees = appliedEmployee !== "all" 
-    ? filteredEmployees.filter(e => e.id === appliedEmployee)
-    : filteredEmployees;
-
   const calculateEmployeeStats = (employeeId) => {
     const empRecords = filteredRecords.filter(r => r.employee_id === employeeId);
     const recordsWithClockIn = empRecords.filter(r => r.clock_in);
