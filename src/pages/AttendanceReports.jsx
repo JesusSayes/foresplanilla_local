@@ -140,12 +140,42 @@ export default function AttendanceReports() {
     return true;
   });
 
-  const filteredRecords = attendanceRecords.filter(record => {
-    if (appliedEmployee !== "all") {
-      return record.employee_id === appliedEmployee;
-    }
-    return filteredEmployees.some(e => e.id === record.employee_id);
-  });
+  // Generar registros completos incluyendo días sin marcación
+  const generateCompleteRecords = () => {
+    const allRecords = [];
+    const allDaysInRange = eachDayOfInterval({ start: appliedStartDate, end: appliedEndDate });
+
+    displayEmployees.forEach(emp => {
+      allDaysInRange.forEach(day => {
+        const dayStr = format(day, "yyyy-MM-dd");
+        const existingRecord = attendanceRecords.find(r => 
+          r.employee_id === emp.id && r.date === dayStr
+        );
+
+        if (existingRecord) {
+          allRecords.push(existingRecord);
+        } else if (!isWeekend(day)) {
+          // Crear registro virtual para día sin marcación
+          allRecords.push({
+            id: `virtual-${emp.id}-${dayStr}`,
+            employee_id: emp.id,
+            date: dayStr,
+            clock_in: null,
+            clock_out: null,
+            worked_hours: null,
+            is_late: false,
+            late_minutes: 0,
+            is_absent: true,
+            status: isHoliday(day) ? "Feriado" : "Sin marcación"
+          });
+        }
+      });
+    });
+
+    return allRecords;
+  };
+
+  const filteredRecords = generateCompleteRecords();
 
   const displayEmployees = appliedEmployee !== "all" 
     ? filteredEmployees.filter(e => e.id === appliedEmployee)
