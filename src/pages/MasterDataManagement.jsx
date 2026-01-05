@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Building, MapPin, Briefcase, CreditCard, Plus, Edit, Trash2, Search, DollarSign
+  Building, MapPin, Briefcase, CreditCard, Plus, Edit, Trash2, Search, DollarSign, Target
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
@@ -83,6 +83,11 @@ export default function MasterDataManagement() {
     queryFn: async () => await base44.entities.Profession.list("name"),
   });
 
+  const { data: costCenters = [] } = useQuery({
+    queryKey: ["costcenters"],
+    queryFn: async () => await base44.entities.CostCenter.list("code"),
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ entity, data }) => {
       return await base44.entities[entity].create(data);
@@ -147,6 +152,7 @@ export default function MasterDataManagement() {
       rmv: "RMV",
       afp: "AFP",
       professions: "Profession",
+      costcenters: "CostCenter",
     };
     const entity = entityMap[activeTab];
 
@@ -213,6 +219,12 @@ export default function MasterDataManagement() {
     p.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const filteredCostCenters = costCenters.filter(c => 
+    c.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (!employee || permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -252,7 +264,7 @@ export default function MasterDataManagement() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-8 gap-6 mb-8">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
@@ -350,10 +362,24 @@ export default function MasterDataManagement() {
               <p className="text-slate-600 text-sm">Profesiones</p>
             </CardContent>
           </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-rose-100 rounded-xl">
+                  <Target className="w-6 h-6 text-rose-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">
+                {costCenters.length}
+              </div>
+              <p className="text-slate-600 text-sm">Centros Costos</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-5xl grid-cols-7">
+          <TabsList className="grid w-full max-w-6xl grid-cols-8">
             <TabsTrigger value="sites">Sedes</TabsTrigger>
             <TabsTrigger value="positions">Cargos</TabsTrigger>
             <TabsTrigger value="departments">Departamentos</TabsTrigger>
@@ -361,6 +387,7 @@ export default function MasterDataManagement() {
             <TabsTrigger value="rmv">RMV</TabsTrigger>
             <TabsTrigger value="afp">AFP</TabsTrigger>
             <TabsTrigger value="professions">Profesiones</TabsTrigger>
+            <TabsTrigger value="costcenters">Centros Costos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="sites" className="space-y-6">
@@ -927,6 +954,92 @@ export default function MasterDataManagement() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="costcenters" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Centros de Costos</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Gestión de centros de costos por categoría operacional
+                    </p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button
+                      onClick={() => handleCreate("costcenters")}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nuevo Centro de Costos
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <Input
+                      placeholder="Buscar centro de costos..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                {["Administración", "Ventas", "Transportes", "Oxapampa", "Lima - VES", "Operaciones Generales"].map(category => {
+                  const categoryCenters = filteredCostCenters.filter(c => c.category === category);
+                  if (categoryCenters.length === 0) return null;
+                  
+                  return (
+                    <div key={category} className="mb-6">
+                      <h3 className="text-lg font-bold text-slate-900 mb-3 pb-2 border-b border-slate-200">
+                        {category}
+                      </h3>
+                      <div className="space-y-2">
+                        {categoryCenters.map(cc => (
+                          <div key={cc.id} className="p-3 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Badge className="bg-rose-100 text-rose-700 font-mono">{cc.code}</Badge>
+                                <span className="font-medium text-slate-900">{cc.name}</span>
+                                {!cc.is_active && (
+                                  <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                {hasAnyPermission(["system.admin"]) && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEdit(cc, "costcenters")}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {hasAnyPermission(["system.admin"]) && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-red-600"
+                                    onClick={() => handleDelete(cc, "CostCenter")}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </TabsContent>
           </Tabs>
           </div>
 
@@ -943,7 +1056,16 @@ export default function MasterDataManagement() {
             <CardHeader className="border-b">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl font-bold">
-                  {editingItem ? "Editar" : "Nuevo"} {activeTab === "sites" ? "Sede" : activeTab === "positions" ? "Cargo" : activeTab === "departments" ? "Departamento" : activeTab === "banks" ? "Banco" : activeTab === "rmv" ? "RMV" : "AFP"}
+                  {editingItem ? "Editar" : "Nuevo"} {
+                    activeTab === "sites" ? "Sede" : 
+                    activeTab === "positions" ? "Cargo" : 
+                    activeTab === "departments" ? "Departamento" : 
+                    activeTab === "banks" ? "Banco" : 
+                    activeTab === "rmv" ? "RMV" : 
+                    activeTab === "afp" ? "AFP" : 
+                    activeTab === "professions" ? "Profesión" :
+                    activeTab === "costcenters" ? "Centro de Costos" : ""
+                  }
                 </CardTitle>
                 <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
               </div>
@@ -1268,6 +1390,54 @@ export default function MasterDataManagement() {
                         className="w-4 h-4 rounded"
                       />
                       <label htmlFor="is_active_profession" className="text-sm">Activa</label>
+                    </div>
+                  </>
+                )}
+
+                {activeTab === "costcenters" && (
+                  <>
+                    <div>
+                      <Label>Código *</Label>
+                      <Input
+                        value={formData.code || ""}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                        placeholder="Ej: 101"
+                      />
+                    </div>
+                    <div>
+                      <Label>Nombre del Centro de Costos *</Label>
+                      <Input
+                        value={formData.name || ""}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Ej: Directorio"
+                      />
+                    </div>
+                    <div>
+                      <Label>Categoría *</Label>
+                      <Select 
+                        value={formData.category || ""} 
+                        onValueChange={(val) => setFormData({ ...formData, category: val })}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Administración">Administración</SelectItem>
+                          <SelectItem value="Ventas">Ventas</SelectItem>
+                          <SelectItem value="Transportes">Transportes</SelectItem>
+                          <SelectItem value="Oxapampa">Oxapampa</SelectItem>
+                          <SelectItem value="Lima - VES">Lima - VES</SelectItem>
+                          <SelectItem value="Operaciones Generales">Operaciones Generales</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_active_costcenter"
+                        checked={formData.is_active !== false}
+                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="is_active_costcenter" className="text-sm">Activo</label>
                     </div>
                   </>
                 )}
