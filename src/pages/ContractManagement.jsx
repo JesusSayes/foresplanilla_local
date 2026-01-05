@@ -480,6 +480,15 @@ export default function ContractManagement() {
                                 #{contract.contract_number}
                               </Badge>
                             )}
+                            {contract.template_id && (() => {
+                              const tmpl = contractTemplates.find(t => t.id === contract.template_id);
+                              return tmpl ? (
+                                <Badge className="bg-slate-100 text-slate-600 border-slate-200" variant="outline">
+                                  <FileText className="w-3 h-3 mr-1" />
+                                  {tmpl.template_name}
+                                </Badge>
+                              ) : null;
+                            })()}
                           </div>
 
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
