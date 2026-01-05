@@ -16,7 +16,24 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
       const { base44 } = await import("@/api/base44Client");
       const templates = await base44.entities.ContractTemplate?.list();
       if (templates && templates.length > 0) {
-        template = templates[0];
+        // Si el contrato tiene una plantilla específica, usarla
+        if (contract.template_id) {
+          template = templates.find(t => t.id === contract.template_id);
+        }
+        // Si no, buscar una plantilla específica para el tipo de contrato
+        if (!template) {
+          template = templates.find(t => 
+            t.contract_types?.includes(contract.contract_type) && t.is_active
+          );
+        }
+        // Si no, usar la plantilla por defecto
+        if (!template) {
+          template = templates.find(t => t.is_default && t.is_active);
+        }
+        // Si no hay ninguna, usar la primera disponible
+        if (!template) {
+          template = templates[0];
+        }
       }
     } catch (error) {
       console.log("No se encontró plantilla personalizada, usando valores por defecto");
