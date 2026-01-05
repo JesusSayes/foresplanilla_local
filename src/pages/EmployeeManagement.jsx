@@ -42,6 +42,9 @@ export default function EmployeeManagement() {
   const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
   const [selectedDepartamento, setSelectedDepartamento] = useState("");
   const [selectedProvincia, setSelectedProvincia] = useState("");
+  const [deptoSearchTerm, setDeptoSearchTerm] = useState("");
+  const [provSearchTerm, setProvSearchTerm] = useState("");
+  const [distSearchTerm, setDistSearchTerm] = useState("");
 
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -1113,9 +1116,21 @@ export default function EmployeeManagement() {
                       >
                         <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
                         <SelectContent>
-                          {departamentos.map(dept => (
-                            <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                          ))}
+                          <div className="p-2 border-b sticky top-0 bg-white z-10">
+                            <Input
+                              placeholder="Buscar departamento..."
+                              value={deptoSearchTerm}
+                              onChange={(e) => setDeptoSearchTerm(e.target.value)}
+                              className="h-8"
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          {departamentos
+                            .filter(dept => dept.toLowerCase().includes(deptoSearchTerm.toLowerCase()))
+                            .map(dept => (
+                              <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1131,9 +1146,21 @@ export default function EmployeeManagement() {
                       >
                         <SelectTrigger><SelectValue placeholder="Seleccionar provincia" /></SelectTrigger>
                         <SelectContent>
-                          {provincias.map(prov => (
-                            <SelectItem key={prov} value={prov}>{prov}</SelectItem>
-                          ))}
+                          <div className="p-2 border-b sticky top-0 bg-white z-10">
+                            <Input
+                              placeholder="Buscar provincia..."
+                              value={provSearchTerm}
+                              onChange={(e) => setProvSearchTerm(e.target.value)}
+                              className="h-8"
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          {provincias
+                            .filter(prov => prov.toLowerCase().includes(provSearchTerm.toLowerCase()))
+                            .map(prov => (
+                              <SelectItem key={prov} value={prov}>{prov}</SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1146,9 +1173,21 @@ export default function EmployeeManagement() {
                       >
                         <SelectTrigger><SelectValue placeholder="Seleccionar distrito" /></SelectTrigger>
                         <SelectContent>
-                          {distritos.map(dist => (
-                            <SelectItem key={dist} value={dist}>{dist}</SelectItem>
-                          ))}
+                          <div className="p-2 border-b sticky top-0 bg-white z-10">
+                            <Input
+                              placeholder="Buscar distrito..."
+                              value={distSearchTerm}
+                              onChange={(e) => setDistSearchTerm(e.target.value)}
+                              className="h-8"
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          {distritos
+                            .filter(dist => dist.toLowerCase().includes(distSearchTerm.toLowerCase()))
+                            .map(dist => (
+                              <SelectItem key={dist} value={dist}>{dist}</SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>
