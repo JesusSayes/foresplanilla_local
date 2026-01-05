@@ -939,176 +939,187 @@ export default function EmployeeManagement() {
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <Label>Código de Empleado <span className="text-red-600">*</span></Label>
-                      <Input
-                        value={formData.employee_code}
-                        onChange={(e) => setFormData({ ...formData, employee_code: e.target.value })}
-                        className={!formData.employee_code ? "border-red-300 focus:border-red-500" : ""}
-                      />
-                      {!formData.employee_code && (
-                        <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
-                      )}
-                    </div>
-                    <div>
-                      <Label>Tipo de Documento <span className="text-red-600">*</span></Label>
-                      <Select value={formData.document_type} onValueChange={(val) => setFormData({ ...formData, document_type: val })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="DNI">DNI</SelectItem>
-                          <SelectItem value="CE">CE</SelectItem>
-                          <SelectItem value="Pasaporte">Pasaporte</SelectItem>
-                          <SelectItem value="CPP">CPP</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Número de Documento <span className="text-red-600">*</span></Label>
-                      <Input
-                        value={formData.document_number}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/\D/g, '');
-                          const maxLength = formData.document_type === 'DNI' ? 8 : 20;
-                          setFormData({ ...formData, document_number: value.slice(0, maxLength) });
-                        }}
-                        placeholder={formData.document_type === 'DNI' ? '8 dígitos' : 'Número de documento'}
-                        maxLength={formData.document_type === 'DNI' ? 8 : 20}
-                        className={!formData.document_number ? "border-red-300 focus:border-red-500" : ""}
-                      />
-                      {!formData.document_number && (
-                        <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
-                      )}
-                      {formData.document_number && formData.document_type === 'DNI' && formData.document_number.length !== 8 && (
-                        <p className="text-xs text-amber-600 mt-1">DNI debe tener 8 dígitos ({formData.document_number.length}/8)</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <Label>Nombres <span className="text-red-600">*</span></Label>
-                      <Input
-                        value={formData.first_name}
-                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                        className={!formData.first_name ? "border-red-300 focus:border-red-500" : ""}
-                      />
-                      {!formData.first_name && (
-                        <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
-                      )}
-                    </div>
-                    <div>
-                      <Label>Apellidos <span className="text-red-600">*</span></Label>
-                      <Input
-                        value={formData.last_name}
-                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                        className={!formData.last_name ? "border-red-300 focus:border-red-500" : ""}
-                      />
-                      {!formData.last_name && (
-                        <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
-                      )}
-                    </div>
-                    <div>
-                      <Label>Género</Label>
-                      <Select value={formData.gender} onValueChange={(val) => setFormData({ ...formData, gender: val })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="M">Masculino</SelectItem>
-                          <SelectItem value="F">Femenino</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    </div>
-
-                    <div>
-                    <Label>Foto del Empleado (Opcional)</Label>
-                    <div className="space-y-3">
-                      {formData.photo_url && (
-                        <div className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                          <img 
-                            src={formData.photo_url} 
-                            alt="Foto del empleado" 
-                            className="w-20 h-20 rounded-full object-cover border-2 border-indigo-200"
+                  {/* Layout con foto en la esquina superior derecha */}
+                  <div className="flex gap-4">
+                    {/* Columna izquierda con formulario */}
+                    <div className="flex-1 space-y-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <Label>Código de Empleado <span className="text-red-600">*</span></Label>
+                          <Input
+                            value={formData.employee_code}
+                            onChange={(e) => setFormData({ ...formData, employee_code: e.target.value })}
+                            className={!formData.employee_code ? "border-red-300 focus:border-red-500" : ""}
                           />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-red-600"
-                            onClick={() => setFormData({ ...formData, photo_url: "" })}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Eliminar Foto
-                          </Button>
+                          {!formData.employee_code && (
+                            <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
+                          )}
                         </div>
-                      )}
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
+                        <div>
+                          <Label>Tipo de Documento <span className="text-red-600">*</span></Label>
+                          <Select value={formData.document_type} onValueChange={(val) => setFormData({ ...formData, document_type: val })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="DNI">DNI</SelectItem>
+                              <SelectItem value="CE">CE</SelectItem>
+                              <SelectItem value="Pasaporte">Pasaporte</SelectItem>
+                              <SelectItem value="CPP">CPP</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Número de Documento <span className="text-red-600">*</span></Label>
+                          <Input
+                            value={formData.document_number}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '');
+                              const maxLength = formData.document_type === 'DNI' ? 8 : 20;
+                              setFormData({ ...formData, document_number: value.slice(0, maxLength) });
+                            }}
+                            placeholder={formData.document_type === 'DNI' ? '8 dígitos' : 'Número de documento'}
+                            maxLength={formData.document_type === 'DNI' ? 8 : 20}
+                            className={!formData.document_number ? "border-red-300 focus:border-red-500" : ""}
+                          />
+                          {!formData.document_number && (
+                            <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
+                          )}
+                          {formData.document_number && formData.document_type === 'DNI' && formData.document_number.length !== 8 && (
+                            <p className="text-xs text-amber-600 mt-1">DNI debe tener 8 dígitos ({formData.document_number.length}/8)</p>
+                          )}
+                        </div>
+                      </div>
 
-                          if (!file.type.startsWith('image/')) {
-                            toast.error("Solo se permiten archivos de imagen");
-                            return;
-                          }
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <Label>Nombres <span className="text-red-600">*</span></Label>
+                          <Input
+                            value={formData.first_name}
+                            onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                            className={!formData.first_name ? "border-red-300 focus:border-red-500" : ""}
+                          />
+                          {!formData.first_name && (
+                            <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
+                          )}
+                        </div>
+                        <div>
+                          <Label>Apellidos <span className="text-red-600">*</span></Label>
+                          <Input
+                            value={formData.last_name}
+                            onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                            className={!formData.last_name ? "border-red-300 focus:border-red-500" : ""}
+                          />
+                          {!formData.last_name && (
+                            <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
+                          )}
+                        </div>
+                        <div>
+                          <Label>Género</Label>
+                          <Select value={formData.gender} onValueChange={(val) => setFormData({ ...formData, gender: val })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="M">Masculino</SelectItem>
+                              <SelectItem value="F">Femenino</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
 
-                          setUploadingPhoto(true);
-                          try {
-                            const { file_url } = await base44.integrations.Core.UploadFile({ file });
-                            setFormData({ ...formData, photo_url: file_url });
-                            toast.success("Foto subida correctamente");
-                          } catch (error) {
-                            toast.error("Error al subir la foto");
-                            console.error(error);
-                          } finally {
-                            setUploadingPhoto(false);
-                          }
-                        }}
-                        disabled={uploadingPhoto}
-                      />
-                      {uploadingPhoto && (
-                        <p className="text-xs text-blue-600 flex items-center gap-2">
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          Subiendo foto...
-                        </p>
-                      )}
-                    </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Fecha de Nacimiento</Label>
+                          <Input
+                            type="date"
+                            value={formData.birth_date}
+                            onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <Label>Profesión</Label>
+                          <Select value={formData.profession} onValueChange={(val) => setFormData({ ...formData, profession: val })}>
+                            <SelectTrigger><SelectValue placeholder="Seleccionar profesión" /></SelectTrigger>
+                            <SelectContent>
+                              <div className="p-2 border-b sticky top-0 bg-white z-10">
+                                <Input
+                                  placeholder="Buscar profesión..."
+                                  value={professionSearchTerm}
+                                  onChange={(e) => setProfessionSearchTerm(e.target.value)}
+                                  className="h-8"
+                                  onClick={(e) => e.stopPropagation()}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                              {professions
+                                .filter(prof => prof.name.toLowerCase().includes(professionSearchTerm.toLowerCase()))
+                                .map(prof => (
+                                  <SelectItem key={prof.id} value={prof.name}>
+                                    {prof.name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Fecha de Nacimiento</Label>
-                      <Input
-                        type="date"
-                        value={formData.birth_date}
-                        onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Profesión</Label>
-                      <Select value={formData.profession} onValueChange={(val) => setFormData({ ...formData, profession: val })}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar profesión" /></SelectTrigger>
-                        <SelectContent>
-                          <div className="p-2 border-b sticky top-0 bg-white z-10">
-                            <Input
-                              placeholder="Buscar profesión..."
-                              value={professionSearchTerm}
-                              onChange={(e) => setProfessionSearchTerm(e.target.value)}
-                              className="h-8"
-                              onClick={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => e.stopPropagation()}
+                    {/* Columna derecha con foto (2cm x 2cm = aprox 75px x 75px) */}
+                    <div className="w-[75px] flex-shrink-0">
+                      <Label className="text-xs">Foto</Label>
+                      <div className="mt-2">
+                        {formData.photo_url ? (
+                          <div className="relative group">
+                            <img 
+                              src={formData.photo_url} 
+                              alt="Foto del empleado" 
+                              className="w-[75px] h-[75px] rounded-lg object-cover border-2 border-indigo-200"
                             />
+                            <Button
+                              size="icon"
+                              variant="destructive"
+                              className="absolute -top-2 -right-2 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => setFormData({ ...formData, photo_url: "" })}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
                           </div>
-                          {professions
-                            .filter(prof => prof.name.toLowerCase().includes(professionSearchTerm.toLowerCase()))
-                            .map(prof => (
-                              <SelectItem key={prof.id} value={prof.name}>
-                                {prof.name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
+                        ) : (
+                          <div className="w-[75px] h-[75px] border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50">
+                            <Users className="w-8 h-8 text-slate-400" />
+                          </div>
+                        )}
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+
+                            if (!file.type.startsWith('image/')) {
+                              toast.error("Solo se permiten archivos de imagen");
+                              return;
+                            }
+
+                            setUploadingPhoto(true);
+                            try {
+                              const { file_url } = await base44.integrations.Core.UploadFile({ file });
+                              setFormData({ ...formData, photo_url: file_url });
+                              toast.success("Foto subida");
+                            } catch (error) {
+                              toast.error("Error al subir la foto");
+                              console.error(error);
+                            } finally {
+                              setUploadingPhoto(false);
+                            }
+                          }}
+                          disabled={uploadingPhoto}
+                          className="mt-2 text-xs h-8"
+                        />
+                        {uploadingPhoto && (
+                          <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Subiendo...
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </TabsContent>
@@ -1416,8 +1427,47 @@ export default function EmployeeManagement() {
                       <Input
                         type="date"
                         value={formData.termination_date}
-                        onChange={(e) => setFormData({ ...formData, termination_date: e.target.value })}
+                        onChange={(e) => {
+                          const terminationDate = e.target.value;
+                          let newStatus = formData.status;
+                          
+                          // Si se ingresa una fecha de cese
+                          if (terminationDate) {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const termDate = new Date(terminationDate);
+                            termDate.setHours(0, 0, 0, 0);
+                            
+                            // Si la fecha de cese es hoy o anterior, cambiar a Cesado
+                            if (termDate <= today) {
+                              newStatus = "Cesado";
+                              toast.info("Estado cambiado automáticamente a Cesado");
+                            }
+                          }
+                          
+                          setFormData({ ...formData, termination_date: terminationDate, status: newStatus });
+                        }}
                       />
+                      {formData.termination_date && (() => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const termDate = new Date(formData.termination_date);
+                        termDate.setHours(0, 0, 0, 0);
+                        
+                        if (termDate > today) {
+                          return (
+                            <p className="text-xs text-amber-600 mt-1">
+                              ⏰ Fecha de cese futura - el estado se actualizará automáticamente
+                            </p>
+                          );
+                        } else if (termDate <= today && formData.status !== "Cesado") {
+                          return (
+                            <p className="text-xs text-red-600 mt-1">
+                              ⚠️ Fecha de cese pasada - estado debe ser "Cesado"
+                            </p>
+                          );
+                        }
+                      })()}
                     </div>
                     <div>
                       <Label>Estado</Label>
