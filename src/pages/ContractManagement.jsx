@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   FileText, Plus, Edit, Download, Search, Calendar,
-  CheckCircle, AlertCircle, XCircle, Users
+  CheckCircle, AlertCircle, XCircle, Users, Star
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
