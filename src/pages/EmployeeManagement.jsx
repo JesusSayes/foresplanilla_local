@@ -45,6 +45,7 @@ export default function EmployeeManagement() {
   const [deptoSearchTerm, setDeptoSearchTerm] = useState("");
   const [provSearchTerm, setProvSearchTerm] = useState("");
   const [distSearchTerm, setDistSearchTerm] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -413,11 +414,16 @@ export default function EmployeeManagement() {
   const initializeForm = (emp = null) => {
     // Buscar el último contrato vigente del empleado
     let baseSalary = emp?.base_salary || "";
+    let contractType = "Plazo Fijo"; // Default para nuevos
+    
     if (emp?.id) {
       const employeeContracts = allContracts.filter(c => c.employee_id === emp.id && c.status === "Vigente");
       if (employeeContracts.length > 0) {
         const latestContract = employeeContracts.sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
         baseSalary = latestContract.salary || baseSalary;
+        contractType = latestContract.contract_type || contractType; // Obtener del contrato vigente
+      } else if (emp.contract_type) {
+        contractType = emp.contract_type; // Si no hay contrato vigente, usar el del empleado
       }
     }
 
@@ -458,8 +464,9 @@ export default function EmployeeManagement() {
       site: emp?.site || "",
       hire_date: emp?.hire_date || "",
       termination_date: emp?.termination_date || "",
-      contract_type: emp?.contract_type || "Indeterminado",
+      contract_type: contractType,
       base_salary: baseSalary,
+      photo_url: emp?.photo_url || "",
       pension_system: emp?.pension_system || "Ninguno",
       afp_id: emp?.afp_id || "",
       afp_affiliation_date: emp?.afp_affiliation_date || "",
@@ -800,9 +807,17 @@ export default function EmployeeManagement() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4 flex-1">
-                          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
-                            {emp.first_name[0]}{emp.last_name[0]}
-                          </div>
+                          {emp.photo_url ? (
+                            <img 
+                              src={emp.photo_url} 
+                              alt={`${emp.first_name} ${emp.last_name}`}
+                              className="w-14 h-14 rounded-full object-cover border-2 border-indigo-200"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
+                              {emp.first_name[0]}{emp.last_name[0]}
+                            </div>
+                          )}
                           
                           <div className="flex-1">
                             <h4 className="font-bold text-slate-900 text-lg">
@@ -1003,9 +1018,65 @@ export default function EmployeeManagement() {
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
+                    </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                    <Label>Foto del Empleado (Opcional)</Label>
+                    <div className="space-y-3">
+                      {formData.photo_url && (
+                        <div className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                          <img 
+                            src={formData.photo_url} 
+                            alt="Foto del empleado" 
+                            className="w-20 h-20 rounded-full object-cover border-2 border-indigo-200"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600"
+                            onClick={() => setFormData({ ...formData, photo_url: "" })}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Eliminar Foto
+                          </Button>
+                        </div>
+                      )}
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+
+                          if (!file.type.startsWith('image/')) {
+                            toast.error("Solo se permiten archivos de imagen");
+                            return;
+                          }
+
+                          setUploadingPhoto(true);
+                          try {
+                            const { file_url } = await base44.integrations.Core.UploadFile({ file });
+                            setFormData({ ...formData, photo_url: file_url });
+                            toast.success("Foto subida correctamente");
+                          } catch (error) {
+                            toast.error("Error al subir la foto");
+                            console.error(error);
+                          } finally {
+                            setUploadingPhoto(false);
+                          }
+                        }}
+                        disabled={uploadingPhoto}
+                      />
+                      {uploadingPhoto && (
+                        <p className="text-xs text-blue-600 flex items-center gap-2">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Subiendo foto...
+                        </p>
+                      )}
+                    </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Fecha de Nacimiento</Label>
                       <Input
@@ -1271,6 +1342,20 @@ export default function EmployeeManagement() {
                           <SelectItem value="SNP">SNP - Servicios No Personales</SelectItem>
                         </SelectContent>
                       </Select>
+                      {editingEmployee && (() => {
+                        const vigentContract = allContracts.find(c => 
+                          c.employee_id === editingEmployee.id && c.status === "Vigente"
+                        );
+                        return vigentContract ? (
+                          <p className="text-xs text-indigo-600 mt-1">
+                            ℹ️ Contrato vigente: {vigentContract.contract_type}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-amber-600 mt-1">
+                            ⚠️ Sin contrato vigente registrado
+                          </p>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -1641,9 +1726,17 @@ export default function EmployeeManagement() {
             <CardHeader className="border-b">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl">
-                    {selectedEmployee.first_name[0]}{selectedEmployee.last_name[0]}
-                  </div>
+                  {selectedEmployee.photo_url ? (
+                    <img 
+                      src={selectedEmployee.photo_url} 
+                      alt={`${selectedEmployee.first_name} ${selectedEmployee.last_name}`}
+                      className="w-16 h-16 rounded-full object-cover border-2 border-indigo-200"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl">
+                      {selectedEmployee.first_name[0]}{selectedEmployee.last_name[0]}
+                    </div>
+                  )}
                   <div>
                     <CardTitle className="text-2xl">
                       {selectedEmployee.first_name} {selectedEmployee.last_name}
