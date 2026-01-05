@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Users, Plus, Edit, Eye, UserX, UserCheck, Search, 
-  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History, Loader2
+  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History, Loader2, Trash2
 } from "lucide-react";
 import { createPageUrl } from "../utils";
 import { format } from "date-fns";
