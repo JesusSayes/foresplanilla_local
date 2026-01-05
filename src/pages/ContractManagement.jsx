@@ -628,7 +628,20 @@ export default function ContractManagement() {
                     </div>
                     <div>
                       <Label>Tipo de Contrato *</Label>
-                      <Select value={formData.contract_type} onValueChange={(v) => setFormData({...formData, contract_type: v})}>
+                      <Select 
+                        value={formData.contract_type} 
+                        onValueChange={(v) => {
+                          // Al cambiar tipo de contrato, actualizar plantilla sugerida
+                          const typeSpecificTemplate = contractTemplates.find(t => 
+                            t.contract_types?.includes(v) && t.is_active
+                          );
+                          setFormData({
+                            ...formData, 
+                            contract_type: v,
+                            template_id: typeSpecificTemplate?.id || defaultTemplate?.id || formData.template_id
+                          });
+                        }}
+                      >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Indeterminado">Indeterminado</SelectItem>
@@ -642,6 +655,47 @@ export default function ContractManagement() {
                       </Select>
                     </div>
                   </div>
+
+                  {/* Selector de Plantilla */}
+                  {contractTemplates.length > 0 && (
+                    <div>
+                      <Label className="flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Plantilla de Contrato
+                      </Label>
+                      <Select 
+                        value={formData.template_id} 
+                        onValueChange={(v) => setFormData({...formData, template_id: v})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar plantilla" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {contractTemplates.map(template => (
+                            <SelectItem key={template.id} value={template.id}>
+                              <div className="flex items-center gap-2">
+                                {template.is_default && (
+                                  <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                                )}
+                                <span>{template.template_name}</span>
+                                {template.contract_types?.length > 0 && (
+                                  <span className="text-xs text-slate-500">
+                                    ({template.contract_types.join(", ")})
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {formData.template_id && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          {contractTemplates.find(t => t.id === formData.template_id)?.description || 
+                            "Esta plantilla se usará al generar el PDF del contrato"}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-3 gap-4">
                     <div>
