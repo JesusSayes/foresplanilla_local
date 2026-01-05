@@ -11,6 +11,8 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
 
   // Cargar plantilla si no se proporciona
   let template = templateData;
+  let customClauses = [];
+  
   if (!template) {
     try {
       const { base44 } = await import("@/api/base44Client");
@@ -34,6 +36,17 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
         if (!template) {
           template = templates[0];
         }
+      }
+
+      // Cargar cláusulas personalizadas
+      const clauses = await base44.entities.ContractClause?.list("order");
+      if (clauses && clauses.length > 0) {
+        customClauses = clauses.filter(c => 
+          c.is_active && 
+          (c.type === "obligatoria" || 
+           !c.contract_types?.length || 
+           c.contract_types.includes(contract.contract_type))
+        );
       }
     } catch (error) {
       console.log("No se encontró plantilla personalizada, usando valores por defecto");
@@ -242,6 +255,30 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     "El presente contrato podrá darse por terminado por las causas previstas en la legislación laboral vigente, especialmente las establecidas en el Decreto Supremo N° 003-97-TR.";
   addText(replaceVariables(terminationText));
   y += 3;
+
+  // Cláusulas Personalizadas
+  if (customClauses.length > 0) {
+    let clauseNumber = 11;
+    const clauseNumberMap = {
+      "general": "GENERAL",
+      "derechos": "DERECHOS",
+      "obligaciones": "OBLIGACIONES",
+      "confidencialidad": "CONFIDENCIALIDAD",
+      "terminacion": "TERMINACIÓN",
+      "otros": "OTROS"
+    };
+
+    for (const clause of customClauses) {
+      const romanNumerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
+      const numeral = clauseNumber < romanNumerals.length ? romanNumerals[clauseNumber - 1] : `${clauseNumber}`;
+      
+      addText(`${numeral}. ${clause.title.toUpperCase()}:`, 11, true);
+      addText(replaceVariables(clause.content));
+      y += 3;
+      
+      clauseNumber++;
+    }
+  }
 
   // Domicilio
   addText("XI. DOMICILIO:", 11, true);

@@ -67,6 +67,18 @@ export default function ContractTemplateConfig() {
   const [showPreview, setShowPreview] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [templateData, setTemplateData] = useState({ ...DEFAULT_TEMPLATE });
+  const [showClauseForm, setShowClauseForm] = useState(false);
+  const [editingClause, setEditingClause] = useState(null);
+  const [clauseData, setClauseData] = useState({
+    title: "",
+    content: "",
+    type: "opcional",
+    contract_types: [],
+    order: 0,
+    is_active: true,
+    category: "general",
+  });
+  const [selectedClauses, setSelectedClauses] = useState([]);
 
   const queryClient = useQueryClient();
 
@@ -104,6 +116,14 @@ export default function ContractTemplateConfig() {
     queryKey: ["contractTemplates"],
     queryFn: async () => {
       return await base44.entities.ContractTemplate.list("-created_date");
+    },
+    enabled: !!employee,
+  });
+
+  const { data: clauses = [] } = useQuery({
+    queryKey: ["contractClauses"],
+    queryFn: async () => {
+      return await base44.entities.ContractClause.list("order");
     },
     enabled: !!employee,
   });
@@ -193,6 +213,38 @@ export default function ContractTemplateConfig() {
     onSuccess: () => {
       queryClient.invalidateQueries(["contractTemplates"]);
       toast.success("Plantilla establecida como predeterminada");
+    },
+  });
+
+  const createClauseMutation = useMutation({
+    mutationFn: async (data) => {
+      return await base44.entities.ContractClause.create(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["contractClauses"]);
+      toast.success("Cláusula creada correctamente");
+      resetClauseForm();
+    },
+  });
+
+  const updateClauseMutation = useMutation({
+    mutationFn: async ({ id, data }) => {
+      return await base44.entities.ContractClause.update(id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["contractClauses"]);
+      toast.success("Cláusula actualizada correctamente");
+      resetClauseForm();
+    },
+  });
+
+  const deleteClauseMutation = useMutation({
+    mutationFn: async (id) => {
+      return await base44.entities.ContractClause.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["contractClauses"]);
+      toast.success("Cláusula eliminada correctamente");
     },
   });
 
@@ -288,6 +340,69 @@ export default function ContractTemplateConfig() {
     setTemplateData({ ...DEFAULT_TEMPLATE });
     setEditingTemplate(null);
     setShowForm(false);
+    setSelectedClauses([]);
+  };
+
+  const resetClauseForm = () => {
+    setClauseData({
+      title: "",
+      content: "",
+      type: "opcional",
+      contract_types: [],
+      order: 0,
+      is_active: true,
+      category: "general",
+    });
+    setEditingClause(null);
+    setShowClauseForm(false);
+  };
+
+  const handleCreateClause = () => {
+    setEditingClause(null);
+    setClauseData({
+      title: "",
+      content: "",
+      type: "opcional",
+      contract_types: [],
+      order: clauses.length,
+      is_active: true,
+      category: "general",
+    });
+    setShowClauseForm(true);
+  };
+
+  const handleEditClause = (clause) => {
+    setEditingClause(clause);
+    setClauseData(clause);
+    setShowClauseForm(true);
+  };
+
+  const handleDeleteClause = (clauseId) => {
+    if (confirm("¿Eliminar esta cláusula?")) {
+      deleteClauseMutation.mutate(clauseId);
+    }
+  };
+
+  const handleSubmitClause = () => {
+    if (!clauseData.title || !clauseData.content) {
+      toast.error("Completa título y contenido");
+      return;
+    }
+
+    if (editingClause) {
+      updateClauseMutation.mutate({ id: editingClause.id, data: clauseData });
+    } else {
+      createClauseMutation.mutate(clauseData);
+    }
+  };
+
+  const toggleClauseContractType = (type) => {
+    const types = clauseData.contract_types || [];
+    if (types.includes(type)) {
+      setClauseData({ ...clauseData, contract_types: types.filter(t => t !== type) });
+    } else {
+      setClauseData({ ...clauseData, contract_types: [...types, type] });
+    }
   };
 
   const toggleContractType = (type) => {
@@ -529,10 +644,11 @@ export default function ContractTemplateConfig() {
             </CardHeader>
             <CardContent className="p-6 max-h-[70vh] overflow-y-auto">
               <Tabs defaultValue="config" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger value="config">Configuración</TabsTrigger>
                   <TabsTrigger value="intro">Introducción</TabsTrigger>
                   <TabsTrigger value="clauses">Cláusulas</TabsTrigger>
+                  <TabsTrigger value="custom-clauses">Cláusulas Personalizadas</TabsTrigger>
                   <TabsTrigger value="final">Textos Finales</TabsTrigger>
                 </TabsList>
 
@@ -793,6 +909,66 @@ export default function ContractTemplateConfig() {
                   </div>
                 </TabsContent>
 
+                {/* Cláusulas Personalizadas */}
+                <TabsContent value="custom-clauses" className="space-y-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <h3 className="font-bold text-slate-900">Cláusulas Personalizadas</h3>
+                      <p className="text-sm text-slate-600">Gestiona cláusulas predefinidas para incluir en contratos</p>
+                    </div>
+                    <Button onClick={handleCreateClause} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nueva Cláusula
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {clauses.filter(c => c.is_active).map(clause => (
+                      <Card key={clause.id} className="border-slate-200">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h4 className="font-semibold text-slate-900">{clause.title}</h4>
+                                <Badge className={clause.type === "obligatoria" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}>
+                                  {clause.type}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">{clause.category}</Badge>
+                              </div>
+                              <p className="text-sm text-slate-600 mb-2">{clause.content.substring(0, 150)}...</p>
+                              {clause.contract_types?.length > 0 && (
+                                <div className="flex gap-1 flex-wrap">
+                                  {clause.contract_types.map(type => (
+                                    <Badge key={type} variant="outline" className="text-xs">{type}</Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex gap-2 ml-4">
+                              <Button size="sm" variant="outline" onClick={() => handleEditClause(clause)}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-red-600"
+                                onClick={() => handleDeleteClause(clause.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                    {clauses.filter(c => c.is_active).length === 0 && (
+                      <div className="text-center py-8 text-slate-500">
+                        No hay cláusulas personalizadas. Crea una nueva.
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
                 {/* Textos Finales */}
                 <TabsContent value="final" className="space-y-4">
                   <div>
@@ -960,6 +1136,129 @@ export default function ContractTemplateConfig() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Clause Form Modal */}
+      {showClauseForm && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-6"
+          onClick={resetClauseForm}
+        >
+          <Card 
+            className="max-w-2xl w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl font-bold">
+                  {editingClause ? "Editar Cláusula" : "Nueva Cláusula"}
+                </CardTitle>
+                <Button variant="ghost" size="icon" onClick={resetClauseForm}>✕</Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div>
+                <Label>Título de la Cláusula *</Label>
+                <Input
+                  value={clauseData.title}
+                  onChange={(e) => setClauseData({ ...clauseData, title: e.target.value })}
+                  placeholder="Ej: Confidencialidad, No Competencia"
+                />
+              </div>
+
+              <div>
+                <Label>Contenido *</Label>
+                <Textarea
+                  value={clauseData.content}
+                  onChange={(e) => setClauseData({ ...clauseData, content: e.target.value })}
+                  placeholder="Texto completo de la cláusula..."
+                  rows={6}
+                  className="font-mono text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Tipo</Label>
+                  <select
+                    value={clauseData.type}
+                    onChange={(e) => setClauseData({ ...clauseData, type: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                  >
+                    <option value="obligatoria">Obligatoria</option>
+                    <option value="opcional">Opcional</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label>Categoría</Label>
+                  <select
+                    value={clauseData.category}
+                    onChange={(e) => setClauseData({ ...clauseData, category: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                  >
+                    <option value="general">General</option>
+                    <option value="derechos">Derechos</option>
+                    <option value="obligaciones">Obligaciones</option>
+                    <option value="confidencialidad">Confidencialidad</option>
+                    <option value="terminacion">Terminación</option>
+                    <option value="otros">Otros</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <Label>Orden de Aparición</Label>
+                <Input
+                  type="number"
+                  value={clauseData.order}
+                  onChange={(e) => setClauseData({ ...clauseData, order: parseInt(e.target.value) })}
+                />
+              </div>
+
+              <div>
+                <Label>Aplicable a tipos de contrato</Label>
+                <p className="text-xs text-slate-500 mb-2">Deja vacío para todos los tipos</p>
+                <div className="flex flex-wrap gap-2">
+                  {CONTRACT_TYPES.map(type => (
+                    <Badge
+                      key={type}
+                      className={`cursor-pointer ${
+                        clauseData.contract_types?.includes(type) 
+                          ? 'bg-indigo-600 text-white' 
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                      onClick={() => toggleClauseContractType(type)}
+                    >
+                      {type}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                <Label>Cláusula Activa</Label>
+                <Switch
+                  checked={clauseData.is_active}
+                  onCheckedChange={(checked) => setClauseData({ ...clauseData, is_active: checked })}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t">
+                <Button variant="outline" className="flex-1" onClick={resetClauseForm}>
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                  onClick={handleSubmitClause}
+                  disabled={createClauseMutation.isPending || updateClauseMutation.isPending}
+                >
+                  {editingClause ? "Actualizar" : "Crear"} Cláusula
+                </Button>
               </div>
             </CardContent>
           </Card>
