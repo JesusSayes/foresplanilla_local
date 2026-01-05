@@ -193,25 +193,25 @@ export default function EmployeeManagement() {
     mutationFn: handleCreateEmployee,
     onSuccess: () => {
       queryClient.invalidateQueries(["allEmployees"]);
-      toast.success("Empleado creado correctamente");
+      toast.success("✅ Empleado creado exitosamente");
       resetForm();
     },
     onError: (error) => {
-      toast.error("Error al crear el empleado");
-      console.error(error);
+      const errorMessage = error?.message || error?.detail || "Error desconocido al crear el empleado";
+      toast.error(`❌ Error al crear empleado: ${errorMessage}`, { duration: 5000 });
+      console.error("Error detallado:", error);
     },
   });
 
   const updateEmployeeMutation = useMutation({
     mutationFn: async ({ id, data, oldData }) => {
-      console.log("🔄 Actualizando empleado ID:", id);
-      console.log("📝 Datos a actualizar:", data);
-      
       // Limpiar datos vacíos y undefined antes de enviar
       const cleanData = {};
       Object.keys(data).forEach(key => {
-        if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
-          cleanData[key] = data[key];
+        const value = data[key];
+        // Incluir null para limpiar campos, pero excluir undefined y strings vacíos
+        if (value !== undefined && value !== '') {
+          cleanData[key] = value;
         }
       });
       
@@ -284,12 +284,13 @@ export default function EmployeeManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries(["allEmployees"]);
       queryClient.invalidateQueries(["employeeChanges"]);
-      toast.success("✅ Empleado actualizado correctamente");
+      toast.success("✅ Empleado actualizado exitosamente");
       resetForm();
     },
     onError: (error) => {
-      console.error("❌ Error al actualizar empleado:", error);
-      toast.error("Error al actualizar: " + (error.message || "Error desconocido"));
+      const errorMessage = error?.message || error?.detail || "Error desconocido al actualizar el empleado";
+      toast.error(`❌ Error al actualizar empleado: ${errorMessage}`, { duration: 5000 });
+      console.error("Error detallado:", error);
     },
   });
 
@@ -465,7 +466,7 @@ export default function EmployeeManagement() {
       hire_date: emp?.hire_date || "",
       termination_date: emp?.termination_date || "",
       contract_type: contractType,
-      base_salary: baseSalary,
+      base_salary: baseSalary || null,
       photo_url: emp?.photo_url || "",
       pension_system: emp?.pension_system || "Ninguno",
       afp_id: emp?.afp_id || "",
@@ -1546,8 +1547,14 @@ export default function EmployeeManagement() {
                         <Input
                           type="number"
                           step="0.01"
-                          value={formData.base_salary}
-                          onChange={(e) => setFormData({ ...formData, base_salary: e.target.value ? parseFloat(e.target.value) : "" })}
+                          value={formData.base_salary || ""}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setFormData({ 
+                              ...formData, 
+                              base_salary: value ? parseFloat(value) : null 
+                            });
+                          }}
                           placeholder="Opcional - se actualiza desde contratos"
                         />
                         <p className="text-xs text-slate-500 mt-1">Se actualiza automáticamente al registrar contratos</p>
