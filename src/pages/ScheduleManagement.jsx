@@ -43,6 +43,8 @@ export default function ScheduleManagement() {
     sunday_end: "",
     break_duration_minutes: 60,
     tolerance_minutes: 10,
+    exempt_from_clocking: false,
+    overtime_authorized: false,
     is_active: true,
   });
 
@@ -223,6 +225,8 @@ export default function ScheduleManagement() {
       sunday_end: "",
       break_duration_minutes: 60,
       tolerance_minutes: 10,
+      exempt_from_clocking: false,
+      overtime_authorized: false,
       is_active: true,
     });
     setEmployeeSearch("");
@@ -390,6 +394,12 @@ export default function ScheduleManagement() {
                               </h4>
                               {!schedule.is_active && (
                                 <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
+                              )}
+                              {schedule.exempt_from_clocking && (
+                                <Badge className="bg-purple-100 text-purple-700">Exonerado marcación</Badge>
+                              )}
+                              {schedule.overtime_authorized && (
+                                <Badge className="bg-blue-100 text-blue-700">HE autorizadas</Badge>
                               )}
                             </div>
                             <div className="space-y-1 text-sm">
@@ -694,6 +704,46 @@ export default function ScheduleManagement() {
                       value={formData.tolerance_minutes}
                       onChange={(e) => setFormData({ ...formData, tolerance_minutes: parseInt(e.target.value) })}
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                  <h3 className="font-semibold text-slate-900 mb-2">Configuración Especial</h3>
+                  
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="exempt_from_clocking"
+                      checked={formData.exempt_from_clocking}
+                      onChange={(e) => setFormData({ ...formData, exempt_from_clocking: e.target.checked })}
+                      className="w-4 h-4 rounded mt-1"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="exempt_from_clocking" className="text-sm font-medium text-slate-900 cursor-pointer">
+                        Exonerado de marcación
+                      </label>
+                      <p className="text-xs text-slate-600 mt-1">
+                        El sistema generará automáticamente marcaciones según el horario configurado
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="overtime_authorized"
+                      checked={formData.overtime_authorized}
+                      onChange={(e) => setFormData({ ...formData, overtime_authorized: e.target.checked })}
+                      className="w-4 h-4 rounded mt-1"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="overtime_authorized" className="text-sm font-medium text-slate-900 cursor-pointer">
+                        Autorizado a realizar horas extras
+                      </label>
+                      <p className="text-xs text-slate-600 mt-1">
+                        Solo el personal autorizado tendrá contabilizadas sus horas extras
+                      </p>
+                    </div>
                   </div>
                 </div>
 

@@ -20,6 +20,7 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
 import IncidentHistory from "../components/attendance/IncidentHistory";
+import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
 
 export default function AttendanceManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -131,6 +132,38 @@ export default function AttendanceManagement() {
     },
   });
 
+  const { data: overtimeAlerts = [] } = useQuery({
+    queryKey: ["overtimeAlerts"],
+    queryFn: async () => {
+      return await base44.entities.OvertimeAlert.filter(
+        { status: "Pendiente" },
+        "-created_date"
+      );
+    },
+  });
+
+  const { data: workSchedules = [] } = useQuery({
+    queryKey: ["workSchedules"],
+    queryFn: async () => {
+      return await base44.entities.WorkSchedule.list("-created_date");
+    },
+  });
+
+  // Generar marcaciones automáticas para exonerados
+  useEffect(() => {
+    const generateExemptClockings = async () => {
+      if (!employee || employee.role !== "admin") return;
+      
+      const result = await generateAutoClockings(selectedDate);
+      if (result.success && result.recordsCreated > 0) {
+        queryClient.invalidateQueries(["todayAttendance"]);
+        toast.success(`✓ ${result.recordsCreated} marcación(es) automática(s) generada(s)`);
+      }
+    };
+    
+    generateExemptClockings();
+  }, [selectedDate, employee]);
+
   const { data: employeeIncidents = [] } = useQuery({
     queryKey: ["employeeIncidents", historyEmployeeId],
     queryFn: async () => {
@@ -241,7 +274,30 @@ export default function AttendanceManagement() {
     setShowEditModal(true);
   };
 
-  const handleSaveEdit = () => {
+  const getEmployeeSchedule = (empId) => {
+    // Buscar horario individual primero
+    let schedule = workSchedules.find(s => s.employee_id === empId && s.is_active);
+    
+    // Si no hay individual, buscar por departamento
+    if (!schedule) {
+      const emp = allEmployees.find(e => e.id === empId);
+      if (emp?.department_name) {
+        schedule = workSchedules.find(s => 
+          s.is_active && 
+          (s.departments?.includes(emp.department_name) || s.department_name === emp.department_name)
+        );
+      }
+    }
+    
+    return schedule;
+  };
+
+  const isOvertimeAuthorized = (empId) => {
+    const schedule = getEmployeeSchedule(empId);
+    return schedule?.overtime_authorized || false;
+  };
+
+  const handleSaveEdit = async () => {
     if (!editingRecord) return;
 
     const clockIn = editingRecord.clock_in;
@@ -267,6 +323,22 @@ export default function AttendanceManagement() {
       
       lateMinutes = Math.max(0, actualMinutes - scheduledMinutes);
       isLate = lateMinutes > 0;
+
+      // Verificar si hay horas extras sin autorización
+      if (workedHours > 8 && !isOvertimeAuthorized(editingRecord.employee_id)) {
+        const overtimeHours = workedHours - 8;
+        
+        // Crear alerta de horas extras no autorizadas
+        await base44.entities.OvertimeAlert.create({
+          employee_id: editingRecord.employee_id,
+          attendance_record_id: editingRecord.id,
+          alert_date: editingRecord.date,
+          overtime_hours: overtimeHours,
+          status: "Pendiente",
+        });
+
+        toast.warning(`⚠️ Alerta: ${overtimeHours.toFixed(2)}h extras sin autorización. Se ha generado una alerta para RRHH.`);
+      }
     }
 
     const updatedData = {
@@ -774,13 +846,35 @@ export default function AttendanceManagement() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card className="border-0 shadow-lg bg-red-50 border-red-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-red-100 rounded-xl shrink-0">
+                    <Clock className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-2xl font-bold text-red-900 leading-tight">
+                      {overtimeAlerts.length}
+                    </div>
+                    <p className="text-red-700 text-xs truncate">HE sin autorización</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Main Content */}
           <Tabs defaultValue="attendance" className="space-y-6">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsList className="grid w-full max-w-2xl grid-cols-3">
               <TabsTrigger value="attendance">Asistencia del Día</TabsTrigger>
               <TabsTrigger value="incidents">Justificaciones</TabsTrigger>
+              <TabsTrigger value="overtime-alerts">
+                Alertas HE
+                {overtimeAlerts.length > 0 && (
+                  <Badge className="ml-2 bg-red-600 text-white">{overtimeAlerts.length}</Badge>
+                )}
+              </TabsTrigger>
             </TabsList>
 
             {/* Attendance Tab */}
@@ -956,8 +1050,9 @@ export default function AttendanceManagement() {
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">HE 25%</p>
-                                  <p className="font-semibold text-blue-600">
+                                  <p className={`font-semibold ${isOvertimeAuthorized(emp.id) ? 'text-blue-600' : 'text-red-600'}`}>
                                     {(() => {
+                                      if (!isOvertimeAuthorized(emp.id)) return "0.00";
                                       const workedHours = emp.record?.worked_hours || 0;
                                       const overtimeHours = Math.max(0, workedHours - 8);
                                       const he25 = Math.min(overtimeHours, 2);
@@ -967,8 +1062,9 @@ export default function AttendanceManagement() {
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">HE 35%</p>
-                                  <p className="font-semibold text-purple-600">
+                                  <p className={`font-semibold ${isOvertimeAuthorized(emp.id) ? 'text-purple-600' : 'text-red-600'}`}>
                                     {(() => {
+                                      if (!isOvertimeAuthorized(emp.id)) return "0.00";
                                       const workedHours = emp.record?.worked_hours || 0;
                                       const overtimeHours = Math.max(0, workedHours - 8);
                                       const he35 = Math.max(0, overtimeHours - 2);
@@ -1030,6 +1126,140 @@ export default function AttendanceManagement() {
                       );
                     })}
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Overtime Alerts Tab */}
+            <TabsContent value="overtime-alerts" className="space-y-6">
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="border-b bg-red-50/50">
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-red-600" />
+                    Alertas de Horas Extras No Autorizadas
+                  </CardTitle>
+                  <p className="text-sm text-slate-600 mt-2">
+                    Personal que registró horas extras sin autorización previa
+                  </p>
+                </CardHeader>
+                <CardContent className="p-6">
+                  {overtimeAlerts.length === 0 ? (
+                    <div className="text-center py-12">
+                      <CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" />
+                      <p className="text-slate-600">No hay alertas de horas extras</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {overtimeAlerts.map(alert => {
+                        const emp = allEmployees.find(e => e.id === alert.employee_id);
+                        const record = todayRecords.find(r => r.id === alert.attendance_record_id);
+                        
+                        return (
+                          <div 
+                            key={alert.id}
+                            className="p-4 border-2 border-red-200 bg-red-50 rounded-lg"
+                          >
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <h4 className="font-bold text-slate-900">
+                                    {emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}
+                                  </h4>
+                                  <Badge className="bg-red-600 text-white">
+                                    {alert.overtime_hours.toFixed(2)}h extras
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-slate-600 mb-2">
+                                  {emp?.employee_code} • {emp?.position} • {emp?.department_name}
+                                </p>
+                                <p className="text-sm text-slate-700">
+                                  📅 {format(new Date(alert.alert_date), "dd MMM yyyy", { locale: es })}
+                                </p>
+                                {record && (
+                                  <p className="text-sm text-slate-600 mt-2">
+                                    Marcación: {record.clock_in} - {record.clock_out} ({record.worked_hours?.toFixed(2)}h trabajadas)
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
+                              <p className="text-sm text-yellow-900">
+                                ⚠️ Este empleado NO está autorizado para realizar horas extras. 
+                                Por favor, verifica la marcación o autoriza las horas extras desde Gestión de Horarios.
+                              </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => {
+                                  if (record) {
+                                    handleEditRecord(record);
+                                  }
+                                }}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Corregir Marcación
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                                onClick={async () => {
+                                  if (confirm("¿Autorizar estas horas extras? Esto autorizará al empleado para futuras HE.")) {
+                                    // Actualizar horario del empleado para autorizar HE
+                                    const schedule = getEmployeeSchedule(emp.id);
+                                    if (schedule) {
+                                      await base44.entities.WorkSchedule.update(schedule.id, {
+                                        overtime_authorized: true
+                                      });
+                                    } else {
+                                      toast.error("No se encontró horario asignado");
+                                      return;
+                                    }
+
+                                    // Marcar alerta como autorizada
+                                    await base44.entities.OvertimeAlert.update(alert.id, {
+                                      status: "Autorizado",
+                                      resolved_by: currentUser.email,
+                                      resolution_date: format(new Date(), "yyyy-MM-dd"),
+                                      resolution_notes: "Horas extras autorizadas retroactivamente"
+                                    });
+
+                                    queryClient.invalidateQueries(["overtimeAlerts"]);
+                                    queryClient.invalidateQueries(["workSchedules"]);
+                                    toast.success("Horas extras autorizadas");
+                                  }
+                                }}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Autorizar HE
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-slate-600"
+                                onClick={async () => {
+                                  await base44.entities.OvertimeAlert.update(alert.id, {
+                                    status: "Descartado",
+                                    resolved_by: currentUser.email,
+                                    resolution_date: format(new Date(), "yyyy-MM-dd"),
+                                  });
+                                  queryClient.invalidateQueries(["overtimeAlerts"]);
+                                  toast.success("Alerta descartada");
+                                }}
+                              >
+                                <XCircle className="w-4 h-4 mr-2" />
+                                Descartar
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

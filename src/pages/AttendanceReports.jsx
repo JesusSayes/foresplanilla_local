@@ -83,6 +83,13 @@ export default function AttendanceReports() {
     },
   });
 
+  const { data: workSchedules = [] } = useQuery({
+    queryKey: ["workSchedules"],
+    queryFn: async () => {
+      return await base44.entities.WorkSchedule.list("-created_date");
+    },
+  });
+
   const { data: attendanceRecords = [] } = useQuery({
     queryKey: ["allAttendanceRecords", appliedStartDate, appliedEndDate],
     queryFn: async () => {
@@ -149,6 +156,29 @@ export default function AttendanceReports() {
       if (v.employee_id !== employeeId || v.status !== "Aprobada") return false;
       return dateStr >= v.start_date && dateStr <= v.end_date;
     });
+  };
+
+  const getEmployeeSchedule = (empId) => {
+    // Buscar horario individual primero
+    let schedule = workSchedules.find(s => s.employee_id === empId && s.is_active);
+    
+    // Si no hay individual, buscar por departamento
+    if (!schedule) {
+      const emp = allEmployees.find(e => e.id === empId);
+      if (emp?.department_name) {
+        schedule = workSchedules.find(s => 
+          s.is_active && 
+          (s.departments?.includes(emp.department_name) || s.department_name === emp.department_name)
+        );
+      }
+    }
+    
+    return schedule;
+  };
+
+  const isOvertimeAuthorized = (empId) => {
+    const schedule = getEmployeeSchedule(empId);
+    return schedule?.overtime_authorized || false;
   };
 
   // Calcular feriados en el rango de fechas aplicado
@@ -239,11 +269,12 @@ export default function AttendanceReports() {
     const totalLateMinutes = recordsWithClockIn.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
     const holidaysInPeriod = empRecords.filter(r => isHoliday(new Date(r.date))).length;
     
-    // Calcular horas extras (más de 8 horas por día)
-    const overtimeHours = recordsWithClockIn.reduce((sum, r) => {
+    // Calcular horas extras SOLO si está autorizado
+    const authorized = isOvertimeAuthorized(employeeId);
+    const overtimeHours = authorized ? recordsWithClockIn.reduce((sum, r) => {
       const hours = r.worked_hours || 0;
       return sum + Math.max(0, hours - 8);
-    }, 0);
+    }, 0) : 0;
 
     // Calcular días laborables esperados (excluyendo fines de semana, feriados, y vacaciones/permisos aprobados)
     const allDaysInRange = eachDayOfInterval({ start: appliedStartDate, end: appliedEndDate });
