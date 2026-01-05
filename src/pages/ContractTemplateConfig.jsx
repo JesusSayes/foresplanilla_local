@@ -140,7 +140,25 @@ export default function ContractTemplateConfig() {
       }
       return await base44.entities.ContractTemplate.update(id, data);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Actualizar todas las plantillas existentes con los nuevos datos de empresa
+      if (companyInfo) {
+        const updatedCompanyData = {
+          company_name: companyInfo.company_name || "",
+          company_ruc: companyInfo.ruc || "",
+          company_address: companyInfo.address || "",
+          company_representative: companyInfo.legal_representative || "",
+          company_representative_doc: companyInfo.legal_representative_dni 
+            ? `DNI ${companyInfo.legal_representative_dni}` : "",
+        };
+        
+        // Actualizar todas las plantillas en paralelo
+        const updatePromises = templates.map(t => 
+          base44.entities.ContractTemplate.update(t.id, updatedCompanyData)
+        );
+        await Promise.all(updatePromises);
+      }
+      
       queryClient.invalidateQueries(["contractTemplates"]);
       toast.success("Plantilla actualizada correctamente");
       resetForm();
@@ -177,6 +195,25 @@ export default function ContractTemplateConfig() {
       toast.success("Plantilla establecida como predeterminada");
     },
   });
+
+  // Sincronizar con CompanyInfo automáticamente
+  useEffect(() => {
+    if (companyInfo && (showForm || templates.length > 0)) {
+      const updatedData = {
+        company_name: companyInfo.company_name || "",
+        company_ruc: companyInfo.ruc || "",
+        company_address: companyInfo.address || "",
+        company_representative: companyInfo.legal_representative || "",
+        company_representative_doc: companyInfo.legal_representative_dni 
+          ? `DNI ${companyInfo.legal_representative_dni}` : "",
+      };
+      
+      setTemplateData(prev => ({
+        ...prev,
+        ...updatedData
+      }));
+    }
+  }, [companyInfo, showForm]);
 
   const handleCreate = () => {
     setEditingTemplate(null);
@@ -229,10 +266,21 @@ export default function ContractTemplateConfig() {
       return;
     }
 
+    // Asegurar que siempre tenga los datos más recientes de la empresa
+    const dataToSave = { ...templateData };
+    if (companyInfo) {
+      dataToSave.company_name = companyInfo.company_name || "";
+      dataToSave.company_ruc = companyInfo.ruc || "";
+      dataToSave.company_address = companyInfo.address || "";
+      dataToSave.company_representative = companyInfo.legal_representative || "";
+      dataToSave.company_representative_doc = companyInfo.legal_representative_dni 
+        ? `DNI ${companyInfo.legal_representative_dni}` : "";
+    }
+
     if (editingTemplate) {
-      updateMutation.mutate({ id: editingTemplate.id, data: templateData });
+      updateMutation.mutate({ id: editingTemplate.id, data: dataToSave });
     } else {
-      createMutation.mutate(templateData);
+      createMutation.mutate(dataToSave);
     }
   };
 
@@ -579,8 +627,9 @@ export default function ContractTemplateConfig() {
                         <Label>Razón Social</Label>
                         <Input
                           value={templateData.company_name}
-                          onChange={(e) => setTemplateData({ ...templateData, company_name: e.target.value })}
-                          placeholder="Nombre de la empresa"
+                          disabled
+                          className="bg-slate-50 cursor-not-allowed"
+                          placeholder="Configurar en Información Empresa"
                         />
                       </div>
 
@@ -589,16 +638,18 @@ export default function ContractTemplateConfig() {
                           <Label>RUC</Label>
                           <Input
                             value={templateData.company_ruc}
-                            onChange={(e) => setTemplateData({ ...templateData, company_ruc: e.target.value })}
-                            placeholder="20XXXXXXXXX"
+                            disabled
+                            className="bg-slate-50 cursor-not-allowed"
+                            placeholder="Configurar en Información Empresa"
                           />
                         </div>
                         <div>
                           <Label>Dirección</Label>
                           <Input
                             value={templateData.company_address}
-                            onChange={(e) => setTemplateData({ ...templateData, company_address: e.target.value })}
-                            placeholder="Dirección de la empresa"
+                            disabled
+                            className="bg-slate-50 cursor-not-allowed"
+                            placeholder="Configurar en Información Empresa"
                           />
                         </div>
                       </div>
@@ -608,16 +659,18 @@ export default function ContractTemplateConfig() {
                           <Label>Representante Legal</Label>
                           <Input
                             value={templateData.company_representative}
-                            onChange={(e) => setTemplateData({ ...templateData, company_representative: e.target.value })}
-                            placeholder="Nombre del representante"
+                            disabled
+                            className="bg-slate-50 cursor-not-allowed"
+                            placeholder="Configurar en Información Empresa"
                           />
                         </div>
                         <div>
                           <Label>Documento del Representante</Label>
                           <Input
                             value={templateData.company_representative_doc}
-                            onChange={(e) => setTemplateData({ ...templateData, company_representative_doc: e.target.value })}
-                            placeholder="DNI XXXXXXXX"
+                            disabled
+                            className="bg-slate-50 cursor-not-allowed"
+                            placeholder="Configurar en Información Empresa"
                           />
                         </div>
                       </div>

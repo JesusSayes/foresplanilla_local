@@ -40,14 +40,34 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     }
   }
 
-  // Datos de la empresa
+  // IMPORTANTE: Cargar datos ACTUALES de la empresa desde CompanyInfo
+  let freshCompanyData = companyData;
+  if (!companyData || Object.keys(companyData).length === 0) {
+    try {
+      const { base44 } = await import("@/api/base44Client");
+      const companyInfoList = await base44.entities.CompanyInfo?.list("-created_date");
+      if (companyInfoList && companyInfoList.length > 0) {
+        const info = companyInfoList[0];
+        freshCompanyData = {
+          name: info.company_name || "EMPRESA EJEMPLO S.A.C.",
+          ruc: info.ruc || "20123456789",
+          address: info.address || "Av. Principal 123, Lima, Perú",
+          representative: info.legal_representative || "Juan Pérez García",
+          representativeDoc: info.legal_representative_dni ? `DNI ${info.legal_representative_dni}` : "DNI 12345678",
+        };
+      }
+    } catch (error) {
+      console.log("No se encontró información de empresa, usando valores por defecto");
+    }
+  }
+
+  // Datos de la empresa (PRIORIDAD: CompanyInfo > template > defaults)
   const company = {
-    name: template?.company_name || companyData.name || "EMPRESA EJEMPLO S.A.C.",
-    ruc: template?.company_ruc || companyData.ruc || "20123456789",
-    address: template?.company_address || companyData.address || "Av. Principal 123, Lima, Perú",
-    representative: template?.company_representative || companyData.representative || "Juan Pérez García",
-    representativeDoc: template?.company_representative_doc || companyData.representativeDoc || "DNI 12345678",
-    ...companyData
+    name: freshCompanyData.name || "EMPRESA EJEMPLO S.A.C.",
+    ruc: freshCompanyData.ruc || "20123456789",
+    address: freshCompanyData.address || "Av. Principal 123, Lima, Perú",
+    representative: freshCompanyData.representative || "Juan Pérez García",
+    representativeDoc: freshCompanyData.representativeDoc || "DNI 12345678",
   };
 
   // Variables dinámicas para reemplazo
