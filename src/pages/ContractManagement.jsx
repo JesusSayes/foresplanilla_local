@@ -167,10 +167,25 @@ export default function ContractManagement() {
       return `${year}-${month}-${day}`;
     };
 
+    // Determinar la plantilla a usar
+    const contractType = contract?.contract_type || "Indeterminado";
+    let selectedTemplateId = contract?.template_id || "";
+    
+    // Si no tiene plantilla asignada, buscar la más adecuada
+    if (!selectedTemplateId && contractTemplates.length > 0) {
+      // Buscar plantilla específica para el tipo de contrato
+      const typeSpecificTemplate = contractTemplates.find(t => 
+        t.contract_types?.includes(contractType)
+      );
+      // Si no hay específica, usar la default
+      selectedTemplateId = typeSpecificTemplate?.id || defaultTemplate?.id || "";
+    }
+
     setFormData({
       employee_id: contract?.employee_id || emp?.id || "",
       contract_number: contract?.contract_number || "",
-      contract_type: contract?.contract_type || "Indeterminado",
+      contract_type: contractType,
+      template_id: selectedTemplateId,
       start_date: normalizeDate(contract?.start_date),
       end_date: normalizeDate(contract?.end_date),
       position: contract?.position || emp?.position || "",
