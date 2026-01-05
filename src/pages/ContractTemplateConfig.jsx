@@ -619,11 +619,9 @@ export default function ContractTemplateConfig() {
       {showForm && (
         <div 
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
-          onClick={resetForm}
         >
           <Card 
             className="max-w-5xl w-full my-8"
-            onClick={(e) => e.stopPropagation()}
           >
             <CardHeader className="border-b sticky top-0 bg-white z-10">
               <div className="flex items-center justify-between">
