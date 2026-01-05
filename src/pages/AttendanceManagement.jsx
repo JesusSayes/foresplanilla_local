@@ -42,6 +42,9 @@ export default function AttendanceManagement() {
     incident_type: "Olvido de Marcación",
     justification: "",
     supporting_document_url: "",
+    justified_time_start: "09:00",
+    justified_time_end: "18:00",
+    full_day_justification: true,
   });
   const [uploadingFile, setUploadingFile] = useState(false);
 
@@ -187,6 +190,9 @@ export default function AttendanceManagement() {
         incident_type: "Olvido de Marcación",
         justification: "",
         supporting_document_url: "",
+        justified_time_start: "09:00",
+        justified_time_end: "18:00",
+        full_day_justification: true,
       });
     },
     onError: (error) => {
@@ -277,7 +283,25 @@ export default function AttendanceManagement() {
     updateRecordMutation.mutate({ id: editingRecord.id, data: updatedData });
   };
 
-  const handleApproveIncident = (incident) => {
+  const handleApproveIncident = async (incident) => {
+    // Actualizar el registro de asistencia con los ajustes
+    const attendanceRecord = todayRecords.find(r => 
+      r.employee_id === incident.employee_id && 
+      r.date === incident.incident_date
+    );
+
+    if (attendanceRecord && incident.hours_to_adjust > 0) {
+      const adjustedWorkedHours = (attendanceRecord.worked_hours || 0) + incident.hours_to_adjust;
+      const adjustedLateMinutes = Math.max(0, (attendanceRecord.late_minutes || 0) - incident.late_minutes_to_adjust);
+
+      await base44.entities.AttendanceRecord.update(attendanceRecord.id, {
+        worked_hours: Math.min(adjustedWorkedHours, 8), // Máximo 8 horas regulares
+        late_minutes: adjustedLateMinutes,
+        is_late: adjustedLateMinutes > 0,
+        status: adjustedLateMinutes === 0 && adjustedWorkedHours >= 8 ? "Completo" : "Incompleto",
+      });
+    }
+
     reviewIncidentMutation.mutate({
       id: incident.id,
       data: {
@@ -310,13 +334,20 @@ export default function AttendanceManagement() {
     
     // Determinar el tipo de incidente basado en el estado del registro
     let incidentType = "Olvido de Marcación";
+    let startTime = record?.scheduled_start || "09:00";
+    let endTime = record?.scheduled_end || "18:00";
+    
     if (record) {
       if (record.is_absent) {
         incidentType = "Falta";
       } else if (record.is_late) {
         incidentType = "Tardanza";
+        startTime = record.scheduled_start || "09:00";
+        endTime = record.clock_in || startTime;
       } else if (record.clock_in && !record.clock_out) {
         incidentType = "Olvido de Marcación";
+        startTime = record.clock_in;
+        endTime = record.scheduled_end || "18:00";
       }
     }
     
@@ -324,6 +355,9 @@ export default function AttendanceManagement() {
       incident_type: incidentType,
       justification: "",
       supporting_document_url: "",
+      justified_time_start: startTime,
+      justified_time_end: endTime,
+      full_day_justification: incidentType === "Falta",
     });
     setShowJustifyModal(true);
   };
@@ -351,12 +385,51 @@ export default function AttendanceManagement() {
       return;
     }
 
+    // Calcular las horas y minutos a ajustar
+    let hoursToAdjust = 0;
+    let lateMinutesToAdjust = 0;
+
+    if (justificationData.full_day_justification) {
+      hoursToAdjust = 8; // Día completo = 8 horas
+      lateMinutesToAdjust = 0;
+    } else if (justificationData.justified_time_start && justificationData.justified_time_end) {
+      const [startHour, startMin] = justificationData.justified_time_start.split(":").map(Number);
+      const [endHour, endMin] = justificationData.justified_time_end.split(":").map(Number);
+      
+      const startMinutes = startHour * 60 + startMin;
+      const endMinutes = endHour * 60 + endMin;
+      const totalMinutes = endMinutes - startMinutes;
+      
+      // Calcular horas (máximo 8 horas regulares, sin extras)
+      hoursToAdjust = Math.min(totalMinutes / 60, 8);
+      
+      // Si es tardanza, calcular minutos de tardanza a ajustar
+      if (justificationData.incident_type === "Tardanza") {
+        const record = todayRecords.find(r => r.employee_id === justifyingEmployee.id);
+        if (record && record.clock_in) {
+          const scheduledStart = record.scheduled_start || "09:00";
+          const [schedHour, schedMin] = scheduledStart.split(":").map(Number);
+          const scheduledMinutes = schedHour * 60 + schedMin;
+          
+          // Si el tiempo justificado cubre la tardanza
+          if (startMinutes <= scheduledMinutes && endMinutes >= startMinutes) {
+            lateMinutesToAdjust = record.late_minutes || 0;
+          }
+        }
+      }
+    }
+
     createJustificationMutation.mutate({
       employee_id: justifyingEmployee.id,
       incident_date: format(selectedDate, "yyyy-MM-dd"),
       incident_type: justificationData.incident_type,
       justification: justificationData.justification,
       supporting_document_url: justificationData.supporting_document_url,
+      justified_time_start: justificationData.justified_time_start,
+      justified_time_end: justificationData.justified_time_end,
+      full_day_justification: justificationData.full_day_justification,
+      hours_to_adjust: hoursToAdjust,
+      late_minutes_to_adjust: lateMinutesToAdjust,
       status: "Pendiente",
     });
   };
@@ -1209,6 +1282,19 @@ export default function AttendanceManagement() {
                     <p className="text-sm text-slate-600 mb-2">
                       <strong>Fecha:</strong> {format(new Date(reviewingIncident.incident_date), "dd 'de' MMMM, yyyy", { locale: es })}
                     </p>
+                    {reviewingIncident.full_day_justification ? (
+                      <p className="text-sm text-slate-600 mb-2">
+                        <strong>Período:</strong> <Badge className="bg-blue-100 text-blue-700">Día completo (8 horas)</Badge>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-slate-600 mb-2">
+                        <strong>Período:</strong> {reviewingIncident.justified_time_start} - {reviewingIncident.justified_time_end}
+                      </p>
+                    )}
+                    <p className="text-sm text-slate-600 mb-2">
+                      <strong>Ajuste:</strong> +{reviewingIncident.hours_to_adjust?.toFixed(2) || 0}h trabajadas
+                      {reviewingIncident.late_minutes_to_adjust > 0 && `, -{reviewingIncident.late_minutes_to_adjust} min tardanza`}
+                    </p>
                     <p className="text-sm text-slate-700">
                       <strong>Justificación:</strong><br />
                       {reviewingIncident.justification}
@@ -1341,6 +1427,62 @@ export default function AttendanceManagement() {
                       <SelectItem value="Olvido de Marcación">Olvido de Marcación</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Período a Justificar
+                  </label>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                      <input
+                        type="checkbox"
+                        checked={justificationData.full_day_justification}
+                        onChange={(e) => setJustificationData({ 
+                          ...justificationData, 
+                          full_day_justification: e.target.checked,
+                          justified_time_start: e.target.checked ? "09:00" : justificationData.justified_time_start,
+                          justified_time_end: e.target.checked ? "18:00" : justificationData.justified_time_end,
+                        })}
+                        className="w-4 h-4 text-indigo-600"
+                      />
+                      <label className="text-sm font-medium text-slate-900">
+                        Justificar día completo (8 horas)
+                      </label>
+                    </div>
+
+                    {!justificationData.full_day_justification && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">
+                            Hora de Inicio
+                          </label>
+                          <Input
+                            type="time"
+                            value={justificationData.justified_time_start}
+                            onChange={(e) => setJustificationData({ ...justificationData, justified_time_start: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">
+                            Hora de Fin
+                          </label>
+                          <Input
+                            type="time"
+                            value={justificationData.justified_time_end}
+                            onChange={(e) => setJustificationData({ ...justificationData, justified_time_end: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-xs text-blue-900">
+                        <strong>Nota:</strong> Las horas extras NO se ajustan con justificaciones. 
+                        Solo se ajustan las horas regulares (máximo 8h) y las tardanzas.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
