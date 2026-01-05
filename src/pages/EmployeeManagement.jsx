@@ -512,13 +512,8 @@ export default function EmployeeManagement() {
   };
 
   const handleSubmit = () => {
-    console.log("🔘 handleSubmit llamado");
-    console.log("Editando:", editingEmployee ? "Sí" : "No");
-    console.log("Datos del formulario:", formData);
-    
     // Si está editando, permitir actualización parcial
     if (editingEmployee) {
-      console.log("✏️ Actualizando empleado existente");
       updateEmployeeMutation.mutate({ 
         id: editingEmployee.id, 
         data: formData,
@@ -537,14 +532,7 @@ export default function EmployeeManagement() {
     
     if (missingFields.length > 0) {
       toast.error(
-        <div>
-          <p className="font-bold">Campos obligatorios faltantes:</p>
-          <ul className="mt-1 ml-4 list-disc">
-            {missingFields.map((field, idx) => (
-              <li key={idx}>{field}</li>
-            ))}
-          </ul>
-        </div>,
+        `❌ Campos obligatorios faltantes: ${missingFields.join(", ")}`,
         { duration: 5000 }
       );
       return;
@@ -552,7 +540,7 @@ export default function EmployeeManagement() {
 
     // Validaciones adicionales solo al crear
     if (formData.document_type === 'DNI' && formData.document_number.length !== 8) {
-      toast.error("El DNI debe tener exactamente 8 dígitos");
+      toast.error("❌ El DNI debe tener exactamente 8 dígitos");
       return;
     }
 
@@ -1061,8 +1049,8 @@ export default function EmployeeManagement() {
                       </div>
                     </div>
 
-                    {/* Columna derecha con foto (2cm x 2cm = aprox 75px x 75px) */}
-                    <div className="w-[75px] flex-shrink-0">
+                    {/* Columna derecha con foto (4cm x 4cm = aprox 150px x 150px) */}
+                    <div className="w-[150px] flex-shrink-0">
                       <Label className="text-xs">Foto</Label>
                       <div className="mt-2">
                         {formData.photo_url ? (
@@ -1070,7 +1058,7 @@ export default function EmployeeManagement() {
                             <img 
                               src={formData.photo_url} 
                               alt="Foto del empleado" 
-                              className="w-[75px] h-[75px] rounded-lg object-cover border-2 border-indigo-200"
+                              className="w-[150px] h-[150px] rounded-lg object-cover border-2 border-indigo-200"
                             />
                             <Button
                               size="icon"
@@ -1082,8 +1070,8 @@ export default function EmployeeManagement() {
                             </Button>
                           </div>
                         ) : (
-                          <div className="w-[75px] h-[75px] border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50">
-                            <Users className="w-8 h-8 text-slate-400" />
+                          <div className="w-[150px] h-[150px] border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50">
+                            <Users className="w-12 h-12 text-slate-400" />
                           </div>
                         )}
                         <Input
@@ -1557,11 +1545,12 @@ export default function EmployeeManagement() {
                         <Label>Salario Base</Label>
                         <Input
                           type="number"
+                          step="0.01"
                           value={formData.base_salary}
-                          readOnly
-                          className="bg-slate-100 cursor-not-allowed"
+                          onChange={(e) => setFormData({ ...formData, base_salary: e.target.value ? parseFloat(e.target.value) : "" })}
+                          placeholder="Opcional - se actualiza desde contratos"
                         />
-                        <p className="text-xs text-slate-500 mt-1">Se obtiene del último contrato vigente</p>
+                        <p className="text-xs text-slate-500 mt-1">Se actualiza automáticamente al registrar contratos</p>
                       </div>
                     </div>
                   </div>
