@@ -259,9 +259,25 @@ export default function ContractManagement() {
     }
 
     try {
-      // Recargar plantilla y datos de empresa antes de generar PDF
+      // Recargar plantillas y datos de empresa antes de generar PDF
       const templates = await base44.entities.ContractTemplate.list("-created_date");
-      const template = templates.length > 0 ? templates[0] : null;
+      
+      // Buscar la plantilla específica del contrato o usar la default
+      let template = null;
+      if (contract.template_id) {
+        template = templates.find(t => t.id === contract.template_id);
+      }
+      if (!template) {
+        // Buscar plantilla específica para el tipo de contrato
+        template = templates.find(t => t.contract_types?.includes(contract.contract_type) && t.is_active);
+      }
+      if (!template) {
+        // Usar la plantilla por defecto
+        template = templates.find(t => t.is_default && t.is_active);
+      }
+      if (!template && templates.length > 0) {
+        template = templates[0];
+      }
       
       const companyData = companyInfo || {};
       
