@@ -93,14 +93,17 @@ export default function ContractManagement() {
     },
   });
 
-  const { data: contractTemplate } = useQuery({
-    queryKey: ["contractTemplate"],
+  const { data: contractTemplates = [] } = useQuery({
+    queryKey: ["contractTemplates"],
     queryFn: async () => {
       const templates = await base44.entities.ContractTemplate.list("-created_date");
-      return templates.length > 0 ? templates[0] : null;
+      return templates.filter(t => t.is_active);
     },
     enabled: !!employee,
   });
+
+  // Obtener la plantilla por defecto
+  const defaultTemplate = contractTemplates.find(t => t.is_default) || contractTemplates[0] || null;
 
   const { data: companyInfo } = useQuery({
     queryKey: ["companyInfo"],
