@@ -215,6 +215,19 @@ export default function EmployeeManagement() {
         }
       });
       
+      // Validar fecha de cese y actualizar estado automáticamente
+      if (cleanData.termination_date) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const termDate = new Date(cleanData.termination_date);
+        termDate.setHours(0, 0, 0, 0);
+        
+        // Si la fecha de cese es hoy o anterior, cambiar automáticamente a Cesado
+        if (termDate <= today) {
+          cleanData.status = "Cesado";
+        }
+      }
+      
       console.log("✅ Datos limpios a enviar:", cleanData);
       
       const updatedEmployee = await base44.entities.Employee.update(id, cleanData);
