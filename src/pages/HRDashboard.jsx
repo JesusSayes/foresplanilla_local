@@ -15,6 +15,7 @@ import { es } from "date-fns/locale";
 import { createPageUrl } from "../utils";
 import { Link } from "react-router-dom";
 import PermissionGuard from "../components/PermissionGuard";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function HRDashboard() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -32,6 +33,15 @@ export default function HRDashboard() {
         
         if (employees && employees.length > 0) {
           setEmployee(employees[0]);
+          
+          // Ejecutar actualización automática de estados de empleados (solo para admin)
+          if (employees[0].role === "admin" || employees[0].role === "super_admin") {
+            updateEmployeeStatuses().then(result => {
+              if (result.success && result.updatedCount > 0) {
+                console.log(`✅ ${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
+              }
+            });
+          }
         }
       } catch (error) {
         console.error("Error loading user:", error);
