@@ -75,7 +75,8 @@ export default function AttendanceManagement() {
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      const allEmps = await base44.entities.Employee.list("-created_date");
+      return allEmps;
     },
   });
 
@@ -122,15 +123,16 @@ export default function AttendanceManagement() {
   const todayIsHoliday = isHoliday(selectedDate);
   const holidayInfo = holidays.find(h => h.date === format(selectedDate, "yyyy-MM-dd"));
 
-  const { data: pendingIncidents = [] } = useQuery({
-    queryKey: ["pendingIncidents"],
+  const { data: allIncidents = [] } = useQuery({
+    queryKey: ["allIncidents"],
     queryFn: async () => {
-      return await base44.entities.AttendanceIncident.filter(
-        { status: "Pendiente" },
-        "-created_date"
-      );
+      return await base44.entities.AttendanceIncident.list("-created_date", 500);
     },
   });
+
+  const pendingIncidents = allIncidents.filter(i => i.status === "Pendiente");
+  const approvedIncidents = allIncidents.filter(i => i.status === "Aprobada");
+  const rejectedIncidents = allIncidents.filter(i => i.status === "Rechazada");
 
   const { data: overtimeAlerts = [] } = useQuery({
     queryKey: ["overtimeAlerts"],
@@ -197,7 +199,7 @@ export default function AttendanceManagement() {
       return await base44.entities.AttendanceIncident.update(id, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["pendingIncidents"]);
+      queryClient.invalidateQueries(["allIncidents"]);
       toast.success("Justificación revisada correctamente");
       setShowIncidentModal(false);
       setReviewingIncident(null);
@@ -214,7 +216,7 @@ export default function AttendanceManagement() {
       return await base44.entities.AttendanceIncident.create(data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["pendingIncidents"]);
+      queryClient.invalidateQueries(["allIncidents"]);
       queryClient.invalidateQueries(["todayAttendance"]);
       toast.success("Justificación creada correctamente");
       setShowJustifyModal(false);
@@ -514,6 +516,20 @@ export default function AttendanceManagement() {
                           emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDept = selectedDepartment === "all" || emp.department_name === selectedDepartment;
     const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
+    
+    // Para empleados cesados, solo mostrar si tienen asistencias pasadas
+    if (emp.status === "Cesado") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selected = new Date(selectedDate);
+      selected.setHours(0, 0, 0, 0);
+      
+      // Solo mostrar cesados si la fecha seleccionada es anterior a hoy
+      if (selected >= today) {
+        return false;
+      }
+    }
+    
     return matchesSearch && matchesDept && matchesSite;
   });
 
@@ -1266,99 +1282,278 @@ export default function AttendanceManagement() {
 
             {/* Incidents Tab */}
             <TabsContent value="incidents" className="space-y-6">
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="border-b bg-slate-50/50">
-                  <CardTitle className="text-xl font-bold">
-                    Justificaciones Pendientes de Aprobación
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  {pendingIncidents.length === 0 ? (
-                    <div className="text-center py-12">
-                      <CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" />
-                      <p className="text-slate-600">No hay justificaciones pendientes</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {pendingIncidents.map(incident => {
-                        const emp = allEmployees.find(e => e.id === incident.employee_id);
-                        return (
-                          <div 
-                            key={incident.id}
-                            className="p-4 border border-slate-200 rounded-lg"
-                          >
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex-1">
-                                <h4 className="font-bold text-slate-900 mb-1">
-                                  {emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}
-                                </h4>
-                                <p className="text-sm text-slate-600 mb-2">
-                                  {emp?.employee_code} • {emp?.position}
-                                </p>
-                                <div className="flex gap-4 text-sm">
-                                  <Badge className="bg-orange-100 text-orange-700">
-                                    {incident.incident_type}
-                                  </Badge>
-                                  <span className="text-slate-600">
-                                    📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}
-                                  </span>
+              <Tabs defaultValue="pending">
+                <TabsList className="grid w-full max-w-xl grid-cols-3 mb-6">
+                  <TabsTrigger value="pending">
+                    Pendientes
+                    {pendingIncidents.length > 0 && (
+                      <Badge className="ml-2 bg-orange-600 text-white">{pendingIncidents.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="approved">
+                    Aprobadas
+                    {approvedIncidents.length > 0 && (
+                      <Badge className="ml-2 bg-green-600 text-white">{approvedIncidents.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="rejected">
+                    Rechazadas
+                    {rejectedIncidents.length > 0 && (
+                      <Badge className="ml-2 bg-red-600 text-white">{rejectedIncidents.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="pending">
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-slate-50/50">
+                      <CardTitle className="text-xl font-bold">
+                        Justificaciones Pendientes de Aprobación
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      {pendingIncidents.length === 0 ? (
+                        <div className="text-center py-12">
+                          <CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" />
+                          <p className="text-slate-600">No hay justificaciones pendientes</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {pendingIncidents.map(incident => {
+                            const emp = allEmployees.find(e => e.id === incident.employee_id);
+                            return (
+                              <div 
+                                key={incident.id}
+                                className="p-4 border border-slate-200 rounded-lg"
+                              >
+                                <div className="flex items-start justify-between mb-4">
+                                  <div className="flex-1">
+                                    <h4 className="font-bold text-slate-900 mb-1">
+                                      {emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}
+                                    </h4>
+                                    <p className="text-sm text-slate-600 mb-2">
+                                      {emp?.employee_code} • {emp?.position}
+                                    </p>
+                                    <div className="flex gap-4 text-sm">
+                                      <Badge className="bg-orange-100 text-orange-700">
+                                        {incident.incident_type}
+                                      </Badge>
+                                      <span className="text-slate-600">
+                                        📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="p-3 bg-slate-50 rounded-lg mb-4">
+                                  <p className="text-sm font-semibold text-slate-900 mb-1">
+                                    Justificación:
+                                  </p>
+                                  <p className="text-sm text-slate-700">
+                                    {incident.justification}
+                                  </p>
+                                </div>
+
+                                {incident.supporting_document_url && (
+                                  <div className="mb-4">
+                                    <a
+                                      href={incident.supporting_document_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:underline bg-indigo-50 px-3 py-2 rounded-lg"
+                                    >
+                                      <Download className="w-4 h-4" />
+                                      Ver documento adjunto
+                                    </a>
+                                  </div>
+                                )}
+
+                                <div className="flex gap-3">
+                                  <Button
+                                    className="flex-1 bg-green-600 hover:bg-green-700"
+                                    onClick={() => {
+                                      setReviewingIncident(incident);
+                                      setShowIncidentModal(true);
+                                    }}
+                                  >
+                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                    Aprobar
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                                    onClick={() => {
+                                      setReviewingIncident(incident);
+                                      setShowIncidentModal(true);
+                                    }}
+                                  >
+                                    <XCircle className="w-4 h-4 mr-2" />
+                                    Rechazar
+                                  </Button>
                                 </div>
                               </div>
-                            </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
 
-                            <div className="p-3 bg-slate-50 rounded-lg mb-4">
-                              <p className="text-sm font-semibold text-slate-900 mb-1">
-                                Justificación:
-                              </p>
-                              <p className="text-sm text-slate-700">
-                                {incident.justification}
-                              </p>
-                            </div>
+                <TabsContent value="approved">
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-green-50/50">
+                      <CardTitle className="text-xl font-bold flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        Justificaciones Aprobadas
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      {approvedIncidents.length === 0 ? (
+                        <div className="text-center py-12">
+                          <AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                          <p className="text-slate-600">No hay justificaciones aprobadas</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {approvedIncidents.map(incident => {
+                            const emp = allEmployees.find(e => e.id === incident.employee_id);
+                            return (
+                              <div 
+                                key={incident.id}
+                                className="p-4 border border-green-200 bg-green-50/30 rounded-lg"
+                              >
+                                <div className="flex items-start justify-between mb-4">
+                                  <div className="flex-1">
+                                    <h4 className="font-bold text-slate-900 mb-1">
+                                      {emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}
+                                    </h4>
+                                    <p className="text-sm text-slate-600 mb-2">
+                                      {emp?.employee_code} • {emp?.position}
+                                    </p>
+                                    <div className="flex gap-4 text-sm flex-wrap">
+                                      <Badge className="bg-green-100 text-green-700">
+                                        {incident.incident_type}
+                                      </Badge>
+                                      <span className="text-slate-600">
+                                        📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}
+                                      </span>
+                                      <Badge className="bg-green-600 text-white">Aprobada</Badge>
+                                    </div>
+                                  </div>
+                                </div>
 
-                            {incident.supporting_document_url && (
-                              <div className="mb-4">
-                                <a
-                                  href={incident.supporting_document_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:underline bg-indigo-50 px-3 py-2 rounded-lg"
-                                >
-                                  <Download className="w-4 h-4" />
-                                  Ver documento adjunto
-                                </a>
+                                <div className="p-3 bg-white rounded-lg mb-3">
+                                  <p className="text-sm font-semibold text-slate-900 mb-1">
+                                    Justificación:
+                                  </p>
+                                  <p className="text-sm text-slate-700">
+                                    {incident.justification}
+                                  </p>
+                                </div>
+
+                                {incident.review_comments && (
+                                  <div className="p-3 bg-green-100 border border-green-200 rounded-lg mb-3">
+                                    <p className="text-sm font-semibold text-green-900 mb-1">
+                                      Comentarios de aprobación:
+                                    </p>
+                                    <p className="text-sm text-green-800">
+                                      {incident.review_comments}
+                                    </p>
+                                  </div>
+                                )}
+
+                                <div className="flex items-center gap-4 text-xs text-slate-600">
+                                  <span>Revisado por: {incident.reviewed_by || "N/A"}</span>
+                                  <span>•</span>
+                                  <span>Fecha: {incident.review_date ? format(new Date(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
+                                </div>
                               </div>
-                            )}
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
 
-                            <div className="flex gap-3">
-                              <Button
-                                className="flex-1 bg-green-600 hover:bg-green-700"
-                                onClick={() => {
-                                  setReviewingIncident(incident);
-                                  setShowIncidentModal(true);
-                                }}
+                <TabsContent value="rejected">
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b bg-red-50/50">
+                      <CardTitle className="text-xl font-bold flex items-center gap-2">
+                        <XCircle className="w-5 h-5 text-red-600" />
+                        Justificaciones Rechazadas
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      {rejectedIncidents.length === 0 ? (
+                        <div className="text-center py-12">
+                          <AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                          <p className="text-slate-600">No hay justificaciones rechazadas</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {rejectedIncidents.map(incident => {
+                            const emp = allEmployees.find(e => e.id === incident.employee_id);
+                            return (
+                              <div 
+                                key={incident.id}
+                                className="p-4 border border-red-200 bg-red-50/30 rounded-lg"
                               >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Aprobar
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
-                                onClick={() => {
-                                  setReviewingIncident(incident);
-                                  setShowIncidentModal(true);
-                                }}
-                              >
-                                <XCircle className="w-4 h-4 mr-2" />
-                                Rechazar
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                                <div className="flex items-start justify-between mb-4">
+                                  <div className="flex-1">
+                                    <h4 className="font-bold text-slate-900 mb-1">
+                                      {emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}
+                                    </h4>
+                                    <p className="text-sm text-slate-600 mb-2">
+                                      {emp?.employee_code} • {emp?.position}
+                                    </p>
+                                    <div className="flex gap-4 text-sm flex-wrap">
+                                      <Badge className="bg-red-100 text-red-700">
+                                        {incident.incident_type}
+                                      </Badge>
+                                      <span className="text-slate-600">
+                                        📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}
+                                      </span>
+                                      <Badge className="bg-red-600 text-white">Rechazada</Badge>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="p-3 bg-white rounded-lg mb-3">
+                                  <p className="text-sm font-semibold text-slate-900 mb-1">
+                                    Justificación:
+                                  </p>
+                                  <p className="text-sm text-slate-700">
+                                    {incident.justification}
+                                  </p>
+                                </div>
+
+                                {incident.review_comments && (
+                                  <div className="p-3 bg-red-100 border border-red-200 rounded-lg mb-3">
+                                    <p className="text-sm font-semibold text-red-900 mb-1">
+                                      Motivo de rechazo:
+                                    </p>
+                                    <p className="text-sm text-red-800">
+                                      {incident.review_comments}
+                                    </p>
+                                  </div>
+                                )}
+
+                                <div className="flex items-center gap-4 text-xs text-slate-600">
+                                  <span>Revisado por: {incident.reviewed_by || "N/A"}</span>
+                                  <span>•</span>
+                                  <span>Fecha: {incident.review_date ? format(new Date(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             </TabsContent>
           </Tabs>
         </div>

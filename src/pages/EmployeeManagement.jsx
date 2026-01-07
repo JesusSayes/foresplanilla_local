@@ -525,7 +525,7 @@ export default function EmployeeManagement() {
     setShowDetails(true);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Si está editando, permitir actualización parcial
     if (editingEmployee) {
       updateEmployeeMutation.mutate({ 
@@ -555,6 +555,20 @@ export default function EmployeeManagement() {
     // Validaciones adicionales solo al crear
     if (formData.document_type === 'DNI' && formData.document_number.length !== 8) {
       toast.error("❌ El DNI debe tener exactamente 8 dígitos");
+      return;
+    }
+
+    // Validar DNI duplicado
+    const existingEmployee = allEmployees.find(emp => 
+      emp.document_number === formData.document_number && 
+      emp.document_type === formData.document_type
+    );
+    
+    if (existingEmployee) {
+      toast.error(
+        `❌ Ya existe un empleado con este ${formData.document_type}: ${formData.document_number} (${existingEmployee.first_name} ${existingEmployee.last_name})`,
+        { duration: 6000 }
+      );
       return;
     }
 
