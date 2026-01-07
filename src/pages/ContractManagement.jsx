@@ -116,11 +116,22 @@ export default function ContractManagement() {
 
   const createContractMutation = useMutation({
     mutationFn: async (data) => {
+      // Generar número de contrato automáticamente si no existe
+      if (!data.contract_number) {
+        const year = new Date().getFullYear();
+        const existingContracts = await base44.entities.Contract.list("-created_date");
+        const contractsThisYear = existingContracts.filter(c => 
+          c.contract_number?.startsWith(`CTR-${year}`)
+        );
+        const nextNumber = contractsThisYear.length + 1;
+        data.contract_number = `CTR-${year}-${String(nextNumber).padStart(3, '0')}`;
+      }
+      
       return await base44.entities.Contract.create(data);
     },
-    onSuccess: () => {
+    onSuccess: (newContract) => {
       queryClient.invalidateQueries(["contracts"]);
-      toast.success("Contrato creado correctamente");
+      toast.success(`Contrato ${newContract.contract_number} creado correctamente`);
       resetForm();
     },
     onError: () => {
@@ -205,12 +216,20 @@ export default function ContractManagement() {
   };
 
   const handleCreate = () => {
+    setEmployeeSearchTerm("");
+    setPositionSearchTerm("");
+    setDepartmentSearchTerm("");
+    setSiteSearchTerm("");
     initializeForm();
     setEditingContract(null);
     setShowForm(true);
   };
 
   const handleEdit = (contract) => {
+    setEmployeeSearchTerm("");
+    setPositionSearchTerm("");
+    setDepartmentSearchTerm("");
+    setSiteSearchTerm("");
     initializeForm(contract);
     setEditingContract(contract);
     setShowForm(true);
@@ -294,6 +313,10 @@ export default function ContractManagement() {
     setEditingContract(null);
     setShowForm(false);
     setConflictingContract(null);
+    setEmployeeSearchTerm("");
+    setPositionSearchTerm("");
+    setDepartmentSearchTerm("");
+    setSiteSearchTerm("");
   };
 
   const filteredContracts = contracts.filter(c => {
@@ -632,8 +655,14 @@ export default function ContractManagement() {
                       <Input
                         value={formData.contract_number}
                         onChange={(e) => setFormData({...formData, contract_number: e.target.value})}
-                        placeholder="Ej: CTR-2024-001"
+                        placeholder="Se genera automáticamente"
+                        disabled={!editingContract}
                       />
+                      {!editingContract && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          Se generará automáticamente al crear el contrato
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label>Tipo de Contrato *</Label>

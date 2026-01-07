@@ -890,7 +890,7 @@ export default function EmployeeManagement() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="text-red-600"
+                                  className="text-yellow-600"
                                   onClick={() => handleStatusChange(emp, "Suspendido")}
                                   title="Suspender"
                                 >
@@ -898,13 +898,35 @@ export default function EmployeeManagement() {
                                 </Button>
                               )}
 
-                              {hasPermission("employees.edit") && emp.status !== "Activo" && (
+                              {hasPermission("employees.edit") && emp.status === "Suspendido" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="text-green-600"
                                   onClick={() => handleStatusChange(emp, "Activo")}
                                   title="Activar"
+                                >
+                                  <UserCheck className="w-4 h-4" />
+                                </Button>
+                              )}
+
+                              {hasPermission("employees.edit") && emp.status === "Cesado" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-blue-600"
+                                  onClick={() => {
+                                    if (confirm("¿Reactivar empleado cesado? Esto cambiará el estado a Activo y limpiará la fecha de cese.")) {
+                                      base44.entities.Employee.update(emp.id, { 
+                                        status: "Activo",
+                                        termination_date: null 
+                                      }).then(() => {
+                                        queryClient.invalidateQueries(["allEmployees"]);
+                                        toast.success("Empleado reactivado");
+                                      });
+                                    }
+                                  }}
+                                  title="Reactivar"
                                 >
                                   <UserCheck className="w-4 h-4" />
                                 </Button>
