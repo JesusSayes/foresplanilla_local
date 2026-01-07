@@ -134,6 +134,8 @@ export default function Layout({ children, currentPageName }) {
         submenu: [
           { name: "Generar Planillas", path: "PayrollManagement" },
           { name: "Conceptos de Planilla", path: "PayrollConcepts" },
+          { name: "Centros de Costo", path: "CostCenterManagement" },
+          { name: "Consulta Valorizada", path: "CostCenterValuation" },
         ]
       },
       { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
