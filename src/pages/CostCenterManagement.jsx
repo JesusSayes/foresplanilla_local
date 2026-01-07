@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Building2, Plus, Edit, Trash2, Users, GitBranch, History, 
-  Download, FileSpreadsheet, FileText, DollarSign, Search, Calendar
+  Download, FileSpreadsheet, FileText, DollarSign, Search, Calendar, Grid3x3, List
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -36,6 +36,7 @@ export default function CostCenterManagement() {
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [historyFilter, setHistoryFilter] = useState(null);
+  const [viewMode, setViewMode] = useState("grid");
 
   const queryClient = useQueryClient();
 
@@ -371,6 +372,30 @@ export default function CostCenterManagement() {
 
   const categories = ["Administración", "Ventas", "Transportes", "Oxapampa", "Lima - VES", "Operaciones Generales"];
 
+  // Empleados sin asignación de centro de costo
+  const employeesWithoutCC = useMemo(() => {
+    const activeEmployees = allEmployees.filter(e => e.status === "Activo");
+    return activeEmployees.filter(emp => {
+      const hasIndividualAssignment = assignments.some(a => 
+        a.assignment_type === "Empleado" && 
+        a.employee_id === emp.id && 
+        a.is_active &&
+        (!a.end_date || new Date(a.end_date) >= new Date())
+      );
+      
+      if (hasIndividualAssignment) return false;
+      
+      const hasDepartmentAssignment = emp.department_name && assignments.some(a => 
+        a.assignment_type === "Departamento" && 
+        a.department_name === emp.department_name && 
+        a.is_active &&
+        (!a.end_date || new Date(a.end_date) >= new Date())
+      );
+      
+      return !hasDepartmentAssignment;
+    });
+  }, [allEmployees, assignments]);
+
   const filteredHistory = historyFilter 
     ? changeLogs.filter(log => log.cost_center_id === historyFilter)
     : changeLogs;
@@ -409,9 +434,15 @@ export default function CostCenterManagement() {
         </div>
 
         <Tabs defaultValue="centers" className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-3">
+          <TabsList className="grid w-full max-w-3xl grid-cols-4">
             <TabsTrigger value="centers">Centros de Costo</TabsTrigger>
             <TabsTrigger value="assignments">Asignaciones</TabsTrigger>
+            <TabsTrigger value="unassigned">
+              Sin Asignar
+              {employeesWithoutCC.length > 0 && (
+                <Badge className="ml-2 bg-orange-600 text-white">{employeesWithoutCC.length}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="history">Historial</TabsTrigger>
           </TabsList>
 
@@ -422,6 +453,24 @@ export default function CostCenterManagement() {
                 <div className="flex items-center justify-between">
                   <CardTitle>Centros de Costo Registrados</CardTitle>
                   <div className="flex gap-2">
+                    <div className="flex border rounded-lg overflow-hidden">
+                      <Button
+                        onClick={() => setViewMode("grid")}
+                        variant={viewMode === "grid" ? "default" : "ghost"}
+                        size="sm"
+                        className={viewMode === "grid" ? "bg-indigo-600" : ""}
+                      >
+                        <Grid3x3 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        onClick={() => setViewMode("table")}
+                        variant={viewMode === "table" ? "default" : "ghost"}
+                        size="sm"
+                        className={viewMode === "table" ? "bg-indigo-600" : ""}
+                      >
+                        <List className="w-4 h-4" />
+                      </Button>
+                    </div>
                     <Button onClick={exportToExcel} variant="outline" size="sm">
                       <FileSpreadsheet className="w-4 h-4 mr-2" />
                       Excel
@@ -461,78 +510,223 @@ export default function CostCenterManagement() {
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredCostCenters.map(cc => {
-                    const ccAssignments = assignments.filter(a => a.cost_center_id === cc.id && a.is_active);
-                    const employeeCount = ccAssignments.filter(a => a.assignment_type === "Empleado").length;
-                    const deptCount = ccAssignments.filter(a => a.assignment_type === "Departamento").length;
-                    
-                    return (
-                      <Card key={cc.id} className="border-2 hover:shadow-lg transition-all">
-                        <CardContent className="p-5">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Building2 className="w-5 h-5 text-indigo-600" />
-                                <h3 className="font-bold text-slate-900">{cc.code}</h3>
+                {viewMode === "grid" ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredCostCenters.map(cc => {
+                      const ccAssignments = assignments.filter(a => a.cost_center_id === cc.id && a.is_active);
+                      const employeeCount = ccAssignments.filter(a => a.assignment_type === "Empleado").length;
+                      const deptCount = ccAssignments.filter(a => a.assignment_type === "Departamento").length;
+                      
+                      return (
+                        <Card key={cc.id} className="border-2 hover:shadow-lg transition-all">
+                          <CardContent className="p-5">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Building2 className="w-5 h-5 text-indigo-600" />
+                                  <h3 className="font-bold text-slate-900">{cc.code}</h3>
+                                </div>
+                                <p className="text-sm text-slate-700 mb-2">{cc.name}</p>
+                                <Badge className="bg-blue-100 text-blue-700">{cc.category}</Badge>
                               </div>
-                              <p className="text-sm text-slate-700 mb-2">{cc.name}</p>
-                              <Badge className="bg-blue-100 text-blue-700">{cc.category}</Badge>
+                              <Badge className={cc.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>
+                                {cc.is_active ? "Activo" : "Inactivo"}
+                              </Badge>
                             </div>
-                            <Badge className={cc.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>
-                              {cc.is_active ? "Activo" : "Inactivo"}
-                            </Badge>
-                          </div>
 
-                          <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
-                            <div className="p-2 bg-purple-50 rounded">
-                              <div className="flex items-center gap-1 text-purple-600 mb-1">
-                                <Users className="w-3 h-3" />
-                                <span className="text-xs">Empleados</span>
+                            <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
+                              <div className="p-2 bg-purple-50 rounded">
+                                <div className="flex items-center gap-1 text-purple-600 mb-1">
+                                  <Users className="w-3 h-3" />
+                                  <span className="text-xs">Empleados</span>
+                                </div>
+                                <p className="font-bold text-purple-900">{employeeCount}</p>
                               </div>
-                              <p className="font-bold text-purple-900">{employeeCount}</p>
-                            </div>
-                            <div className="p-2 bg-indigo-50 rounded">
-                              <div className="flex items-center gap-1 text-indigo-600 mb-1">
-                                <GitBranch className="w-3 h-3" />
-                                <span className="text-xs">Deptos</span>
+                              <div className="p-2 bg-indigo-50 rounded">
+                                <div className="flex items-center gap-1 text-indigo-600 mb-1">
+                                  <GitBranch className="w-3 h-3" />
+                                  <span className="text-xs">Deptos</span>
+                                </div>
+                                <p className="font-bold text-indigo-900">{deptCount}</p>
                               </div>
-                              <p className="font-bold text-indigo-900">{deptCount}</p>
                             </div>
-                          </div>
 
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1"
-                              onClick={() => {
-                                setSelectedCC(cc);
-                                handleCreateAssignment(cc);
-                              }}
-                            >
-                              <Plus className="w-3 h-3 mr-1" />
-                              Asignar
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleEditCC(cc)}>
-                              <Edit className="w-3 h-3" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setHistoryFilter(cc.id);
-                                setShowHistory(true);
-                              }}
-                            >
-                              <History className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => {
+                                  setSelectedCC(cc);
+                                  handleCreateAssignment(cc);
+                                }}
+                              >
+                                <Plus className="w-3 h-3 mr-1" />
+                                Asignar
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => handleEditCC(cc)}>
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setHistoryFilter(cc.id);
+                                  setShowHistory(true);
+                                }}
+                              >
+                                <History className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-100 border-b-2">
+                        <tr>
+                          <th className="text-left p-3 font-semibold text-slate-700">Código</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Nombre</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Categoría</th>
+                          <th className="text-center p-3 font-semibold text-slate-700">Empleados</th>
+                          <th className="text-center p-3 font-semibold text-slate-700">Deptos</th>
+                          <th className="text-center p-3 font-semibold text-slate-700">Estado</th>
+                          <th className="text-center p-3 font-semibold text-slate-700">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredCostCenters.map(cc => {
+                          const ccAssignments = assignments.filter(a => a.cost_center_id === cc.id && a.is_active);
+                          const employeeCount = ccAssignments.filter(a => a.assignment_type === "Empleado").length;
+                          const deptCount = ccAssignments.filter(a => a.assignment_type === "Departamento").length;
+                          
+                          return (
+                            <tr key={cc.id} className="border-b hover:bg-slate-50">
+                              <td className="p-3">
+                                <div className="flex items-center gap-2">
+                                  <Building2 className="w-4 h-4 text-indigo-600" />
+                                  <span className="font-bold text-slate-900">{cc.code}</span>
+                                </div>
+                              </td>
+                              <td className="p-3 text-slate-700">{cc.name}</td>
+                              <td className="p-3">
+                                <Badge className="bg-blue-100 text-blue-700">{cc.category}</Badge>
+                              </td>
+                              <td className="p-3 text-center">
+                                <Badge className="bg-purple-100 text-purple-700">{employeeCount}</Badge>
+                              </td>
+                              <td className="p-3 text-center">
+                                <Badge className="bg-indigo-100 text-indigo-700">{deptCount}</Badge>
+                              </td>
+                              <td className="p-3 text-center">
+                                <Badge className={cc.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>
+                                  {cc.is_active ? "Activo" : "Inactivo"}
+                                </Badge>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex gap-1 justify-center">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setSelectedCC(cc);
+                                      handleCreateAssignment(cc);
+                                    }}
+                                    title="Asignar"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => handleEditCC(cc)} title="Editar">
+                                    <Edit className="w-3 h-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setHistoryFilter(cc.id);
+                                      setShowHistory(true);
+                                    }}
+                                    title="Historial"
+                                  >
+                                    <History className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Empleados sin asignar Tab */}
+          <TabsContent value="unassigned">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-orange-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="w-5 h-5 text-orange-600" />
+                      Empleados sin Centro de Costo
+                    </CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Empleados activos que no tienen asignación individual ni departamental
+                    </p>
+                  </div>
                 </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                {employeesWithoutCC.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Users className="w-16 h-16 text-green-300 mx-auto mb-4" />
+                    <p className="text-slate-600">Todos los empleados activos tienen centro de costo asignado</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {employeesWithoutCC.map(emp => (
+                      <div key={emp.id} className="p-4 border-2 border-orange-200 bg-orange-50/30 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-bold text-slate-900 mb-1">
+                              {emp.first_name} {emp.last_name}
+                            </h4>
+                            <p className="text-sm text-slate-600">
+                              {emp.employee_code} • {emp.position} • {emp.department_name || "Sin departamento"}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            className="bg-indigo-600 hover:bg-indigo-700"
+                            onClick={() => {
+                              setAssignmentFormData({
+                                cost_center_id: "",
+                                assignment_type: "Empleado",
+                                employee_id: emp.id,
+                                department_name: "",
+                                percentage: 100,
+                                start_date: format(new Date(), "yyyy-MM-dd"),
+                                is_active: true,
+                                notes: "",
+                              });
+                              setEditingAssignment(null);
+                              setShowAssignmentForm(true);
+                            }}
+                          >
+                            <Plus className="w-3 h-3 mr-2" />
+                            Asignar Centro de Costo
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
