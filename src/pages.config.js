@@ -31,6 +31,8 @@ import UserManagement from './pages/UserManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
+import CostCenterManagement from './pages/CostCenterManagement';
+import CostCenterValuation from './pages/CostCenterValuation';
 import __Layout from './Layout.jsx';
 
 
@@ -68,6 +70,8 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
+    "CostCenterManagement": CostCenterManagement,
+    "CostCenterValuation": CostCenterValuation,
 }
 
 export const pagesConfig = {
