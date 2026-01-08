@@ -53,34 +53,38 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     }
   }
 
-  // IMPORTANTE: Cargar datos ACTUALES de la empresa desde CompanyInfo
-  let freshCompanyData = companyData;
-  if (!companyData || Object.keys(companyData).length === 0) {
-    try {
-      const { base44 } = await import("@/api/base44Client");
-      const companyInfoList = await base44.entities.CompanyInfo?.list("-created_date");
-      if (companyInfoList && companyInfoList.length > 0) {
-        const info = companyInfoList[0];
-        freshCompanyData = {
-          name: info.company_name || "EMPRESA EJEMPLO S.A.C.",
-          ruc: info.ruc || "20123456789",
-          address: info.address || "Av. Principal 123, Lima, Perú",
-          representative: info.legal_representative || "Juan Pérez García",
-          representativeDoc: info.legal_representative_dni ? `DNI ${info.legal_representative_dni}` : "DNI 12345678",
-        };
-      }
-    } catch (error) {
-      console.log("No se encontró información de empresa, usando valores por defecto");
+  // IMPORTANTE: Cargar datos ACTUALES de la empresa desde CompanyInfo SIEMPRE
+  let freshCompanyData = {};
+  try {
+    const { base44 } = await import("@/api/base44Client");
+    const companyInfoList = await base44.entities.CompanyInfo?.list("-created_date");
+    if (companyInfoList && companyInfoList.length > 0) {
+      const info = companyInfoList[0];
+      freshCompanyData = {
+        name: info.company_name,
+        ruc: info.ruc,
+        address: info.address,
+        representative: info.legal_representative,
+        representativeDoc: info.legal_representative_dni ? `DNI ${info.legal_representative_dni}` : "",
+      };
     }
+  } catch (error) {
+    console.error("Error cargando información de empresa:", error);
+    throw new Error("No se pudo cargar la información de la empresa. Por favor, configure los datos de la empresa en Configuración de Empresa.");
   }
 
-  // Datos de la empresa (PRIORIDAD: CompanyInfo > template > defaults)
+  // Validar que exista información de empresa
+  if (!freshCompanyData.name || !freshCompanyData.ruc) {
+    throw new Error("No se encontró información de empresa registrada. Por favor, configure los datos en Configuración de Empresa.");
+  }
+
+  // Datos de la empresa (solo desde CompanyInfo)
   const company = {
-    name: freshCompanyData.name || "EMPRESA EJEMPLO S.A.C.",
-    ruc: freshCompanyData.ruc || "20123456789",
-    address: freshCompanyData.address || "Av. Principal 123, Lima, Perú",
-    representative: freshCompanyData.representative || "Juan Pérez García",
-    representativeDoc: freshCompanyData.representativeDoc || "DNI 12345678",
+    name: freshCompanyData.name,
+    ruc: freshCompanyData.ruc,
+    address: freshCompanyData.address,
+    representative: freshCompanyData.representative,
+    representativeDoc: freshCompanyData.representativeDoc,
   };
 
   // Variables dinámicas para reemplazo
