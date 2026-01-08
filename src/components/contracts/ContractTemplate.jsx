@@ -86,10 +86,10 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   // Variables dinámicas para reemplazo
   const variables = {
     "{contract_type}": contract.contract_type,
+    "{contract_number}": contract.contract_number || "S/N",
     "{employee_name}": `${employee.first_name} ${employee.last_name}`,
     "{employee_doc_type}": employee.document_type || "DNI",
     "{employee_doc_number}": employee.document_number || "",
-    "{employee_birth_date}": employee.birth_date ? format(new Date(employee.birth_date), "dd 'de' MMMM 'de' yyyy", { locale: es }) : "No especificada",
     "{employee_address}": `${employee.address || "No especificado"}, ${employee.district || ""}, ${employee.province || ""}`,
     "{position}": contract.position,
     "{department}": contract.department || employee.department_name || "",
@@ -143,7 +143,14 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
 
   doc.setFontSize(12);
   doc.text(`${contract.contract_type.toUpperCase()}`, pageWidth / 2, y, { align: "center" });
-  y += 15;
+  y += 8;
+  
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'normal');
+  doc.text(`Contrato N° ${contract.contract_number || "S/N"}`, pageWidth / 2, y, { align: "center" });
+  y += 3;
+  doc.text(`Fecha de Firma: ${format(new Date(contract.signed_date || contract.start_date), "dd/MM/yyyy")}`, pageWidth / 2, y, { align: "center" });
+  y += 10;
 
   // Conste por el presente documento
   const introText = template?.introduction_text || 
@@ -164,7 +171,6 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   addText("II. DATOS DEL TRABAJADOR:", 11, true);
   addText(`Nombres y Apellidos: ${employee.first_name} ${employee.last_name}`);
   addText(`${employee.document_type}: ${employee.document_number}`);
-  addText(`Fecha de Nacimiento: ${employee.birth_date ? format(new Date(employee.birth_date), "dd 'de' MMMM 'de' yyyy", { locale: es }) : "No especificada"}`);
   addText(`Domicilio: ${employee.address || "No especificado"}, ${employee.district || ""}, ${employee.province || ""}`);
   y += 3;
 
