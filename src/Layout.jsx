@@ -326,6 +326,13 @@ export default function Layout({ children, currentPageName }) {
                             <Shield className="w-4 h-4" />
                             Inicializar Roles Sistema
                           </Link>
+                          <Link
+                            to={createPageUrl("DataExport")}
+                            className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            <Shield className="w-4 h-4" />
+                            Exportar Datos
+                          </Link>
                           </>
                           )}
                           <button

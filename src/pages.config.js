@@ -7,6 +7,8 @@ import CompanySettings from './pages/CompanySettings';
 import ContractManagement from './pages/ContractManagement';
 import ContractRenewalAutomation from './pages/ContractRenewalAutomation';
 import ContractTemplateConfig from './pages/ContractTemplateConfig';
+import CostCenterManagement from './pages/CostCenterManagement';
+import CostCenterValuation from './pages/CostCenterValuation';
 import Dashboard from './pages/Dashboard';
 import DatabaseConfig from './pages/DatabaseConfig';
 import EmployeeManagement from './pages/EmployeeManagement';
@@ -31,8 +33,7 @@ import UserManagement from './pages/UserManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
-import CostCenterManagement from './pages/CostCenterManagement';
-import CostCenterValuation from './pages/CostCenterValuation';
+import DataExport from './pages/DataExport';
 import __Layout from './Layout.jsx';
 
 
@@ -46,6 +47,8 @@ export const PAGES = {
     "ContractManagement": ContractManagement,
     "ContractRenewalAutomation": ContractRenewalAutomation,
     "ContractTemplateConfig": ContractTemplateConfig,
+    "CostCenterManagement": CostCenterManagement,
+    "CostCenterValuation": CostCenterValuation,
     "Dashboard": Dashboard,
     "DatabaseConfig": DatabaseConfig,
     "EmployeeManagement": EmployeeManagement,
@@ -70,8 +73,7 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
-    "CostCenterManagement": CostCenterManagement,
-    "CostCenterValuation": CostCenterValuation,
+    "DataExport": DataExport,
 }
 
 export const pagesConfig = {
