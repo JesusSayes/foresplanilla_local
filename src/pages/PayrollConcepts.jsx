@@ -525,13 +525,18 @@ export default function PayrollConcepts() {
               items: {
                 type: "object",
                 properties: {
-                  employee_code: { type: "string" },
+                  document_number: { type: "string" },
                   concept_type: { type: "string" },
+                  concept_category: { type: "string" },
                   concept_name: { type: "string" },
+                  concept_code: { type: "string" },
+                  description: { type: "string" },
                   amount: { type: "number" },
                   is_dynamic: { type: "boolean" },
                   calculation_formula: { type: "string" },
-                  description: { type: "string" },
+                  is_recurring: { type: "boolean" },
+                  is_mandatory: { type: "boolean" },
+                  applies_to_payroll_types: { type: "string" },
                   notes: { type: "string" },
                 }
               }
@@ -556,28 +561,43 @@ export default function PayrollConcepts() {
 
   const bulkCreateMutation = useMutation({
     mutationFn: async (concepts) => {
-      const results = { success: 0, errors: 0 };
+      const results = { success: 0, errors: 0, errorDetails: [] };
       
       for (const concept of concepts) {
         try {
-          const emp = allEmployees.find(e => e.employee_code === concept.employee_code);
+          const emp = allEmployees.find(e => e.document_number === concept.document_number);
           if (!emp) {
             results.errors++;
+            results.errorDetails.push(`Documento ${concept.document_number} no encontrado`);
             continue;
+          }
+
+          // Parsear applies_to_payroll_types (puede venir como string separado por comas)
+          let payrollTypes = ["Mensual"];
+          if (concept.applies_to_payroll_types) {
+            if (typeof concept.applies_to_payroll_types === 'string') {
+              payrollTypes = concept.applies_to_payroll_types.split(',').map(t => t.trim());
+            } else if (Array.isArray(concept.applies_to_payroll_types)) {
+              payrollTypes = concept.applies_to_payroll_types;
+            }
           }
 
           await base44.entities.PayrollConcept.create({
             employee_id: emp.id,
-            concept_type: concept.concept_type,
+            concept_type: concept.concept_type || "Ingreso",
+            concept_category: concept.concept_category || "",
             concept_name: concept.concept_name,
+            concept_code: concept.concept_code || "",
+            description: concept.description || "",
             amount: concept.is_dynamic ? 0 : parseFloat(concept.amount || 0),
             is_dynamic: concept.is_dynamic || false,
             calculation_formula: concept.calculation_formula || "",
+            is_recurring: concept.is_recurring || false,
+            is_mandatory: concept.is_mandatory || false,
+            applies_to_payroll_types: payrollTypes,
             month: selectedMonth,
             year: selectedYear,
-            is_recurring: false,
             is_applied: false,
-            description: concept.description || "",
             notes: concept.notes || "",
           });
           
@@ -585,6 +605,7 @@ export default function PayrollConcepts() {
         } catch (error) {
           console.error("Error creating concept:", error);
           results.errors++;
+          results.errorDetails.push(`Error en documento ${concept.document_number}: ${error.message}`);
         }
       }
       
@@ -592,7 +613,12 @@ export default function PayrollConcepts() {
     },
     onSuccess: (results) => {
       queryClient.invalidateQueries(["payrollConcepts"]);
-      toast.success(`${results.success} conceptos creados. ${results.errors} errores.`);
+      if (results.errors > 0) {
+        toast.error(`${results.success} conceptos creados. ${results.errors} errores. Revisa la consola para detalles.`, { duration: 6000 });
+        console.error("Errores en carga masiva:", results.errorDetails);
+      } else {
+        toast.success(`${results.success} conceptos creados exitosamente`);
+      }
       setShowBulkUpload(false);
       setUploadPreview([]);
       setUploadedFile(null);
@@ -603,10 +629,11 @@ export default function PayrollConcepts() {
   });
 
   const downloadBulkTemplate = () => {
-    const template = `employee_code,concept_type,concept_name,amount,is_dynamic,calculation_formula,description,notes
-639,Ingreso,Bono Productividad,500,FALSE,,Bono por metas cumplidas,
-640,Descuento,Préstamo Personal,200,FALSE,,Cuota mensual préstamo,Cuota 1 de 12
-641,Ingreso,Comisión Ventas,0,TRUE,ventas_mensuales * 0.05,Comisión 5% sobre ventas,`;
+    const template = `document_number,concept_type,concept_category,concept_name,concept_code,description,amount,is_dynamic,calculation_formula,is_recurring,is_mandatory,applies_to_payroll_types,notes
+76549618,Ingreso,Bonificaciones,Bono Productividad,ING001,Bono por metas cumplidas,500,FALSE,,FALSE,FALSE,"Mensual,Quincenal",
+76549618,Descuento,Préstamos,Préstamo Personal,DESC001,Cuota mensual préstamo,200,FALSE,,TRUE,FALSE,Mensual,Cuota 1 de 12
+08123456,Ingreso,Horas Extras,Comisión Ventas,ING002,Comisión 5% sobre ventas,0,TRUE,ventas_mensuales * 0.05,TRUE,FALSE,Mensual,
+08123456,Descuento,Descuentos Varios,Descuento Tardanza,DESC002,Descuento por llegar tarde,50,FALSE,,FALSE,FALSE,Mensual,`;
 
     const blob = new Blob([template], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -1510,8 +1537,10 @@ export default function PayrollConcepts() {
                 <h4 className="font-bold text-blue-900 mb-2">📋 Instrucciones</h4>
                 <ul className="text-sm text-blue-800 space-y-1">
                   <li>1. Descarga la plantilla CSV con el formato correcto</li>
-                  <li>2. Completa los datos de cada concepto (employee_code, concept_type, concept_name, amount, etc.)</li>
-                  <li>3. Sube el archivo completado para procesar</li>
+                  <li>2. Completa los datos de cada concepto usando <strong>número de documento</strong> (preserva ceros iniciales)</li>
+                  <li>3. Para <strong>is_dynamic, is_recurring, is_mandatory</strong> usa: TRUE o FALSE</li>
+                  <li>4. Para <strong>applies_to_payroll_types</strong> separa con comas: "Mensual,Quincenal"</li>
+                  <li>5. Sube el archivo completado para procesar</li>
                 </ul>
                 <Button
                   onClick={downloadBulkTemplate}
@@ -1570,34 +1599,56 @@ export default function PayrollConcepts() {
                     <table className="w-full text-sm">
                       <thead className="bg-slate-100 sticky top-0">
                         <tr>
-                          <th className="text-left p-2 text-xs">Código Emp</th>
+                          <th className="text-left p-2 text-xs">N° Doc</th>
+                          <th className="text-left p-2 text-xs">Empleado</th>
                           <th className="text-left p-2 text-xs">Tipo</th>
+                          <th className="text-left p-2 text-xs">Categoría</th>
                           <th className="text-left p-2 text-xs">Concepto</th>
+                          <th className="text-left p-2 text-xs">Código</th>
                           <th className="text-right p-2 text-xs">Monto</th>
-                          <th className="text-left p-2 text-xs">Dinámico</th>
-                          <th className="text-left p-2 text-xs">Fórmula</th>
+                          <th className="text-center p-2 text-xs">Recurrente</th>
+                          <th className="text-center p-2 text-xs">Obligatorio</th>
                         </tr>
                       </thead>
                       <tbody>
                         {uploadPreview.map((item, idx) => {
-                          const emp = allEmployees.find(e => e.employee_code === item.employee_code);
+                          const emp = allEmployees.find(e => e.document_number === item.document_number);
                           return (
                             <tr key={idx} className={`border-t ${!emp ? 'bg-red-50' : ''}`}>
-                              <td className="p-2">
-                                {item.employee_code}
+                              <td className="p-2 font-mono">
+                                {item.document_number}
                                 {!emp && <span className="text-red-600 text-xs block">⚠ No encontrado</span>}
+                              </td>
+                              <td className="p-2 text-xs">
+                                {emp ? `${emp.first_name} ${emp.last_name}` : "-"}
                               </td>
                               <td className="p-2">
                                 <Badge className={
-                                  item.concept_type === "Ingreso" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                  item.concept_type === "Ingreso" 
+                                    ? "bg-green-100 text-green-700 text-xs" 
+                                    : item.concept_type === "Aportación"
+                                    ? "bg-blue-100 text-blue-700 text-xs"
+                                    : "bg-red-100 text-red-700 text-xs"
                                 }>
                                   {item.concept_type}
                                 </Badge>
                               </td>
-                              <td className="p-2 font-medium">{item.concept_name}</td>
-                              <td className="p-2 text-right">{item.is_dynamic ? "-" : `S/ ${parseFloat(item.amount || 0).toFixed(2)}`}</td>
-                              <td className="p-2">{item.is_dynamic ? "Sí" : "No"}</td>
-                              <td className="p-2 text-xs font-mono">{item.calculation_formula || "-"}</td>
+                              <td className="p-2 text-xs">{item.concept_category || "-"}</td>
+                              <td className="p-2 font-medium text-xs">{item.concept_name}</td>
+                              <td className="p-2 text-xs font-mono">{item.concept_code || "-"}</td>
+                              <td className="p-2 text-right text-xs">
+                                {item.is_dynamic ? (
+                                  <Badge className="bg-purple-100 text-purple-700 text-xs">Dinámico</Badge>
+                                ) : (
+                                  `S/ ${parseFloat(item.amount || 0).toFixed(2)}`
+                                )}
+                              </td>
+                              <td className="p-2 text-center text-xs">
+                                {item.is_recurring ? "✓" : "-"}
+                              </td>
+                              <td className="p-2 text-center text-xs">
+                                {item.is_mandatory ? "⚠" : "-"}
+                              </td>
                             </tr>
                           );
                         })}
