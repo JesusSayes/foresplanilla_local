@@ -15,6 +15,7 @@ export default function Layout({ children, currentPageName }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState(null);
 
   // Pages that don't need sidebar/layout
   const noLayoutPages = ["Home"];
@@ -202,9 +203,11 @@ export default function Layout({ children, currentPageName }) {
                   (item.submenu && item.submenu.some(sub => sub.path === currentPageName));
                 
                 if (item.submenu) {
+                  const isOpen = openDropdown === item.path;
                   return (
-                    <div key={item.path} className="relative group">
+                    <div key={item.path} className="relative">
                       <button
+                        onClick={() => setOpenDropdown(isOpen ? null : item.path)}
                         className={`
                           flex items-center gap-2 px-4 py-2 rounded-lg
                           transition-all duration-200 text-sm
@@ -216,28 +219,31 @@ export default function Layout({ children, currentPageName }) {
                       >
                         <Icon className="w-4 h-4" />
                         <span>{item.name}</span>
-                        <ChevronDown className="w-3 h-3" />
+                        <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                       </button>
-                      <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                        <div className="py-2">
-                          {item.submenu.map((subItem) => (
-                            <Link
-                              key={subItem.path}
-                              to={createPageUrl(subItem.path)}
-                              className={`
-                                flex items-center px-4 py-2 text-sm
-                                transition-colors duration-150
-                                ${currentPageName === subItem.path
-                                  ? 'bg-indigo-50 text-indigo-600 font-semibold'
-                                  : 'text-slate-700 hover:bg-slate-50'
-                                }
-                              `}
-                            >
-                              {subItem.name}
-                            </Link>
-                          ))}
+                      {isOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-slate-200 z-50">
+                          <div className="py-2">
+                            {item.submenu.map((subItem) => (
+                              <Link
+                                key={subItem.path}
+                                to={createPageUrl(subItem.path)}
+                                onClick={() => setOpenDropdown(null)}
+                                className={`
+                                  flex items-center px-4 py-2 text-sm
+                                  transition-colors duration-150
+                                  ${currentPageName === subItem.path
+                                    ? 'bg-indigo-50 text-indigo-600 font-semibold'
+                                    : 'text-slate-700 hover:bg-slate-50'
+                                  }
+                                `}
+                              >
+                                {subItem.name}
+                              </Link>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 }
@@ -269,8 +275,11 @@ export default function Layout({ children, currentPageName }) {
                 <NotificationCenter userEmail={currentUser.email} />
               )}
               {employee && (
-                <div className="hidden md:block relative group">
-                  <button className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-slate-50 transition-all">
+                <div className="hidden md:block relative">
+                  <button 
+                    onClick={() => setOpenDropdown(openDropdown === 'profile' ? null : 'profile')}
+                    className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-slate-50 transition-all"
+                  >
                     <p className="text-sm text-slate-600">
                       {employee.first_name} {employee.last_name}
                     </p>
@@ -278,12 +287,14 @@ export default function Layout({ children, currentPageName }) {
                       <Shield className="w-3 h-3" />
                       {roleBadge.text}
                     </div>
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${openDropdown === 'profile' ? 'rotate-180' : ''}`} />
                   </button>
-                  <div className="absolute top-full right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                    <div className="py-2">
+                  {openDropdown === 'profile' && (
+                    <div className="absolute top-full right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-slate-200 z-50">
+                      <div className="py-2">
                       <Link
                         to={createPageUrl("MyProfile")}
+                        onClick={() => setOpenDropdown(null)}
                         className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                       >
                         <User className="w-4 h-4" />
@@ -293,6 +304,7 @@ export default function Layout({ children, currentPageName }) {
                         <>
                           <Link
                             to={createPageUrl("CompanySettings")}
+                            onClick={() => setOpenDropdown(null)}
                             className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             <Shield className="w-4 h-4" />
@@ -300,6 +312,7 @@ export default function Layout({ children, currentPageName }) {
                           </Link>
                           <Link
                             to={createPageUrl("PayslipTemplateConfig")}
+                            onClick={() => setOpenDropdown(null)}
                             className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             <Shield className="w-4 h-4" />
@@ -307,6 +320,7 @@ export default function Layout({ children, currentPageName }) {
                           </Link>
                           <Link
                             to={createPageUrl("MasterDataManagement")}
+                            onClick={() => setOpenDropdown(null)}
                             className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             <Shield className="w-4 h-4" />
@@ -314,6 +328,7 @@ export default function Layout({ children, currentPageName }) {
                           </Link>
                           <Link
                             to={createPageUrl("UserManagement")}
+                            onClick={() => setOpenDropdown(null)}
                             className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             <Users className="w-4 h-4" />
@@ -321,6 +336,7 @@ export default function Layout({ children, currentPageName }) {
                           </Link>
                           <Link
                             to={createPageUrl("SystemRoleInitializer")}
+                            onClick={() => setOpenDropdown(null)}
                             className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             <Shield className="w-4 h-4" />
@@ -328,6 +344,7 @@ export default function Layout({ children, currentPageName }) {
                           </Link>
                           <Link
                             to={createPageUrl("DataExport")}
+                            onClick={() => setOpenDropdown(null)}
                             className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             <Shield className="w-4 h-4" />
@@ -336,16 +353,20 @@ export default function Layout({ children, currentPageName }) {
                           </>
                           )}
                           <button
-                          onClick={handleLogout}
+                          onClick={() => {
+                            setOpenDropdown(null);
+                            handleLogout();
+                          }}
                           className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                           >
                           <LogOut className="w-4 h-4" />
                           Cerrar Sesión
                           </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+                          </div>
+                          </div>
+                          )}
+                          </div>
+                          )}
 
               {/* Mobile menu button */}
               <Button
@@ -403,6 +424,14 @@ export default function Layout({ children, currentPageName }) {
             </div>
           </nav>
         </div>
+      )}
+
+      {/* Overlay to close dropdowns when clicking outside */}
+      {openDropdown && (
+        <div 
+          className="fixed inset-0 z-30"
+          onClick={() => setOpenDropdown(null)}
+        />
       )}
 
       {/* Mobile overlay */}
