@@ -1062,13 +1062,34 @@ export default function EmployeeManagement() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
                         <div>
                           <Label>Fecha de Nacimiento</Label>
                           <Input
                             type="date"
                             value={formData.birth_date}
                             onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <Label>Edad</Label>
+                          <Input
+                            value={
+                              formData.birth_date
+                                ? (() => {
+                                    const birthDate = new Date(formData.birth_date);
+                                    const today = new Date();
+                                    let age = today.getFullYear() - birthDate.getFullYear();
+                                    const monthDiff = today.getMonth() - birthDate.getMonth();
+                                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                                      age--;
+                                    }
+                                    return `${age} años`;
+                                  })()
+                                : ""
+                            }
+                            disabled
+                            className="bg-slate-100 text-slate-700 font-medium"
                           />
                         </div>
                         <div>
