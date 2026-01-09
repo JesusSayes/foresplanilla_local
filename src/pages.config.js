@@ -10,6 +10,7 @@ import ContractTemplateConfig from './pages/ContractTemplateConfig';
 import CostCenterManagement from './pages/CostCenterManagement';
 import CostCenterValuation from './pages/CostCenterValuation';
 import Dashboard from './pages/Dashboard';
+import DataExport from './pages/DataExport';
 import DatabaseConfig from './pages/DatabaseConfig';
 import EmployeeManagement from './pages/EmployeeManagement';
 import HRDashboard from './pages/HRDashboard';
@@ -33,7 +34,6 @@ import UserManagement from './pages/UserManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
-import DataExport from './pages/DataExport';
 import __Layout from './Layout.jsx';
 
 
@@ -50,6 +50,7 @@ export const PAGES = {
     "CostCenterManagement": CostCenterManagement,
     "CostCenterValuation": CostCenterValuation,
     "Dashboard": Dashboard,
+    "DataExport": DataExport,
     "DatabaseConfig": DatabaseConfig,
     "EmployeeManagement": EmployeeManagement,
     "HRDashboard": HRDashboard,
@@ -73,7 +74,6 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
-    "DataExport": DataExport,
 }
 
 export const pagesConfig = {

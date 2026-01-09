@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Building, MapPin, Briefcase, CreditCard, Plus, Edit, Trash2, Search, DollarSign, Target
+  Building, MapPin, Briefcase, CreditCard, Plus, Edit, Trash2, Search, DollarSign, Target, Shield
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
@@ -88,6 +88,16 @@ export default function MasterDataManagement() {
     queryFn: async () => await base44.entities.CostCenter.list("code"),
   });
 
+  const { data: seguroVidaLey = [] } = useQuery({
+    queryKey: ["segurovida"],
+    queryFn: async () => await base44.entities.SeguroVidaLey.list("age_range_start"),
+  });
+
+  const { data: uitRecords = [] } = useQuery({
+    queryKey: ["uit"],
+    queryFn: async () => await base44.entities.UIT.list("-year"),
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ entity, data }) => {
       return await base44.entities[entity].create(data);
@@ -153,6 +163,8 @@ export default function MasterDataManagement() {
       afp: "AFP",
       professions: "Profession",
       costcenters: "CostCenter",
+      segurovida: "SeguroVidaLey",
+      uit: "UIT",
     };
     const entity = entityMap[activeTab];
 
@@ -225,6 +237,18 @@ export default function MasterDataManagement() {
     c.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const filteredSeguroVida = seguroVidaLey.filter(s =>
+    s.age_range_start?.toString().includes(searchTerm) ||
+    s.age_range_end?.toString().includes(searchTerm)
+  );
+
+  const filteredUIT = uitRecords.filter(u =>
+    u.year?.toString().includes(searchTerm) ||
+    u.amount?.toString().includes(searchTerm)
+  );
+
+  const activeUIT = uitRecords.find(u => u.year === new Date().getFullYear());
+
   if (!employee || permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -264,7 +288,7 @@ export default function MasterDataManagement() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-8 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-10 gap-6 mb-8">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
@@ -376,10 +400,38 @@ export default function MasterDataManagement() {
               <p className="text-slate-600 text-sm">Centros Costos</p>
             </CardContent>
           </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-red-100 rounded-xl">
+                  <Shield className="w-6 h-6 text-red-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">
+                {seguroVidaLey.length}
+              </div>
+              <p className="text-slate-600 text-sm">Seguro Vida</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-yellow-100 rounded-xl">
+                  <DollarSign className="w-6 h-6 text-yellow-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">
+                {activeUIT ? `S/ ${activeUIT.amount.toFixed(0)}` : "N/A"}
+              </div>
+              <p className="text-slate-600 text-sm">UIT {new Date().getFullYear()}</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-6xl grid-cols-8">
+          <TabsList className="grid w-full max-w-7xl grid-cols-10">
             <TabsTrigger value="sites">Sedes</TabsTrigger>
             <TabsTrigger value="positions">Cargos</TabsTrigger>
             <TabsTrigger value="departments">Departamentos</TabsTrigger>
@@ -388,6 +440,8 @@ export default function MasterDataManagement() {
             <TabsTrigger value="afp">AFP</TabsTrigger>
             <TabsTrigger value="professions">Profesiones</TabsTrigger>
             <TabsTrigger value="costcenters">Centros Costos</TabsTrigger>
+            <TabsTrigger value="segurovida">Seguro Vida</TabsTrigger>
+            <TabsTrigger value="uit">UIT</TabsTrigger>
           </TabsList>
 
           <TabsContent value="sites" className="space-y-6">
@@ -1040,6 +1094,139 @@ export default function MasterDataManagement() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="segurovida" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Seguro Vida Ley</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Tasas comerciales por rango de edad
+                    </p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button
+                      onClick={() => handleCreate("segurovida")}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nuevo Rango
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  {filteredSeguroVida.map(seguro => (
+                    <div key={seguro.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-bold text-slate-900 text-lg">
+                              {seguro.age_range_start}-{seguro.age_range_end === 1000 ? "más" : seguro.age_range_end} años
+                            </h4>
+                            <Badge className="bg-red-100 text-red-700">{seguro.commercial_rate}%</Badge>
+                            {!seguro.is_active && (
+                              <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEdit(seguro, "segurovida")}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => handleDelete(seguro, "SeguroVidaLey")}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="uit" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Unidad Impositiva Tributaria (UIT)</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Valores históricos de UIT por año
+                    </p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button
+                      onClick={() => handleCreate("uit")}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nueva UIT
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  {filteredUIT.map(uit => (
+                    <div key={uit.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-bold text-slate-900 text-xl">Año {uit.year}</h4>
+                            <Badge className="bg-yellow-100 text-yellow-700 text-lg">S/ {uit.amount.toFixed(2)}</Badge>
+                            {uit.year === new Date().getFullYear() && (
+                              <Badge className="bg-green-100 text-green-700">Vigente</Badge>
+                            )}
+                            {!uit.is_active && (
+                              <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEdit(uit, "uit")}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => handleDelete(uit, "UIT")}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
           </Tabs>
           </div>
 
@@ -1064,7 +1251,9 @@ export default function MasterDataManagement() {
                     activeTab === "rmv" ? "RMV" : 
                     activeTab === "afp" ? "AFP" : 
                     activeTab === "professions" ? "Profesión" :
-                    activeTab === "costcenters" ? "Centro de Costos" : ""
+                    activeTab === "costcenters" ? "Centro de Costos" :
+                    activeTab === "segurovida" ? "Seguro Vida Ley" :
+                    activeTab === "uit" ? "UIT" : ""
                   }
                 </CardTitle>
                 <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
@@ -1438,6 +1627,85 @@ export default function MasterDataManagement() {
                         className="w-4 h-4 rounded"
                       />
                       <label htmlFor="is_active_costcenter" className="text-sm">Activo</label>
+                    </div>
+                  </>
+                )}
+
+                {activeTab === "segurovida" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Edad Inicio *</Label>
+                        <Input
+                          type="number"
+                          value={formData.age_range_start || ""}
+                          onChange={(e) => setFormData({ ...formData, age_range_start: parseInt(e.target.value) })}
+                          placeholder="Ej: 18"
+                        />
+                      </div>
+                      <div>
+                        <Label>Edad Fin *</Label>
+                        <Input
+                          type="number"
+                          value={formData.age_range_end || ""}
+                          onChange={(e) => setFormData({ ...formData, age_range_end: parseInt(e.target.value) })}
+                          placeholder="Ej: 36 (use 1000 para 'más')"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Tasa Comercial (%) *</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={formData.commercial_rate || ""}
+                        onChange={(e) => setFormData({ ...formData, commercial_rate: parseFloat(e.target.value) })}
+                        placeholder="Ej: 0.12"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_active_seguro"
+                        checked={formData.is_active !== false}
+                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="is_active_seguro" className="text-sm">Activo</label>
+                    </div>
+                  </>
+                )}
+
+                {activeTab === "uit" && (
+                  <>
+                    <div>
+                      <Label>Año *</Label>
+                      <Input
+                        type="number"
+                        value={formData.year || ""}
+                        onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
+                        placeholder="Ej: 2026"
+                      />
+                    </div>
+                    <div>
+                      <Label>Monto (S/) *</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={formData.amount || ""}
+                        onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
+                        placeholder="Ej: 5150.00"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_active_uit"
+                        checked={formData.is_active !== false}
+                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="is_active_uit" className="text-sm">Activo</label>
                     </div>
                   </>
                 )}
