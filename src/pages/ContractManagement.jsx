@@ -203,6 +203,9 @@ export default function ContractManagement() {
       department: contract?.department || emp?.department_name || "",
       work_location: contract?.work_location || emp?.site || "",
       salary: contract?.salary || emp?.base_salary || "",
+      activity_cost: contract?.activity_cost || 0,
+      food_cost: contract?.food_cost || 0,
+      transport_cost: contract?.transport_cost || 0,
       work_schedule: contract?.work_schedule || "Lunes a Viernes de 9:00 AM a 6:00 PM",
       weekly_hours: contract?.weekly_hours || 48,
       functions: contract?.functions || "",
@@ -611,6 +614,16 @@ export default function ContractManagement() {
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-4">
+                  {editingContract && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-blue-900">Número de Contrato:</span>
+                        <span className="text-sm font-bold text-blue-700">{formData.contract_number || "N/A"}</span>
+                      </div>
+                      <p className="text-xs text-blue-600 mt-1">Este campo se genera automáticamente y no puede ser modificado</p>
+                    </div>
+                  )}
+
                   <div>
                     <Label>Empleado *</Label>
                     <Select 
@@ -650,20 +663,6 @@ export default function ContractManagement() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Número de Contrato</Label>
-                      <Input
-                        value={formData.contract_number}
-                        onChange={(e) => setFormData({...formData, contract_number: e.target.value})}
-                        placeholder="Se genera automáticamente"
-                        disabled={!editingContract}
-                      />
-                      {!editingContract && (
-                        <p className="text-xs text-slate-500 mt-1">
-                          Se generará automáticamente al crear el contrato
-                        </p>
-                      )}
-                    </div>
                     <div>
                       <Label>Tipo de Contrato *</Label>
                       <Select 
@@ -879,6 +878,39 @@ export default function ContractManagement() {
                         type="number"
                         value={formData.trial_period_days}
                         onChange={(e) => setFormData({...formData, trial_period_days: parseInt(e.target.value)})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label>Costo de Actividad (S/)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={formData.activity_cost}
+                        onChange={(e) => setFormData({...formData, activity_cost: parseFloat(e.target.value) || 0})}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label>Costo de Alimento (S/)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={formData.food_cost}
+                        onChange={(e) => setFormData({...formData, food_cost: parseFloat(e.target.value) || 0})}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label>Costo de Movilidad (S/)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={formData.transport_cost}
+                        onChange={(e) => setFormData({...formData, transport_cost: parseFloat(e.target.value) || 0})}
+                        placeholder="0.00"
                       />
                     </div>
                   </div>
