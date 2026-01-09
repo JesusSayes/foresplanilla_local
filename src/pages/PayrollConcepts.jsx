@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   DollarSign, Plus, Trash2, Search, TrendingUp, 
-  TrendingDown, Users, AlertCircle, Edit2, CheckCircle, User, Copy
+  TrendingDown, Users, AlertCircle, Edit2, CheckCircle, User, Copy, Upload, FileSpreadsheet, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -204,6 +204,10 @@ export default function PayrollConcepts() {
     notes: "",
   });
   const [editingConcept, setEditingConcept] = useState(null);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [processingFile, setProcessingFile] = useState(false);
+  const [uploadPreview, setUploadPreview] = useState([]);
 
   const queryClient = useQueryClient();
 
@@ -503,6 +507,119 @@ export default function PayrollConcepts() {
     toast.info("Concepto copiado. Modifica y guarda.");
   };
 
+  const handleBulkUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setProcessingFile(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+
+      const extractedData = await base44.integrations.Core.ExtractDataFromUploadedFile({
+        file_url,
+        json_schema: {
+          type: "object",
+          properties: {
+            concepts: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  employee_code: { type: "string" },
+                  concept_type: { type: "string" },
+                  concept_name: { type: "string" },
+                  amount: { type: "number" },
+                  is_dynamic: { type: "boolean" },
+                  calculation_formula: { type: "string" },
+                  description: { type: "string" },
+                  notes: { type: "string" },
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (extractedData.status === "success" && extractedData.output?.concepts) {
+        setUploadPreview(extractedData.output.concepts);
+        toast.success(`${extractedData.output.concepts.length} conceptos cargados para revisión`);
+      } else {
+        toast.error("Error al procesar el archivo");
+      }
+    } catch (error) {
+      toast.error("Error al cargar el archivo");
+      console.error(error);
+    } finally {
+      setProcessingFile(false);
+    }
+  };
+
+  const bulkCreateMutation = useMutation({
+    mutationFn: async (concepts) => {
+      const results = { success: 0, errors: 0 };
+      
+      for (const concept of concepts) {
+        try {
+          const emp = allEmployees.find(e => e.employee_code === concept.employee_code);
+          if (!emp) {
+            results.errors++;
+            continue;
+          }
+
+          await base44.entities.PayrollConcept.create({
+            employee_id: emp.id,
+            concept_type: concept.concept_type,
+            concept_name: concept.concept_name,
+            amount: concept.is_dynamic ? 0 : parseFloat(concept.amount || 0),
+            is_dynamic: concept.is_dynamic || false,
+            calculation_formula: concept.calculation_formula || "",
+            month: selectedMonth,
+            year: selectedYear,
+            is_recurring: false,
+            is_applied: false,
+            description: concept.description || "",
+            notes: concept.notes || "",
+          });
+          
+          results.success++;
+        } catch (error) {
+          console.error("Error creating concept:", error);
+          results.errors++;
+        }
+      }
+      
+      return results;
+    },
+    onSuccess: (results) => {
+      queryClient.invalidateQueries(["payrollConcepts"]);
+      toast.success(`${results.success} conceptos creados. ${results.errors} errores.`);
+      setShowBulkUpload(false);
+      setUploadPreview([]);
+      setUploadedFile(null);
+    },
+    onError: () => {
+      toast.error("Error en la carga masiva");
+    },
+  });
+
+  const downloadBulkTemplate = () => {
+    const template = `employee_code,concept_type,concept_name,amount,is_dynamic,calculation_formula,description,notes
+639,Ingreso,Bono Productividad,500,FALSE,,Bono por metas cumplidas,
+640,Descuento,Préstamo Personal,200,FALSE,,Cuota mensual préstamo,Cuota 1 de 12
+641,Ingreso,Comisión Ventas,0,TRUE,ventas_mensuales * 0.05,Comisión 5% sobre ventas,`;
+
+    const blob = new Blob([template], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "plantilla_conceptos_masivos.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Plantilla descargada");
+  };
+
   const resetForm = () => {
     setFormData({
       concept_type: "Ingreso",
@@ -566,6 +683,21 @@ export default function PayrollConcepts() {
             </p>
           </div>
           <div className="flex gap-3">
+            <Button
+              onClick={() => setShowForm(true)}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Concepto
+            </Button>
+            <Button
+              onClick={() => setShowBulkUpload(true)}
+              variant="outline"
+              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Carga Masiva
+            </Button>
             <Button
               onClick={() => syncONPConceptsMutation.mutate()}
               variant="outline"
@@ -1354,6 +1486,131 @@ export default function PayrollConcepts() {
         </Tabs>
       </div>
 
+      {/* Bulk Upload Modal */}
+      {showBulkUpload && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+          onClick={() => setShowBulkUpload(false)}
+        >
+          <Card 
+            className="max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-green-600" />
+                  Carga Masiva de Conceptos
+                </CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => setShowBulkUpload(false)}>✕</Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-bold text-blue-900 mb-2">📋 Instrucciones</h4>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>1. Descarga la plantilla CSV con el formato correcto</li>
+                  <li>2. Completa los datos de cada concepto (employee_code, concept_type, concept_name, amount, etc.)</li>
+                  <li>3. Sube el archivo completado para procesar</li>
+                </ul>
+                <Button
+                  onClick={downloadBulkTemplate}
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                >
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Descargar Plantilla CSV
+                </Button>
+              </div>
+
+              <div>
+                <Label>Cargar Archivo CSV</Label>
+                <Input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleBulkUpload}
+                  disabled={processingFile}
+                  className="mt-2"
+                />
+                {processingFile && (
+                  <div className="flex items-center gap-2 mt-2 text-blue-600">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Procesando archivo...</span>
+                  </div>
+                )}
+              </div>
+
+              {uploadPreview.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-bold text-slate-900">
+                      Vista Previa ({uploadPreview.length} conceptos)
+                    </h4>
+                    <Button
+                      onClick={() => bulkCreateMutation.mutate(uploadPreview)}
+                      disabled={bulkCreateMutation.isPending}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {bulkCreateMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Importando...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Importar Conceptos
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="border rounded-lg max-h-96 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-100 sticky top-0">
+                        <tr>
+                          <th className="text-left p-2 text-xs">Código Emp</th>
+                          <th className="text-left p-2 text-xs">Tipo</th>
+                          <th className="text-left p-2 text-xs">Concepto</th>
+                          <th className="text-right p-2 text-xs">Monto</th>
+                          <th className="text-left p-2 text-xs">Dinámico</th>
+                          <th className="text-left p-2 text-xs">Fórmula</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {uploadPreview.map((item, idx) => {
+                          const emp = allEmployees.find(e => e.employee_code === item.employee_code);
+                          return (
+                            <tr key={idx} className={`border-t ${!emp ? 'bg-red-50' : ''}`}>
+                              <td className="p-2">
+                                {item.employee_code}
+                                {!emp && <span className="text-red-600 text-xs block">⚠ No encontrado</span>}
+                              </td>
+                              <td className="p-2">
+                                <Badge className={
+                                  item.concept_type === "Ingreso" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                }>
+                                  {item.concept_type}
+                                </Badge>
+                              </td>
+                              <td className="p-2 font-medium">{item.concept_name}</td>
+                              <td className="p-2 text-right">{item.is_dynamic ? "-" : `S/ ${parseFloat(item.amount || 0).toFixed(2)}`}</td>
+                              <td className="p-2">{item.is_dynamic ? "Sí" : "No"}</td>
+                              <td className="p-2 text-xs font-mono">{item.calculation_formula || "-"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Form Modal */}
       {showForm && (
         <div 
@@ -1373,6 +1630,15 @@ export default function PayrollConcepts() {
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-amber-800">
+                  {activeTab === "general" 
+                    ? "Este concepto se aplicará a todos los empleados automáticamente"
+                    : "Este concepto se aplicará solo al empleado seleccionado"
+                  }
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Tipo de Concepto *</Label>
