@@ -1796,7 +1796,7 @@ export default function PayrollConcepts() {
                     className="font-mono text-sm"
                   />
                   <p className="text-xs text-slate-500 mt-1">
-                    Variables disponibles: base_salary, worked_days, horas_extras_25, horas_extras_35, horas_nocturnas
+                    Variables disponibles: base_salary, worked_days, horas_extras_25, horas_extras_35, horas_nocturnas, activity_cost, food_cost, transport_cost
                   </p>
                 </div>
               ) : (
