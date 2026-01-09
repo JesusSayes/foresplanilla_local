@@ -699,17 +699,17 @@ export default function PayrollConcepts() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-8 flex justify-between items-start">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row justify-between items-start gap-4">
           <div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-2">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-2">
               Gestión de Conceptos de Planilla
             </h1>
-            <p className="text-slate-600 text-lg">
+            <p className="text-slate-600 text-sm sm:text-base lg:text-lg">
               Configura ingresos, descuentos y aportaciones según legislación peruana
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             <Button
               onClick={() => setShowForm(true)}
               className="bg-indigo-600 hover:bg-indigo-700"
@@ -751,7 +751,7 @@ export default function PayrollConcepts() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
@@ -817,7 +817,7 @@ export default function PayrollConcepts() {
                 </p>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
                   {/* Columna Izquierda: Conceptos No Incorporados */}
                   <div className="space-y-4">
                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">

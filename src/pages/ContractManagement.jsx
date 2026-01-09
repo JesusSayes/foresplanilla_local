@@ -370,18 +370,18 @@ export default function ContractManagement() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-2">
             Gestión de Contratos
           </h1>
-          <p className="text-slate-600 text-lg">
+          <p className="text-slate-600 text-sm sm:text-base lg:text-lg">
             Registra y administra los contratos laborales de los empleados
           </p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
@@ -517,7 +517,7 @@ export default function ContractManagement() {
                             })()}
                           </div>
 
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                             <div>
                               <p className="text-slate-600">Cargo</p>
                               <p className="font-semibold text-slate-900">{contract.position}</p>
@@ -662,7 +662,7 @@ export default function ContractManagement() {
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>Tipo de Contrato *</Label>
                       <Select 
@@ -691,50 +691,50 @@ export default function ContractManagement() {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Selector de Plantilla */}
+                    {contractTemplates.length > 0 && (
+                      <div>
+                        <Label className="flex items-center gap-2">
+                          <FileText className="w-4 h-4" />
+                          Plantilla de Contrato
+                        </Label>
+                        <Select 
+                          value={formData.template_id} 
+                          onValueChange={(v) => setFormData({...formData, template_id: v})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar plantilla" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {contractTemplates.map(template => (
+                              <SelectItem key={template.id} value={template.id}>
+                                <div className="flex items-center gap-2">
+                                  {template.is_default && (
+                                    <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                                  )}
+                                  <span>{template.template_name}</span>
+                                  {template.contract_types?.length > 0 && (
+                                    <span className="text-xs text-slate-500">
+                                      ({template.contract_types.join(", ")})
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {formData.template_id && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            {contractTemplates.find(t => t.id === formData.template_id)?.description || 
+                              "Esta plantilla se usará al generar el PDF del contrato"}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Selector de Plantilla */}
-                  {contractTemplates.length > 0 && (
-                    <div>
-                      <Label className="flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        Plantilla de Contrato
-                      </Label>
-                      <Select 
-                        value={formData.template_id} 
-                        onValueChange={(v) => setFormData({...formData, template_id: v})}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar plantilla" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {contractTemplates.map(template => (
-                            <SelectItem key={template.id} value={template.id}>
-                              <div className="flex items-center gap-2">
-                                {template.is_default && (
-                                  <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-                                )}
-                                <span>{template.template_name}</span>
-                                {template.contract_types?.length > 0 && (
-                                  <span className="text-xs text-slate-500">
-                                    ({template.contract_types.join(", ")})
-                                  </span>
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {formData.template_id && (
-                        <p className="text-xs text-slate-500 mt-1">
-                          {contractTemplates.find(t => t.id === formData.template_id)?.description || 
-                            "Esta plantilla se usará al generar el PDF del contrato"}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <Label>Fecha de Inicio *</Label>
                       <Input
@@ -778,7 +778,7 @@ export default function ContractManagement() {
                 </TabsContent>
 
                 <TabsContent value="work" className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>Cargo *</Label>
                       <Select value={formData.position} onValueChange={(val) => setFormData({ ...formData, position: val })}>
@@ -854,7 +854,7 @@ export default function ContractManagement() {
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <Label>Remuneración Mensual (S/) *</Label>
                       <Input
@@ -882,7 +882,7 @@ export default function ContractManagement() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <Label>Costo de Actividad (S/)</Label>
                       <Input
