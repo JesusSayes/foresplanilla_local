@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Download, Database, FileJson, FileCode, Loader2, CheckCircle2 } from "lucide-react";
+import { Download, Database, FileJson, FileCode, Loader2, CheckCircle2, FileType } from "lucide-react";
 import { toast } from "sonner";
 
 export default function DataExport() {
@@ -29,7 +29,7 @@ export default function DataExport() {
     "CompanyInfo", "PayslipTemplate", "RMV",
     "DatabaseConnection", "SyncLog", "AccessDevice", "EmployeeAccessMapping", "DeviceEvent",
     "Notification", "NotificationPreference",
-    "UserInvitation"
+    "UserInvitation", "Derechohabiente"
   ];
 
   useEffect(() => {
@@ -173,6 +173,101 @@ export default function DataExport() {
     }
   };
 
+  const exportAllSchemas = async () => {
+    setExporting(true);
+    setProgress({ current: 0, total: entities.length, entity: "schemas" });
+
+    try {
+      const schemas = {};
+
+      for (let i = 0; i < entities.length; i++) {
+        const entityName = entities[i];
+        setProgress({ current: i + 1, total: entities.length, entity: entityName });
+
+        try {
+          const schema = await base44.entities[entityName].schema();
+          schemas[entityName] = schema;
+          toast.success(`✓ ${entityName} esquema obtenido`);
+        } catch (error) {
+          console.error(`Error obteniendo esquema de ${entityName}:`, error);
+          schemas[entityName] = { error: "No se pudo obtener el esquema" };
+          toast.error(`✗ Error en ${entityName}`);
+        }
+      }
+
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        schemas: schemas
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `base44_schemas_all_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("✅ Exportación de esquemas completa");
+    } catch (error) {
+      toast.error("Error exportando esquemas");
+      console.error(error);
+    } finally {
+      setExporting(false);
+      setProgress({ current: 0, total: 0, entity: "" });
+    }
+  };
+
+  const exportSelectedSchemas = async () => {
+    setExporting(true);
+    const selectedList = entities.filter(e => selectedEntities[e]);
+    setProgress({ current: 0, total: selectedList.length, entity: "schemas" });
+
+    try {
+      const schemas = {};
+
+      for (let i = 0; i < selectedList.length; i++) {
+        const entityName = selectedList[i];
+        setProgress({ current: i + 1, total: selectedList.length, entity: entityName });
+
+        try {
+          const schema = await base44.entities[entityName].schema();
+          schemas[entityName] = schema;
+          toast.success(`✓ ${entityName} esquema obtenido`);
+        } catch (error) {
+          console.error(`Error obteniendo esquema de ${entityName}:`, error);
+          schemas[entityName] = { error: "No se pudo obtener el esquema" };
+          toast.error(`✗ Error en ${entityName}`);
+        }
+      }
+
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        schemas: schemas
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `base44_schemas_selected_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("✅ Exportación de esquemas seleccionados completa");
+    } catch (error) {
+      toast.error("Error exportando esquemas");
+      console.error(error);
+    } finally {
+      setExporting(false);
+      setProgress({ current: 0, total: 0, entity: "" });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -239,7 +334,7 @@ export default function DataExport() {
               <CardHeader className="border-b bg-indigo-50/50">
                 <CardTitle className="flex items-center gap-2">
                   <Database className="w-5 h-5 text-indigo-600" />
-                  Formato de Exportación
+                  Exportar Datos
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
@@ -248,7 +343,7 @@ export default function DataExport() {
                   disabled={exporting || selectedCount === 0}
                   className="w-full bg-indigo-600 hover:bg-indigo-700"
                 >
-                  {exporting && progress.entity ? (
+                  {exporting && progress.entity !== "schemas" ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Exportando...
@@ -256,7 +351,7 @@ export default function DataExport() {
                   ) : (
                     <>
                       <FileJson className="w-4 h-4 mr-2" />
-                      Descargar JSON
+                      Descargar Datos JSON
                     </>
                   )}
                 </Button>
@@ -267,7 +362,7 @@ export default function DataExport() {
                   variant="outline"
                   className="w-full"
                 >
-                  {exporting && progress.entity ? (
+                  {exporting && progress.entity !== "schemas" ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Generando SQL...
@@ -275,41 +370,90 @@ export default function DataExport() {
                   ) : (
                     <>
                       <FileCode className="w-4 h-4 mr-2" />
-                      Descargar SQL
+                      Descargar Datos SQL
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-green-50/50">
+                <CardTitle className="flex items-center gap-2">
+                  <FileType className="w-5 h-5 text-green-600" />
+                  Exportar Esquemas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <Button
+                  onClick={exportAllSchemas}
+                  disabled={exporting}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  {exporting && progress.entity === "schemas" ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Exportando Esquemas...
+                    </>
+                  ) : (
+                    <>
+                      <FileType className="w-4 h-4 mr-2" />
+                      Todas las Tablas
                     </>
                   )}
                 </Button>
 
-                {exporting && (
-                  <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                      <span className="text-sm font-medium text-blue-900">
-                        Exportando {progress.entity}
-                      </span>
-                    </div>
-                    <div className="w-full bg-blue-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all"
-                        style={{ width: `${(progress.current / progress.total) * 100}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-blue-700 mt-1">
-                      {progress.current} de {progress.total} entidades
-                    </p>
-                  </div>
-                )}
+                <Button
+                  onClick={exportSelectedSchemas}
+                  disabled={exporting || selectedCount === 0}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {exporting && progress.entity === "schemas" ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Exportando...
+                    </>
+                  ) : (
+                    <>
+                      <FileType className="w-4 h-4 mr-2" />
+                      Tablas Seleccionadas
+                    </>
+                  )}
+                </Button>
               </CardContent>
             </Card>
+
+            {exporting && (
+              <Card className="border-0 shadow-lg">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                    <span className="text-sm font-medium text-blue-900">
+                      {progress.entity === "schemas" ? "Exportando esquemas" : `Exportando ${progress.entity}`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all"
+                      style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-blue-700 mt-1">
+                    {progress.current} de {progress.total} {progress.entity === "schemas" ? "esquemas" : "entidades"}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="border-0 shadow-lg bg-amber-50">
               <CardContent className="p-6">
                 <h3 className="font-bold text-amber-900 mb-2">ℹ️ Información</h3>
                 <ul className="text-sm text-amber-800 space-y-2">
-                  <li>• <strong>JSON:</strong> Formato completo con toda la estructura</li>
-                  <li>• <strong>SQL:</strong> Scripts INSERT para importar a tu DB</li>
-                  <li>• Los datos incluyen registros completos con IDs</li>
-                  <li>• Se mantienen las relaciones entre entidades</li>
+                  <li>• <strong>Datos JSON:</strong> Registros completos con IDs</li>
+                  <li>• <strong>Datos SQL:</strong> Scripts INSERT para importar</li>
+                  <li>• <strong>Esquemas:</strong> Estructura de tablas (campos y tipos)</li>
+                  <li>• Los esquemas no incluyen datos, solo definiciones</li>
                 </ul>
               </CardContent>
             </Card>
