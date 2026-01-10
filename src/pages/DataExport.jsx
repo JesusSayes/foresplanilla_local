@@ -185,18 +185,57 @@ export default function DataExport() {
         setProgress({ current: i + 1, total: entities.length, entity: entityName });
 
         try {
-          const schema = await base44.entities[entityName].schema();
-          schemas[entityName] = schema;
-          toast.success(`✓ ${entityName} esquema obtenido`);
+          // Obtener un registro de muestra para inferir el esquema
+          const sampleData = await base44.entities[entityName].list("", 1);
+          
+          if (sampleData && sampleData.length > 0) {
+            // Construir esquema basado en el primer registro
+            const sample = sampleData[0];
+            const schema = {
+              properties: {},
+              sample_record: sample
+            };
+            
+            Object.keys(sample).forEach(key => {
+              const value = sample[key];
+              let type = typeof value;
+              
+              if (value === null) {
+                type = "null";
+              } else if (Array.isArray(value)) {
+                type = "array";
+              } else if (value instanceof Date || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value))) {
+                type = "string (date)";
+              }
+              
+              schema.properties[key] = {
+                type: type,
+                example: value
+              };
+            });
+            
+            schemas[entityName] = schema;
+            toast.success(`✓ ${entityName}: ${Object.keys(schema.properties).length} campos`, { duration: 2000 });
+          } else {
+            schemas[entityName] = { 
+              properties: {},
+              note: "No hay registros para inferir esquema"
+            };
+            toast.warning(`⚠ ${entityName}: sin datos`, { duration: 2000 });
+          }
         } catch (error) {
           console.error(`Error obteniendo esquema de ${entityName}:`, error);
-          schemas[entityName] = { error: "No se pudo obtener el esquema" };
-          toast.error(`✗ Error en ${entityName}`);
+          schemas[entityName] = { 
+            error: error.message || "No se pudo obtener el esquema",
+            details: String(error)
+          };
+          toast.error(`✗ ${entityName}: ${error.message}`, { duration: 2000 });
         }
       }
 
       const exportData = {
         exportDate: new Date().toISOString(),
+        totalEntities: entities.length,
         schemas: schemas
       };
 
@@ -212,7 +251,7 @@ export default function DataExport() {
 
       toast.success("✅ Exportación de esquemas completa");
     } catch (error) {
-      toast.error("Error exportando esquemas");
+      toast.error("Error exportando esquemas: " + error.message);
       console.error(error);
     } finally {
       setExporting(false);
@@ -233,18 +272,57 @@ export default function DataExport() {
         setProgress({ current: i + 1, total: selectedList.length, entity: entityName });
 
         try {
-          const schema = await base44.entities[entityName].schema();
-          schemas[entityName] = schema;
-          toast.success(`✓ ${entityName} esquema obtenido`);
+          // Obtener un registro de muestra para inferir el esquema
+          const sampleData = await base44.entities[entityName].list("", 1);
+          
+          if (sampleData && sampleData.length > 0) {
+            // Construir esquema basado en el primer registro
+            const sample = sampleData[0];
+            const schema = {
+              properties: {},
+              sample_record: sample
+            };
+            
+            Object.keys(sample).forEach(key => {
+              const value = sample[key];
+              let type = typeof value;
+              
+              if (value === null) {
+                type = "null";
+              } else if (Array.isArray(value)) {
+                type = "array";
+              } else if (value instanceof Date || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value))) {
+                type = "string (date)";
+              }
+              
+              schema.properties[key] = {
+                type: type,
+                example: value
+              };
+            });
+            
+            schemas[entityName] = schema;
+            toast.success(`✓ ${entityName}: ${Object.keys(schema.properties).length} campos`, { duration: 2000 });
+          } else {
+            schemas[entityName] = { 
+              properties: {},
+              note: "No hay registros para inferir esquema"
+            };
+            toast.warning(`⚠ ${entityName}: sin datos`, { duration: 2000 });
+          }
         } catch (error) {
           console.error(`Error obteniendo esquema de ${entityName}:`, error);
-          schemas[entityName] = { error: "No se pudo obtener el esquema" };
-          toast.error(`✗ Error en ${entityName}`);
+          schemas[entityName] = { 
+            error: error.message || "No se pudo obtener el esquema",
+            details: String(error)
+          };
+          toast.error(`✗ ${entityName}: ${error.message}`, { duration: 2000 });
         }
       }
 
       const exportData = {
         exportDate: new Date().toISOString(),
+        totalEntities: selectedList.length,
         schemas: schemas
       };
 
@@ -260,7 +338,7 @@ export default function DataExport() {
 
       toast.success("✅ Exportación de esquemas seleccionados completa");
     } catch (error) {
-      toast.error("Error exportando esquemas");
+      toast.error("Error exportando esquemas: " + error.message);
       console.error(error);
     } finally {
       setExporting(false);
