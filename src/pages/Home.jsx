@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { createPageUrl } from "../utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
+import {
   Users, Calendar, Clock, FileText, Award, TrendingUp,
   ArrowRight, Shield, CheckCircle
 } from "lucide-react";
@@ -24,10 +24,10 @@ export default function Home() {
         }
 
         const user = await base44.auth.me();
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
+        const employees = await base44.entities.Employee.filter({
+          work_email: user.email
         });
-        
+
         if (employees && employees.length > 0) {
           setEmployee(employees[0]);
         }
@@ -117,7 +117,7 @@ export default function Home() {
             <CardContent className="p-10">
               <div className="text-center mb-8">
                 <div className="mx-auto mb-6">
-                  <img 
+                  <img
                     src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6947a46a4a533fe8f1a3a057/dc4db427e_image.png"
                     alt="PAMA Logo"
                     className="h-24 mx-auto"
@@ -135,7 +135,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   className="w-full bg-[#1a5850] hover:bg-[#0f3d37] text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-lg py-6"
-                  onClick={() => base44.auth.redirectToLogin(createPageUrl("Dashboard"))}
+                  onClick={() => window.location.href = '/login'}
                 >
                   <Shield className="w-5 h-5 mr-2" />
                   Iniciar Sesión
@@ -178,7 +178,7 @@ export default function Home() {
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-10">
         <div className="flex items-center gap-4">
-          <img 
+          <img
             src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6947a46a4a533fe8f1a3a057/dc4db427e_image.png"
             alt="PAMA Logo"
             className="h-12"
@@ -205,11 +205,11 @@ export default function Home() {
             <CheckCircle className="w-4 h-4" />
             <span className="text-sm font-semibold">Sesión Iniciada</span>
           </div>
-          
+
           <h2 className="text-5xl md:text-6xl font-bold text-white mb-4">
             Bienvenido{employee?.first_name ? `, ${employee.first_name}` : ""}
           </h2>
-          
+
           {employee && (
             <div className="flex flex-col items-center gap-2">
               <p className="text-2xl text-white/90">
@@ -243,11 +243,11 @@ export default function Home() {
           <h3 className="text-3xl font-bold text-white text-center mb-8">
             Acceso Rápido
           </h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {features.map((feature, index) => {
               const Icon = feature.icon;
-              
+
               return (
                 <motion.div
                   key={feature.title}
@@ -263,15 +263,15 @@ export default function Home() {
                       <div className={`w-16 h-16 bg-gradient-to-br ${feature.color} rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-xl`}>
                         <Icon className="w-8 h-8 text-white" />
                       </div>
-                      
+
                       <h4 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-[#1a5850] transition-colors">
                         {feature.title}
                       </h4>
-                      
+
                       <p className="text-slate-600 text-sm mb-4">
                         {feature.description}
                       </p>
-                      
+
                       <div className="flex items-center text-[#1a5850] font-bold text-sm group-hover:gap-2 transition-all">
                         Acceder
                         <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-2 transition-transform" />

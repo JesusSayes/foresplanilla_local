@@ -1,20 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { createPageUrl } from "./utils";
-import { useLocalAuth } from "@/lib/LocalAuthContext";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  LayoutDashboard, FileText, Calendar, Clock,
+import { 
+  LayoutDashboard, FileText, Calendar, Clock, 
   User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown
 } from "lucide-react";
 import NotificationCenter from "./components/notifications/NotificationCenter";
 
 export default function Layout({ children, currentPageName }) {
-  const navigate = useNavigate();
-  const { user: currentUser, logout } = useLocalAuth();
   const [employee, setEmployee] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -25,13 +23,20 @@ export default function Layout({ children, currentPageName }) {
   useEffect(() => {
     const loadEmployee = async () => {
       try {
-        if (!currentUser) {
+        const isAuth = await base44.auth.isAuthenticated();
+        if (!isAuth) {
+          // Si no está autenticado y no está en Home, redirigir a Home
+          if (currentPageName !== "Home") {
+            window.location.href = createPageUrl("Home");
+          }
           setLoading(false);
           return;
         }
 
-        const employees = await base44.entities.Employee.filter({
-          work_email: currentUser.email
+        const user = await base44.auth.me();
+        setCurrentUser(user);
+        const employees = await base44.entities.Employee.filter({ 
+          work_email: user.email 
         });
 
         if (employees && employees.length > 0) {
@@ -39,17 +44,20 @@ export default function Layout({ children, currentPageName }) {
         }
       } catch (error) {
         console.error("Error loading employee:", error);
+        // En caso de error de autenticación, redirigir a Home
+        if (currentPageName !== "Home") {
+          window.location.href = createPageUrl("Home");
+        }
       } finally {
         setLoading(false);
       }
     };
 
     loadEmployee();
-  }, [currentUser, currentPageName]);
+  }, [currentPageName]);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
+  const handleLogout = () => {
+    base44.auth.logout(createPageUrl("Home"));
   };
 
   const getMenuItems = () => {
@@ -72,18 +80,18 @@ export default function Layout({ children, currentPageName }) {
     ];
 
     const adminMenu = [
-      {
-        name: "Dashboard",
-        icon: LayoutDashboard,
+      { 
+        name: "Dashboard", 
+        icon: LayoutDashboard, 
         path: "HRDashboard",
         submenu: [
           { name: "Dashboard RRHH", path: "HRDashboard" },
           { name: "Dashboard Personal", path: "Dashboard" },
         ]
       },
-      {
-        name: "Gestión Empleados",
-        icon: Users,
+      { 
+        name: "Gestión Empleados", 
+        icon: Users, 
         path: "EmployeeManagement",
         submenu: [
           { name: "Ver Empleados", path: "EmployeeManagement" },
@@ -97,9 +105,9 @@ export default function Layout({ children, currentPageName }) {
           { name: "Certificados", path: "Certificates" },
         ]
       },
-      {
-        name: "Gestión Contratos",
-        icon: FileText,
+      { 
+        name: "Gestión Contratos", 
+        icon: FileText, 
         path: "ContractManagement",
         submenu: [
           { name: "Ver Contratos", path: "ContractManagement" },
@@ -107,9 +115,9 @@ export default function Layout({ children, currentPageName }) {
           { name: "Automatización Renovación", path: "ContractRenewalAutomation" },
         ]
       },
-      {
-        name: "Gestión Asistencia",
-        icon: CheckSquare,
+      { 
+        name: "Gestión Asistencia", 
+        icon: CheckSquare, 
         path: "AttendanceManagement",
         submenu: [
           { name: "Ver Asistencia", path: "AttendanceManagement" },
@@ -120,9 +128,9 @@ export default function Layout({ children, currentPageName }) {
           { name: "Mi Asistencia", path: "Attendance" },
         ]
       },
-      {
-        name: "Gestión Planillas",
-        icon: FileText,
+      { 
+        name: "Gestión Planillas", 
+        icon: FileText, 
         path: "PayrollManagement",
         submenu: [
           { name: "Generar Planillas", path: "PayrollManagement" },
@@ -191,9 +199,9 @@ export default function Layout({ children, currentPageName }) {
               <nav className="hidden lg:flex items-center gap-1">
                 {menuItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = currentPageName === item.path ||
+                const isActive = currentPageName === item.path || 
                   (item.submenu && item.submenu.some(sub => sub.path === currentPageName));
-
+                
                 if (item.submenu) {
                   const isOpen = openDropdown === item.path;
                   return (
@@ -203,8 +211,8 @@ export default function Layout({ children, currentPageName }) {
                         className={`
                           flex items-center gap-2 px-4 py-2 rounded-lg
                           transition-all duration-200 text-sm
-                          ${isActive
-                            ? 'bg-indigo-50 text-indigo-600 font-semibold'
+                          ${isActive 
+                            ? 'bg-indigo-50 text-indigo-600 font-semibold' 
                             : 'text-slate-700 hover:bg-slate-50'
                           }
                         `}
@@ -239,7 +247,7 @@ export default function Layout({ children, currentPageName }) {
                     </div>
                   );
                 }
-
+                
                 return (
                   <Link
                     key={item.path}
@@ -247,8 +255,8 @@ export default function Layout({ children, currentPageName }) {
                     className={`
                       flex items-center gap-2 px-4 py-2 rounded-lg
                       transition-all duration-200 text-sm
-                      ${isActive
-                        ? 'bg-indigo-50 text-indigo-600 font-semibold'
+                      ${isActive 
+                        ? 'bg-indigo-50 text-indigo-600 font-semibold' 
                         : 'text-slate-700 hover:bg-slate-50'
                       }
                     `}
@@ -268,7 +276,7 @@ export default function Layout({ children, currentPageName }) {
               )}
               {employee && (
                 <div className="hidden md:block relative">
-                  <button
+                  <button 
                     onClick={() => setOpenDropdown(openDropdown === 'profile' ? null : 'profile')}
                     className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-slate-50 transition-all"
                   >
@@ -382,7 +390,7 @@ export default function Layout({ children, currentPageName }) {
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentPageName === item.path;
-
+                
                 return (
                   <li key={item.path}>
                     <Link
@@ -391,8 +399,8 @@ export default function Layout({ children, currentPageName }) {
                       className={`
                         flex items-center gap-3 px-4 py-3 rounded-lg
                         transition-all duration-200
-                        ${isActive
-                          ? 'bg-indigo-50 text-indigo-600 font-semibold'
+                        ${isActive 
+                          ? 'bg-indigo-50 text-indigo-600 font-semibold' 
                           : 'text-slate-700 hover:bg-slate-50'
                         }
                       `}
@@ -420,7 +428,7 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Overlay to close dropdowns when clicking outside */}
       {openDropdown && (
-        <div
+        <div 
           className="fixed inset-0 z-30"
           onClick={() => setOpenDropdown(null)}
         />
@@ -428,7 +436,7 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Mobile overlay */}
       {mobileMenuOpen && (
-        <div
+        <div 
           className="fixed inset-0 bg-black/50 z-20 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />

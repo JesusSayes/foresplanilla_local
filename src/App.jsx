@@ -1,84 +1,284 @@
-import { Toaster } from "@/components/ui/toaster"
-import { QueryClientProvider } from '@tanstack/react-query'
-import { queryClientInstance } from '@/lib/query-client'
-import VisualEditAgent from '@/lib/VisualEditAgent'
-import NavigationTracker from '@/lib/NavigationTracker'
-import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import PageNotFound from './lib/PageNotFound';
-import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { LocalAuthProvider, useLocalAuth } from '@/lib/LocalAuthContext';
+import Layout from "./Layout";
+import Login from "./pages/Login";
 
-const { Pages, Layout, mainPage } = pagesConfig;
-const mainPageKey = mainPage ?? Object.keys(Pages)[0];
-const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
+// Importar todas las páginas
+import Home from "./pages/Home";
+import Dashboard from "./pages/Dashboard";
+import HRDashboard from "./pages/HRDashboard";
+import Payslips from "./pages/Payslips";
+import VacationRequest from "./pages/VacationRequest";
+import Attendance from "./pages/Attendance";
+import Certificates from "./pages/Certificates";
+import MyProfile from "./pages/MyProfile";
+import EmployeeManagement from "./pages/EmployeeManagement";
+import PayrollManagement from "./pages/PayrollManagement";
+import AttendanceManagement from "./pages/AttendanceManagement";
+import VacationManagement from "./pages/VacationManagement";
+import Reports from "./pages/Reports";
+import CompanySettings from "./pages/CompanySettings";
+import UserManagement from "./pages/UserManagement";
+import RoleManagement from "./pages/RoleManagement";
+import AttendanceReports from "./pages/AttendanceReports";
+import ManagerApprovals from "./pages/ManagerApprovals";
+import VacationCalendar from "./pages/VacationCalendar";
+import OrgChart from "./pages/OrgChart";
+import ImportEmployees from "./pages/ImportEmployees";
+import MasterDataManagement from "./pages/MasterDataManagement";
+import PayrollConcepts from "./pages/PayrollConcepts";
+import CostCenterManagement from "./pages/CostCenterManagement";
+import CostCenterValuation from "./pages/CostCenterValuation";
+import HolidayManagement from "./pages/HolidayManagement";
+import ScheduleManagement from "./pages/ScheduleManagement";
+import DatabaseConfig from "./pages/DatabaseConfig";
+import AccessDeviceConfig from "./pages/AccessDeviceConfig";
+import ContractManagement from "./pages/ContractManagement";
+import ContractTemplateConfig from "./pages/ContractTemplateConfig";
+import ContractRenewalAutomation from "./pages/ContractRenewalAutomation";
+import PayslipTemplateConfig from "./pages/PayslipTemplateConfig";
+import NotificationSettings from "./pages/NotificationSettings";
+import DataExport from "./pages/DataExport";
+import SystemRoleInitializer from "./pages/SystemRoleInitializer";
 
-const LayoutWrapper = ({ children, currentPageName }) => Layout ?
-  <Layout currentPageName={currentPageName}>{children}</Layout>
-  : <>{children}</>;
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
-const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+// Componente para rutas protegidas
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, isLoadingAuth } = useLocalAuth();
 
-  // Show loading spinner while checking app public settings or auth
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  if (isLoadingAuth) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-[#1a5850] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  // Handle authentication errors
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
-    }
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
 
-  // Render the main app
+  return children;
+};
+
+const AuthenticatedApp = () => {
+  const { isLoadingAuth } = useLocalAuth();
+
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen bg-[#1a5850] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <Routes>
-      <Route path="/" element={
-        <LayoutWrapper currentPageName={mainPageKey}>
-          <MainPage />
-        </LayoutWrapper>
+      <Route path="/login" element={<Login />} />
+      <Route path="/" element={<Home />} />
+
+      {/* Rutas protegidas */}
+      <Route path="/Dashboard" element={
+        <ProtectedRoute>
+          <Layout currentPageName="Dashboard"><Dashboard /></Layout>
+        </ProtectedRoute>
       } />
-      {Object.entries(Pages).map(([path, Page]) => (
-        <Route
-          key={path}
-          path={`/${path}`}
-          element={
-            <LayoutWrapper currentPageName={path}>
-              <Page />
-            </LayoutWrapper>
-          }
-        />
-      ))}
-      <Route path="*" element={<PageNotFound />} />
+      <Route path="/HRDashboard" element={
+        <ProtectedRoute>
+          <Layout currentPageName="HRDashboard"><HRDashboard /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/Payslips" element={
+        <ProtectedRoute>
+          <Layout currentPageName="Payslips"><Payslips /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/VacationRequest" element={
+        <ProtectedRoute>
+          <Layout currentPageName="VacationRequest"><VacationRequest /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/Attendance" element={
+        <ProtectedRoute>
+          <Layout currentPageName="Attendance"><Attendance /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/Certificates" element={
+        <ProtectedRoute>
+          <Layout currentPageName="Certificates"><Certificates /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/MyProfile" element={
+        <ProtectedRoute>
+          <Layout currentPageName="MyProfile"><MyProfile /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/EmployeeManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="EmployeeManagement"><EmployeeManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/PayrollManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="PayrollManagement"><PayrollManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/AttendanceManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="AttendanceManagement"><AttendanceManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/VacationManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="VacationManagement"><VacationManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/Reports" element={
+        <ProtectedRoute>
+          <Layout currentPageName="Reports"><Reports /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/CompanySettings" element={
+        <ProtectedRoute>
+          <Layout currentPageName="CompanySettings"><CompanySettings /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/UserManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="UserManagement"><UserManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/RoleManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="RoleManagement"><RoleManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/AttendanceReports" element={
+        <ProtectedRoute>
+          <Layout currentPageName="AttendanceReports"><AttendanceReports /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/ManagerApprovals" element={
+        <ProtectedRoute>
+          <Layout currentPageName="ManagerApprovals"><ManagerApprovals /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/VacationCalendar" element={
+        <ProtectedRoute>
+          <Layout currentPageName="VacationCalendar"><VacationCalendar /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/OrgChart" element={
+        <ProtectedRoute>
+          <Layout currentPageName="OrgChart"><OrgChart /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/ImportEmployees" element={
+        <ProtectedRoute>
+          <Layout currentPageName="ImportEmployees"><ImportEmployees /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/MasterDataManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="MasterDataManagement"><MasterDataManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/PayrollConcepts" element={
+        <ProtectedRoute>
+          <Layout currentPageName="PayrollConcepts"><PayrollConcepts /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/CostCenterManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="CostCenterManagement"><CostCenterManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/CostCenterValuation" element={
+        <ProtectedRoute>
+          <Layout currentPageName="CostCenterValuation"><CostCenterValuation /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/HolidayManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="HolidayManagement"><HolidayManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/ScheduleManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="ScheduleManagement"><ScheduleManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/DatabaseConfig" element={
+        <ProtectedRoute>
+          <Layout currentPageName="DatabaseConfig"><DatabaseConfig /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/AccessDeviceConfig" element={
+        <ProtectedRoute>
+          <Layout currentPageName="AccessDeviceConfig"><AccessDeviceConfig /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/ContractManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="ContractManagement"><ContractManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/ContractTemplateConfig" element={
+        <ProtectedRoute>
+          <Layout currentPageName="ContractTemplateConfig"><ContractTemplateConfig /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/ContractRenewalAutomation" element={
+        <ProtectedRoute>
+          <Layout currentPageName="ContractRenewalAutomation"><ContractRenewalAutomation /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/PayslipTemplateConfig" element={
+        <ProtectedRoute>
+          <Layout currentPageName="PayslipTemplateConfig"><PayslipTemplateConfig /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/NotificationSettings" element={
+        <ProtectedRoute>
+          <Layout currentPageName="NotificationSettings"><NotificationSettings /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/DataExport" element={
+        <ProtectedRoute>
+          <Layout currentPageName="DataExport"><DataExport /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/SystemRoleInitializer" element={
+        <ProtectedRoute>
+          <Layout currentPageName="SystemRoleInitializer"><SystemRoleInitializer /></Layout>
+        </ProtectedRoute>
+      } />
     </Routes>
   );
 };
 
-
 function App() {
-
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <NavigationTracker />
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <LocalAuthProvider>
           <AuthenticatedApp />
-        </Router>
-        <Toaster />
-        <VisualEditAgent />
-      </QueryClientProvider>
-    </AuthProvider>
-  )
+          <Toaster />
+        </LocalAuthProvider>
+      </Router>
+    </QueryClientProvider>
+  );
 }
 
-export default App
+export default App;
