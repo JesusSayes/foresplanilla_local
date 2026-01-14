@@ -329,6 +329,9 @@ export default function ScheduleManagement() {
 
   const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
 
+  const individualAssignments = assignments.filter(s => s.employee_id);
+  const departmentAssignments = assignments.filter(s => (s.departments?.length > 0 || s.department_name) && !s.employee_id);
+
   // Empleados con y sin horario asignado
   const employeesWithSchedule = individualAssignments.map(s => s.employee_id);
   const employeesWithoutSchedule = allEmployees.filter(emp => !employeesWithSchedule.includes(emp.id));
@@ -338,9 +341,6 @@ export default function ScheduleManagement() {
     departmentAssignments.flatMap(s => s.departments || [s.department_name]).filter(Boolean)
   )];
   const departmentsWithoutSchedule = departments.filter(dept => !assignedDepartments.includes(dept));
-
-  const individualAssignments = assignments.filter(s => s.employee_id);
-  const departmentAssignments = assignments.filter(s => (s.departments?.length > 0 || s.department_name) && !s.employee_id);
 
   const getEmployeeName = (empId) => {
     const emp = allEmployees.find(e => e.id === empId);
