@@ -27,6 +27,7 @@ export default function ScheduleManagement() {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateSearch, setTemplateSearch] = useState("");
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+  const [assignmentFilter, setAssignmentFilter] = useState("all");
   
   const [templateFormData, setTemplateFormData] = useState({
     schedule_name: "",
@@ -328,6 +329,16 @@ export default function ScheduleManagement() {
 
   const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
 
+  // Empleados con y sin horario asignado
+  const employeesWithSchedule = individualAssignments.map(s => s.employee_id);
+  const employeesWithoutSchedule = allEmployees.filter(emp => !employeesWithSchedule.includes(emp.id));
+
+  // Departamentos con y sin horario asignado
+  const assignedDepartments = [...new Set(
+    departmentAssignments.flatMap(s => s.departments || [s.department_name]).filter(Boolean)
+  )];
+  const departmentsWithoutSchedule = departments.filter(dept => !assignedDepartments.includes(dept));
+
   const individualAssignments = assignments.filter(s => s.employee_id);
   const departmentAssignments = assignments.filter(s => (s.departments?.length > 0 || s.department_name) && !s.employee_id);
 
@@ -352,7 +363,8 @@ export default function ScheduleManagement() {
            s.schedule_name.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  const filteredEmployees = allEmployees.filter(emp => {
+  // Filtrar empleados SIN horario para el modal de asignación
+  const filteredEmployeesWithoutSchedule = employeesWithoutSchedule.filter(emp => {
     const searchLower = employeeSearch.toLowerCase();
     return emp.first_name.toLowerCase().includes(searchLower) ||
            emp.last_name.toLowerCase().includes(searchLower) ||
@@ -461,31 +473,51 @@ export default function ScheduleManagement() {
         </div>
 
         <Tabs defaultValue="templates" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <TabsList className="grid w-full max-w-2xl grid-cols-3">
-              <TabsTrigger value="templates">Plantillas de Horario</TabsTrigger>
-              <TabsTrigger value="individual">Asignaciones Individuales</TabsTrigger>
-              <TabsTrigger value="department">Asignaciones por Departamento</TabsTrigger>
-            </TabsList>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <TabsList className="grid w-full max-w-3xl grid-cols-5">
+                <TabsTrigger value="templates">Plantillas</TabsTrigger>
+                <TabsTrigger value="individual">Asignados</TabsTrigger>
+                <TabsTrigger value="department">Departamentos</TabsTrigger>
+                <TabsTrigger value="unassigned-employees">Sin Horario</TabsTrigger>
+                <TabsTrigger value="unassigned-departments">Depts Sin Horario</TabsTrigger>
+              </TabsList>
 
-            {hasAnyPermission(["schedules.create", "schedules.manage", "system.admin"]) && (
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleCreateTemplate}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nueva Plantilla
-                </Button>
-                <Button
-                  onClick={handleCreateAssignment}
-                  className="bg-indigo-600 hover:bg-indigo-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Asignar Horario
-                </Button>
-              </div>
-            )}
+              {hasAnyPermission(["schedules.create", "schedules.manage", "system.admin"]) && (
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleCreateTemplate}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nueva Plantilla
+                  </Button>
+                  <Button
+                    onClick={handleCreateAssignment}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Asignar Horario
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium">Filtrar por:</Label>
+              <Select value={assignmentFilter} onValueChange={setAssignmentFilter}>
+                <SelectTrigger className="w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="with-schedule">Empleados con horario</SelectItem>
+                  <SelectItem value="without-schedule">Empleados sin horario</SelectItem>
+                  <SelectItem value="dept-with-schedule">Departamentos con horario</SelectItem>
+                  <SelectItem value="dept-without-schedule">Departamentos sin horario</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <Card className="border-0 shadow-lg">
@@ -570,14 +602,19 @@ export default function ScheduleManagement() {
               </TabsContent>
 
               <TabsContent value="individual" className="mt-0">
-                {filteredIndividual.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Clock className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-600">No hay horarios individuales</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {filteredIndividual.map(schedule => (
+                {(() => {
+                  const filtered = assignmentFilter === "with-schedule" || assignmentFilter === "all" 
+                    ? filteredIndividual 
+                    : [];
+                  
+                  return filtered.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Clock className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                      <p className="text-slate-600">No hay horarios individuales</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filtered.map(schedule => (
                       <div key={schedule.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -631,20 +668,26 @@ export default function ScheduleManagement() {
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  );
+                })()}
               </TabsContent>
 
               <TabsContent value="department" className="mt-0">
-                {filteredDepartment.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-600">No hay horarios departamentales</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {filteredDepartment.map(schedule => {
+                {(() => {
+                  const filtered = assignmentFilter === "dept-with-schedule" || assignmentFilter === "all"
+                    ? filteredDepartment
+                    : [];
+                  
+                  return filtered.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                      <p className="text-slate-600">No hay horarios departamentales</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filtered.map(schedule => {
                       const scheduleDepts = schedule.departments || [schedule.department_name];
                       return (
                         <div key={schedule.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -703,13 +746,101 @@ export default function ScheduleManagement() {
                               </div>
                               );
                               })}
-                  </div>
-                )}
-              </TabsContent>
-            </CardContent>
-          </Card>
-        </Tabs>
-      </div>
+                              </div>
+                              );
+                              })()}
+                              </TabsContent>
+
+                              <TabsContent value="unassigned-employees" className="mt-0">
+                              {(() => {
+                              const filtered = assignmentFilter === "without-schedule" || assignmentFilter === "all"
+                              ? employeesWithoutSchedule.filter(emp => {
+                              const searchLower = searchTerm.toLowerCase();
+                              return emp.first_name.toLowerCase().includes(searchLower) ||
+                              emp.last_name.toLowerCase().includes(searchLower) ||
+                              emp.employee_code.toLowerCase().includes(searchLower) ||
+                              emp.department_name?.toLowerCase().includes(searchLower);
+                              })
+                              : [];
+
+                              return filtered.length === 0 ? (
+                              <div className="text-center py-12">
+                              <User className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                              <p className="text-slate-600">Todos los empleados tienen horario asignado</p>
+                              </div>
+                              ) : (
+                              <div className="space-y-3">
+                              {filtered.map(emp => (
+                              <div key={emp.id} className="p-4 border border-amber-200 bg-amber-50/30 rounded-lg hover:shadow-md transition-all">
+                              <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold">
+                              {emp.first_name[0]}{emp.last_name[0]}
+                              </div>
+                              <div>
+                              <h4 className="font-bold text-slate-900">
+                                {emp.first_name} {emp.last_name}
+                              </h4>
+                              <p className="text-sm text-slate-600">
+                                {emp.employee_code} • {emp.department_name || "Sin departamento"}
+                              </p>
+                              </div>
+                              </div>
+                              <Badge className="bg-amber-100 text-amber-700 border-amber-300">
+                              Sin Horario
+                              </Badge>
+                              </div>
+                              </div>
+                              ))}
+                              </div>
+                              );
+                              })()}
+                              </TabsContent>
+
+                              <TabsContent value="unassigned-departments" className="mt-0">
+                              {(() => {
+                              const filtered = assignmentFilter === "dept-without-schedule" || assignmentFilter === "all"
+                              ? departmentsWithoutSchedule.filter(dept => 
+                              dept.toLowerCase().includes(searchTerm.toLowerCase())
+                              )
+                              : [];
+
+                              return filtered.length === 0 ? (
+                              <div className="text-center py-12">
+                              <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                              <p className="text-slate-600">Todos los departamentos tienen horario asignado</p>
+                              </div>
+                              ) : (
+                              <div className="space-y-3">
+                              {filtered.map(dept => {
+                              const empCount = allEmployees.filter(e => e.department_name === dept).length;
+                              return (
+                              <div key={dept} className="p-4 border border-amber-200 bg-amber-50/30 rounded-lg hover:shadow-md transition-all">
+                              <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                              <div className="p-3 bg-amber-100 rounded-xl">
+                                <Users className="w-6 h-6 text-amber-600" />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-900">{dept}</h4>
+                                <p className="text-sm text-slate-600">{empCount} empleados</p>
+                              </div>
+                              </div>
+                              <Badge className="bg-amber-100 text-amber-700 border-amber-300">
+                              Sin Horario
+                              </Badge>
+                              </div>
+                              </div>
+                              );
+                              })}
+                              </div>
+                              );
+                              })()}
+                              </TabsContent>
+                              </CardContent>
+                              </Card>
+                              </Tabs>
+                              </div>
 
       {/* Template Form Modal */}
       {showTemplateForm && (
@@ -991,47 +1122,47 @@ export default function ScheduleManagement() {
                         />
                       </div>
                       <div className="max-h-60 overflow-y-auto">
-                        <button
-                          type="button"
-                          className="w-full px-3 py-2 text-left hover:bg-slate-50 text-sm text-slate-600 border-b"
-                          onClick={() => {
-                            setAssignFormData({ ...assignFormData, employee_id: null });
-                            setEmployeeSearch("");
-                            setShowEmployeeDropdown(false);
-                          }}
-                        >
-                          Ninguno
-                        </button>
-                        {filteredEmployees.length > 0 ? (
-                          filteredEmployees.map(emp => (
-                            <button
-                              key={emp.id}
-                              type="button"
-                              className={`w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center justify-between ${
-                                assignFormData.employee_id === emp.id ? 'bg-indigo-50' : ''
-                              }`}
-                              onClick={() => {
-                                setAssignFormData({ ...assignFormData, employee_id: emp.id, departments: [] });
-                                setEmployeeSearch(`${emp.first_name} ${emp.last_name} - ${emp.employee_code}`);
-                                setShowEmployeeDropdown(false);
-                              }}
-                            >
-                              <div className="flex flex-col">
-                                <span className="text-sm font-medium text-slate-900">
-                                  {emp.first_name} {emp.last_name}
-                                </span>
-                                <span className="text-xs text-slate-500">{emp.employee_code}</span>
-                              </div>
-                              {assignFormData.employee_id === emp.id && (
-                                <Check className="w-4 h-4 text-indigo-600" />
-                              )}
-                            </button>
-                          ))
-                        ) : (
-                          <div className="px-3 py-4 text-sm text-slate-500 text-center">
-                            No se encontraron empleados
-                          </div>
-                        )}
+                       <button
+                         type="button"
+                         className="w-full px-3 py-2 text-left hover:bg-slate-50 text-sm text-slate-600 border-b"
+                         onClick={() => {
+                           setAssignFormData({ ...assignFormData, employee_id: null });
+                           setEmployeeSearch("");
+                           setShowEmployeeDropdown(false);
+                         }}
+                       >
+                         Ninguno
+                       </button>
+                       {filteredEmployeesWithoutSchedule.length > 0 ? (
+                         filteredEmployeesWithoutSchedule.map(emp => (
+                           <button
+                             key={emp.id}
+                             type="button"
+                             className={`w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center justify-between ${
+                               assignFormData.employee_id === emp.id ? 'bg-indigo-50' : ''
+                             }`}
+                             onClick={() => {
+                               setAssignFormData({ ...assignFormData, employee_id: emp.id, departments: [] });
+                               setEmployeeSearch(`${emp.first_name} ${emp.last_name} - ${emp.employee_code}`);
+                               setShowEmployeeDropdown(false);
+                             }}
+                           >
+                             <div className="flex flex-col">
+                               <span className="text-sm font-medium text-slate-900">
+                                 {emp.first_name} {emp.last_name}
+                               </span>
+                               <span className="text-xs text-slate-500">{emp.employee_code} • {emp.department_name || "Sin depto"}</span>
+                             </div>
+                             {assignFormData.employee_id === emp.id && (
+                               <Check className="w-4 h-4 text-indigo-600" />
+                             )}
+                           </button>
+                         ))
+                       ) : (
+                         <div className="px-3 py-4 text-sm text-slate-500 text-center">
+                           {employeeSearch ? "No se encontraron empleados" : "Todos los empleados tienen horario asignado"}
+                         </div>
+                       )}
                       </div>
                     </div>
                   )}
@@ -1041,7 +1172,7 @@ export default function ScheduleManagement() {
               <div>
                 <Label>O asignar a Departamentos (múltiples)</Label>
                 <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
-                  {departments.map(dept => (
+                  {departmentsWithoutSchedule.map(dept => (
                     <label key={dept} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
                       <input
                         type="checkbox"
@@ -1057,6 +1188,11 @@ export default function ScheduleManagement() {
                       <span className="text-sm">{dept}</span>
                     </label>
                   ))}
+                  {departmentsWithoutSchedule.length === 0 && (
+                    <p className="text-sm text-slate-500 text-center py-2">
+                      Todos los departamentos ya tienen horario asignado
+                    </p>
+                  )}
                 </div>
                 {assignFormData.departments?.length > 0 && (
                   <p className="text-xs text-slate-600 mt-2">
