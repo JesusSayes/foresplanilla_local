@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Clock, Plus, Edit, Trash2, Users, User, Calendar, Search, ChevronsUpDown, Check
+  Clock, Plus, Edit, Trash2, Users, User, Calendar, Search, ChevronsUpDown, Check, X
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
@@ -27,7 +27,6 @@ export default function ScheduleManagement() {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateSearch, setTemplateSearch] = useState("");
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
-  const [assignmentFilter, setAssignmentFilter] = useState("all");
   
   const [templateFormData, setTemplateFormData] = useState({
     schedule_name: "",
@@ -502,22 +501,6 @@ export default function ScheduleManagement() {
                 </div>
               )}
             </div>
-
-            <div className="flex items-center gap-4">
-              <Label className="text-sm font-medium">Filtrar por:</Label>
-              <Select value={assignmentFilter} onValueChange={setAssignmentFilter}>
-                <SelectTrigger className="w-64">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="with-schedule">Empleados con horario</SelectItem>
-                  <SelectItem value="without-schedule">Empleados sin horario</SelectItem>
-                  <SelectItem value="dept-with-schedule">Departamentos con horario</SelectItem>
-                  <SelectItem value="dept-without-schedule">Departamentos sin horario</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <Card className="border-0 shadow-lg">
@@ -602,19 +585,14 @@ export default function ScheduleManagement() {
               </TabsContent>
 
               <TabsContent value="individual" className="mt-0">
-                {(() => {
-                  const filtered = assignmentFilter === "with-schedule" || assignmentFilter === "all" 
-                    ? filteredIndividual 
-                    : [];
-                  
-                  return filtered.length === 0 ? (
+                {filteredIndividual.length === 0 ? (
                     <div className="text-center py-12">
                       <Clock className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                       <p className="text-slate-600">No hay horarios individuales</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {filtered.map(schedule => (
+                      </div>
+                      ) : (
+                      <div className="space-y-3">
+                      {filteredIndividual.map(schedule => (
                       <div key={schedule.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -668,26 +646,20 @@ export default function ScheduleManagement() {
                           </div>
                         </div>
                       </div>
-                      ))}
-                    </div>
-                  );
-                })()}
+                    ))}
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="department" className="mt-0">
-                {(() => {
-                  const filtered = assignmentFilter === "dept-with-schedule" || assignmentFilter === "all"
-                    ? filteredDepartment
-                    : [];
-                  
-                  return filtered.length === 0 ? (
+                {filteredDepartment.length === 0 ? (
                     <div className="text-center py-12">
                       <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                       <p className="text-slate-600">No hay horarios departamentales</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {filtered.map(schedule => {
+                      </div>
+                      ) : (
+                      <div className="space-y-3">
+                      {filteredDepartment.map(schedule => {
                       const scheduleDepts = schedule.departments || [schedule.department_name];
                       return (
                         <div key={schedule.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -747,21 +719,18 @@ export default function ScheduleManagement() {
                               );
                               })}
                               </div>
-                              );
-                              })()}
+                              )}
                               </TabsContent>
 
                               <TabsContent value="unassigned-employees" className="mt-0">
                               {(() => {
-                              const filtered = assignmentFilter === "without-schedule" || assignmentFilter === "all"
-                              ? employeesWithoutSchedule.filter(emp => {
+                              const filtered = employeesWithoutSchedule.filter(emp => {
                               const searchLower = searchTerm.toLowerCase();
                               return emp.first_name.toLowerCase().includes(searchLower) ||
                               emp.last_name.toLowerCase().includes(searchLower) ||
                               emp.employee_code.toLowerCase().includes(searchLower) ||
                               emp.department_name?.toLowerCase().includes(searchLower);
-                              })
-                              : [];
+                              });
 
                               return filtered.length === 0 ? (
                               <div className="text-center py-12">
@@ -798,14 +767,12 @@ export default function ScheduleManagement() {
                               </TabsContent>
 
                               <TabsContent value="unassigned-departments" className="mt-0">
-                              {(() => {
-                              const filtered = assignmentFilter === "dept-without-schedule" || assignmentFilter === "all"
-                              ? departmentsWithoutSchedule.filter(dept => 
-                              dept.toLowerCase().includes(searchTerm.toLowerCase())
-                              )
-                              : [];
+                                {(() => {
+                                  const filtered = departmentsWithoutSchedule.filter(dept => 
+                                    dept.toLowerCase().includes(searchTerm.toLowerCase())
+                                  );
 
-                              return filtered.length === 0 ? (
+                                  return filtered.length === 0 ? (
                               <div className="text-center py-12">
                               <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                               <p className="text-slate-600">Todos los departamentos tienen horario asignado</p>
@@ -1034,16 +1001,32 @@ export default function ScheduleManagement() {
                 <div>
                   <Label>Seleccionar Plantilla de Horario *</Label>
                   <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
-                      className="w-full flex items-center justify-between px-3 py-2 border border-slate-200 rounded-md bg-white hover:bg-slate-50 text-left"
-                    >
-                      <span className={selectedTemplateId ? "text-slate-900" : "text-slate-500"}>
-                        {selectedTemplateId && templateSearch ? templateSearch : "Seleccionar plantilla"}
-                      </span>
-                      <ChevronsUpDown className="w-4 h-4 text-slate-400" />
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                        className="flex-1 flex items-center justify-between px-3 py-2 border border-slate-200 rounded-md bg-white hover:bg-slate-50 text-left"
+                      >
+                        <span className={selectedTemplateId ? "text-slate-900" : "text-slate-500"}>
+                          {selectedTemplateId && templateSearch ? templateSearch : "Seleccionar plantilla"}
+                        </span>
+                        <ChevronsUpDown className="w-4 h-4 text-slate-400" />
+                      </button>
+                      {selectedTemplateId && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            setSelectedTemplateId("");
+                            setTemplateSearch("");
+                          }}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                     
                     {showTemplateDropdown && (
                       <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
@@ -1099,16 +1082,32 @@ export default function ScheduleManagement() {
               <div>
                 <Label>Asignar a Empleado Individual</Label>
                 <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowEmployeeDropdown(!showEmployeeDropdown)}
-                    className="w-full flex items-center justify-between px-3 py-2 border border-slate-200 rounded-md bg-white hover:bg-slate-50 text-left"
-                  >
-                    <span className={assignFormData.employee_id ? "text-slate-900" : "text-slate-500"}>
-                      {assignFormData.employee_id && employeeSearch ? employeeSearch : "Seleccionar empleado"}
-                    </span>
-                    <ChevronsUpDown className="w-4 h-4 text-slate-400" />
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowEmployeeDropdown(!showEmployeeDropdown)}
+                      className="flex-1 flex items-center justify-between px-3 py-2 border border-slate-200 rounded-md bg-white hover:bg-slate-50 text-left"
+                    >
+                      <span className={assignFormData.employee_id ? "text-slate-900" : "text-slate-500"}>
+                        {assignFormData.employee_id && employeeSearch ? employeeSearch : "Seleccionar empleado"}
+                      </span>
+                      <ChevronsUpDown className="w-4 h-4 text-slate-400" />
+                    </button>
+                    {assignFormData.employee_id && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          setAssignFormData({ ...assignFormData, employee_id: null });
+                          setEmployeeSearch("");
+                        }}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                   
                   {showEmployeeDropdown && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
@@ -1170,7 +1169,20 @@ export default function ScheduleManagement() {
               </div>
 
               <div>
-                <Label>O asignar a Departamentos (múltiples)</Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>O asignar a Departamentos (múltiples)</Label>
+                  {assignFormData.departments?.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAssignFormData({ ...assignFormData, departments: [] })}
+                      className="text-red-600 hover:text-red-700 h-7 text-xs"
+                    >
+                      Limpiar
+                    </Button>
+                  )}
+                </div>
                 <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
                   {departmentsWithoutSchedule.map(dept => (
                     <label key={dept} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
