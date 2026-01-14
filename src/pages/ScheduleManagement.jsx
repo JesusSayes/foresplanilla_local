@@ -25,6 +25,8 @@ export default function ScheduleManagement() {
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
   
   const [templateFormData, setTemplateFormData] = useState({
     schedule_name: "",
@@ -193,9 +195,11 @@ export default function ScheduleManagement() {
     }
     setEditingAssignment(null);
     setAssignFormData({ employee_id: null, departments: [] });
-    setSelectedTemplateId(templates[0]?.id || "");
+    setSelectedTemplateId("");
+    setTemplateSearch("");
     setEmployeeSearch("");
     setShowEmployeeDropdown(false);
+    setShowTemplateDropdown(false);
     setShowAssignForm(true);
   };
 
@@ -206,6 +210,7 @@ export default function ScheduleManagement() {
       departments: assignment.departments || (assignment.department_name ? [assignment.department_name] : []),
     });
     setSelectedTemplateId(assignment.id);
+    setTemplateSearch(`${assignment.schedule_name} (${assignment.monday_start} - ${assignment.monday_end})`);
     
     if (assignment.employee_id) {
       const emp = allEmployees.find(e => e.id === assignment.employee_id);
@@ -217,6 +222,7 @@ export default function ScheduleManagement() {
     }
     
     setShowEmployeeDropdown(false);
+    setShowTemplateDropdown(false);
     setShowAssignForm(true);
   };
 
@@ -312,8 +318,10 @@ export default function ScheduleManagement() {
   const resetAssignForm = () => {
     setAssignFormData({ employee_id: null, departments: [] });
     setSelectedTemplateId("");
+    setTemplateSearch("");
     setEmployeeSearch("");
     setShowEmployeeDropdown(false);
+    setShowTemplateDropdown(false);
     setEditingAssignment(null);
     setShowAssignForm(false);
   };
@@ -349,6 +357,12 @@ export default function ScheduleManagement() {
     return emp.first_name.toLowerCase().includes(searchLower) ||
            emp.last_name.toLowerCase().includes(searchLower) ||
            emp.employee_code.toLowerCase().includes(searchLower);
+  });
+
+  const filteredTemplatesForAssignment = templates.filter(template => {
+    const searchLower = templateSearch.toLowerCase();
+    return template.schedule_name.toLowerCase().includes(searchLower) ||
+           `${template.monday_start} - ${template.monday_end}`.includes(searchLower);
   });
 
   if (!employee || permissionsLoading) {
@@ -888,18 +902,66 @@ export default function ScheduleManagement() {
               {!editingAssignment && (
                 <div>
                   <Label>Seleccionar Plantilla de Horario *</Label>
-                  <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar plantilla" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {templates.map(template => (
-                        <SelectItem key={template.id} value={template.id}>
-                          {template.schedule_name} ({template.monday_start} - {template.monday_end})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                      className="w-full flex items-center justify-between px-3 py-2 border border-slate-200 rounded-md bg-white hover:bg-slate-50 text-left"
+                    >
+                      <span className={selectedTemplateId ? "text-slate-900" : "text-slate-500"}>
+                        {selectedTemplateId && templateSearch ? templateSearch : "Seleccionar plantilla"}
+                      </span>
+                      <ChevronsUpDown className="w-4 h-4 text-slate-400" />
+                    </button>
+                    
+                    {showTemplateDropdown && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
+                        <div className="p-2 border-b">
+                          <Input
+                            placeholder="Buscar plantilla..."
+                            value={templateSearch}
+                            onChange={(e) => setTemplateSearch(e.target.value)}
+                            autoFocus
+                            className="h-8"
+                          />
+                        </div>
+                        <div className="max-h-60 overflow-y-auto">
+                          {filteredTemplatesForAssignment.length > 0 ? (
+                            filteredTemplatesForAssignment.map(template => (
+                              <button
+                                key={template.id}
+                                type="button"
+                                className={`w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center justify-between ${
+                                  selectedTemplateId === template.id ? 'bg-indigo-50' : ''
+                                }`}
+                                onClick={() => {
+                                  setSelectedTemplateId(template.id);
+                                  setTemplateSearch(`${template.schedule_name} (${template.monday_start} - ${template.monday_end})`);
+                                  setShowTemplateDropdown(false);
+                                }}
+                              >
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium text-slate-900">
+                                    {template.schedule_name}
+                                  </span>
+                                  <span className="text-xs text-slate-500">
+                                    {template.monday_start} - {template.monday_end}
+                                  </span>
+                                </div>
+                                {selectedTemplateId === template.id && (
+                                  <Check className="w-4 h-4 text-indigo-600" />
+                                )}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-4 text-sm text-slate-500 text-center">
+                              No se encontraron plantillas
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
