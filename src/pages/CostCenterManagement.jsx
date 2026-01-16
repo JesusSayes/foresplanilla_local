@@ -37,6 +37,9 @@ export default function CostCenterManagement() {
   const [showHistory, setShowHistory] = useState(false);
   const [historyFilter, setHistoryFilter] = useState(null);
   const [viewMode, setViewMode] = useState("grid");
+  const [assignmentSearchTerm, setAssignmentSearchTerm] = useState("");
+  const [unassignedSearchTerm, setUnassignedSearchTerm] = useState("");
+  const [historySearchTerm, setHistorySearchTerm] = useState("");
 
   const queryClient = useQueryClient();
 
@@ -683,14 +686,45 @@ export default function CostCenterManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                {employeesWithoutCC.length === 0 ? (
+                <div className="mb-4 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <Input
+                    placeholder="Buscar empleado..."
+                    value={unassignedSearchTerm}
+                    onChange={(e) => setUnassignedSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                {employeesWithoutCC.filter(emp => {
+                  if (!unassignedSearchTerm) return true;
+                  const searchLower = unassignedSearchTerm.toLowerCase();
+                  return (
+                    emp.first_name.toLowerCase().includes(searchLower) ||
+                    emp.last_name.toLowerCase().includes(searchLower) ||
+                    emp.employee_code.toLowerCase().includes(searchLower) ||
+                    emp.department_name?.toLowerCase().includes(searchLower)
+                  );
+                }).length === 0 ? (
                   <div className="text-center py-12">
                     <Users className="w-16 h-16 text-green-300 mx-auto mb-4" />
-                    <p className="text-slate-600">Todos los empleados activos tienen centro de costo asignado</p>
+                    <p className="text-slate-600">
+                      {unassignedSearchTerm 
+                        ? "No se encontraron empleados con ese criterio" 
+                        : "Todos los empleados activos tienen centro de costo asignado"}
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {employeesWithoutCC.map(emp => (
+                    {employeesWithoutCC.filter(emp => {
+                      if (!unassignedSearchTerm) return true;
+                      const searchLower = unassignedSearchTerm.toLowerCase();
+                      return (
+                        emp.first_name.toLowerCase().includes(searchLower) ||
+                        emp.last_name.toLowerCase().includes(searchLower) ||
+                        emp.employee_code.toLowerCase().includes(searchLower) ||
+                        emp.department_name?.toLowerCase().includes(searchLower)
+                      );
+                    }).map(emp => (
                       <div key={emp.id} className="p-4 border-2 border-orange-200 bg-orange-50/30 rounded-lg">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
@@ -744,8 +778,33 @@ export default function CostCenterManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
+                <div className="mb-4 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <Input
+                    placeholder="Buscar asignación..."
+                    value={assignmentSearchTerm}
+                    onChange={(e) => setAssignmentSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
                 <div className="space-y-3">
-                  {assignments.filter(a => a.is_active).map(assignment => {
+                  {assignments.filter(a => {
+                    if (!a.is_active) return false;
+                    if (!assignmentSearchTerm) return true;
+                    const cc = costCenters.find(c => c.id === a.cost_center_id);
+                    const emp = a.assignment_type === "Empleado" 
+                      ? allEmployees.find(e => e.id === a.employee_id)
+                      : null;
+                    const searchLower = assignmentSearchTerm.toLowerCase();
+                    return (
+                      cc?.code.toLowerCase().includes(searchLower) ||
+                      cc?.name.toLowerCase().includes(searchLower) ||
+                      a.department_name?.toLowerCase().includes(searchLower) ||
+                      emp?.first_name.toLowerCase().includes(searchLower) ||
+                      emp?.last_name.toLowerCase().includes(searchLower) ||
+                      emp?.employee_code.toLowerCase().includes(searchLower)
+                    );
+                  }).map(assignment => {
                     const cc = costCenters.find(c => c.id === assignment.cost_center_id);
                     const emp = assignment.assignment_type === "Empleado" 
                       ? allEmployees.find(e => e.id === assignment.employee_id)
@@ -818,8 +877,28 @@ export default function CostCenterManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
+                <div className="mb-4 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <Input
+                    placeholder="Buscar en historial..."
+                    value={historySearchTerm}
+                    onChange={(e) => setHistorySearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
                 <div className="space-y-3">
-                  {filteredHistory.slice(0, 50).map(log => {
+                  {filteredHistory.filter(log => {
+                    if (!historySearchTerm) return true;
+                    const cc = costCenters.find(c => c.id === log.cost_center_id);
+                    const searchLower = historySearchTerm.toLowerCase();
+                    return (
+                      cc?.code.toLowerCase().includes(searchLower) ||
+                      cc?.name.toLowerCase().includes(searchLower) ||
+                      log.change_type.toLowerCase().includes(searchLower) ||
+                      log.field_changed.toLowerCase().includes(searchLower) ||
+                      log.changed_by.toLowerCase().includes(searchLower)
+                    );
+                  }).slice(0, 50).map(log => {
                     const cc = costCenters.find(c => c.id === log.cost_center_id);
                     return (
                       <div key={log.id} className="p-4 border border-slate-200 rounded-lg">

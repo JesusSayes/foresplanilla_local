@@ -36,6 +36,9 @@ export default function PayrollManagement() {
   const [selectedPayslipForClose, setSelectedPayslipForClose] = useState(null);
   const [previewPayslip, setPreviewPayslip] = useState(null);
   const [excludedEmployees, setExcludedEmployees] = useState([]);
+  const [historySearchTerm, setHistorySearchTerm] = useState("");
+  const [historyYearFilter, setHistoryYearFilter] = useState(new Date().getFullYear());
+  const [historyTypeFilter, setHistoryTypeFilter] = useState("all");
 
   const queryClient = useQueryClient();
 
@@ -74,6 +77,13 @@ export default function PayrollManagement() {
         month: selectedMonth,
         year: selectedYear
       }, "-created_date");
+    },
+  });
+
+  const { data: allPayslips = [] } = useQuery({
+    queryKey: ["allPayslips"],
+    queryFn: async () => {
+      return await base44.entities.Payslip.list("-created_date", 500);
     },
   });
 
@@ -167,11 +177,26 @@ export default function PayrollManagement() {
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries(["payslips"]);
+      queryClient.invalidateQueries(["allPayslips"]);
       toast.success(`Planilla ${status === "Aprobada" ? "aprobada" : "marcada como pagada"}`);
       setSelectedPayslipForClose(null);
     },
     onError: () => {
       toast.error("Error al actualizar el estado");
+    },
+  });
+
+  const deletePayslipMutation = useMutation({
+    mutationFn: async (id) => {
+      return await base44.entities.Payslip.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["payslips"]);
+      queryClient.invalidateQueries(["allPayslips"]);
+      toast.success("Planilla eliminada exitosamente");
+    },
+    onError: () => {
+      toast.error("Error al eliminar la planilla");
     },
   });
 
@@ -400,6 +425,108 @@ export default function PayrollManagement() {
     adicional: existingPayslips.filter(p => p.payroll_type === "Adicional").length,
     snp: existingPayslips.filter(p => p.payroll_type === "SNP").length,
     total: existingPayslips.reduce((sum, p) => sum + (p.net_pay || 0), 0),
+  };
+
+  const getLatestPayslipsByMonth = () => {
+    const grouped = {};
+    allPayslips.forEach(p => {
+      const key = `${p.year}-${p.month}-${p.payroll_type}`;
+      if (!grouped[key] || new Date(p.created_date) > new Date(grouped[key].created_date)) {
+        grouped[key] = p;
+      }
+    });
+    return Object.values(grouped);
+  };
+
+  const handleDeleteLastPayroll = async (payslip) => {
+    if (!confirm(`¿Está seguro de eliminar todas las planillas de ${payslip.payroll_type} de ${format(new Date(payslip.year, payslip.month - 1), 'MMMM yyyy', { locale: es })}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+    
+    const toDelete = allPayslips.filter(p => 
+      p.year === payslip.year && 
+      p.month === payslip.month && 
+      p.payroll_type === payslip.payroll_type
+    );
+    
+    try {
+      await Promise.all(toDelete.map(p => base44.entities.Payslip.delete(p.id)));
+      queryClient.invalidateQueries(["payslips"]);
+      queryClient.invalidateQueries(["allPayslips"]);
+      toast.success(`${toDelete.length} planilla(s) eliminada(s)`);
+    } catch (error) {
+      toast.error("Error al eliminar las planillas");
+    }
+  };
+
+  const generatePayslipPDF = async (payslip, employee) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Header
+    doc.setFontSize(16);
+    doc.text("BOLETA DE PAGO", pageWidth / 2, 20, { align: "center" });
+    
+    // Employee Info
+    doc.setFontSize(10);
+    doc.text(`Empleado: ${employee.first_name} ${employee.last_name}`, 14, 35);
+    doc.text(`Código: ${employee.employee_code}`, 14, 42);
+    doc.text(`Periodo: ${payslip.period}`, 14, 49);
+    doc.text(`Tipo: ${payslip.payroll_type}`, 120, 49);
+    
+    // Income
+    let yPos = 65;
+    doc.setFont(undefined, 'bold');
+    doc.text("INGRESOS", 14, yPos);
+    doc.setFont(undefined, 'normal');
+    yPos += 7;
+    doc.text(`Salario Base:`, 14, yPos);
+    doc.text(`S/ ${payslip.base_salary.toFixed(2)}`, 160, yPos, { align: "right" });
+    yPos += 7;
+    doc.text(`Total Ingresos:`, 14, yPos);
+    doc.setFont(undefined, 'bold');
+    doc.text(`S/ ${payslip.total_income.toFixed(2)}`, 160, yPos, { align: "right" });
+    
+    // Deductions
+    yPos += 15;
+    doc.setFont(undefined, 'bold');
+    doc.text("DESCUENTOS", 14, yPos);
+    doc.setFont(undefined, 'normal');
+    yPos += 7;
+    if (payslip.pension_deduction > 0) {
+      doc.text(`Pensiones:`, 14, yPos);
+      doc.text(`S/ ${payslip.pension_deduction.toFixed(2)}`, 160, yPos, { align: "right" });
+      yPos += 7;
+    }
+    if (payslip.income_tax > 0) {
+      doc.text(`Renta 5ta:`, 14, yPos);
+      doc.text(`S/ ${payslip.income_tax.toFixed(2)}`, 160, yPos, { align: "right" });
+      yPos += 7;
+    }
+    doc.text(`Total Descuentos:`, 14, yPos);
+    doc.setFont(undefined, 'bold');
+    doc.text(`S/ ${payslip.total_deductions.toFixed(2)}`, 160, yPos, { align: "right" });
+    
+    // Net Pay
+    yPos += 15;
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text("NETO A PAGAR:", 14, yPos);
+    doc.text(`S/ ${payslip.net_pay.toFixed(2)}`, 160, yPos, { align: "right" });
+    
+    doc.save(`Boleta_${employee.employee_code}_${payslip.period}.pdf`);
+    toast.success("Boleta generada");
+  };
+
+  const generateMassivePayslipsPDF = async (payslips) => {
+    for (const payslip of payslips) {
+      const emp = allEmployees.find(e => e.id === payslip.employee_id);
+      if (emp) {
+        await generatePayslipPDF(payslip, emp);
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+    }
+    toast.success(`${payslips.length} boletas generadas`);
   };
 
   if (!employee || employee.role !== "admin") {
@@ -844,16 +971,23 @@ export default function PayrollManagement() {
                 </CardContent>
               </Card>
             ) : (
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="border-b">
-                  <CardTitle className="text-xl font-bold">
-                    Planillas del Periodo
-                  </CardTitle>
-                  <p className="text-sm text-slate-600 mt-1">
-                    {format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}
-                  </p>
-                </CardHeader>
-                <CardContent className="p-6">
+              <Tabs defaultValue="current" className="space-y-6">
+                <TabsList>
+                  <TabsTrigger value="current">Periodo Actual</TabsTrigger>
+                  <TabsTrigger value="history">Histórico de Planillas</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="current">
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b">
+                      <CardTitle className="text-xl font-bold">
+                        Planillas del Periodo
+                      </CardTitle>
+                      <p className="text-sm text-slate-600 mt-1">
+                        {format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}
+                      </p>
+                    </CardHeader>
+                    <CardContent className="p-6">
                   {filteredPayslips.length === 0 ? (
                     <div className="text-center py-12">
                       <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
@@ -956,7 +1090,197 @@ export default function PayrollManagement() {
                   )}
                 </CardContent>
               </Card>
-            )}
+            </TabsContent>
+
+            <TabsContent value="history">
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="border-b">
+                  <CardTitle className="text-xl font-bold">Histórico de Planillas</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="flex gap-4 mb-6">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                      <Input
+                        placeholder="Buscar empleado..."
+                        value={historySearchTerm}
+                        onChange={(e) => setHistorySearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <Select value={String(historyYearFilter)} onValueChange={(v) => setHistoryYearFilter(parseInt(v))}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[2023, 2024, 2025, 2026].map(year => (
+                          <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={historyTypeFilter} onValueChange={setHistoryTypeFilter}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="Quincenal">Quincenal</SelectItem>
+                        <SelectItem value="Mensual">Mensual</SelectItem>
+                        <SelectItem value="Adicional">Adicional</SelectItem>
+                        <SelectItem value="SNP">SNP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(() => {
+                    const latestPayslips = getLatestPayslipsByMonth();
+                    const filtered = latestPayslips.filter(p => {
+                      if (p.year !== historyYearFilter) return false;
+                      if (historyTypeFilter !== "all" && p.payroll_type !== historyTypeFilter) return false;
+                      if (historySearchTerm) {
+                        const emp = allEmployees.find(e => e.id === p.employee_id);
+                        if (!emp) return false;
+                        const searchLower = historySearchTerm.toLowerCase();
+                        return (
+                          emp.first_name.toLowerCase().includes(searchLower) ||
+                          emp.last_name.toLowerCase().includes(searchLower) ||
+                          emp.employee_code.toLowerCase().includes(searchLower)
+                        );
+                      }
+                      return true;
+                    });
+
+                    // Group by month and type
+                    const grouped = {};
+                    filtered.forEach(p => {
+                      const key = `${p.year}-${p.month}-${p.payroll_type}`;
+                      if (!grouped[key]) {
+                        grouped[key] = {
+                          year: p.year,
+                          month: p.month,
+                          type: p.payroll_type,
+                          payslips: []
+                        };
+                      }
+                      grouped[key].payslips.push(p);
+                    });
+
+                    const groups = Object.values(grouped).sort((a, b) => {
+                      if (a.year !== b.year) return b.year - a.year;
+                      if (a.month !== b.month) return b.month - a.month;
+                      return a.type.localeCompare(b.type);
+                    });
+
+                    return groups.length === 0 ? (
+                      <div className="text-center py-12">
+                        <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                        <p className="text-slate-600">No se encontraron planillas</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {groups.map((group, idx) => {
+                          const allGroupPayslips = allPayslips.filter(p => 
+                            p.year === group.year && 
+                            p.month === group.month && 
+                            p.payroll_type === group.type
+                          );
+                          const total = allGroupPayslips.reduce((sum, p) => sum + (p.net_pay || 0), 0);
+                          const isLatest = idx === 0;
+
+                          return (
+                            <Card key={`${group.year}-${group.month}-${group.type}`} className="border-2">
+                              <CardContent className="p-5">
+                                <div className="flex items-center justify-between mb-4">
+                                  <div>
+                                    <h3 className="text-lg font-bold text-slate-900">
+                                      {format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })} - {group.type}
+                                    </h3>
+                                    <p className="text-sm text-slate-600">
+                                      {allGroupPayslips.length} empleado(s) • Total: S/ {total.toFixed(2)}
+                                    </p>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        const emp = allEmployees.find(e => e.id === allGroupPayslips[0].employee_id);
+                                        if (emp) generatePayslipPDF(allGroupPayslips[0], emp);
+                                      }}
+                                    >
+                                      <Download className="w-3 h-3 mr-1" />
+                                      Boleta Individual
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => generateMassivePayslipsPDF(allGroupPayslips)}
+                                    >
+                                      <Download className="w-3 h-3 mr-1" />
+                                      Todas las Boletas
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        const doc = new jsPDF();
+                                        doc.text(`Planilla ${group.type}`, 14, 20);
+                                        doc.text(`${format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })}`, 14, 28);
+                                        let y = 40;
+                                        allGroupPayslips.forEach(p => {
+                                          const emp = allEmployees.find(e => e.id === p.employee_id);
+                                          if (emp) {
+                                            doc.text(`${emp.employee_code} - ${emp.first_name} ${emp.last_name}`, 14, y);
+                                            doc.text(`S/ ${p.net_pay.toFixed(2)}`, 160, y, { align: "right" });
+                                            y += 7;
+                                          }
+                                        });
+                                        doc.save(`Planilla_${group.type}_${group.year}_${group.month}.pdf`);
+                                      }}
+                                    >
+                                      <FileText className="w-3 h-3 mr-1" />
+                                      Resumen PDF
+                                    </Button>
+                                    {isLatest && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-red-600 hover:bg-red-50"
+                                        onClick={() => handleDeleteLastPayroll(allGroupPayslips[0])}
+                                      >
+                                        Eliminar
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  {allGroupPayslips.slice(0, 5).map(p => {
+                                    const emp = allEmployees.find(e => e.id === p.employee_id);
+                                    return emp ? (
+                                      <div key={p.id} className="flex items-center justify-between text-sm p-2 bg-slate-50 rounded">
+                                        <span>{emp.employee_code} - {emp.first_name} {emp.last_name}</span>
+                                        <span className="font-semibold">S/ {p.net_pay.toFixed(2)}</span>
+                                      </div>
+                                    ) : null;
+                                  })}
+                                  {allGroupPayslips.length > 5 && (
+                                    <p className="text-xs text-slate-500 text-center">
+                                      y {allGroupPayslips.length - 5} más...
+                                    </p>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
           </div>
         </div>
 
