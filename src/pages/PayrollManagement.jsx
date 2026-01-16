@@ -38,7 +38,9 @@ export default function PayrollManagement() {
   const [excludedEmployees, setExcludedEmployees] = useState([]);
   const [historySearchTerm, setHistorySearchTerm] = useState("");
   const [historyYearFilter, setHistoryYearFilter] = useState(new Date().getFullYear());
+  const [historyMonthFilter, setHistoryMonthFilter] = useState("all");
   const [historyTypeFilter, setHistoryTypeFilter] = useState("all");
+  const [selectedPayrollToDelete, setSelectedPayrollToDelete] = useState(null);
 
   const queryClient = useQueryClient();
 
@@ -438,15 +440,13 @@ export default function PayrollManagement() {
     return Object.values(grouped);
   };
 
-  const handleDeleteLastPayroll = async (payslip) => {
-    if (!confirm(`¿Está seguro de eliminar todas las planillas de ${payslip.payroll_type} de ${format(new Date(payslip.year, payslip.month - 1), 'MMMM yyyy', { locale: es })}? Esta acción no se puede deshacer.`)) {
-      return;
-    }
+  const handleDeletePayroll = async () => {
+    if (!selectedPayrollToDelete) return;
     
     const toDelete = allPayslips.filter(p => 
-      p.year === payslip.year && 
-      p.month === payslip.month && 
-      p.payroll_type === payslip.payroll_type
+      p.year === selectedPayrollToDelete.year && 
+      p.month === selectedPayrollToDelete.month && 
+      p.payroll_type === selectedPayrollToDelete.type
     );
     
     try {
@@ -454,8 +454,10 @@ export default function PayrollManagement() {
       queryClient.invalidateQueries(["payslips"]);
       queryClient.invalidateQueries(["allPayslips"]);
       toast.success(`${toDelete.length} planilla(s) eliminada(s)`);
+      setSelectedPayrollToDelete(null);
     } catch (error) {
       toast.error("Error al eliminar las planillas");
+      console.error(error);
     }
   };
 
@@ -1098,8 +1100,8 @@ export default function PayrollManagement() {
                   <CardTitle className="text-xl font-bold">Histórico de Planillas</CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <div className="flex gap-4 mb-6">
-                    <div className="flex-1 relative">
+                  <div className="flex gap-4 mb-6 flex-wrap">
+                    <div className="flex-1 min-w-[200px] relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
                       <Input
                         placeholder="Buscar empleado..."
@@ -1109,8 +1111,8 @@ export default function PayrollManagement() {
                       />
                     </div>
                     <Select value={String(historyYearFilter)} onValueChange={(v) => setHistoryYearFilter(parseInt(v))}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
+                      <SelectTrigger className="w-28">
+                        <SelectValue placeholder="Año" />
                       </SelectTrigger>
                       <SelectContent>
                         {[2023, 2024, 2025, 2026].map(year => (
@@ -1118,9 +1120,22 @@ export default function PayrollManagement() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <Select value={historyMonthFilter} onValueChange={setHistoryMonthFilter}>
+                      <SelectTrigger className="w-36">
+                        <SelectValue placeholder="Mes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los meses</SelectItem>
+                        {Array.from({ length: 12 }, (_, i) => (
+                          <SelectItem key={i + 1} value={String(i + 1)}>
+                            {format(new Date(2024, i), 'MMMM', { locale: es })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Select value={historyTypeFilter} onValueChange={setHistoryTypeFilter}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue />
+                      <SelectTrigger className="w-36">
+                        <SelectValue placeholder="Tipo" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
@@ -1136,6 +1151,7 @@ export default function PayrollManagement() {
                     const latestPayslips = getLatestPayslipsByMonth();
                     const filtered = latestPayslips.filter(p => {
                       if (p.year !== historyYearFilter) return false;
+                      if (historyMonthFilter !== "all" && p.month !== parseInt(historyMonthFilter)) return false;
                       if (historyTypeFilter !== "all" && p.payroll_type !== historyTypeFilter) return false;
                       if (historySearchTerm) {
                         const emp = allEmployees.find(e => e.id === p.employee_id);
@@ -1185,19 +1201,29 @@ export default function PayrollManagement() {
                             p.payroll_type === group.type
                           );
                           const total = allGroupPayslips.reduce((sum, p) => sum + (p.net_pay || 0), 0);
-                          const isLatest = idx === 0;
+                          const isSelected = selectedPayrollToDelete?.year === group.year && 
+                                            selectedPayrollToDelete?.month === group.month && 
+                                            selectedPayrollToDelete?.type === group.type;
 
                           return (
-                            <Card key={`${group.year}-${group.month}-${group.type}`} className="border-2">
+                            <Card key={`${group.year}-${group.month}-${group.type}`} className={`border-2 ${isSelected ? 'border-red-400 bg-red-50' : ''}`}>
                               <CardContent className="p-5">
                                 <div className="flex items-center justify-between mb-4">
-                                  <div>
-                                    <h3 className="text-lg font-bold text-slate-900">
-                                      {format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })} - {group.type}
-                                    </h3>
-                                    <p className="text-sm text-slate-600">
-                                      {allGroupPayslips.length} empleado(s) • Total: S/ {total.toFixed(2)}
-                                    </p>
+                                  <div className="flex items-center gap-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => setSelectedPayrollToDelete(isSelected ? null : group)}
+                                      className="w-5 h-5 rounded border-slate-300"
+                                    />
+                                    <div>
+                                      <h3 className="text-lg font-bold text-slate-900">
+                                        {format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })} - {group.type}
+                                      </h3>
+                                      <p className="text-sm text-slate-600">
+                                        {allGroupPayslips.length} empleado(s) • Total: S/ {total.toFixed(2)}
+                                      </p>
+                                    </div>
                                   </div>
                                   <div className="flex gap-2">
                                     <Button
@@ -1241,16 +1267,6 @@ export default function PayrollManagement() {
                                       <FileText className="w-3 h-3 mr-1" />
                                       Resumen PDF
                                     </Button>
-                                    {isLatest && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="text-red-600 hover:bg-red-50"
-                                        onClick={() => handleDeleteLastPayroll(allGroupPayslips[0])}
-                                      >
-                                        Eliminar
-                                      </Button>
-                                    )}
                                   </div>
                                 </div>
 
@@ -1277,6 +1293,37 @@ export default function PayrollManagement() {
                       </div>
                     );
                   })()}
+
+                  {selectedPayrollToDelete && (
+                    <div className="mt-6 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-red-900 mb-1">
+                            ⚠️ Planilla seleccionada para eliminar
+                          </p>
+                          <p className="text-sm text-red-700">
+                            {format(new Date(selectedPayrollToDelete.year, selectedPayrollToDelete.month - 1), 'MMMM yyyy', { locale: es })} - {selectedPayrollToDelete.type}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedPayrollToDelete(null)}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={handleDeletePayroll}
+                          >
+                            Confirmar Eliminación
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
