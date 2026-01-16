@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  DollarSign, Plus, Trash2, Search, TrendingUp, 
+import {
+  DollarSign, Plus, Trash2, Search, TrendingUp,
   TrendingDown, Users, AlertCircle, Edit2, CheckCircle, User, Copy, Upload, FileSpreadsheet, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
@@ -18,162 +19,162 @@ import { toast } from "sonner";
 // Conceptos predefinidos según legislación peruana
 const PREDEFINED_CONCEPTS = {
   ingresos: [
-    { 
-      name: "Remuneración Básica", 
-      isDefault: true, 
-      isCompulsory: true, 
+    {
+      name: "Remuneración Básica",
+      isDefault: true,
+      isCompulsory: true,
       is_dynamic: true,
       calculation_formula: "(base_salary / 30) * worked_days",
       description: "Salario base proporcional a días trabajados (30 días = salario completo)"
     },
-    { 
-      name: "Asignación Familiar", 
+    {
+      name: "Asignación Familiar",
       description: "10% de RMV para trabajadores con hijos menores",
       is_dynamic: true,
       calculation_formula: "rmv * 0.10"
     },
-    { 
-      name: "Horas Extras al 25%", 
+    {
+      name: "Horas Extras al 25%",
       description: "Primeras 2 horas extras diarias",
       is_dynamic: true,
       calculation_formula: "(base_salary / 30 / 8) * 1.25 * horas_extras_25"
     },
-    { 
-      name: "Horas Extras al 35%", 
+    {
+      name: "Horas Extras al 35%",
       description: "Horas extras posteriores a las 2 primeras",
       is_dynamic: true,
       calculation_formula: "(base_salary / 30 / 8) * 1.35 * horas_extras_35"
     },
-    { 
-      name: "Bonificación por Movilidad", 
+    {
+      name: "Bonificación por Movilidad",
       description: "No mayor a 24% de RMV",
       is_dynamic: false
     },
-    { 
-      name: "Bonificación por Alimentación", 
+    {
+      name: "Bonificación por Alimentación",
       description: "No mayor a 20% de RMV",
       is_dynamic: false
     },
-    { 
-      name: "Comisiones", 
+    {
+      name: "Comisiones",
       description: "Variable por ventas o desempeño",
       is_dynamic: false
     },
-    { 
-      name: "Gratificación Ordinaria", 
+    {
+      name: "Gratificación Ordinaria",
       description: "Julio y Diciembre - equivalente a 1 sueldo",
       is_dynamic: true,
       calculation_formula: "base_salary"
     },
-    { 
-      name: "Gratificación Extraordinaria", 
+    {
+      name: "Gratificación Extraordinaria",
       description: "Bonificación adicional voluntaria",
       is_dynamic: false
     },
-    { 
-      name: "Bonificación por Escolaridad", 
+    {
+      name: "Bonificación por Escolaridad",
       description: "Apoyo educativo",
       is_dynamic: false
     },
-    { 
-      name: "Trabajo Nocturno (Sobretasa 35%)", 
+    {
+      name: "Trabajo Nocturno (Sobretasa 35%)",
       description: "Trabajo entre 22:00 y 06:00",
       is_dynamic: true,
       calculation_formula: "(base_salary / 30 / 8) * 0.35 * horas_nocturnas"
     },
   ],
   descuentos: [
-    { 
-      name: "ONP", 
-      description: "13% sobre remuneración bruta", 
+    {
+      name: "ONP",
+      description: "13% sobre remuneración bruta",
       percentage: 13,
       is_dynamic: true,
       calculation_formula: "base_salary * 0.13"
     },
-    { 
-      name: "Impuesto a la Renta 5ta Categoría", 
+    {
+      name: "Impuesto a la Renta 5ta Categoría",
       description: "Según escala progresiva",
       is_dynamic: false
     },
-    { 
-      name: "Préstamos", 
+    {
+      name: "Préstamos",
       description: "Descuento por préstamos otorgados",
       is_dynamic: false
     },
-    { 
-      name: "Adelanto Quincenal", 
+    {
+      name: "Adelanto Quincenal",
       description: "Adelanto de primera quincena",
       is_dynamic: false
     },
-    { 
-      name: "Descuento por Tardanzas", 
+    {
+      name: "Descuento por Tardanzas",
       description: "Según reglamento interno",
       is_dynamic: false
     },
-    { 
-      name: "Descuento por Inasistencias", 
+    {
+      name: "Descuento por Inasistencias",
       description: "Descuento proporcional",
       is_dynamic: false
     },
-    { 
-      name: "Retención Judicial", 
+    {
+      name: "Retención Judicial",
       description: "Por orden judicial",
       is_dynamic: false
     },
   ],
   aportaciones: [
-    { 
-      name: "ESSALUD", 
-      description: "9% sobre remuneración asegurable (empleador)", 
-      percentage: 9, 
+    {
+      name: "ESSALUD",
+      description: "9% sobre remuneración asegurable (empleador)",
+      percentage: 9,
       paidBy: "employer",
       is_dynamic: true,
       calculation_formula: "base_salary * 0.09"
     },
-    { 
-      name: "Seguro Vida Ley", 
-      description: "Aprox. 0.53% - 1.55% (empleador)", 
+    {
+      name: "Seguro Vida Ley",
+      description: "Aprox. 0.53% - 1.55% (empleador)",
       paidBy: "employer",
       is_dynamic: true,
       calculation_formula: "base_salary * 0.0053"
     },
-    { 
-      name: "SCTR Salud", 
-      description: "Seguro complementario trabajo de riesgo (empleador)", 
+    {
+      name: "SCTR Salud",
+      description: "Seguro complementario trabajo de riesgo (empleador)",
       paidBy: "employer",
       is_dynamic: false
     },
-    { 
-      name: "SCTR Pensión", 
-      description: "Seguro complementario trabajo de riesgo (empleador)", 
+    {
+      name: "SCTR Pensión",
+      description: "Seguro complementario trabajo de riesgo (empleador)",
       paidBy: "employer",
       is_dynamic: false
     },
   ],
   otros: [
-    { 
-      name: "CTS Mayo", 
+    {
+      name: "CTS Mayo",
       description: "Compensación por Tiempo de Servicios - Mayo",
       is_dynamic: false
     },
-    { 
-      name: "CTS Noviembre", 
+    {
+      name: "CTS Noviembre",
       description: "Compensación por Tiempo de Servicios - Noviembre",
       is_dynamic: false
     },
-    { 
-      name: "Utilidades", 
+    {
+      name: "Utilidades",
       description: "Participación en utilidades de la empresa",
       is_dynamic: false
     },
-    { 
-      name: "Vacaciones", 
+    {
+      name: "Vacaciones",
       description: "30 días calendario por año trabajado",
       is_dynamic: true,
       calculation_formula: "base_salary"
     },
-    { 
-      name: "Liquidación de Beneficios Sociales", 
+    {
+      name: "Liquidación de Beneficios Sociales",
       description: "Al cese laboral",
       is_dynamic: false
     },
@@ -217,10 +218,11 @@ export default function PayrollConcepts() {
         const user = await base44.auth.me();
         setCurrentUser(user);
 
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
+        // const employees = await base44.entities.Employee.filter({
+        const employees = await entitiesAPI.Employee.filter({
+          work_email: user.email
         });
-        
+
         if (employees && employees.length > 0) {
           setEmployee(employees[0]);
         }
@@ -235,14 +237,16 @@ export default function PayrollConcepts() {
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      // return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
 
   const { data: afps = [] } = useQuery({
     queryKey: ["afps"],
     queryFn: async () => {
-      const allAFPs = await base44.entities.AFP.list("name");
+      // const allAFPs = await base44.entities.AFP.list("name");
+      const allAFPs = await entitiesAPI.AFP.list("name");
       return allAFPs.filter(a => a.is_active);
     },
   });
@@ -252,14 +256,16 @@ export default function PayrollConcepts() {
     queryFn: async () => {
       if (activeTab === "general") {
         // Para configuración general, traer solo conceptos generales
-        return await base44.entities.PayrollConcept.filter({ employee_id: "general" }, "-created_date");
+        // return await base44.entities.PayrollConcept.filter({ employee_id: "general" }, "-created_date");
+        return await entitiesAPI.PayrollConcept.filter({ employee_id: "general" }, "-created_date");
       } else {
         // Para configuración individual, traer conceptos generales + conceptos del empleado
-        const allConcepts = await base44.entities.PayrollConcept.list("-created_date");
-        
+        // const allConcepts = await base44.entities.PayrollConcept.list("-created_date");
+        const allConcepts = await entitiesAPI.PayrollConcept.list("-created_date");
+
         // Filtrar conceptos generales o del empleado seleccionado
-        return allConcepts.filter(c => 
-          c.employee_id === "general" || 
+        return allConcepts.filter(c =>
+          c.employee_id === "general" ||
           (selectedEmployee && c.employee_id === selectedEmployee)
         );
       }
@@ -269,9 +275,11 @@ export default function PayrollConcepts() {
   const createConceptMutation = useMutation({
     mutationFn: async (data) => {
       if (editingConcept) {
-        return await base44.entities.PayrollConcept.update(editingConcept.id, data);
+        // return await base44.entities.PayrollConcept.update(editingConcept.id, data);
+        return await entitiesAPI.PayrollConcept.update(editingConcept.id, data);
       }
-      return await base44.entities.PayrollConcept.create(data);
+      // return await base44.entities.PayrollConcept.create(data);
+      return await entitiesAPI.PayrollConcept.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["payrollConcepts"]);
@@ -285,7 +293,8 @@ export default function PayrollConcepts() {
 
   const deleteConceptMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.PayrollConcept.delete(id);
+      // return await base44.entities.PayrollConcept.delete(id);
+      return await entitiesAPI.PayrollConcept.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["payrollConcepts"]);
@@ -298,17 +307,19 @@ export default function PayrollConcepts() {
 
   const clearAllConceptsMutation = useMutation({
     mutationFn: async () => {
-      const allConcepts = await base44.entities.PayrollConcept.list();
-      
+      // const allConcepts = await base44.entities.PayrollConcept.list();
+      const allConcepts = await entitiesAPI.PayrollConcept.list();
+
       // Filtrar conceptos a eliminar (todos excepto AFP y ONP automáticos)
-      const conceptsToDelete = allConcepts.filter(c => 
+      const conceptsToDelete = allConcepts.filter(c =>
         !c.concept_name.includes("AFP - ") && c.concept_name !== "ONP"
       );
-      
+
       for (const concept of conceptsToDelete) {
-        await base44.entities.PayrollConcept.delete(concept.id);
+        // await base44.entities.PayrollConcept.delete(concept.id);
+        await entitiesAPI.PayrollConcept.delete(concept.id);
       }
-      
+
       return conceptsToDelete.length;
     },
     onSuccess: (count) => {
@@ -323,23 +334,25 @@ export default function PayrollConcepts() {
   const syncONPConceptsMutation = useMutation({
     mutationFn: async () => {
       const onpEmployees = allEmployees.filter(emp => emp.pension_system === "ONP");
-      
+
       if (onpEmployees.length === 0) {
         throw new Error("No hay empleados con sistema ONP");
       }
 
-      const allConcepts = await base44.entities.PayrollConcept.list();
+      // const allConcepts = await base44.entities.PayrollConcept.list();
+      const allConcepts = await entitiesAPI.PayrollConcept.list();
       let syncedCount = 0;
 
       for (const emp of onpEmployees) {
         // Verificar si el empleado ya tiene concepto ONP
-        const hasONP = allConcepts.some(c => 
+        const hasONP = allConcepts.some(c =>
           c.employee_id === emp.id && c.concept_name === "ONP"
         );
 
         if (!hasONP) {
           // Crear concepto ONP para este empleado
-          await base44.entities.PayrollConcept.create({
+          // await base44.entities.PayrollConcept.create({
+          await entitiesAPI.PayrollConcept.create({
             employee_id: emp.id,
             concept_type: "Descuento",
             concept_name: "ONP",
@@ -443,14 +456,15 @@ export default function PayrollConcepts() {
     // Si es ONP y es concepto general, sincronizar con empleados que tienen ONP
     if (activeTab === "general" && formData.concept_name === "ONP") {
       const onpEmployees = allEmployees.filter(emp => emp.pension_system === "ONP");
-      
+
       // Crear concepto general
       await createConceptMutation.mutateAsync(conceptData);
-      
+
       // Crear conceptos individuales para cada empleado con ONP
       for (const emp of onpEmployees) {
         try {
-          await base44.entities.PayrollConcept.create({
+          // await base44.entities.PayrollConcept.create({
+          await entitiesAPI.PayrollConcept.create({
             ...conceptData,
             employee_id: emp.id,
             notes: `${conceptData.notes || "ONP - 13% sobre remuneración bruta"} (Auto-asignado)`
@@ -459,7 +473,7 @@ export default function PayrollConcepts() {
           console.error(`Error al crear concepto ONP para empleado ${emp.id}:`, error);
         }
       }
-      
+
       toast.success(`Concepto ONP agregado para ${onpEmployees.length} empleados con ONP`);
       queryClient.invalidateQueries(["payrollConcepts"]);
       resetForm();
@@ -562,7 +576,7 @@ export default function PayrollConcepts() {
   const bulkCreateMutation = useMutation({
     mutationFn: async (concepts) => {
       const results = { success: 0, errors: 0, errorDetails: [] };
-      
+
       for (const concept of concepts) {
         try {
           const emp = allEmployees.find(e => e.document_number === concept.document_number);
@@ -582,7 +596,8 @@ export default function PayrollConcepts() {
             }
           }
 
-          await base44.entities.PayrollConcept.create({
+          // await base44.entities.PayrollConcept.create({
+          await entitiesAPI.PayrollConcept.create({
             employee_id: emp.id,
             concept_type: concept.concept_type || "Ingreso",
             concept_category: concept.concept_category || "",
@@ -600,7 +615,7 @@ export default function PayrollConcepts() {
             is_applied: false,
             notes: concept.notes || "",
           });
-          
+
           results.success++;
         } catch (error) {
           console.error("Error creating concept:", error);
@@ -608,7 +623,7 @@ export default function PayrollConcepts() {
           results.errorDetails.push(`Error en documento ${concept.document_number}: ${error.message}`);
         }
       }
-      
+
       return results;
     },
     onSuccess: (results) => {
@@ -666,14 +681,14 @@ export default function PayrollConcepts() {
     setShowForm(false);
   };
 
-  const filteredEmployees = allEmployees.filter(emp => 
+  const filteredEmployees = allEmployees.filter(emp =>
     emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const generalConcepts = payrollConcepts.filter(c => c.employee_id === "general");
-  const individualConcepts = selectedEmployee 
+  const individualConcepts = selectedEmployee
     ? payrollConcepts.filter(c => c.employee_id === selectedEmployee)
     : [];
 
@@ -826,7 +841,7 @@ export default function PayrollConcepts() {
                         Conceptos Disponibles
                       </h3>
                       <p className="text-xs text-slate-600 mb-4">Haz clic en (+) para incorporar</p>
-                      
+
                       <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
                         {/* Ingresos */}
                         <div>
@@ -1043,7 +1058,7 @@ export default function PayrollConcepts() {
                         Conceptos Incorporados (Todos los Empleados)
                       </h3>
                       <p className="text-xs text-slate-600 mb-4">Estos conceptos se aplican a todos los empleados</p>
-                      
+
                       <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
                         {generalConcepts.length === 0 ? (
                           <div className="text-center py-12 text-slate-500">
@@ -1068,8 +1083,8 @@ export default function PayrollConcepts() {
                                   </div>
                                   <div className="flex flex-wrap gap-1 mb-2">
                                     <Badge className={
-                                      concept.concept_type === "Ingreso" 
-                                        ? "bg-green-100 text-green-700 text-xs" 
+                                      concept.concept_type === "Ingreso"
+                                        ? "bg-green-100 text-green-700 text-xs"
                                         : concept.concept_type === "Aportación"
                                         ? "bg-blue-100 text-blue-700 text-xs"
                                         : "bg-red-100 text-red-700 text-xs"
@@ -1277,11 +1292,11 @@ export default function PayrollConcepts() {
                               )}
                               <span className="font-semibold text-slate-900 text-sm">{concept.concept_name}</span>
                             </div>
-                            
+
                             <div className="flex flex-wrap gap-1 mb-2">
                               <Badge className={
-                                concept.concept_type === "Ingreso" 
-                                  ? "bg-green-100 text-green-700 text-xs" 
+                                concept.concept_type === "Ingreso"
+                                  ? "bg-green-100 text-green-700 text-xs"
                                   : concept.concept_type === "Aportación"
                                   ? "bg-blue-100 text-blue-700 text-xs"
                                   : "bg-red-100 text-red-700 text-xs"
@@ -1307,7 +1322,7 @@ export default function PayrollConcepts() {
                                 <Badge className="bg-orange-100 text-orange-700 text-xs font-bold">⚠ Obligatorio</Badge>
                               )}
                             </div>
-                            
+
                             {concept.description && (
                               <p className="text-xs text-slate-600 mb-2 italic">{concept.description}</p>
                             )}
@@ -1322,7 +1337,7 @@ export default function PayrollConcepts() {
                                 ))}
                               </div>
                             )}
-                            
+
                             {concept.is_dynamic ? (
                               <p className="text-xs text-slate-600 mt-2 font-mono bg-slate-50 p-1 rounded">
                                 {concept.calculation_formula}
@@ -1366,8 +1381,8 @@ export default function PayrollConcepts() {
                         <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                         <p className="font-semibold mb-1">No hay conceptos específicos</p>
                         <p className="text-xs">Este empleado solo tiene los conceptos generales aplicables</p>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           onClick={() => setShowForm(true)}
                           className="mt-4"
                           variant="outline"
@@ -1397,8 +1412,8 @@ export default function PayrollConcepts() {
                                     </Badge>
                                   )}
                                   <Badge className={
-                                    concept.concept_type === "Ingreso" 
-                                      ? "bg-green-100 text-green-700" 
+                                    concept.concept_type === "Ingreso"
+                                      ? "bg-green-100 text-green-700"
                                       : concept.concept_type === "Aportación"
                                       ? "bg-blue-100 text-blue-700"
                                       : "bg-red-100 text-red-700"
@@ -1515,11 +1530,11 @@ export default function PayrollConcepts() {
 
       {/* Bulk Upload Modal */}
       {showBulkUpload && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
           onClick={() => setShowBulkUpload(false)}
         >
-          <Card 
+          <Card
             className="max-w-4xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1624,8 +1639,8 @@ export default function PayrollConcepts() {
                               </td>
                               <td className="p-2">
                                 <Badge className={
-                                  item.concept_type === "Ingreso" 
-                                    ? "bg-green-100 text-green-700 text-xs" 
+                                  item.concept_type === "Ingreso"
+                                    ? "bg-green-100 text-green-700 text-xs"
                                     : item.concept_type === "Aportación"
                                     ? "bg-blue-100 text-blue-700 text-xs"
                                     : "bg-red-100 text-red-700 text-xs"
@@ -1664,11 +1679,11 @@ export default function PayrollConcepts() {
 
       {/* Form Modal */}
       {showForm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
           onClick={resetForm}
         >
-          <Card 
+          <Card
             className="max-w-lg w-full"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1683,7 +1698,7 @@ export default function PayrollConcepts() {
             <CardContent className="p-6 space-y-4">
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
                 <p className="text-sm text-amber-800">
-                  {activeTab === "general" 
+                  {activeTab === "general"
                     ? "Este concepto se aplicará a todos los empleados automáticamente"
                     : "Este concepto se aplicará solo al empleado seleccionado"
                   }
@@ -1761,10 +1776,10 @@ export default function PayrollConcepts() {
 
               <div>
                 <Label>Tipo de Cálculo</Label>
-                <Select 
-                  value={formData.is_dynamic ? "dynamic" : "fixed"} 
+                <Select
+                  value={formData.is_dynamic ? "dynamic" : "fixed"}
                   onValueChange={(v) => setFormData({
-                    ...formData, 
+                    ...formData,
                     is_dynamic: v === "dynamic",
                     amount: v === "dynamic" ? "0" : formData.amount,
                     calculation_formula: v === "fixed" ? "" : formData.calculation_formula
@@ -1779,8 +1794,8 @@ export default function PayrollConcepts() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-slate-500 mt-1">
-                  {formData.is_dynamic 
-                    ? "El monto se calculará automáticamente según la fórmula" 
+                  {formData.is_dynamic
+                    ? "El monto se calculará automáticamente según la fórmula"
                     : "Ingresa un monto específico"
                   }
                 </p>

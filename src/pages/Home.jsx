@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { createPageUrl } from "../utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,20 +12,31 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 
 export default function Home() {
+  const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadEmployee = async () => {
       try {
-        const isAuth = await base44.auth.isAuthenticated();
-        if (!isAuth) {
+        if (isLoadingAuth) {
+          return;
+        }
+
+        if (!isAuthenticated || !user) {
           setLoading(false);
           return;
         }
 
-        const user = await base44.auth.me();
-        const employees = await base44.entities.Employee.filter({
+        // Use employee data from auth context if available
+        if (user.employee) {
+          setEmployee(user.employee);
+          setLoading(false);
+          return;
+        }
+
+        // Fallback to API call if needed
+        const employees = await entitiesAPI.Employee.filter({
           work_email: user.email
         });
 
@@ -39,7 +51,7 @@ export default function Home() {
     };
 
     loadEmployee();
-  }, []);
+  }, [user, isAuthenticated, isLoadingAuth]);
 
   const getRoleText = (role) => {
     const roles = {
@@ -187,7 +199,7 @@ export default function Home() {
         <Button
           variant="outline"
           className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 shadow-lg hover:shadow-xl transition-all"
-          onClick={() => base44.auth.logout()}
+          onClick={() => logout()}
         >
           Cerrar Sesión
         </Button>

@@ -10,8 +10,9 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-pool.on('connect', () => {
-  console.log('OK: Conectado a PostgreSQL');
+pool.on('connect', (client) => {
+  client.query('SET search_path TO public');
+  console.log('OK: Conectado a PostgreSQL: foresplanilla_local');
 });
 
 pool.on('error', (err) => {
@@ -19,6 +20,17 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
-export const query = (text, params) => pool.query(text, params);
+export const query = async (text, params) => {
+  const start = Date.now();
+  try {
+    const res = await pool.query(text, params);
+    const duration = Date.now() - start;
+    console.log('Executed query', { text: text.substring(0, 100), duration, rows: res.rowCount });
+    return res;
+  } catch (error) {
+    console.error('Query error:', error);
+    throw error;
+  }
+};
 
 export default pool;

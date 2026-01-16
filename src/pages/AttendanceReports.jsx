@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Clock, Calendar as CalendarIcon, Download, Users, 
+import {
+  Clock, Calendar as CalendarIcon, Download, Users,
   TrendingUp, AlertCircle, CheckCircle, XCircle, FileText, BarChart3, Search
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, differenceInDays } from "date-fns";
@@ -32,7 +33,7 @@ export default function AttendanceReports() {
   const [reportType, setReportType] = useState("general");
   const [chartType, setChartType] = useState("line");
   const [incidentTypeFilter, setIncidentTypeFilter] = useState("all");
-  
+
   // Filtros aplicados (se actualizan al hacer clic en Buscar)
   const [appliedStartDate, setAppliedStartDate] = useState(startOfMonth(new Date()));
   const [appliedEndDate, setAppliedEndDate] = useState(endOfMonth(new Date()));
@@ -40,7 +41,7 @@ export default function AttendanceReports() {
   const [appliedEmployee, setAppliedEmployee] = useState("all");
   const [appliedReportType, setAppliedReportType] = useState("general");
   const [appliedIncidentType, setAppliedIncidentType] = useState("all");
-  
+
   // Estados para búsqueda
   const [employeeSearchOpen, setEmployeeSearchOpen] = useState(false);
   const [departmentSearchOpen, setDepartmentSearchOpen] = useState(false);
@@ -61,10 +62,11 @@ export default function AttendanceReports() {
         const user = await base44.auth.me();
         setCurrentUser(user);
 
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
+        // const employees = await base44.entities.Employee.filter({
+        const employees = await entitiesAPI.Employee.filter({
+          work_email: user.email
         });
-        
+
         if (employees && employees.length > 0) {
           setEmployee(employees[0]);
         }
@@ -79,21 +81,24 @@ export default function AttendanceReports() {
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      // return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
 
   const { data: workSchedules = [] } = useQuery({
     queryKey: ["workSchedules"],
     queryFn: async () => {
-      return await base44.entities.WorkSchedule.list("-created_date");
+      // return await base44.entities.WorkSchedule.list("-created_date");
+      return await entitiesAPI.WorkSchedule.list("-created_date");
     },
   });
 
   const { data: attendanceRecords = [] } = useQuery({
     queryKey: ["allAttendanceRecords", appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      const records = await base44.entities.AttendanceRecord.list("-date");
+      // const records = await base44.entities.AttendanceRecord.list("-date");
+      const records = await entitiesAPI.AttendanceRecord.list("-date");
       return records.filter(r => {
         const recordDate = new Date(r.date);
         return recordDate >= appliedStartDate && recordDate <= appliedEndDate;
@@ -104,7 +109,8 @@ export default function AttendanceReports() {
   const { data: incidents = [] } = useQuery({
     queryKey: ["allIncidents", appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      const allIncidents = await base44.entities.AttendanceIncident.list("-created_date");
+      // const allIncidents = await base44.entities.AttendanceIncident.list("-created_date");
+      const allIncidents = await entitiesAPI.AttendanceIncident.list("-created_date");
       return allIncidents.filter(i => {
         const incidentDate = new Date(i.incident_date);
         return incidentDate >= appliedStartDate && incidentDate <= appliedEndDate;
@@ -115,14 +121,16 @@ export default function AttendanceReports() {
   const { data: holidays = [] } = useQuery({
     queryKey: ["holidays"],
     queryFn: async () => {
-      return await base44.entities.Holiday.list("-date");
+      // return await base44.entities.Holiday.list("-date");
+      return await entitiesAPI.Holiday.list("-date");
     },
   });
 
   const { data: vacationRequests = [] } = useQuery({
     queryKey: ["vacationRequests", appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      const allRequests = await base44.entities.VacationRequest.list("-created_date");
+      // const allRequests = await base44.entities.VacationRequest.list("-created_date");
+      const allRequests = await entitiesAPI.VacationRequest.list("-created_date");
       return allRequests.filter(v => {
         if (v.status !== "Aprobada") return false;
         const startDate = new Date(v.start_date);
@@ -161,18 +169,18 @@ export default function AttendanceReports() {
   const getEmployeeSchedule = (empId) => {
     // Buscar horario individual primero
     let schedule = workSchedules.find(s => s.employee_id === empId && s.is_active);
-    
+
     // Si no hay individual, buscar por departamento
     if (!schedule) {
       const emp = allEmployees.find(e => e.id === empId);
       if (emp?.department_name) {
-        schedule = workSchedules.find(s => 
-          s.is_active && 
+        schedule = workSchedules.find(s =>
+          s.is_active &&
           (s.departments?.includes(emp.department_name) || s.department_name === emp.department_name)
         );
       }
     }
-    
+
     return schedule;
   };
 
@@ -199,7 +207,7 @@ export default function AttendanceReports() {
     return true;
   });
 
-  const displayEmployees = appliedEmployee !== "all" 
+  const displayEmployees = appliedEmployee !== "all"
     ? filteredEmployees.filter(e => e.id === appliedEmployee)
     : filteredEmployees;
 
@@ -210,7 +218,7 @@ export default function AttendanceReports() {
   displayEmployees.forEach(emp => {
     allDaysInRange.forEach(day => {
       const dayStr = format(day, "yyyy-MM-dd");
-      const existingRecord = attendanceRecords.find(r => 
+      const existingRecord = attendanceRecords.find(r =>
         r.employee_id === emp.id && r.date === dayStr
       );
 
@@ -252,23 +260,23 @@ export default function AttendanceReports() {
   const calculateEmployeeStats = (employeeId) => {
     const empRecords = filteredRecords.filter(r => r.employee_id === employeeId);
     const recordsWithClockIn = empRecords.filter(r => r.clock_in);
-    
+
     const totalDays = recordsWithClockIn.length;
     const presentDays = recordsWithClockIn.filter(r => !r.is_absent && r.clock_in).length;
     const lateDays = recordsWithClockIn.filter(r => r.is_late && r.late_minutes > 0).length;
-    
+
     // No contar como ausencias los días con vacaciones/permisos aprobados o feriados
     const absentDays = empRecords.filter(r => {
       const recordDate = new Date(r.date);
-      return r.is_absent 
-        && !isHoliday(recordDate) 
+      return r.is_absent
+        && !isHoliday(recordDate)
         && !isOnVacationOrLeave(employeeId, recordDate);
     }).length;
-    
+
     const totalHours = recordsWithClockIn.reduce((sum, r) => sum + (r.worked_hours || 0), 0);
     const totalLateMinutes = recordsWithClockIn.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
     const holidaysInPeriod = empRecords.filter(r => isHoliday(new Date(r.date))).length;
-    
+
     // Calcular horas extras SOLO si está autorizado
     const authorized = isOvertimeAuthorized(employeeId);
     const overtimeHours = authorized ? recordsWithClockIn.reduce((sum, r) => {
@@ -278,25 +286,25 @@ export default function AttendanceReports() {
 
     // Calcular días laborables esperados (excluyendo fines de semana, feriados, y vacaciones/permisos aprobados)
     const allDaysInRange = eachDayOfInterval({ start: appliedStartDate, end: appliedEndDate });
-    const workDays = allDaysInRange.filter(day => 
-      !isWeekend(day) 
-      && !isHoliday(day) 
+    const workDays = allDaysInRange.filter(day =>
+      !isWeekend(day)
+      && !isHoliday(day)
       && !isOnVacationOrLeave(employeeId, day)
     ).length;
     const expectedDays = workDays;
-    
+
     // Contar días de vacaciones/permisos en el período
-    const vacationDaysInPeriod = allDaysInRange.filter(day => 
+    const vacationDaysInPeriod = allDaysInRange.filter(day =>
       !isWeekend(day) && isOnVacationOrLeave(employeeId, day)
     ).length;
 
-    return { 
-      totalDays, 
-      presentDays, 
-      lateDays, 
-      absentDays, 
-      totalHours, 
-      totalLateMinutes, 
+    return {
+      totalDays,
+      presentDays,
+      lateDays,
+      absentDays,
+      totalHours,
+      totalLateMinutes,
       holidaysInPeriod,
       overtimeHours,
       expectedDays,
@@ -307,16 +315,16 @@ export default function AttendanceReports() {
 
   const departmentStats = departments.map(dept => {
     const deptEmployees = allEmployees.filter(e => e.department_name === dept);
-    const deptRecords = filteredRecords.filter(r => 
+    const deptRecords = filteredRecords.filter(r =>
       deptEmployees.some(e => e.id === r.employee_id)
     );
-    
+
     // Solo contar registros con marcación
     const recordsWithClockIn = deptRecords.filter(r => r.clock_in);
-    
+
     const lateDays = recordsWithClockIn.filter(r => r.is_late && r.late_minutes > 0).length;
     const absentDays = deptRecords.filter(r => r.is_absent).length;
-    const avgAttendance = recordsWithClockIn.length > 0 
+    const avgAttendance = recordsWithClockIn.length > 0
       ? ((recordsWithClockIn.filter(r => !r.is_absent && r.clock_in).length / recordsWithClockIn.length) * 100).toFixed(1)
       : 0;
 
@@ -440,7 +448,7 @@ export default function AttendanceReports() {
       });
       fileName = `Reporte_General_Asistencia_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.csv`;
     }
-    
+
     if (appliedReportType === "incidencias") {
       headers = ['Código', 'Empleado', 'Departamento', 'Tipo Incidencia', 'Fecha', 'Estado', 'Justificación'];
       dataToExport = filteredIncidents.map(inc => {
@@ -468,7 +476,7 @@ export default function AttendanceReports() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-    
+
     toast.success('✓ Reporte CSV generado correctamente');
   };
 
@@ -574,7 +582,7 @@ export default function AttendanceReports() {
       sheetName = 'Reporte General';
       fileName = `Reporte_General_Asistencia_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.xlsx`;
     }
-    
+
     if (appliedReportType === "incidencias") {
       dataToExport = filteredIncidents.map(inc => {
         const emp = allEmployees.find(e => e.id === inc.employee_id);
@@ -597,9 +605,9 @@ export default function AttendanceReports() {
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    
+
     XLSX.writeFile(wb, fileName);
-    
+
     toast.success('✓ Reporte Excel generado correctamente');
   };
 
@@ -700,7 +708,7 @@ export default function AttendanceReports() {
       });
       fileName = `Reporte_General_Asistencia_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.pdf`;
     }
-    
+
     if (appliedReportType === "incidencias") {
       title = 'Reporte de Incidencias';
       headers = [['Código', 'Empleado', 'Depto', 'Tipo', 'Fecha', 'Estado']];
@@ -717,14 +725,14 @@ export default function AttendanceReports() {
       });
       fileName = `Reporte_Incidencias_${format(appliedStartDate, "yyyy-MM-dd")}_${format(appliedEndDate, "yyyy-MM-dd")}.pdf`;
     }
-    
+
     doc.setFontSize(18);
     doc.text(title, 14, 20);
-    
+
     doc.setFontSize(11);
     doc.text(`Período: ${format(appliedStartDate, "dd/MM/yyyy")} - ${format(appliedEndDate, "dd/MM/yyyy")}`, 14, 30);
     doc.text(`Generado: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 36);
-    
+
     if (appliedDepartment !== "all") {
       doc.text(`Departamento: ${appliedDepartment}`, 14, 42);
     }
@@ -881,8 +889,8 @@ export default function AttendanceReports() {
                   <Popover open={employeeSearchOpen} onOpenChange={setEmployeeSearchOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="flex-1 min-w-[320px] justify-between">
-                        {selectedEmployee === "all" 
-                          ? "Todos los empleados" 
+                        {selectedEmployee === "all"
+                          ? "Todos los empleados"
                           : (() => {
                               const emp = filteredEmployees.find(e => e.id === selectedEmployee);
                               return emp ? `${emp.first_name} ${emp.last_name}` : "Seleccionar empleado";
@@ -957,7 +965,7 @@ export default function AttendanceReports() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Button 
+                  <Button
                     onClick={applyFilters}
                     className="bg-indigo-600 hover:bg-indigo-700"
                   >
@@ -965,7 +973,7 @@ export default function AttendanceReports() {
                     Buscar
                   </Button>
 
-                  <Button 
+                  <Button
                     onClick={exportToCSV}
                     variant="outline"
                     className="bg-blue-600 text-white hover:bg-blue-700"
@@ -973,7 +981,7 @@ export default function AttendanceReports() {
                     <Download className="w-4 h-4 mr-2" />
                     CSV
                   </Button>
-                  <Button 
+                  <Button
                     onClick={exportToExcel}
                     variant="outline"
                     className="bg-green-600 text-white hover:bg-green-700"
@@ -981,7 +989,7 @@ export default function AttendanceReports() {
                     <Download className="w-4 h-4 mr-2" />
                     Excel
                   </Button>
-                  <Button 
+                  <Button
                     onClick={exportToPDF}
                     variant="outline"
                     className="bg-red-600 text-white hover:bg-red-700"
@@ -1059,7 +1067,7 @@ export default function AttendanceReports() {
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card className="border-0 shadow-lg">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
@@ -1108,7 +1116,7 @@ export default function AttendanceReports() {
                       .map((record) => {
                         const emp = allEmployees.find(e => e.id === record.employee_id);
                         if (!emp) return null;
-                        
+
                         return (
                           <tr key={record.id} className="border-b hover:bg-slate-50 transition-colors">
                             <td className="p-3">
@@ -1322,8 +1330,8 @@ export default function AttendanceReports() {
                       <div>
                         <p className="text-sm text-slate-600 mb-1">Empleado</p>
                         <p className="font-semibold text-slate-900">
-                          {appliedEmployee === "all" 
-                            ? "Todos los empleados" 
+                          {appliedEmployee === "all"
+                            ? "Todos los empleados"
                             : (() => {
                                 const emp = allEmployees.find(e => e.id === appliedEmployee);
                                 return emp ? `${emp.first_name} ${emp.last_name}` : "N/A";
@@ -1500,7 +1508,7 @@ export default function AttendanceReports() {
                 const emp = displayEmployees[0];
                 const stats = calculateEmployeeStats(emp.id);
                 const empRecords = filteredRecords.filter(r => r.employee_id === emp.id).sort((a, b) => new Date(a.date) - new Date(b.date));
-                
+
                 return (
                   <Card className="border-0 shadow-lg">
                     <CardHeader className="border-b bg-slate-50/50">
@@ -1723,7 +1731,7 @@ export default function AttendanceReports() {
                     </CardHeader>
                     <CardContent className="p-6">
                       <ResponsiveContainer width="100%" height={300}>
-                        <BarChart 
+                        <BarChart
                           data={displayEmployees
                             .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
                             .filter(item => item.stats.absentDays > 0)
@@ -1775,7 +1783,7 @@ export default function AttendanceReports() {
                     </CardHeader>
                     <CardContent className="p-6">
                       <ResponsiveContainer width="100%" height={300}>
-                        <BarChart 
+                        <BarChart
                           data={displayEmployees
                             .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
                             .filter(item => item.stats.lateDays > 0)
@@ -1810,7 +1818,7 @@ export default function AttendanceReports() {
                     </CardHeader>
                     <CardContent className="p-6">
                       <ResponsiveContainer width="100%" height={300}>
-                        <BarChart 
+                        <BarChart
                           data={displayEmployees
                             .map(emp => ({ emp, stats: calculateEmployeeStats(emp.id) }))
                             .filter(item => item.stats.overtimeHours > 0)
@@ -1878,7 +1886,7 @@ export default function AttendanceReports() {
                     </CardHeader>
                     <CardContent className="p-6">
                       <ResponsiveContainer width="100%" height={300}>
-                        <BarChart 
+                        <BarChart
                           data={[
                             { name: "Tardanza", cantidad: filteredIncidents.filter(i => i.incident_type === "Tardanza").length },
                             { name: "Falta", cantidad: filteredIncidents.filter(i => i.incident_type === "Falta").length },

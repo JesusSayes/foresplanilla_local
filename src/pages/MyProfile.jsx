@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { 
-  User, Mail, Phone, MapPin, Calendar, 
+import {
+  User, Mail, Phone, MapPin, Calendar,
   Briefcase, Save, Edit, X, Check, AlertCircle
 } from "lucide-react";
 import { format } from "date-fns";
@@ -15,7 +16,7 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 
 export default function MyProfile() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user, isLoadingAuth } = useAuth();
   const [employee, setEmployee] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
@@ -24,49 +25,35 @@ export default function MyProfile() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
+    if (!isLoadingAuth && user) {
+      if (user.employee) {
+        setEmployee(user.employee);
+        setFormData({
+          personal_email: user.employee.personal_email || "",
+          phone: user.employee.phone || "",
+          mobile: user.employee.mobile || "",
+          address: user.employee.address || "",
+          district: user.employee.district || "",
+          province: user.employee.province || "",
+          department: user.employee.department || "",
+          emergency_contact_name: user.employee.emergency_contact_name || "",
+          emergency_contact_phone: user.employee.emergency_contact_phone || "",
+          emergency_contact_relationship: user.employee.emergency_contact_relationship || "",
         });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-          setFormData({
-            personal_email: employees[0].personal_email || "",
-            phone: employees[0].phone || "",
-            mobile: employees[0].mobile || "",
-            address: employees[0].address || "",
-            district: employees[0].district || "",
-            province: employees[0].province || "",
-            department: employees[0].department || "",
-            emergency_contact_name: employees[0].emergency_contact_name || "",
-            emergency_contact_phone: employees[0].emergency_contact_phone || "",
-            emergency_contact_relationship: employees[0].emergency_contact_relationship || "",
-          });
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      } finally {
-        setLoading(false);
       }
-    };
-
-    loadUserData();
-  }, []);
+      setLoading(false);
+    }
+  }, [user, isLoadingAuth]);
 
   const updateMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.Employee.update(employee.id, data);
+      return await entitiesAPI.Employee.update(employee.id, data);
     },
     onSuccess: (updatedEmployee) => {
       setEmployee(updatedEmployee);
       setIsEditing(false);
       toast.success("Información actualizada exitosamente");
-      queryClient.invalidateQueries(["employee"]);
+      queryClient.invalidateQueries({ queryKey: ["employee"] });
     },
     onError: (error) => {
       toast.error("Error al actualizar la información");
@@ -75,7 +62,6 @@ export default function MyProfile() {
   });
 
   const handleSave = () => {
-    // Validate required fields
     if (!formData.mobile) {
       toast.error("El número de celular es requerido");
       return;

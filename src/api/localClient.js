@@ -12,7 +12,7 @@ const localClient = axios.create({
 // Interceptor para agregar token a todas las peticiones
 localClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -29,8 +29,7 @@ localClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Token expirado o inválido
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user_data');
+      localStorage.removeItem('token');
       window.location.href = '/';
     }
     return Promise.reject(error);
@@ -55,8 +54,7 @@ export const authAPI = {
     } catch (error) {
       console.error('Error en logout:', error);
     } finally {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user_data');
+      localStorage.removeItem('token');
     }
   },
 
@@ -70,7 +68,7 @@ export const authAPI = {
   },
 
   isAuthenticated: () => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('token');
     return !!token;
   }
 };

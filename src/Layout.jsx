@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "./utils";
-import { useLocalAuth } from "@/lib/LocalAuthContext";
+import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,7 +14,7 @@ import NotificationCenter from "./components/notifications/NotificationCenter";
 
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
-  const { user: currentUser, logout } = useLocalAuth();
+  const { user: currentUser, logout } = useAuth();
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -30,7 +31,15 @@ export default function Layout({ children, currentPageName }) {
           return;
         }
 
-        const employees = await base44.entities.Employee.filter({
+        // Use employee data from auth context if available
+        if (currentUser.employee) {
+          setEmployee(currentUser.employee);
+          setLoading(false);
+          return;
+        }
+
+        // Fallback to API call if needed
+        const employees = await entitiesAPI.Employee.filter({
           work_email: currentUser.email
         });
 

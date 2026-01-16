@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  User, FileText, Calendar, Download, 
+import {
+  User, FileText, Calendar, Download,
   TrendingUp, Clock, DollarSign, Award,
   ChevronRight, Briefcase, Mail, Phone
 } from "lucide-react";
@@ -15,32 +16,18 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 export default function Dashboard() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user, isLoadingAuth } = useAuth();
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      } finally {
-        setLoading(false);
+    if (!isLoadingAuth && user) {
+      if (user.employee) {
+        setEmployee(user.employee);
       }
-    };
-
-    loadUserData();
-  }, []);
+      setLoading(false);
+    }
+  }, [user, isLoadingAuth]);
 
   const { data: latestPayslip } = useQuery({
     queryKey: ["latestPayslip", employee?.id],

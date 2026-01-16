@@ -2,7 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { LocalAuthProvider, useLocalAuth } from '@/lib/LocalAuthContext';
+import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import Layout from "./Layout";
 import Login from "./pages/Login";
 
@@ -55,7 +55,7 @@ const queryClient = new QueryClient({
 
 // Componente para rutas protegidas
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isLoadingAuth } = useLocalAuth();
+  const { isAuthenticated, isLoadingAuth } = useAuth();
 
   if (isLoadingAuth) {
     return (
@@ -73,7 +73,7 @@ const ProtectedRoute = ({ children }) => {
 };
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth } = useLocalAuth();
+  const { isLoadingAuth } = useAuth();
 
   if (isLoadingAuth) {
     return (
@@ -272,10 +272,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <LocalAuthProvider>
+        <AuthProvider>
           <AuthenticatedApp />
           <Toaster />
-        </LocalAuthProvider>
+        </AuthProvider>
       </Router>
     </QueryClientProvider>
   );

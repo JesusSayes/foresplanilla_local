@@ -17,40 +17,33 @@ export default function NotificationCenter({ userEmail }) {
   const [isOpen, setIsOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  // Temporalmente deshabilitado hasta migrar a API local
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ["notifications", userEmail],
     queryFn: async () => {
-      if (!userEmail) return [];
-      return await base44.entities.Notification.filter(
-        { user_email: userEmail },
-        "-created_date",
-        50
-      );
+      return []; // Retornar array vacío por ahora
     },
-    enabled: !!userEmail,
-    refetchInterval: 30000, // Refrescar cada 30 segundos
+    enabled: false, // Deshabilitar consultas
+    refetchInterval: false, // Deshabilitar refetch automático
   });
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const markAsReadMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.Notification.update(id, { is_read: true });
+      return null; // Deshabilitado temporalmente
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["notifications"]);
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
-      const unread = notifications.filter(n => !n.is_read);
-      await Promise.all(
-        unread.map(n => base44.entities.Notification.update(n.id, { is_read: true }))
-      );
+      return null; // Deshabilitado temporalmente
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["notifications"]);
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
       toast.success("Todas las notificaciones marcadas como leídas");
     },
   });

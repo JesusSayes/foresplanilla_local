@@ -2,6 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
+import employeeRoutes from './routes/employees.js';
+import masterDataRoutes from './routes/masterData.js';
+import employeeChangelogRoutes from './routes/employeeChangelog.js';
+import contractRoutes from './routes/contracts.js';
+import userRolesRoutes from './routes/userRoles.js';
 
 dotenv.config();
 
@@ -33,6 +38,11 @@ app.get('/health', (req, res) => {
 
 // Rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/employees', employeeRoutes);
+app.use('/api/master-data', masterDataRoutes);
+app.use('/api/employees/changelog', employeeChangelogRoutes);
+app.use('/api/contracts', contractRoutes);
+app.use('/api/users/roles', userRolesRoutes);
 
 // Ruta 404
 app.use((req, res) => {

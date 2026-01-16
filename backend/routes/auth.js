@@ -19,11 +19,15 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    console.log('🔍 Intentando login con email:', email);
+
     // Buscar usuario por email
     const result = await query(
       'SELECT * FROM users WHERE email = $1 AND is_active = true',
       [email.toLowerCase()]
     );
+
+    console.log('📊 Usuarios encontrados:', result.rows.length);
 
     if (result.rows.length === 0) {
       return res.status(401).json({
@@ -33,9 +37,11 @@ router.post('/login', async (req, res) => {
     }
 
     const user = result.rows[0];
+    console.log('👤 Usuario encontrado:', user.email, '| Hash existe:', !!user.password_hash);
 
     // Verificar contraseña
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    console.log('🔐 Contraseña válida:', isValidPassword);
 
     if (!isValidPassword) {
       return res.status(401).json({
@@ -47,7 +53,9 @@ router.post('/login', async (req, res) => {
     // Generar token JWT
     const token = jwt.sign(
       {
-        id: user.id,
+        userId: user.id,
+        email: user.email,
+        role: user.role,
         email: user.email,
         full_name: user.full_name
       },
@@ -79,22 +87,43 @@ router.post('/login', async (req, res) => {
 // GET /api/auth/me - Obtener usuario actual
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const result = await query(
-      'SELECT id, email, full_name, created_at FROM users WHERE id = $1 AND is_active = true',
-      [req.user.id]
+    // Obtener datos del usuario
+    const userResult = await query(
+      'SELECT id, email, full_name, role, is_active, created_at FROM users WHERE id = $1 AND is_active = true',
+      [req.user.userId]
     );
 
-    if (result.rows.length === 0) {
+    if (userResult.rows.length === 0) {
       return res.status(404).json({
         error: 'Usuario no encontrado',
         message: 'El usuario no existe o está inactivo'
       });
     }
 
-    res.json({
-      success: true,
-      user: result.rows[0]
-    });
+    const user = userResult.rows[0];
+
+    // Obtener datos del empleado asociado
+    const employeeResult = await query(
+      'SELECT * FROM employee WHERE work_email = $1 OR personal_email = $1',
+      [user.email]
+    );
+
+    // Construir respuesta
+    const response = {
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name,
+      role: user.role,
+      is_active: user.is_active,
+      created_at: user.created_at
+    };
+
+    // Agregar datos del empleado si existe
+    if (employeeResult.rows.length > 0) {
+      response.employee = employeeResult.rows[0];
+    }
+
+    res.json(response);
 
   } catch (error) {
     console.error('Error en /me:', error);

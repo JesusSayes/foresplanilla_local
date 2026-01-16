@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  FileText, Save, Eye, Plus, Trash2, CheckSquare, 
+import {
+  FileText, Save, Eye, Plus, Trash2, CheckSquare,
   Square, Settings, Palette, User, Building2
 } from "lucide-react";
 import { toast } from "sonner";
@@ -77,7 +78,8 @@ export default function PayslipTemplateConfig() {
       try {
         const user = await base44.auth.me();
         setCurrentUser(user);
-        const employees = await base44.entities.Employee.filter({ work_email: user.email });
+        // const employees = await base44.entities.Employee.filter({ work_email: user.email });
+        const employees = await entitiesAPI.Employee.filter({ work_email: user.email });
         if (employees && employees.length > 0) {
           setEmployee(employees[0]);
         }
@@ -90,15 +92,18 @@ export default function PayslipTemplateConfig() {
 
   const { data: templates = [] } = useQuery({
     queryKey: ["payslipTemplates"],
-    queryFn: async () => await base44.entities.PayslipTemplate.list("-created_date"),
+    // queryFn: async () => await base44.entities.PayslipTemplate.list("-created_date"),
+    queryFn: async () => await entitiesAPI.PayslipTemplate.list("-created_date"),
   });
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       if (editingTemplate) {
-        return await base44.entities.PayslipTemplate.update(editingTemplate.id, data);
+        // return await base44.entities.PayslipTemplate.update(editingTemplate.id, data);
+        return await entitiesAPI.PayslipTemplate.update(editingTemplate.id, data);
       } else {
-        return await base44.entities.PayslipTemplate.create(data);
+        // return await base44.entities.PayslipTemplate.create(data);
+        return await entitiesAPI.PayslipTemplate.create(data);
       }
     },
     onSuccess: () => {
@@ -110,7 +115,8 @@ export default function PayslipTemplateConfig() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id) => await base44.entities.PayslipTemplate.delete(id),
+    // mutationFn: async (id) => await base44.entities.PayslipTemplate.delete(id),
+    mutationFn: async (id) => await entitiesAPI.PayslipTemplate.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(["payslipTemplates"]);
       toast.success("Plantilla eliminada");
@@ -258,11 +264,11 @@ export default function PayslipTemplateConfig() {
 
         {/* Form Modal */}
         {showForm && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
             onClick={resetForm}
           >
-            <Card 
+            <Card
               className="max-w-5xl w-full my-8"
               onClick={(e) => e.stopPropagation()}
             >

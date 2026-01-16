@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
+import {
   FileText, Download, Search, Calendar as CalendarIcon,
   TrendingUp, TrendingDown, Filter, Eye, Settings
 } from "lucide-react";
@@ -27,10 +28,11 @@ export default function Payslips() {
         const user = await base44.auth.me();
         setCurrentUser(user);
 
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
+        // const employees = await base44.entities.Employee.filter({
+        const employees = await entitiesAPI.Employee.filter({
+          work_email: user.email
         });
-        
+
         if (employees && employees.length > 0) {
           setEmployee(employees[0]);
         }
@@ -46,7 +48,8 @@ export default function Payslips() {
     queryKey: ["payslips", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return [];
-      return await base44.entities.Payslip.filter(
+      // return await base44.entities.Payslip.filter(
+      return await entitiesAPI.Payslip.filter(
         { employee_id: employee.id },
         "-year,-month"
       );
@@ -68,8 +71,8 @@ export default function Payslips() {
   const stats = {
     totalIncome: payslips.reduce((sum, p) => sum + (p.total_income || 0), 0),
     totalDeductions: payslips.reduce((sum, p) => sum + (p.total_deductions || 0), 0),
-    averageNetPay: payslips.length > 0 
-      ? payslips.reduce((sum, p) => sum + (p.net_pay || 0), 0) / payslips.length 
+    averageNetPay: payslips.length > 0
+      ? payslips.reduce((sum, p) => sum + (p.net_pay || 0), 0) / payslips.length
       : 0,
     lastIncrease: calculateLastIncrease(payslips),
   };
@@ -210,7 +213,7 @@ export default function Payslips() {
                   className="pl-10"
                 />
               </div>
-              
+
               <Select value={yearFilter} onValueChange={setYearFilter}>
                 <SelectTrigger>
                   <CalendarIcon className="w-4 h-4 mr-2" />
@@ -249,8 +252,8 @@ export default function Payslips() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {filteredPayslips.map((payslip) => (
-              <Card 
-                key={payslip.id} 
+              <Card
+                key={payslip.id}
                 className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
                 onClick={() => setSelectedPayslip(payslip)}
               >
@@ -277,21 +280,21 @@ export default function Payslips() {
                         {payslip.worked_days} días
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600 text-sm">Ingresos</span>
                       <span className="font-semibold text-green-600">
                         + S/ {payslip.total_income?.toFixed(2)}
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600 text-sm">Descuentos</span>
                       <span className="font-semibold text-red-600">
                         - S/ {payslip.total_deductions?.toFixed(2)}
                       </span>
                     </div>
-                    
+
                     <div className="pt-3 border-t">
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-slate-900">Neto a pagar</span>
@@ -303,7 +306,7 @@ export default function Payslips() {
                   </div>
 
                   <div className="flex gap-3">
-                    <Button 
+                    <Button
                       className="flex-1 bg-indigo-600 hover:bg-indigo-700"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -314,7 +317,7 @@ export default function Payslips() {
                       <Download className="w-4 h-4 mr-2" />
                       Descargar
                     </Button>
-                    <Button 
+                    <Button
                       variant="outline"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -332,11 +335,11 @@ export default function Payslips() {
 
         {/* Detail Modal */}
         {selectedPayslip && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             onClick={() => setSelectedPayslip(null)}
           >
-            <Card 
+            <Card
               className="max-w-2xl w-full max-h-[90vh] overflow-auto"
               onClick={(e) => e.stopPropagation()}
             >
@@ -348,8 +351,8 @@ export default function Payslips() {
                     </CardTitle>
                     <p className="text-slate-600">{selectedPayslip.period}</p>
                   </div>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="icon"
                     onClick={() => setSelectedPayslip(null)}
                   >
@@ -446,7 +449,7 @@ export default function Payslips() {
                     )}
                   </div>
 
-                  <Button 
+                  <Button
                     className="w-full bg-indigo-600 hover:bg-indigo-700"
                     onClick={() => handleDownload(selectedPayslip)}
                     disabled={!selectedPayslip.pdf_url}

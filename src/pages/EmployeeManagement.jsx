@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Users, Plus, Edit, Eye, UserX, UserCheck, Search, 
+import {
+  Users, Plus, Edit, Eye, UserX, UserCheck, Search,
   Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History, Loader2, Trash2
 } from "lucide-react";
 import { createPageUrl } from "../utils";
@@ -22,7 +23,7 @@ import { usePermissions } from "../components/hooks/usePermissions";
 import EmployeeHistory from "../components/employees/EmployeeHistory";
 
 export default function EmployeeManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user, isLoadingAuth } = useAuth();
   const [employee, setEmployee] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -51,37 +52,24 @@ export default function EmployeeManagement() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+    if (!isLoadingAuth && user && user.employee) {
+      setEmployee(user.employee);
+    }
+  }, [user, isLoadingAuth]);
 
   const { data: allEmployees = [], isLoading } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.list("-created_date");
+      // return await base44.entities.Employee.list("-created_date");
+      return await entitiesAPI.Employee.list("-created_date");
     },
   });
 
   const { data: positions = [] } = useQuery({
     queryKey: ["positions"],
     queryFn: async () => {
-      const allPositions = await base44.entities.Position.list("name");
+      // const allPositions = await base44.entities.Position.list("name");
+      const allPositions = await entitiesAPI.Position.list("name");
       return allPositions.filter(p => p.is_active);
     },
   });
@@ -89,7 +77,8 @@ export default function EmployeeManagement() {
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
-      const allDepartments = await base44.entities.Department.list("name");
+      // const allDepartments = await base44.entities.Department.list("name");
+      const allDepartments = await entitiesAPI.Department.list("name");
       return allDepartments.filter(d => d.is_active);
     },
   });
@@ -97,7 +86,8 @@ export default function EmployeeManagement() {
   const { data: banks = [] } = useQuery({
     queryKey: ["banks"],
     queryFn: async () => {
-      const allBanks = await base44.entities.Bank.list("name");
+      // const allBanks = await base44.entities.Bank.list("name");
+      const allBanks = await entitiesAPI.Bank.list("name");
       return allBanks.filter(b => b.is_active);
     },
   });
@@ -105,7 +95,8 @@ export default function EmployeeManagement() {
   const { data: sites = [] } = useQuery({
     queryKey: ["sites"],
     queryFn: async () => {
-      const allSites = await base44.entities.Site.list("name");
+      // const allSites = await base44.entities.Site.list("name");
+      const allSites = await entitiesAPI.Site.list("name");
       return allSites.filter(s => s.is_active);
     },
   });
@@ -113,7 +104,8 @@ export default function EmployeeManagement() {
   const { data: afps = [] } = useQuery({
     queryKey: ["afps"],
     queryFn: async () => {
-      const allAFPs = await base44.entities.AFP.list("name");
+      // const allAFPs = await base44.entities.AFP.list("name");
+      const allAFPs = await entitiesAPI.AFP.list("name");
       return allAFPs.filter(a => a.is_active);
     },
   });
@@ -121,14 +113,16 @@ export default function EmployeeManagement() {
   const { data: ubigeos = [] } = useQuery({
     queryKey: ["ubigeos"],
     queryFn: async () => {
-      return await base44.entities.Ubigeo.list("departamento");
+      // return await base44.entities.Ubigeo.list("departamento");
+      return await entitiesAPI.Ubigeo.list("departamento");
     },
   });
 
   const { data: professions = [] } = useQuery({
     queryKey: ["professions"],
     queryFn: async () => {
-      const allProfessions = await base44.entities.Profession.list("name");
+      // const allProfessions = await base44.entities.Profession.list("name");
+      const allProfessions = await entitiesAPI.Profession.list("name");
       return allProfessions.filter(p => p.is_active);
     },
   });
@@ -137,7 +131,8 @@ export default function EmployeeManagement() {
     queryKey: ["employeeChanges", historyEmployeeId],
     queryFn: async () => {
       if (!historyEmployeeId) return [];
-      return await base44.entities.EmployeeChangeLog.filter(
+      // return await base44.entities.EmployeeChangeLog.filter(
+      return await entitiesAPI.EmployeeChangeLog.filter(
         { employee_id: historyEmployeeId },
         "-created_date"
       );
@@ -148,24 +143,27 @@ export default function EmployeeManagement() {
   const { data: allContracts = [] } = useQuery({
     queryKey: ["allContracts"],
     queryFn: async () => {
-      return await base44.entities.Contract.list("-created_date");
+      // return await base44.entities.Contract.list("-created_date");
+      return await entitiesAPI.Contract.list("-created_date");
     },
   });
 
   const createChangeLogMutation = useMutation({
     mutationFn: async (changeData) => {
-      return await base44.entities.EmployeeChangeLog.create(changeData);
+      // return await base44.entities.EmployeeChangeLog.create(changeData);
+      return await entitiesAPI.EmployeeChangeLog.create(changeData);
     },
   });
 
   const handleCreateEmployee = async (data) => {
-    const newEmployee = await base44.entities.Employee.create(data);
-    
+    // const newEmployee = await base44.entities.Employee.create(data);
+    const newEmployee = await entitiesAPI.Employee.create(data);
+
     // Si seleccionó ONP, agregar concepto automáticamente
     if (data.pension_system === "ONP") {
       await addONPConcept(newEmployee.id);
     }
-    
+
     // Si seleccionó AFP, agregar conceptos automáticamente
     if (data.pension_system === "AFP" && data.afp_id) {
       const selectedAFP = afps.find(a => a.id === data.afp_id);
@@ -173,7 +171,7 @@ export default function EmployeeManagement() {
         await syncAFPConcepts(newEmployee.id, selectedAFP);
       }
     }
-    
+
     // Registrar creación en el historial
     await createChangeLogMutation.mutateAsync({
       employee_id: newEmployee.id,
@@ -181,11 +179,11 @@ export default function EmployeeManagement() {
       old_value: "",
       new_value: "Empleado creado",
       change_type: "Creación",
-      changed_by: currentUser?.email || "Sistema",
+      changed_by: user?.email || "Sistema",
       change_date: new Date().toISOString(),
       notes: "Registro inicial del empleado en el sistema"
     });
-    
+
     return newEmployee;
   };
 
@@ -214,25 +212,26 @@ export default function EmployeeManagement() {
           cleanData[key] = value;
         }
       });
-      
+
       // Validar fecha de cese y actualizar estado automáticamente
       if (cleanData.termination_date) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const termDate = new Date(cleanData.termination_date);
         termDate.setHours(0, 0, 0, 0);
-        
+
         // Si la fecha de cese es hoy o anterior, cambiar automáticamente a Cesado
         if (termDate <= today) {
           cleanData.status = "Cesado";
         }
       }
-      
-      console.log("✅ Datos limpios a enviar:", cleanData);
-      
-      const updatedEmployee = await base44.entities.Employee.update(id, cleanData);
-      console.log("✅ Empleado actualizado:", updatedEmployee);
-      
+
+      console.log("OK: Datos limpios a enviar:", cleanData);
+
+      // const updatedEmployee = await base44.entities.Employee.update(id, cleanData);
+      const updatedEmployee = await entitiesAPI.Employee.update(id, cleanData);
+      console.log("OK: Empleado actualizado:", updatedEmployee);
+
       // Si cambió la AFP, actualizar conceptos de planilla
       if (cleanData.afp_id && cleanData.afp_id !== oldData.afp_id && cleanData.pension_system === "AFP") {
         const selectedAFP = afps.find(a => a.id === cleanData.afp_id);
@@ -240,7 +239,7 @@ export default function EmployeeManagement() {
           await syncAFPConcepts(id, selectedAFP);
         }
       }
-      
+
       // Si cambió el sistema de pensiones a AFP, agregar conceptos
       if (cleanData.pension_system === "AFP" && oldData.pension_system !== "AFP" && cleanData.afp_id) {
         const selectedAFP = afps.find(a => a.id === cleanData.afp_id);
@@ -248,23 +247,23 @@ export default function EmployeeManagement() {
           await syncAFPConcepts(id, selectedAFP);
         }
       }
-      
+
       // Si cambió a ONP o Ninguno, eliminar conceptos AFP
       if ((cleanData.pension_system === "ONP" || cleanData.pension_system === "Ninguno") && oldData.pension_system === "AFP") {
         await removeAFPConcepts(id);
       }
-      
+
       // Si cambió a ONP, agregar concepto ONP y eliminar AFP
       if (cleanData.pension_system === "ONP" && oldData.pension_system !== "ONP") {
         await removeAFPConcepts(id);
         await addONPConcept(id);
       }
-      
+
       // Si cambió de ONP a otro sistema, eliminar concepto ONP
       if (cleanData.pension_system !== "ONP" && oldData.pension_system === "ONP") {
         await removeONPConcept(id);
       }
-      
+
       // Registrar cambios en el historial solo de campos modificados
       const changedFields = [];
       Object.keys(cleanData).forEach(key => {
@@ -276,7 +275,7 @@ export default function EmployeeManagement() {
           });
         }
       });
-      
+
       // Crear registros de cambio
       if (changedFields.length > 0) {
         for (const change of changedFields) {
@@ -286,12 +285,12 @@ export default function EmployeeManagement() {
             old_value: String(change.oldValue),
             new_value: String(change.newValue),
             change_type: "Actualización",
-            changed_by: currentUser?.email || "Sistema",
+            changed_by: user?.email || "Sistema",
             change_date: new Date().toISOString(),
           });
         }
       }
-      
+
       return updatedEmployee;
     },
     onSuccess: () => {
@@ -311,12 +310,12 @@ export default function EmployeeManagement() {
     try {
       // Eliminar conceptos AFP anteriores
       await removeAFPConcepts(employeeId);
-      
+
       // Agregar nuevos conceptos AFP
       const currentDate = new Date();
       const month = currentDate.getMonth() + 1;
       const year = currentDate.getFullYear();
-      
+
       const afpConcepts = [
         {
           employee_id: employeeId,
@@ -358,11 +357,12 @@ export default function EmployeeManagement() {
           notes: `${afp.name} - Seguro ${afp.insurance_percentage}%`
         }
       ];
-      
+
       for (const concept of afpConcepts) {
-        await base44.entities.PayrollConcept.create(concept);
+        // await base44.entities.PayrollConcept.create(concept);
+        await entitiesAPI.PayrollConcept.create(concept);
       }
-      
+
       toast.success(`Conceptos AFP de ${afp.name} agregados automáticamente`);
     } catch (error) {
       console.error("Error al sincronizar conceptos AFP:", error);
@@ -371,15 +371,17 @@ export default function EmployeeManagement() {
 
   const removeAFPConcepts = async (employeeId) => {
     try {
-      const allConcepts = await base44.entities.PayrollConcept.filter({ employee_id: employeeId });
-      const afpConcepts = allConcepts.filter(c => 
-        c.concept_name.includes("AFP - Comisión") || 
-        c.concept_name.includes("AFP - Aporte Obligatorio") || 
+      // const allConcepts = await base44.entities.PayrollConcept.filter({ employee_id: employeeId });
+      const allConcepts = await entitiesAPI.PayrollConcept.filter({ employee_id: employeeId });
+      const afpConcepts = allConcepts.filter(c =>
+        c.concept_name.includes("AFP - Comisión") ||
+        c.concept_name.includes("AFP - Aporte Obligatorio") ||
         c.concept_name.includes("AFP - Seguro")
       );
-      
+
       for (const concept of afpConcepts) {
-        await base44.entities.PayrollConcept.delete(concept.id);
+        // await base44.entities.PayrollConcept.delete(concept.id);
+        await entitiesAPI.PayrollConcept.delete(concept.id);
       }
     } catch (error) {
       console.error("Error al eliminar conceptos AFP:", error);
@@ -391,8 +393,9 @@ export default function EmployeeManagement() {
       const currentDate = new Date();
       const month = currentDate.getMonth() + 1;
       const year = currentDate.getFullYear();
-      
-      await base44.entities.PayrollConcept.create({
+
+      // await base44.entities.PayrollConcept.create({
+      await entitiesAPI.PayrollConcept.create({
         employee_id: employeeId,
         concept_type: "Descuento",
         concept_name: "ONP",
@@ -405,7 +408,7 @@ export default function EmployeeManagement() {
         is_applied: false,
         notes: "ONP - 13% sobre remuneración bruta"
       });
-      
+
       toast.success("Concepto ONP agregado automáticamente");
     } catch (error) {
       console.error("Error al agregar concepto ONP:", error);
@@ -414,11 +417,13 @@ export default function EmployeeManagement() {
 
   const removeONPConcept = async (employeeId) => {
     try {
-      const allConcepts = await base44.entities.PayrollConcept.filter({ employee_id: employeeId });
+      // const allConcepts = await base44.entities.PayrollConcept.filter({ employee_id: employeeId });
+      const allConcepts = await entitiesAPI.PayrollConcept.filter({ employee_id: employeeId });
       const onpConcepts = allConcepts.filter(c => c.concept_name === "ONP");
-      
+
       for (const concept of onpConcepts) {
-        await base44.entities.PayrollConcept.delete(concept.id);
+        // await base44.entities.PayrollConcept.delete(concept.id);
+        await entitiesAPI.PayrollConcept.delete(concept.id);
       }
     } catch (error) {
       console.error("Error al eliminar concepto ONP:", error);
@@ -429,7 +434,7 @@ export default function EmployeeManagement() {
     // Buscar el último contrato vigente del empleado
     let baseSalary = emp?.base_salary || "";
     let contractType = "Plazo Fijo"; // Default para nuevos
-    
+
     if (emp?.id) {
       const employeeContracts = allContracts.filter(c => c.employee_id === emp.id && c.status === "Vigente");
       if (employeeContracts.length > 0) {
@@ -528,22 +533,22 @@ export default function EmployeeManagement() {
   const handleSubmit = async () => {
     // Si está editando, permitir actualización parcial
     if (editingEmployee) {
-      updateEmployeeMutation.mutate({ 
-        id: editingEmployee.id, 
+      updateEmployeeMutation.mutate({
+        id: editingEmployee.id,
         data: formData,
-        oldData: editingEmployee 
+        oldData: editingEmployee
       });
       return;
     }
-    
+
     // Solo validar campos obligatorios al crear un nuevo empleado
     const missingFields = [];
-    
+
     if (!formData.employee_code) missingFields.push("Código de Empleado");
     if (!formData.document_number) missingFields.push("Número de Documento");
     if (!formData.first_name) missingFields.push("Nombres");
     if (!formData.last_name) missingFields.push("Apellidos");
-    
+
     if (missingFields.length > 0) {
       toast.error(
         `❌ Campos obligatorios faltantes: ${missingFields.join(", ")}`,
@@ -559,11 +564,11 @@ export default function EmployeeManagement() {
     }
 
     // Validar DNI duplicado
-    const existingEmployee = allEmployees.find(emp => 
-      emp.document_number === formData.document_number && 
+    const existingEmployee = allEmployees.find(emp =>
+      emp.document_number === formData.document_number &&
       emp.document_type === formData.document_type
     );
-    
+
     if (existingEmployee) {
       toast.error(
         `❌ Ya existe un empleado con este ${formData.document_type}: ${formData.document_number} (${existingEmployee.first_name} ${existingEmployee.last_name})`,
@@ -580,10 +585,11 @@ export default function EmployeeManagement() {
       toast.error("No tienes permisos para cambiar el estado");
       return;
     }
-    
+
     try {
-      await base44.entities.Employee.update(emp.id, { status: newStatus });
-      
+      // await base44.entities.Employee.update(emp.id, { status: newStatus });
+      await entitiesAPI.Employee.update(emp.id, { status: newStatus });
+
       // Registrar cambio de estado
       await createChangeLogMutation.mutateAsync({
         employee_id: emp.id,
@@ -591,11 +597,11 @@ export default function EmployeeManagement() {
         old_value: emp.status,
         new_value: newStatus,
         change_type: "Cambio de Estado",
-        changed_by: currentUser?.email || "Sistema",
+        changed_by: user?.email || "Sistema",
         change_date: new Date().toISOString(),
         notes: `Estado cambiado de ${emp.status} a ${newStatus}`
       });
-      
+
       queryClient.invalidateQueries(["allEmployees"]);
       queryClient.invalidateQueries(["employeeChanges"]);
       toast.success(`Estado actualizado a ${newStatus}`);
@@ -619,10 +625,10 @@ export default function EmployeeManagement() {
 
   // Obtener listas únicas de ubigeos
   const departamentos = [...new Set(ubigeos.map(u => u.departamento))].sort();
-  const provincias = selectedDepartamento 
+  const provincias = selectedDepartamento
     ? [...new Set(ubigeos.filter(u => u.departamento === selectedDepartamento).map(u => u.provincia))].sort()
     : [];
-  const distritos = selectedProvincia 
+  const distritos = selectedProvincia
     ? [...new Set(ubigeos.filter(u => u.departamento === selectedDepartamento && u.provincia === selectedProvincia).map(u => u.distrito))].sort()
     : [];
 
@@ -817,15 +823,15 @@ export default function EmployeeManagement() {
                   const StatusIcon = statusConfig.icon;
 
                   return (
-                    <div 
+                    <div
                       key={emp.id}
                       className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4 flex-1">
                           {emp.photo_url ? (
-                            <img 
-                              src={emp.photo_url} 
+                            <img
+                              src={emp.photo_url}
                               alt={`${emp.first_name} ${emp.last_name}`}
                               className="w-14 h-14 rounded-full object-cover border-2 border-indigo-200"
                             />
@@ -834,7 +840,7 @@ export default function EmployeeManagement() {
                               {emp.first_name[0]}{emp.last_name[0]}
                             </div>
                           )}
-                          
+
                           <div className="flex-1">
                             <h4 className="font-bold text-slate-900 text-lg">
                               {emp.first_name} {emp.last_name}
@@ -917,9 +923,10 @@ export default function EmployeeManagement() {
                                   className="text-blue-600"
                                   onClick={() => {
                                     if (confirm("¿Reactivar empleado cesado? Esto cambiará el estado a Activo y limpiará la fecha de cese.")) {
-                                      base44.entities.Employee.update(emp.id, { 
+                                      // base44.entities.Employee.update(emp.id, {
+                                      entitiesAPI.Employee.update(emp.id, {
                                         status: "Activo",
-                                        termination_date: null 
+                                        termination_date: null
                                       }).then(() => {
                                         queryClient.invalidateQueries(["allEmployees"]);
                                         toast.success("Empleado reactivado");
@@ -946,10 +953,10 @@ export default function EmployeeManagement() {
 
       {/* Form Modal */}
       {showForm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
         >
-          <Card 
+          <Card
             className="max-w-5xl w-full my-8"
           >
             <CardHeader className="border-b">
@@ -1126,9 +1133,9 @@ export default function EmployeeManagement() {
                       <div className="mt-2">
                         {formData.photo_url ? (
                           <div className="relative group">
-                            <img 
-                              src={formData.photo_url} 
-                              alt="Foto del empleado" 
+                            <img
+                              src={formData.photo_url}
+                              alt="Foto del empleado"
                               className="w-[150px] h-[150px] rounded-lg object-cover border-2 border-indigo-200"
                             />
                             <Button
@@ -1247,8 +1254,8 @@ export default function EmployeeManagement() {
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label>Departamento</Label>
-                      <Select 
-                        value={selectedDepartamento} 
+                      <Select
+                        value={selectedDepartamento}
                         onValueChange={(val) => {
                           setSelectedDepartamento(val);
                           setSelectedProvincia("");
@@ -1277,8 +1284,8 @@ export default function EmployeeManagement() {
                     </div>
                     <div>
                       <Label>Provincia</Label>
-                      <Select 
-                        value={selectedProvincia} 
+                      <Select
+                        value={selectedProvincia}
                         onValueChange={(val) => {
                           setSelectedProvincia(val);
                           setFormData({ ...formData, province: val, district: "" });
@@ -1307,8 +1314,8 @@ export default function EmployeeManagement() {
                     </div>
                     <div>
                       <Label>Distrito</Label>
-                      <Select 
-                        value={formData.district} 
+                      <Select
+                        value={formData.district}
                         onValueChange={(val) => setFormData({ ...formData, district: val })}
                         disabled={!selectedProvincia}
                       >
@@ -1413,7 +1420,7 @@ export default function EmployeeManagement() {
                         </SelectContent>
                       </Select>
                       {editingEmployee && (() => {
-                        const vigentContract = allContracts.find(c => 
+                        const vigentContract = allContracts.find(c =>
                           c.employee_id === editingEmployee.id && c.status === "Vigente"
                         );
                         return vigentContract ? (
@@ -1489,21 +1496,21 @@ export default function EmployeeManagement() {
                         onChange={(e) => {
                           const terminationDate = e.target.value;
                           let newStatus = formData.status;
-                          
+
                           // Si se ingresa una fecha de cese
                           if (terminationDate) {
                             const today = new Date();
                             today.setHours(0, 0, 0, 0);
                             const termDate = new Date(terminationDate);
                             termDate.setHours(0, 0, 0, 0);
-                            
+
                             // Si la fecha de cese es hoy o anterior, cambiar a Cesado
                             if (termDate <= today) {
                               newStatus = "Cesado";
                               toast.info("Estado cambiado automáticamente a Cesado");
                             }
                           }
-                          
+
                           setFormData({ ...formData, termination_date: terminationDate, status: newStatus });
                         }}
                       />
@@ -1512,7 +1519,7 @@ export default function EmployeeManagement() {
                         today.setHours(0, 0, 0, 0);
                         const termDate = new Date(formData.termination_date);
                         termDate.setHours(0, 0, 0, 0);
-                        
+
                         if (termDate > today) {
                           return (
                             <p className="text-xs text-amber-600 mt-1">
@@ -1606,8 +1613,8 @@ export default function EmployeeManagement() {
                             maxLength={formData.pension_system === "AFP" ? 12 : 20}
                           />
                           <p className="text-xs text-slate-500 mt-1">
-                            {formData.pension_system === "AFP" 
-                              ? "Código único de 12 dígitos del Sistema Privado de Pensiones" 
+                            {formData.pension_system === "AFP"
+                              ? "Código único de 12 dígitos del Sistema Privado de Pensiones"
                               : "Número de afiliación al Sistema Nacional de Pensiones"}
                           </p>
                         </div>
@@ -1620,9 +1627,9 @@ export default function EmployeeManagement() {
                           value={formData.base_salary || ""}
                           onChange={(e) => {
                             const value = e.target.value;
-                            setFormData({ 
-                              ...formData, 
-                              base_salary: value ? parseFloat(value) : null 
+                            setFormData({
+                              ...formData,
+                              base_salary: value ? parseFloat(value) : null
                             });
                           }}
                           placeholder="Opcional - se actualiza desde contratos"
@@ -1809,11 +1816,11 @@ export default function EmployeeManagement() {
 
       {/* History Modal */}
       {showHistory && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
           onClick={() => setShowHistory(false)}
         >
-          <div 
+          <div
             className="max-w-4xl w-full my-8"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1831,11 +1838,11 @@ export default function EmployeeManagement() {
 
       {/* Details Modal */}
       {showDetails && selectedEmployee && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
           onClick={() => setShowDetails(false)}
         >
-          <Card 
+          <Card
             className="max-w-4xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1843,8 +1850,8 @@ export default function EmployeeManagement() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   {selectedEmployee.photo_url ? (
-                    <img 
-                      src={selectedEmployee.photo_url} 
+                    <img
+                      src={selectedEmployee.photo_url}
                       alt={`${selectedEmployee.first_name} ${selectedEmployee.last_name}`}
                       className="w-16 h-16 rounded-full object-cover border-2 border-indigo-200"
                     />
