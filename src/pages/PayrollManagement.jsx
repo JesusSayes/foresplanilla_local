@@ -1281,6 +1281,7 @@ export default function PayrollManagement() {
               </Card>
             </TabsContent>
           </Tabs>
+            )}
           </div>
         </div>
 
