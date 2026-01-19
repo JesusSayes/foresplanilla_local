@@ -76,7 +76,10 @@ export default function CostCenterManagement() {
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
-    queryFn: () => base44.entities.Employee.list("first_name"),
+    queryFn: async () => {
+      const employees = await base44.entities.Employee.list("first_name");
+      return employees.filter(e => e.status === "Activo");
+    },
   });
 
   const { data: departments = [] } = useQuery({
@@ -377,8 +380,7 @@ export default function CostCenterManagement() {
 
   // Empleados sin asignación de centro de costo
   const employeesWithoutCC = useMemo(() => {
-    const activeEmployees = allEmployees.filter(e => e.status === "Activo");
-    return activeEmployees.filter(emp => {
+    return allEmployees.filter(emp => {
       const hasIndividualAssignment = assignments.some(a => 
         a.assignment_type === "Empleado" && 
         a.employee_id === emp.id && 
@@ -725,16 +727,25 @@ export default function CostCenterManagement() {
                         emp.department_name?.toLowerCase().includes(searchLower)
                       );
                     }).map(emp => (
-                      <div key={emp.id} className="p-4 border-2 border-orange-200 bg-orange-50/30 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-bold text-slate-900 mb-1">
-                              {emp.first_name} {emp.last_name}
-                            </h4>
-                            <p className="text-sm text-slate-600">
-                              {emp.employee_code} • {emp.position} • {emp.department_name || "Sin departamento"}
-                            </p>
-                          </div>
+                     <div key={emp.id} className="p-4 border-2 border-orange-200 bg-orange-50/30 rounded-lg">
+                       <div className="flex items-center justify-between">
+                         <div className="flex-1">
+                           <div className="flex items-center gap-2 mb-1">
+                             <h4 className="font-bold text-slate-900">
+                               {emp.first_name} {emp.last_name}
+                             </h4>
+                             <Badge className={
+                               emp.status === "Activo" ? "bg-green-100 text-green-700" :
+                               emp.status === "Suspendido" ? "bg-yellow-100 text-yellow-700" :
+                               "bg-gray-100 text-gray-700"
+                             }>
+                               {emp.status}
+                             </Badge>
+                           </div>
+                           <p className="text-sm text-slate-600">
+                             {emp.employee_code} • {emp.position} • {emp.department_name || "Sin departamento"}
+                           </p>
+                         </div>
                           <Button
                             size="sm"
                             className="bg-indigo-600 hover:bg-indigo-700"
@@ -811,19 +822,28 @@ export default function CostCenterManagement() {
                       : null;
                     
                     return (
-                      <div key={assignment.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <Badge className={assignment.assignment_type === "Empleado" ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"}>
-                                {assignment.assignment_type}
-                              </Badge>
-                              <h4 className="font-bold text-slate-900">
-                                {assignment.assignment_type === "Empleado" 
-                                  ? `${emp?.first_name} ${emp?.last_name}` 
-                                  : assignment.department_name}
-                              </h4>
-                              <span className="text-slate-500">→</span>
+                     <div key={assignment.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                       <div className="flex items-center justify-between">
+                         <div className="flex-1">
+                           <div className="flex items-center gap-3 mb-2">
+                             <Badge className={assignment.assignment_type === "Empleado" ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"}>
+                               {assignment.assignment_type}
+                             </Badge>
+                             <h4 className="font-bold text-slate-900">
+                               {assignment.assignment_type === "Empleado" 
+                                 ? `${emp?.first_name} ${emp?.last_name}` 
+                                 : assignment.department_name}
+                             </h4>
+                             {assignment.assignment_type === "Empleado" && emp && (
+                               <Badge className={
+                                 emp.status === "Activo" ? "bg-green-100 text-green-700" :
+                                 emp.status === "Suspendido" ? "bg-yellow-100 text-yellow-700" :
+                                 "bg-gray-100 text-gray-700"
+                               }>
+                                 {emp.status}
+                               </Badge>
+                             )}
+                             <span className="text-slate-500">→</span>
                               <div className="flex items-center gap-2">
                                 <Building2 className="w-4 h-4 text-indigo-600" />
                                 <span className="font-semibold text-indigo-600">{cc?.code}</span>
@@ -1058,7 +1078,7 @@ export default function CostCenterManagement() {
                         )
                         .map(emp => (
                           <SelectItem key={emp.id} value={emp.id}>
-                            {emp.employee_code} - {emp.first_name} {emp.last_name}
+                            {emp.employee_code} - {emp.first_name} {emp.last_name} ({emp.status})
                           </SelectItem>
                         ))}
                     </SelectContent>
