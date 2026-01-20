@@ -1,0 +1,669 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model access_device {
+  id Int @id @default(autoincrement())
+}
+
+model afp {
+  name                               String?   @db.VarChar(150)
+  code                               String?   @db.VarChar(50)
+  commission_percentage              Decimal?  @db.Decimal(6, 2)
+  obligatory_contribution_percentage Decimal?  @db.Decimal(6, 2)
+  insurance_percentage               Decimal?  @db.Decimal(6, 2)
+  is_active                          Boolean?
+  notes                              String?
+  id                                 String    @id @db.VarChar(50)
+  created_date                       DateTime? @db.Timestamp(6)
+  updated_date                       DateTime? @db.Timestamp(6)
+  created_by_id                      Int?
+  created_by                         String?   @db.VarChar(150)
+  is_sample                          Boolean?
+  users                              users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model attendance_incident {
+  employee_id             String?   @db.VarChar(50)
+  attendance_record_id    String?   @db.VarChar(50)
+  incident_date           DateTime? @db.Date
+  incident_type           String?   @db.VarChar(100)
+  justification           String?
+  supporting_document_url String?
+  justified_time_start    String?   @db.VarChar(10)
+  justified_time_end      String?   @db.VarChar(10)
+  full_day_justification  Boolean?
+  hours_to_adjust         Decimal?  @db.Decimal(6, 2)
+  late_minutes_to_adjust  Decimal?  @db.Decimal(6, 2)
+  status                  String?   @db.VarChar(50)
+  reviewed_by             String?   @db.VarChar(150)
+  review_date             DateTime? @db.Date
+  review_comments         String?
+  id                      String    @id @db.VarChar(50)
+  created_date            DateTime? @db.Timestamp(6)
+  updated_date            DateTime? @db.Timestamp(6)
+  created_by_id           Int?
+  created_by              String?   @db.VarChar(150)
+  is_sample               Boolean?
+  users                   users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model attendance_record {
+  employee_id     String?   @db.VarChar(50)
+  date            DateTime? @db.Date
+  clock_in        String?   @db.VarChar(10)
+  clock_out       String?   @db.VarChar(10)
+  scheduled_start String?   @db.VarChar(10)
+  scheduled_end   String?   @db.VarChar(10)
+  worked_hours    Decimal?  @db.Decimal(6, 2)
+  is_late         Boolean?
+  late_minutes    Decimal?  @db.Decimal(6, 2)
+  is_absent       Boolean?
+  status          String?   @db.VarChar(50)
+  notes           String?
+  id              String    @id @db.VarChar(50)
+  created_date    DateTime? @db.Timestamp(6)
+  updated_date    DateTime? @db.Timestamp(6)
+  created_by_id   Int?
+  created_by      String?   @db.VarChar(150)
+  is_sample       Boolean?
+  users           users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model bank {
+  name          String?   @db.VarChar(150)
+  code          String?   @db.VarChar(50)
+  is_active     Boolean?
+  id            String    @id @db.VarChar(50)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id Int?
+  created_by    String?   @db.VarChar(150)
+  is_sample     Boolean?
+  users         users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model certificate {
+  id Int @id @default(autoincrement())
+}
+
+model company_info {
+  company_name                  String?   @db.VarChar(200)
+  ruc                           String?   @db.VarChar(20)
+  address                       String?   @db.VarChar(250)
+  phone                         String?   @db.VarChar(50)
+  email                         String?   @db.VarChar(150)
+  logo_url                      String?
+  legal_representative          String?   @db.VarChar(150)
+  legal_representative_dni      String?   @db.VarChar(20)
+  legal_representative_position String?   @db.VarChar(150)
+  website                       String?   @db.VarChar(150)
+  is_active                     Boolean?
+  id                            String    @id @db.VarChar(50)
+  created_date                  DateTime? @db.Timestamp(6)
+  updated_date                  DateTime? @db.Timestamp(6)
+  created_by_id                 Int?
+  created_by                    String?   @db.VarChar(150)
+  is_sample                     Boolean?
+  users                         users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model contract {
+  employee_id       String?   @db.VarChar(50)
+  contract_number   String?   @db.VarChar(50)
+  contract_type     String?   @db.VarChar(50)
+  template_id       String?   @db.VarChar(50)
+  start_date        DateTime? @db.Date
+  end_date          DateTime? @db.Date
+  position          String?   @db.VarChar(100)
+  department        String?   @db.VarChar(100)
+  work_location     String?   @db.VarChar(150)
+  salary            Decimal?  @db.Decimal(12, 2)
+  work_schedule     String?
+  weekly_hours      Decimal?  @db.Decimal(5, 2)
+  functions         String?
+  benefits          String?
+  trial_period_days Decimal?  @db.Decimal(5, 0)
+  renewable         Boolean?
+  status            String?   @db.VarChar(50)
+  signed_date       DateTime? @db.Date
+  pdf_url           String?
+  notes             String?
+  id                String    @id @db.VarChar(50)
+  created_date      DateTime? @db.Timestamp(6)
+  updated_date      DateTime? @db.Timestamp(6)
+  created_by_id     Int?
+  created_by        String?   @db.VarChar(150)
+  is_sample         Boolean?
+  users             users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model contract_clause {
+  title          String?   @db.VarChar(200)
+  content        String?
+  type           String?   @db.VarChar(50)
+  contract_types Json?
+  order          Decimal?  @db.Decimal(5, 0)
+  is_active      Boolean?
+  category       String?   @db.VarChar(50)
+  id             String    @id @db.VarChar(50)
+  created_date   DateTime? @db.Timestamp(6)
+  updated_date   DateTime? @db.Timestamp(6)
+  created_by_id  Int?
+  created_by     String?   @db.VarChar(150)
+  is_sample      Boolean?
+  users          users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model contract_renewal_rule {
+  name                   String?   @db.VarChar(200)
+  is_active              Boolean?
+  days_before_expiration Decimal?  @db.Decimal(5, 0)
+  contract_types         Json?
+  send_notification      Boolean?
+  notification_emails    Json?
+  auto_create_draft      Boolean?
+  only_renewable         Boolean?
+  draft_extension_months Decimal?  @db.Decimal(5, 0)
+  id                     String    @id @db.VarChar(50)
+  created_date           DateTime? @db.Timestamp(6)
+  updated_date           DateTime? @db.Timestamp(6)
+  created_by_id          Int?
+  created_by             String?   @db.VarChar(150)
+  is_sample              Boolean?
+  users                  users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model contract_template {
+  template_name               String?   @db.VarChar(200)
+  description                 String?
+  is_default                  Boolean?
+  is_active                   Boolean?
+  contract_types              Json?
+  company_name                String?   @db.VarChar(200)
+  company_ruc                 String?   @db.VarChar(20)
+  company_address             String?   @db.VarChar(250)
+  company_representative      String?   @db.VarChar(150)
+  company_representative_doc  String?   @db.VarChar(100)
+  introduction_text           String?
+  contract_object_text        String?
+  functions_intro_text        String?
+  duration_indeterminate_text String?
+  duration_fixed_text         String?
+  trial_period_text           String?
+  salary_text                 String?
+  schedule_text               String?
+  work_location_text          String?
+  obligations_text            String?
+  benefits_text               String?
+  termination_text            String?
+  domicile_text               String?
+  id                          String    @id @db.VarChar(50)
+  created_date                DateTime? @db.Timestamp(6)
+  updated_date                DateTime? @db.Timestamp(6)
+  created_by_id               Int?
+  created_by                  String?   @db.VarChar(150)
+  is_sample                   Boolean?
+  users                       users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model cost_center {
+  code          String?   @db.VarChar(50)
+  name          String?   @db.VarChar(200)
+  category      String?   @db.VarChar(100)
+  is_active     Boolean?
+  id            String    @id @db.VarChar(50)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id Int?
+  created_by    String?   @db.VarChar(150)
+  is_sample     Boolean?
+  users         users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model cost_center_assignment {
+  cost_center_id  String?   @db.VarChar(50)
+  assignment_type String?   @db.VarChar(50)
+  employee_id     String?   @db.VarChar(50)
+  department_name String?   @db.VarChar(150)
+  percentage      Decimal?  @db.Decimal(5, 2)
+  start_date      DateTime? @db.Date
+  end_date        DateTime? @db.Date
+  is_active       Boolean?
+  notes           String?
+  id              String    @id @db.VarChar(50)
+  created_date    DateTime? @db.Timestamp(6)
+  updated_date    DateTime? @db.Timestamp(6)
+  created_by_id   Int?
+  created_by      String?   @db.VarChar(150)
+  is_sample       Boolean?
+  users           users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model cost_center_change_log {
+  cost_center_id String?   @db.VarChar(50)
+  assignment_id  String?   @db.VarChar(50)
+  change_type    String?   @db.VarChar(100)
+  entity_type    String?   @db.VarChar(50)
+  entity_id      String?   @db.VarChar(50)
+  field_changed  String?   @db.VarChar(150)
+  old_value      String?
+  new_value      String?
+  changed_by     String?   @db.VarChar(150)
+  change_date    DateTime? @db.Timestamp(6)
+  notes          String?
+  id             String    @id @db.VarChar(50)
+  created_date   DateTime? @db.Timestamp(6)
+  updated_date   DateTime? @db.Timestamp(6)
+  created_by_id  Int?
+  created_by     String?   @db.VarChar(150)
+  is_sample      Boolean?
+  users          users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model database_connection {
+  id Int @id @default(autoincrement())
+}
+
+model department {
+  name          String?   @db.VarChar(150)
+  code          String?   @db.VarChar(50)
+  description   String?
+  is_active     Boolean?
+  id            String    @id @db.VarChar(50)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id Int?
+  created_by    String?   @db.VarChar(150)
+  is_sample     Boolean?
+  users         users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model derechohabiente {
+  id Int @id @default(autoincrement())
+}
+
+model device_event {
+  id Int @id @default(autoincrement())
+}
+
+model employee {
+  employee_code                  String?   @db.VarChar(50)
+  document_type                  String?   @db.VarChar(20)
+  document_number                String?   @db.VarChar(20)
+  first_name                     String?   @db.VarChar(100)
+  last_name                      String?   @db.VarChar(150)
+  birth_date                     DateTime? @db.Date
+  gender                         String?   @db.VarChar(10)
+  personal_email                 String?   @db.VarChar(150)
+  work_email                     String?   @db.VarChar(150)
+  phone                          String?   @db.VarChar(50)
+  mobile                         String?   @db.VarChar(50)
+  address                        String?   @db.VarChar(200)
+  district                       String?   @db.VarChar(100)
+  province                       String?   @db.VarChar(100)
+  department                     String?   @db.VarChar(100)
+  company                        String?   @db.VarChar(150)
+  position                       String?   @db.VarChar(100)
+  position_level                 String?   @db.VarChar(100)
+  profession                     String?   @db.VarChar(150)
+  department_name                String?   @db.VarChar(150)
+  work_unit                      String?   @db.VarChar(100)
+  site                           String?   @db.VarChar(150)
+  hire_date                      DateTime? @db.Date
+  termination_date               DateTime? @db.Date
+  contract_type                  String?   @db.VarChar(50)
+  base_salary                    Decimal?  @db.Decimal(12, 2)
+  bank_name                      String?   @db.VarChar(150)
+  bank_account                   String?   @db.VarChar(100)
+  cci_account                    String?   @db.VarChar(100)
+  cts_bank                       String?   @db.VarChar(150)
+  cts_account_number             String?   @db.VarChar(100)
+  cts_currency                   String?   @db.VarChar(50)
+  pension_system                 String?   @db.VarChar(50)
+  afp_id                         String?   @db.VarChar(50)
+  afp_affiliation_date           DateTime? @db.Date
+  cuspp                          String?   @db.VarChar(50)
+  worker_type                    String?   @db.VarChar(50)
+  tax_residence                  String?   @db.VarChar(50)
+  photo_url                      String?
+  status                         String?   @db.VarChar(50)
+  role                           String?   @db.VarChar(50)
+  managed_team_ids               Json?
+  supervisor_id                  String?   @db.VarChar(50)
+  supervisor_name                String?   @db.VarChar(150)
+  emergency_contact_name         String?   @db.VarChar(150)
+  emergency_contact_phone        String?   @db.VarChar(50)
+  emergency_contact_relationship String?   @db.VarChar(50)
+  id                             String    @id @db.VarChar(50)
+  created_date                   DateTime? @db.Timestamp(6)
+  updated_date                   DateTime? @db.Timestamp(6)
+  created_by_id                  Int?
+  created_by                     String?   @db.VarChar(150)
+  is_sample                      Boolean?
+  users                          users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model employee_access_mapping {
+  id Int @id @default(autoincrement())
+}
+
+model employee_change_log {
+  employee_id   String?   @db.VarChar(50)
+  field_changed String?   @db.VarChar(100)
+  old_value     String?   @db.VarChar(255)
+  new_value     String?   @db.VarChar(255)
+  change_type   String?   @db.VarChar(50)
+  changed_by    String?   @db.VarChar(150)
+  change_date   DateTime? @db.Timestamp(6)
+  notes         String?
+  id            String    @id @db.VarChar(50)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id Int?
+  created_by    String?   @db.VarChar(150)
+  is_sample     Boolean?
+  users         users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model holiday {
+  name          String?   @db.VarChar(150)
+  date          DateTime? @db.Date
+  type          String?   @db.VarChar(50)
+  is_mandatory  Boolean?
+  description   String?
+  id            String    @id @db.VarChar(50)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id Int?
+  created_by    String?   @db.VarChar(150)
+  is_sample     Boolean?
+  users         users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model notification {
+  id Int @id @default(autoincrement())
+}
+
+model notification_preference {
+  id Int @id @default(autoincrement())
+}
+
+model overtime_alert {
+  id Int @id @default(autoincrement())
+}
+
+model payroll_concept {
+  employee_id              String?   @db.VarChar(50)
+  concept_type             String?   @db.VarChar(50)
+  concept_category         String?   @db.VarChar(100)
+  concept_name             String?   @db.VarChar(150)
+  concept_code             String?   @db.VarChar(50)
+  description              String?
+  amount                   Decimal?  @db.Decimal(12, 2)
+  is_dynamic               Boolean?
+  calculation_formula      String?
+  period                   String?   @db.VarChar(50)
+  month                    Decimal?  @db.Decimal(2, 0)
+  year                     Decimal?  @db.Decimal(4, 0)
+  is_recurring             Boolean?
+  is_mandatory             Boolean?
+  applies_to_payroll_types Json?
+  is_applied               Boolean?
+  payslip_id               String?   @db.VarChar(50)
+  notes                    String?
+  id                       String    @id @db.VarChar(50)
+  created_date             DateTime? @db.Timestamp(6)
+  updated_date             DateTime? @db.Timestamp(6)
+  created_by_id            Int?
+  created_by               String?   @db.VarChar(150)
+  is_sample                Boolean?
+  users                    users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model payslip {
+  id Int @id @default(autoincrement())
+}
+
+model payslip_template {
+  template_name                 String?   @db.VarChar(200)
+  is_active                     Boolean?
+  show_company_logo             Boolean?
+  show_employee_photo           Boolean?
+  header_fields                 Json?
+  employee_info_fields          Json?
+  work_period_fields            Json?
+  income_section                Json?
+  discount_section              Json?
+  employer_contribution_section Json?
+  footer_fields                 Json?
+  show_signatures               Boolean?
+  custom_notes                  String?
+  color_scheme                  String?   @db.VarChar(50)
+  id                            String    @id @db.VarChar(50)
+  created_date                  DateTime? @db.Timestamp(6)
+  updated_date                  DateTime? @db.Timestamp(6)
+  created_by_id                 Int?
+  created_by                    String?   @db.VarChar(150)
+  is_sample                     Boolean?
+  users                         users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model position {
+  name          String?   @db.VarChar(150)
+  department    String?   @db.VarChar(150)
+  level         String?   @db.VarChar(100)
+  is_active     Boolean?
+  description   String?
+  id            String    @id @db.VarChar(50)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id Int?
+  created_by    String?   @db.VarChar(150)
+  is_sample     Boolean?
+  users         users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model profession {
+  name          String?   @db.VarChar(150)
+  category      String?   @db.VarChar(100)
+  is_active     Boolean?
+  id            String    @id @db.VarChar(50)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id Int?
+  created_by    String?   @db.VarChar(150)
+  is_sample     Boolean?
+  users         users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model rmv {
+  amount         Decimal?  @db.Decimal(12, 2)
+  effective_date DateTime? @db.Date
+  is_active      Boolean?
+  notes          String?
+  id             String    @id @db.VarChar(50)
+  created_date   DateTime? @db.Timestamp(6)
+  updated_date   DateTime? @db.Timestamp(6)
+  created_by_id  Int?
+  created_by     String?   @db.VarChar(150)
+  is_sample      Boolean?
+  users          users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model role {
+  name                  String?   @db.VarChar(100)
+  description           String?
+  permissions           Json?
+  is_system_role        Boolean?
+  department_restricted Boolean?
+  team_restricted       Boolean?
+  priority              Decimal?  @db.Decimal(5, 0)
+  id                    String    @id @db.VarChar(50)
+  created_date          DateTime? @db.Timestamp(6)
+  updated_date          DateTime? @db.Timestamp(6)
+  created_by_id         Int?
+  created_by            String?   @db.VarChar(150)
+  is_sample             Boolean?
+  users                 users?    @relation("roles_created", fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model site {
+  name          String?   @db.VarChar(150)
+  code          String?   @db.VarChar(50)
+  address       String?
+  is_active     Boolean?
+  id            String    @id @db.VarChar(50)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id Int?
+  created_by    String?   @db.VarChar(150)
+  is_sample     Boolean?
+  users         users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model sync_log {
+  id Int @id @default(autoincrement())
+}
+
+model ubigeo {
+  codigo_ubigeo       String?   @db.VarChar(10)
+  departamento        String?   @db.VarChar(100)
+  provincia           String?   @db.VarChar(100)
+  distrito            String?   @db.VarChar(100)
+  codigo_departamento String?   @db.VarChar(10)
+  codigo_provincia    String?   @db.VarChar(10)
+  id                  String    @id @db.VarChar(50)
+  created_date        DateTime? @db.Timestamp(6)
+  updated_date        DateTime? @db.Timestamp(6)
+  created_by_id       Int?
+  created_by          String?   @db.VarChar(150)
+  is_sample           Boolean?
+  users               users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model user_invitation {
+  employee_id   String?   @db.VarChar(50)
+  email         String?   @db.VarChar(150)
+  invited_by    String?   @db.VarChar(150)
+  invited_at    DateTime? @db.Timestamp(6)
+  status        String?   @db.VarChar(50)
+  id            String    @id @db.VarChar(50)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id Int?
+  created_by    String?   @db.VarChar(150)
+  is_sample     Boolean?
+  users         users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model user_role {
+  employee_id   String?   @db.VarChar(50)
+  role_id       String?   @db.VarChar(50)
+  assigned_by   String?   @db.VarChar(150)
+  assigned_date DateTime? @db.Date
+  id            String    @id @db.VarChar(50)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id Int?
+  created_by    String?   @db.VarChar(150)
+  is_sample     Boolean?
+  users         users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model users {
+  id                     Int                      @id @default(autoincrement())
+  email                  String                   @unique @db.VarChar(255)
+  password_hash          String                   @db.VarChar(255)
+  role                   String                   @default("admin") @db.VarChar(255)
+  full_name              String?                  @db.VarChar(255)
+  is_active              Boolean?                 @default(true)
+  created_at             DateTime?                @default(now()) @db.Timestamp(6)
+  updated_at             DateTime?                @default(now()) @db.Timestamp(6)
+  afp                    afp[]
+  roles_created          role[]                   @relation("roles_created")
+  attendance_incident    attendance_incident[]
+  attendance_record      attendance_record[]
+  bank                   bank[]
+  company_info           company_info[]
+  contract               contract[]
+  contract_clause        contract_clause[]
+  contract_renewal_rule  contract_renewal_rule[]
+  contract_template      contract_template[]
+  cost_center            cost_center[]
+  cost_center_assignment cost_center_assignment[]
+  cost_center_change_log cost_center_change_log[]
+  department             department[]
+  employee               employee[]
+  employee_change_log    employee_change_log[]
+  holiday                holiday[]
+  payroll_concept        payroll_concept[]
+  payslip_template       payslip_template[]
+  position               position[]
+  profession             profession[]
+  rmv                    rmv[]
+  site                   site[]
+  ubigeo                 ubigeo[]
+  user_invitation        user_invitation[]
+  user_role              user_role[]
+  vacation_balance       vacation_balance[]
+  work_schedule          work_schedule[]
+}
+
+model vacatin_request {
+  id Int @id @default(autoincrement())
+}
+
+model vacation_balance {
+  employee_id         String?   @db.VarChar(50)
+  period_start        DateTime? @db.Date
+  period_end          DateTime? @db.Date
+  total_entitled_days Decimal?  @db.Decimal(5, 2)
+  days_taken          Decimal?  @db.Decimal(5, 2)
+  days_pending        Decimal?  @db.Decimal(5, 2)
+  days_sold           Decimal?  @db.Decimal(5, 2)
+  is_active           Boolean?
+  deadline            DateTime? @db.Date
+  id                  String    @id @db.VarChar(50)
+  created_date        DateTime? @db.Timestamp(6)
+  updated_date        DateTime? @db.Timestamp(6)
+  created_by_id       Int?
+  created_by          String?   @db.VarChar(150)
+  is_sample           Boolean?
+  users               users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model work_schedule {
+  employee_id            String?   @db.VarChar(50)
+  department_name        String?   @db.VarChar(150)
+  schedule_name          String?   @db.VarChar(150)
+  monday_start           String?   @db.VarChar(10)
+  monday_end             String?   @db.VarChar(10)
+  tuesday_start          String?   @db.VarChar(10)
+  tuesday_end            String?   @db.VarChar(10)
+  wednesday_start        String?   @db.VarChar(10)
+  wednesday_end          String?   @db.VarChar(10)
+  thursday_start         String?   @db.VarChar(10)
+  thursday_end           String?   @db.VarChar(10)
+  friday_start           String?   @db.VarChar(10)
+  friday_end             String?   @db.VarChar(10)
+  saturday_start         String?   @db.VarChar(10)
+  saturday_end           String?   @db.VarChar(10)
+  sunday_start           String?   @db.VarChar(10)
+  sunday_end             String?   @db.VarChar(10)
+  break_duration_minutes Decimal?  @db.Decimal(5, 0)
+  tolerance_minutes      Decimal?  @db.Decimal(5, 0)
+  is_active              Boolean?
+  id                     String    @id @db.VarChar(50)
+  created_date           DateTime? @db.Timestamp(6)
+  updated_date           DateTime? @db.Timestamp(6)
+  created_by_id          Int?
+  created_by             String?   @db.VarChar(150)
+  is_sample              Boolean?
+  users                  users?    @relation(fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
