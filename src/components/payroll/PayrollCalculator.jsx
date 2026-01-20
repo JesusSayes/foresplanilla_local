@@ -16,6 +16,21 @@ export class PayrollCalculator {
     this.salaryScales = [];
   }
 
+  async loadAdvancedRules() {
+    const { base44 } = await import("@/api/base44Client");
+    
+    try {
+      this.customFormulas = await base44.entities.PayrollFormula.filter({ is_active: true });
+      this.customFormulas.sort((a, b) => (a.priority || 0) - (b.priority || 0));
+      
+      this.taxTables = await base44.entities.TaxTable.filter({ is_active: true });
+      
+      this.salaryScales = await base44.entities.SalaryScale.filter({ is_active: true });
+    } catch (error) {
+      console.warn("Advanced payroll rules not loaded:", error);
+    }
+  }
+
   /**
    * Evalúa una fórmula de cálculo con variables del empleado
    */
@@ -27,12 +42,14 @@ export class PayrollCalculator {
         worked_days: context.worked_days || 30,
         regular_hours: context.regular_hours || 0,
         overtime_hours: context.overtime_hours || 0,
-        rmv: context.rmv || 1025, // RMV actual
+        rmv: context.rmv || 1025,
         horas_extras_25: context.horas_extras_25 || 0,
         horas_extras_35: context.horas_extras_35 || 0,
         horas_nocturnas: context.horas_nocturnas || 0,
         total_income: context.total_income || 0,
         total_deductions: context.total_deductions || 0,
+        salary_scale_bonus: context.salary_scale_bonus || 0,
+        ...context, // Incluir todas las variables del contexto
       };
 
       // Reemplazar variables en la fórmula
@@ -90,45 +107,239 @@ export class PayrollCalculator {
     }
   }
 
+  evaluateCondition(condition, context) {
+    if (!condition || condition.trim() === "") return true;
+    
+    try {
+      // Reemplazar variables en la condición
+      let evaluableCondition = condition;
+      for (const [key, value] of Object.entries(context)) {
+        const regex = new RegExp(`\\b${key}\\b`, 'g');
+        if (typeof value === 'string') {
+          evaluableCondition = evaluableCondition.replace(regex, `"${value}"`);
+        } else {
+          evaluableCondition = evaluableCondition.replace(regex, value);
+        }
+      }
+      
+      // Variables del empleado para condiciones
+      const employeeVars = {
+        contract_type: this.employee.contract_type,
+        position: this.employee.position,
+        department_name: this.employee.department_name,
+        pension_system: this.employee.pension_system,
+      };
+      
+      for (const [key, value] of Object.entries(employeeVars)) {
+        const regex = new RegExp(`\\b${key}\\b`, 'g');
+        if (typeof value === 'string') {
+          evaluableCondition = evaluableCondition.replace(regex, `"${value}"`);
+        } else {
+          evaluableCondition = evaluableCondition.replace(regex, value);
+        }
+      }
+      
+      // Evaluar condición de forma segura
+      return new Function(`return ${evaluableCondition}`)();
+    } catch (error) {
+      this.logError(condition, `Error al evaluar condición: ${error.message}`);
+      return false;
+    }
+  }
+
+  calculateSalaryScaleBonus(baseSalary) {
+    if (!this.employee.hire_date || this.salaryScales.length === 0) return 0;
+    
+    const hireDate = new Date(this.employee.hire_date);
+    const currentDate = new Date(this.year, this.month - 1, 1);
+    const yearsOfService = (currentDate - hireDate) / (1000 * 60 * 60 * 24 * 365.25);
+    
+    for (const scale of this.salaryScales) {
+      // Verificar si aplica por antigüedad
+      if (scale.scale_type === "Antigüedad" || scale.scale_type === "Mixto") {
+        if (yearsOfService >= (scale.min_years || 0) && 
+            (!scale.max_years || yearsOfService <= scale.max_years)) {
+          const bonus = (baseSalary * (scale.percentage_increase || 0) / 100) + (scale.fixed_amount || 0);
+          this.log(`Escala salarial [${scale.name}]: ${bonus} (${yearsOfService.toFixed(1)} años)`);
+          return bonus;
+        }
+      }
+      
+      // Verificar si aplica por cargo
+      if ((scale.scale_type === "Cargo" || scale.scale_type === "Mixto") && 
+          scale.position === this.employee.position) {
+        const bonus = (baseSalary * (scale.percentage_increase || 0) / 100) + (scale.fixed_amount || 0);
+        this.log(`Escala salarial [${scale.name}]: ${bonus} (cargo: ${scale.position})`);
+        return bonus;
+      }
+    }
+    
+    return 0;
+  }
+
+  calculateTaxWithTable(taxType, amount) {
+    const table = this.taxTables.find(t => t.tax_type === taxType);
+    if (!table) return 0;
+    
+    if (table.calculation_method === "Porcentaje Fijo") {
+      return amount * (table.fixed_rate || 0) / 100;
+    }
+    
+    if (table.calculation_method === "Tramos" && table.brackets) {
+      for (const bracket of table.brackets) {
+        if (amount >= bracket.min_amount && (!bracket.max_amount || amount <= bracket.max_amount)) {
+          const tax = (amount * (bracket.rate || 0) / 100) - (bracket.fixed_deduction || 0);
+          return Math.max(0, tax);
+        }
+      }
+    }
+    
+    if (table.calculation_method === "Fórmula Personalizada" && table.formula) {
+      try {
+        return this.evaluateFormula(table.formula, { amount, ...this.buildContext({}, 0) });
+      } catch (error) {
+        this.logError(table.formula, error.message);
+      }
+    }
+    
+    return 0;
+  }
+
   /**
    * Calcula todos los conceptos de planilla para el empleado
    */
-  async calculatePayroll(concepts, attendanceData, rmvAmount) {
-    const context = this.buildContext(attendanceData, rmvAmount);
+  async calculatePayroll(concepts, attendanceData, rmvAmount = 1025) {
+    await this.loadAdvancedRules();
     
-    // Separar conceptos por tipo
+    // Salario base según tipo de planilla
+    const baseSalary = this.payrollType === "Quincenal" 
+      ? (this.employee.base_salary || 0) / 2 
+      : (this.employee.base_salary || 0);
+
+    const workedDays = attendanceData?.worked_days || 
+      (this.payrollType === "Quincenal" ? 15 : 30);
+
+    // Aplicar escalas salariales
+    const salaryScaleBonus = this.calculateSalaryScaleBonus(baseSalary);
+    
+    // Contexto de variables para fórmulas
+    const context = {
+      base_salary: baseSalary,
+      salary_scale_bonus: salaryScaleBonus,
+      worked_days: workedDays,
+      regular_hours: attendanceData?.regular_hours || 0,
+      overtime_hours: attendanceData?.overtime_hours || 0,
+      rmv: rmvAmount || 1025,
+      horas_extras_25: attendanceData?.horas_extras_25 || 0,
+      horas_extras_35: attendanceData?.horas_extras_35 || 0,
+      horas_nocturnas: attendanceData?.horas_nocturnas || 0,
+      contract_type: this.employee.contract_type,
+      position: this.employee.position,
+      department_name: this.employee.department_name,
+    };
+
+    this.log(`=== Inicio cálculo planilla ${this.payrollType} ===`);
+    this.log(`Empleado: ${this.employee.first_name} ${this.employee.last_name} (${this.employee.employee_code})`);
+    this.log(`Salario base: ${baseSalary}`);
+    if (salaryScaleBonus > 0) {
+      this.log(`Bono escala salarial: ${salaryScaleBonus}`);
+    }
+
+    // Filtrar conceptos aplicables
+    const applicableConcepts = concepts.filter(c => this.shouldApplyConcept(c));
+    this.log(`Conceptos aplicables: ${applicableConcepts.length} de ${concepts.length}`);
+
+    // 3. Aplicar fórmulas personalizadas primero (variables auxiliares)
+    const auxiliaryVariables = {};
+    for (const formula of this.customFormulas.filter(f => f.formula_type === "Variable Auxiliar")) {
+      if (this.evaluateCondition(formula.conditions, context)) {
+        try {
+          const value = this.evaluateFormula(formula.formula, { ...context, ...auxiliaryVariables });
+          auxiliaryVariables[formula.name.toLowerCase().replace(/\s+/g, '_')] = value;
+          this.log(`Variable auxiliar ${formula.name}: ${value}`);
+        } catch (error) {
+          this.logError(formula.formula, error.message);
+        }
+      }
+    }
+    
+    // Agregar variables auxiliares al contexto
+    Object.assign(context, auxiliaryVariables);
+    
+    // 4. Aplicar conceptos
     const incomes = [];
     const deductions = [];
     const contributions = [];
 
-    for (const concept of concepts) {
-      // Verificar si el concepto aplica según su periodicidad y fechas
-      if (!this.shouldApplyConcept(concept)) {
-        continue;
+    // Aplicar fórmulas personalizadas
+    for (const formula of this.customFormulas.filter(f => f.formula_type !== "Variable Auxiliar")) {
+      if (this.evaluateCondition(formula.conditions, context)) {
+        try {
+          const value = this.evaluateFormula(formula.formula, context);
+          const item = {
+            concept_name: formula.name,
+            calculated_amount: value,
+            formula: formula.formula,
+          };
+          
+          if (formula.formula_type === "Ingreso") {
+            incomes.push(item);
+            this.log(`Ingreso [${formula.name}]: ${value} (fórmula: ${formula.formula})`);
+          } else if (formula.formula_type === "Deducción") {
+            deductions.push(item);
+            this.log(`Deducción [${formula.name}]: ${value} (fórmula: ${formula.formula})`);
+          } else if (formula.formula_type === "Contribución Empleador") {
+            contributions.push(item);
+            this.log(`Contribución [${formula.name}]: ${value} (fórmula: ${formula.formula})`);
+          }
+        } catch (error) {
+          this.logError(formula.formula, error.message);
+        }
+      }
+    }
+    
+    // Aplicar cada concepto según su tipo
+    for (const concept of applicableConcepts) {
+      let calculatedAmount = 0;
+
+      if (concept.is_dynamic && concept.calculation_formula) {
+        calculatedAmount = this.evaluateFormula(concept.calculation_formula, context);
+        this.log(`${concept.concept_type} [${concept.concept_name}]: ${calculatedAmount} (fórmula: ${concept.calculation_formula})`);
+      } else {
+        calculatedAmount = parseFloat(concept.amount) || 0;
+        this.log(`${concept.concept_type} [${concept.concept_name}]: ${calculatedAmount} (monto fijo)`);
       }
 
-      const calculatedConcept = this.calculateConcept(concept, context);
-      
-      if (calculatedConcept.concept_type === "Ingreso") {
-        incomes.push(calculatedConcept);
-      } else if (calculatedConcept.concept_type === "Descuento") {
-        deductions.push(calculatedConcept);
-      } else if (calculatedConcept.concept_type === "Aportación") {
-        contributions.push(calculatedConcept);
+      const conceptItem = {
+        ...concept,
+        calculated_amount: Math.round(calculatedAmount * 100) / 100,
+      };
+
+      if (concept.concept_type === "Ingreso") {
+        incomes.push(conceptItem);
+      } else if (concept.concept_type === "Descuento") {
+        deductions.push(conceptItem);
+      } else if (concept.concept_type === "Aportación") {
+        contributions.push(conceptItem);
       }
     }
 
     // Calcular totales
-    const totalIncome = incomes.reduce((sum, c) => sum + c.calculated_amount, 0);
+    const totalIncome = incomes.reduce((sum, c) => sum + c.calculated_amount, 0) + baseSalary + salaryScaleBonus;
     const totalDeductions = deductions.reduce((sum, c) => sum + c.calculated_amount, 0);
     const totalContributions = contributions.reduce((sum, c) => sum + c.calculated_amount, 0);
     const netPay = totalIncome - totalDeductions;
+
+    this.log(`Total Ingresos: ${totalIncome}`);
+    this.log(`Total Descuentos: ${totalDeductions}`);
+    this.log(`Neto a Pagar: ${netPay}`);
+    this.log(`=== Fin cálculo ===`);
 
     return {
       employee: this.employee,
       period: `${this.month}/${this.year}`,
       payrollType: this.payrollType,
-      context: context,
+      context: { ...context, base_salary: baseSalary },
       incomes: incomes,
       deductions: deductions,
       contributions: contributions,
@@ -167,8 +378,8 @@ export class PayrollCalculator {
       horas_extras_25: attendanceData?.horas_extras_25 || 0,
       horas_extras_35: attendanceData?.horas_extras_35 || 0,
       horas_nocturnas: attendanceData?.horas_nocturnas || 0,
-      total_income: 0, // Se actualizará después
-      total_deductions: 0, // Se actualizará después
+      total_income: 0,
+      total_deductions: 0,
     };
   }
 
@@ -188,7 +399,7 @@ export class PayrollCalculator {
 
     return {
       ...concept,
-      calculated_amount: Math.round(calculatedAmount * 100) / 100, // Redondear a 2 decimales
+      calculated_amount: Math.round(calculatedAmount * 100) / 100,
       calculation_method: concept.is_dynamic ? 'dynamic' : 'fixed',
       applied_date: new Date().toISOString()
     };
@@ -205,7 +416,7 @@ export class PayrollCalculator {
 
     // Verificar si es recurrente o específico del mes/año
     if (concept.is_recurring) {
-      return true; // Los conceptos recurrentes siempre se aplican
+      return true;
     }
 
     // Verificar si el concepto es para este mes/año específico
@@ -222,7 +433,7 @@ export class PayrollCalculator {
       return currentDate >= startDate && currentDate <= endDate;
     }
 
-    return true; // Por defecto, aplicar el concepto
+    return true;
   }
 
   /**
@@ -233,6 +444,15 @@ export class PayrollCalculator {
       timestamp: new Date().toISOString(),
       ...log
     });
+  }
+
+  log(message) {
+    this.calculationLog.push(message);
+  }
+
+  logError(formula, error) {
+    this.errors.push({ formula, error });
+    this.log(`❌ Error en fórmula: ${formula} - ${error}`);
   }
 
   /**

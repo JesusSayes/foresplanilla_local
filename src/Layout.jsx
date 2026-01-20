@@ -135,6 +135,7 @@ export default function Layout({ children, currentPageName }) {
         submenu: [
           { name: "Generar Planillas", path: "PayrollManagement" },
           { name: "Conceptos de Planilla", path: "PayrollConcepts" },
+          { name: "Motor de Reglas", path: "PayrollRulesConfig" },
           { name: "Centros de Costo", path: "CostCenterManagement" },
           { name: "Consulta Valorizada", path: "CostCenterValuation" },
         ]
