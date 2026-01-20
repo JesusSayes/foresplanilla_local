@@ -12,6 +12,7 @@ import {
   DollarSign, FileText, Calendar, Users, Download, 
   Eye, CheckCircle, AlertCircle, Plus, Search, Lock, Edit2
 } from "lucide-react";
+import { usePermissions } from "../components/hooks/usePermissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -22,6 +23,7 @@ import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
 
 export default function PayrollManagement() {
+  const { hasPermission, canAccessDepartment, loading: permissionsLoading } = usePermissions();
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -206,7 +208,7 @@ export default function PayrollManagement() {
     const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
     
     // Filtrar empleados según búsqueda y departamento
-    let filteredEmployees = allEmployees;
+    let filteredEmployees = getFilteredEmployees();
     
     // Filtrar por tipo de contrato si es SNP
     if (payrollType === "SNP") {
@@ -531,18 +533,42 @@ export default function PayrollManagement() {
     toast.success(`${payslips.length} boletas generadas`);
   };
 
-  if (!employee || employee.role !== "admin") {
+  if (permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <Card className="max-w-md">
           <CardContent className="p-8 text-center">
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
-            <p className="text-slate-600">Solo administradores pueden gestionar planillas</p>
+            <p className="text-slate-600">Cargando permisos...</p>
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  if (!hasPermission("payroll.view_all") && !hasPermission("payroll.view_department")) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
+            <p className="text-slate-600">No tienes permisos para gestionar planillas</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const canCreate = hasPermission("payroll.create");
+  const canEdit = hasPermission("payroll.edit");
+  const canDelete = hasPermission("payroll.delete");
+  const canViewAmounts = hasPermission("payroll.view_amounts");
+  const canViewAllDepartments = hasPermission("payroll.view_all");
+  
+  // Filtrar empleados según permisos departamentales
+  const getFilteredEmployees = () => {
+    if (canViewAllDepartments) return allEmployees;
+    return allEmployees.filter(emp => canAccessDepartment(emp.department_name));
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -608,7 +634,7 @@ export default function PayrollManagement() {
                 </div>
               </div>
               <div className="text-2xl font-bold text-slate-900 mb-1">
-                S/ {stats.total.toFixed(2)}
+                {canViewAmounts ? `S/ ${stats.total.toFixed(2)}` : '🔒'}
               </div>
               <p className="text-slate-600 text-sm">Total Planillas</p>
             </CardContent>
@@ -706,13 +732,15 @@ export default function PayrollManagement() {
                   </div>
                 </div>
 
-                <Button
-                  onClick={calculatePayroll}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700"
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  Vista Previa
-                </Button>
+                {canCreate && (
+                  <Button
+                    onClick={calculatePayroll}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    Vista Previa
+                  </Button>
+                )}
 
                 <div className="pt-4 border-t">
                   <Button
@@ -831,32 +859,40 @@ export default function PayrollManagement() {
                             </div>
                           )}
 
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="text-slate-600">Salario Base</p>
-                              <p className="font-semibold text-slate-900">
-                                S/ {payslip.base_salary.toFixed(2)}
+                          {canViewAmounts ? (
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <p className="text-slate-600">Salario Base</p>
+                                <p className="font-semibold text-slate-900">
+                                  S/ {payslip.base_salary.toFixed(2)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-slate-600">Total Ingresos</p>
+                                <p className="font-semibold text-green-600">
+                                  S/ {payslip.total_income.toFixed(2)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-slate-600">Descuentos</p>
+                                <p className="font-semibold text-red-600">
+                                  -S/ {payslip.total_deductions.toFixed(2)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-slate-600 font-bold">Neto a Pagar</p>
+                                <p className="font-bold text-indigo-600 text-lg">
+                                  S/ {payslip.net_pay.toFixed(2)}
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-4 bg-slate-100 rounded-lg text-center">
+                              <p className="text-sm text-slate-600">
+                                🔒 Sin permisos para ver montos
                               </p>
                             </div>
-                            <div>
-                              <p className="text-slate-600">Total Ingresos</p>
-                              <p className="font-semibold text-green-600">
-                                S/ {payslip.total_income.toFixed(2)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-slate-600">Descuentos</p>
-                              <p className="font-semibold text-red-600">
-                                -S/ {payslip.total_deductions.toFixed(2)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-slate-600 font-bold">Neto a Pagar</p>
-                              <p className="font-bold text-indigo-600 text-lg">
-                                S/ {payslip.net_pay.toFixed(2)}
-                              </p>
-                            </div>
-                          </div>
+                          )}
 
                           {payslip.advance_deduction > 0 && (
                             <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
@@ -926,17 +962,19 @@ export default function PayrollManagement() {
                     })}
                   </div>
 
-                  <div className="mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900 text-lg">Total General:</span>
-                      <span className="font-bold text-indigo-600 text-2xl">
-                        S/ {previewData.reduce((sum, p) => sum + p.net_pay, 0).toFixed(2)}
-                      </span>
+                  {canViewAmounts && (
+                    <div className="mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900 text-lg">Total General:</span>
+                        <span className="font-bold text-indigo-600 text-2xl">
+                          S/ {previewData.reduce((sum, p) => sum + p.net_pay, 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-600 mt-1">
+                        {previewData.length} empleados
+                      </p>
                     </div>
-                    <p className="text-sm text-slate-600 mt-1">
-                      {previewData.length} empleados
-                    </p>
-                  </div>
+                  )}
 
                   {/* Empleados No Incluidos */}
                   {getExcludedEmployeesData().length > 0 && (
@@ -1039,12 +1077,19 @@ export default function PayrollManagement() {
                                           </Badge>
                                         </div>
                                         <div className="grid grid-cols-3 gap-4 text-sm">
-                                         <div>
-                                           <p className="text-slate-600">Neto a Pagar</p>
-                                           <p className="font-bold text-indigo-600">
-                                             S/ {payslip.net_pay.toFixed(2)}
-                                           </p>
-                                         </div>
+                                         {canViewAmounts ? (
+                                           <div>
+                                             <p className="text-slate-600">Neto a Pagar</p>
+                                             <p className="font-bold text-indigo-600">
+                                               S/ {payslip.net_pay.toFixed(2)}
+                                             </p>
+                                           </div>
+                                         ) : (
+                                           <div>
+                                             <p className="text-slate-600">Neto a Pagar</p>
+                                             <p className="font-bold text-slate-400">🔒</p>
+                                           </div>
+                                         )}
                                          <div>
                                            <p className="text-slate-600">Días Trabajados</p>
                                            <p className="font-semibold text-slate-900">{payslip.worked_days}</p>
@@ -1221,7 +1266,8 @@ export default function PayrollManagement() {
                                         {format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })} - {group.type}
                                       </h3>
                                       <p className="text-sm text-slate-600">
-                                        {allGroupPayslips.length} empleado(s) • Total: S/ {total.toFixed(2)}
+                                        {allGroupPayslips.length} empleado(s)
+                                        {canViewAmounts && ` • Total: S/ ${total.toFixed(2)}`}
                                       </p>
                                     </div>
                                   </div>
@@ -1276,7 +1322,11 @@ export default function PayrollManagement() {
                                     return emp ? (
                                       <div key={p.id} className="flex items-center justify-between text-sm p-2 bg-slate-50 rounded">
                                         <span>{emp.employee_code} - {emp.first_name} {emp.last_name}</span>
-                                        <span className="font-semibold">S/ {p.net_pay.toFixed(2)}</span>
+                                        {canViewAmounts ? (
+                                          <span className="font-semibold">S/ {p.net_pay.toFixed(2)}</span>
+                                        ) : (
+                                          <span className="text-slate-400">🔒</span>
+                                        )}
                                       </div>
                                     ) : null;
                                   })}
