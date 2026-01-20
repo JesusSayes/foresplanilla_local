@@ -284,6 +284,17 @@ export default function RoleManagement() {
       "reports.view", "reports.export", "reports.attendance", "reports.payroll", 
       "reports.vacations", "reports.employees"
     ],
+    "Centros de Costo": [
+      "cost_centers.view", "cost_centers.create", "cost_centers.edit", "cost_centers.delete",
+      "cost_centers.assign", "cost_centers.view_amounts"
+    ],
+    "Planillas": [
+      "payroll.view_own", "payroll.view_all", "payroll.view_department", "payroll.view_amounts",
+      "payroll.edit", "payroll.create", "payroll.delete", "payroll.calculate", "payroll.approve"
+    ],
+    "Contratos": [
+      "contracts.view", "contracts.view_amounts", "contracts.create", "contracts.edit", "contracts.delete"
+    ],
     "Administración": [
       "roles.view", "roles.manage", "roles.assign", "system.admin", "system.settings"
     ],

@@ -13,6 +13,7 @@ import {
   Building2, Plus, Edit, Trash2, Users, GitBranch, History, 
   Download, FileSpreadsheet, FileText, DollarSign, Search, Calendar, Grid3x3, List
 } from "lucide-react";
+import { usePermissions } from "../components/hooks/usePermissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -22,6 +23,7 @@ import 'jspdf-autotable';
 import { createPageUrl } from "../utils";
 
 export default function CostCenterManagement() {
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
   const [showCCForm, setShowCCForm] = useState(false);
@@ -405,18 +407,36 @@ export default function CostCenterManagement() {
     ? changeLogs.filter(log => log.cost_center_id === historyFilter)
     : changeLogs;
 
-  if (!employee || (employee.role !== "admin" && employee.role !== "super_admin")) {
+  if (permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <Card className="max-w-md">
           <CardContent className="p-8 text-center">
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
-            <p className="text-slate-600">Solo administradores pueden gestionar centros de costos</p>
+            <p className="text-slate-600">Cargando permisos...</p>
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  if (!hasPermission("cost_centers.view")) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
+            <p className="text-slate-600">No tienes permisos para ver centros de costos</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const canCreate = hasPermission("cost_centers.create");
+  const canEdit = hasPermission("cost_centers.edit");
+  const canDelete = hasPermission("cost_centers.delete");
+  const canAssign = hasPermission("cost_centers.assign");
+  const canViewAmounts = hasPermission("cost_centers.view_amounts");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -484,10 +504,12 @@ export default function CostCenterManagement() {
                       <FileText className="w-4 h-4 mr-2" />
                       PDF
                     </Button>
-                    <Button onClick={handleCreateCC} className="bg-indigo-600 hover:bg-indigo-700">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Nuevo Centro
-                    </Button>
+                    {canCreate && (
+                      <Button onClick={handleCreateCC} className="bg-indigo-600 hover:bg-indigo-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Nuevo Centro
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -557,21 +579,25 @@ export default function CostCenterManagement() {
                             </div>
 
                             <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="flex-1"
-                                onClick={() => {
-                                  setSelectedCC(cc);
-                                  handleCreateAssignment(cc);
-                                }}
-                              >
-                                <Plus className="w-3 h-3 mr-1" />
-                                Asignar
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleEditCC(cc)}>
-                                <Edit className="w-3 h-3" />
-                              </Button>
+                              {canAssign && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1"
+                                  onClick={() => {
+                                    setSelectedCC(cc);
+                                    handleCreateAssignment(cc);
+                                  }}
+                                >
+                                  <Plus className="w-3 h-3 mr-1" />
+                                  Asignar
+                                </Button>
+                              )}
+                              {canEdit && (
+                                <Button size="sm" variant="outline" onClick={() => handleEditCC(cc)}>
+                                  <Edit className="w-3 h-3" />
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -633,20 +659,24 @@ export default function CostCenterManagement() {
                               </td>
                               <td className="p-3">
                                 <div className="flex gap-1 justify-center">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setSelectedCC(cc);
-                                      handleCreateAssignment(cc);
-                                    }}
-                                    title="Asignar"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                  </Button>
-                                  <Button size="sm" variant="outline" onClick={() => handleEditCC(cc)} title="Editar">
-                                    <Edit className="w-3 h-3" />
-                                  </Button>
+                                  {canAssign && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        setSelectedCC(cc);
+                                        handleCreateAssignment(cc);
+                                      }}
+                                      title="Asignar"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                  {canEdit && (
+                                    <Button size="sm" variant="outline" onClick={() => handleEditCC(cc)} title="Editar">
+                                      <Edit className="w-3 h-3" />
+                                    </Button>
+                                  )}
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -746,27 +776,29 @@ export default function CostCenterManagement() {
                              {emp.employee_code} • {emp.position} • {emp.department_name || "Sin departamento"}
                            </p>
                          </div>
-                          <Button
-                            size="sm"
-                            className="bg-indigo-600 hover:bg-indigo-700"
-                            onClick={() => {
-                              setAssignmentFormData({
-                                cost_center_id: "",
-                                assignment_type: "Empleado",
-                                employee_id: emp.id,
-                                department_name: "",
-                                percentage: 100,
-                                start_date: format(new Date(), "yyyy-MM-dd"),
-                                is_active: true,
-                                notes: "",
-                              });
-                              setEditingAssignment(null);
-                              setShowAssignmentForm(true);
-                            }}
-                          >
-                            <Plus className="w-3 h-3 mr-2" />
-                            Asignar Centro de Costo
-                          </Button>
+                          {canAssign && (
+                            <Button
+                              size="sm"
+                              className="bg-indigo-600 hover:bg-indigo-700"
+                              onClick={() => {
+                                setAssignmentFormData({
+                                  cost_center_id: "",
+                                  assignment_type: "Empleado",
+                                  employee_id: emp.id,
+                                  department_name: "",
+                                  percentage: 100,
+                                  start_date: format(new Date(), "yyyy-MM-dd"),
+                                  is_active: true,
+                                  notes: "",
+                                });
+                                setEditingAssignment(null);
+                                setShowAssignmentForm(true);
+                              }}
+                            >
+                              <Plus className="w-3 h-3 mr-2" />
+                              Asignar Centro de Costo
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -782,10 +814,12 @@ export default function CostCenterManagement() {
               <CardHeader className="border-b bg-slate-50/50">
                 <div className="flex items-center justify-between">
                   <CardTitle>Asignaciones Activas</CardTitle>
-                  <Button onClick={() => handleCreateAssignment()} className="bg-indigo-600 hover:bg-indigo-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Nueva Asignación
-                  </Button>
+                  {canAssign && (
+                    <Button onClick={() => handleCreateAssignment()} className="bg-indigo-600 hover:bg-indigo-700">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nueva Asignación
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="p-6">
@@ -858,21 +892,25 @@ export default function CostCenterManagement() {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleEditAssignment(assignment)}>
-                              <Edit className="w-3 h-3" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => {
-                                if (confirm("¿Eliminar esta asignación?")) {
-                                  deleteAssignmentMutation.mutate(assignment);
-                                }
-                              }}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
+                            {canEdit && (
+                              <Button size="sm" variant="outline" onClick={() => handleEditAssignment(assignment)}>
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600"
+                                onClick={() => {
+                                  if (confirm("¿Eliminar esta asignación?")) {
+                                    deleteAssignmentMutation.mutate(assignment);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
