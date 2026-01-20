@@ -11,6 +11,9 @@ export class PayrollCalculator {
     this.payrollType = payrollType;
     this.calculationLog = [];
     this.errors = [];
+    this.customFormulas = [];
+    this.taxTables = [];
+    this.salaryScales = [];
   }
 
   /**
