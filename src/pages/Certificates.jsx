@@ -42,10 +42,11 @@ export default function Certificates() {
     queryKey: ["certificates", targetEmployeeId],
     queryFn: async () => {
       if (!targetEmployeeId) return [];
-      return await entitiesAPI.Certificate.filter(
-        { employee_id: targetEmployeeId },
-        "-created_date"
-      );
+      // return await entitiesAPI.Certificate.filter(
+        // { employee_id: targetEmployeeId },
+        // "-created_date"
+      // );
+      return await entitiesAPI.Certificate.list({ sort: "-created_date", ...filters })
     },
     enabled: !!targetEmployeeId,
   });
@@ -181,7 +182,7 @@ export default function Certificates() {
                   {certificateTypes.map((cert, index) => {
                     const Icon = cert.icon;
                     return (
-                      <Card 
+                      <Card
                         key={index}
                         className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
                         onClick={() => {
@@ -199,8 +200,8 @@ export default function Certificates() {
                           <p className="text-slate-600 text-sm mb-4">
                             {cert.description}
                           </p>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             className="w-full group-hover:bg-indigo-50 group-hover:text-indigo-700 group-hover:border-indigo-200"
                           >
                             <Plus className="w-4 h-4 mr-2" />
@@ -241,8 +242,8 @@ export default function Certificates() {
                     <CardTitle className="text-xl font-bold">
                       Solicitar Certificado
                     </CardTitle>
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       size="icon"
                       onClick={() => {
                         setShowRequestForm(false);
@@ -260,7 +261,7 @@ export default function Certificates() {
                         <Label className="text-sm font-semibold text-slate-900 mb-2 block">
                           Empleado *
                         </Label>
-                        <Select 
+                        <Select
                           value={selectedEmployeeId || ""}
                           onValueChange={(value) => setSelectedEmployeeId(value)}
                         >
@@ -446,7 +447,7 @@ export default function Certificates() {
                     {certificates.map((cert) => {
                       const StatusIcon = getStatusConfig(cert.status).icon;
                       return (
-                        <div 
+                        <div
                           key={cert.id}
                           className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all"
                         >

@@ -9,8 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  FileText, Save, Eye, RotateCcw, Plus, Edit, Trash2, 
+import {
+  FileText, Save, Eye, RotateCcw, Plus, Edit, Trash2,
   Star, Copy, CheckCircle, AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
@@ -61,8 +61,8 @@ const CONTRACT_TYPES = [
 ];
 
 export default function ContractTemplateConfig() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  // const [currentUser, setCurrentUser] = useState(null);
+  // const [employee, setEmployee] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
@@ -237,10 +237,10 @@ export default function ContractTemplateConfig() {
         company_ruc: companyInfo.ruc || "",
         company_address: companyInfo.address || "",
         company_representative: companyInfo.legal_representative || "",
-        company_representative_doc: companyInfo.legal_representative_dni 
+        company_representative_doc: companyInfo.legal_representative_dni
           ? `DNI ${companyInfo.legal_representative_dni}` : "",
       };
-      
+
       setTemplateData(prev => ({
         ...prev,
         ...updatedData
@@ -251,17 +251,17 @@ export default function ContractTemplateConfig() {
   const handleCreate = () => {
     setEditingTemplate(null);
     const newTemplate = { ...DEFAULT_TEMPLATE };
-    
+
     // Cargar datos de empresa si existen
     if (companyInfo) {
       newTemplate.company_name = companyInfo.company_name || "";
       newTemplate.company_ruc = companyInfo.ruc || "";
       newTemplate.company_address = companyInfo.address || "";
       newTemplate.company_representative = companyInfo.legal_representative || "";
-      newTemplate.company_representative_doc = companyInfo.legal_representative_dni 
+      newTemplate.company_representative_doc = companyInfo.legal_representative_dni
         ? `DNI ${companyInfo.legal_representative_dni}` : "";
     }
-    
+
     setTemplateData(newTemplate);
     setShowForm(true);
   };
@@ -274,8 +274,8 @@ export default function ContractTemplateConfig() {
 
   const handleDuplicate = (template) => {
     setEditingTemplate(null);
-    setTemplateData({ 
-      ...DEFAULT_TEMPLATE, 
+    setTemplateData({
+      ...DEFAULT_TEMPLATE,
       ...template,
       template_name: `${template.template_name} (Copia)`,
       is_default: false
@@ -306,7 +306,7 @@ export default function ContractTemplateConfig() {
       dataToSave.company_ruc = companyInfo.ruc || "";
       dataToSave.company_address = companyInfo.address || "";
       dataToSave.company_representative = companyInfo.legal_representative || "";
-      dataToSave.company_representative_doc = companyInfo.legal_representative_dni 
+      dataToSave.company_representative_doc = companyInfo.legal_representative_dni
         ? `DNI ${companyInfo.legal_representative_dni}` : "";
     }
 
@@ -472,8 +472,8 @@ export default function ContractTemplateConfig() {
             ) : (
               <div className="space-y-4">
                 {templates.map(template => (
-                  <div 
-                    key={template.id} 
+                  <div
+                    key={template.id}
                     className={`p-4 border rounded-lg transition-all hover:shadow-md ${
                       template.is_default ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200'
                     }`}
@@ -494,11 +494,11 @@ export default function ContractTemplateConfig() {
                             {template.is_active ? "Activa" : "Inactiva"}
                           </Badge>
                         </div>
-                        
+
                         {template.description && (
                           <p className="text-sm text-slate-600 mb-3">{template.description}</p>
                         )}
-                        
+
                         <div className="flex flex-wrap gap-2">
                           {template.contract_types?.length > 0 ? (
                             template.contract_types.map(type => (
@@ -598,10 +598,10 @@ export default function ContractTemplateConfig() {
 
       {/* Form Modal */}
       {showForm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
         >
-          <Card 
+          <Card
             className="max-w-5xl w-full my-8"
           >
             <CardHeader className="border-b sticky top-0 bg-white z-10">
@@ -690,8 +690,8 @@ export default function ContractTemplateConfig() {
                             <Badge
                               key={type}
                               className={`cursor-pointer transition-all ${
-                                templateData.contract_types?.includes(type) 
-                                  ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+                                templateData.contract_types?.includes(type)
+                                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                               }`}
                               onClick={() => toggleContractType(type)}
@@ -927,9 +927,9 @@ export default function ContractTemplateConfig() {
                               <Button size="sm" variant="outline" onClick={() => handleEditClause(clause)}>
                                 <Edit className="w-4 h-4" />
                               </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 className="text-red-600"
                                 onClick={() => handleDeleteClause(clause.id)}
                               >
@@ -1012,11 +1012,11 @@ export default function ContractTemplateConfig() {
 
       {/* Preview Modal */}
       {showPreview && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-6"
           onClick={() => setShowPreview(false)}
         >
-          <Card 
+          <Card
             className="max-w-4xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1123,11 +1123,11 @@ export default function ContractTemplateConfig() {
 
       {/* Clause Form Modal */}
       {showClauseForm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-6"
           onClick={resetClauseForm}
         >
-          <Card 
+          <Card
             className="max-w-2xl w-full"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1207,8 +1207,8 @@ export default function ContractTemplateConfig() {
                     <Badge
                       key={type}
                       className={`cursor-pointer ${
-                        clauseData.contract_types?.includes(type) 
-                          ? 'bg-indigo-600 text-white' 
+                        clauseData.contract_types?.includes(type)
+                          ? 'bg-indigo-600 text-white'
                           : 'bg-slate-100 text-slate-700'
                       }`}
                       onClick={() => toggleClauseContractType(type)}
