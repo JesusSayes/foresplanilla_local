@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import React, { useState } from "react";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { 
-  CheckCircle, XCircle, Clock, Calendar, User, 
+import {
+  CheckCircle, XCircle, Clock, Calendar, User,
   FileText, AlertCircle, Search, Filter
 } from "lucide-react";
 import { format } from "date-fns";
@@ -16,8 +17,8 @@ import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
 
 export default function ManagerApprovals() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [filterStatus, setFilterStatus] = useState("Pendiente");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -29,39 +30,18 @@ export default function ManagerApprovals() {
 
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
-
   const { data: allRequests = [], isLoading } = useQuery({
     queryKey: ["allVacationRequests", employee?.department_name],
     queryFn: async () => {
       if (!employee?.department_name) return [];
-      
-      const allEmployees = await base44.entities.Employee.filter({
+
+      const allEmployees = await entitiesAPI.Employee.filter({
         department_name: employee.department_name,
       });
-      
+
       const employeeIds = allEmployees.map(e => e.id);
-      const requests = await base44.entities.VacationRequest.list("-created_date");
-      
+      const requests = await entitiesAPI.VacationRequest.list("-created_date");
+
       return requests.filter(r => employeeIds.includes(r.employee_id));
     },
     enabled: !!employee?.department_name,
@@ -71,7 +51,7 @@ export default function ManagerApprovals() {
     queryKey: ["departmentEmployees", employee?.department_name],
     queryFn: async () => {
       if (!employee?.department_name) return [];
-      return await base44.entities.Employee.filter({
+      return await entitiesAPI.Employee.filter({
         department_name: employee.department_name,
       });
     },
@@ -80,35 +60,35 @@ export default function ManagerApprovals() {
 
   const updateRequestMutation = useMutation({
     mutationFn: async ({ id, data, request }) => {
-      const updatedRequest = await base44.entities.VacationRequest.update(id, data);
-      
-      // Si se aprobó la solicitud, actualizar el balance de vacaciones y crear concepto de descuento si es sin goce
+      const updatedRequest = await entitiesAPI.VacationRequest.update(id, data);
+
       if (data.status === "Aprobada") {
         try {
-          // Actualizar balance de vacaciones si es solicitud de vacaciones
-          if (request.request_type === "Vacaciones") {
-            const balances = await base44.entities.VacationBalance.filter({
-              employee_id: request.employee_id,
-              is_active: true
-            });
-            
-            if (balances.length > 0) {
-              const balance = balances[0];
-              await base44.entities.VacationBalance.update(balance.id, {
-                days_taken: (balance.days_taken || 0) + request.business_days,
-                days_pending: (balance.total_entitled_days || 0) - ((balance.days_taken || 0) + request.business_days)
+          const balances = await entitiesAPI.VacationBalance.filter({
+            employee_id: request.employee_id,
+            is_active: true
+          });
+
+          if (balances && balances.length > 0) {
+            const balance = balances[0];
+            const newDaysTaken = (balance.days_taken || 0) + request.total_days;
+            const newDaysPending = balance.total_entitled_days - newDaysTaken;
+
+            if (newDaysPending >= 0) {
+              await entitiesAPI.VacationBalance.update(balance.id, {
+                days_taken: newDaysTaken,
+                days_pending: newDaysPending,
               });
             }
           }
-          
-          // Si es permiso sin goce, crear concepto de descuento en planilla
+
           if (request.request_type === "Permiso sin goce") {
             const emp = employees.find(e => e.id === request.employee_id);
             if (emp && emp.base_salary) {
               const startDate = new Date(request.start_date);
               const discountAmount = (emp.base_salary / 30) * request.total_days;
-              
-              await base44.entities.PayrollConcept.create({
+
+              await entitiesAPI.PayrollConcept.create({
                 employee_id: request.employee_id,
                 concept_type: "Descuento",
                 concept_name: "Permiso sin goce",
@@ -126,7 +106,7 @@ export default function ManagerApprovals() {
           console.error("Error al actualizar balance o crear descuento:", error);
         }
       }
-      
+
       return updatedRequest;
     },
     onSuccess: () => {

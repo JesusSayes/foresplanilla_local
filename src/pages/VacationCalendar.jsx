@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import React, { useState } from "react";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, User, Filter, ChevronLeft, ChevronRight } from "lucide-react";
-import { 
-  format, 
-  startOfMonth, 
-  endOfMonth, 
-  eachDayOfInterval, 
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
   isSameDay,
   addMonths,
   subMonths,
@@ -21,48 +22,27 @@ import { es } from "date-fns/locale";
 import PermissionGuard from "../components/PermissionGuard";
 
 export default function VacationCalendar() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [filterDepartment, setFilterDepartment] = useState("all");
   const [filterEmployee, setFilterEmployee] = useState("all");
 
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
-
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.list();
+      return await entitiesAPI.Employee.list();
     },
   });
 
   const { data: vacationRequests = [] } = useQuery({
     queryKey: ["calendarVacationRequests", currentMonth],
     queryFn: async () => {
-      const requests = await base44.entities.VacationRequest.filter(
+      const requests = await entitiesAPI.VacationRequest.filter(
         { status: "Aprobada" },
         "-start_date"
       );
-      
+
       return requests;
     },
   });

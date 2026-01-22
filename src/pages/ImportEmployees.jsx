@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { 
+import {
   Upload, Download, CheckCircle, AlertCircle, FileSpreadsheet,
   Users, Loader2, XCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function ImportEmployees() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
   const [file, setFile] = useState(null);
   const [previewData, setPreviewData] = useState(null);
   const [processing, setProcessing] = useState(false);
@@ -22,28 +22,20 @@ export default function ImportEmployees() {
   const [uploadError, setUploadError] = useState(null);
   const [uploadProgress, setUploadProgress] = useState("");
 
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
+
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const employeeSchema = {
     type: "array",
@@ -131,14 +123,14 @@ export default function ImportEmployees() {
       setUploadProgress("Paso 1/2: Subiendo archivo al servidor...");
       console.log("📤 PASO 1: Iniciando subida de archivo...");
       toast.loading("Subiendo archivo al servidor...", { id: "upload" });
-      
+
       const uploadResult = await Promise.race([
         base44.integrations.Core.UploadFile({ file: selectedFile }),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Timeout: La subida tardó más de 2 minutos")), 120000)
         )
       ]);
-      
+
       console.log("✅ PASO 1 COMPLETADO - Archivo subido:", uploadResult);
 
       if (!uploadResult || !uploadResult.file_url) {
@@ -159,7 +151,7 @@ export default function ImportEmployees() {
           file_url: file_url,
           json_schema: employeeSchema
         }),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Timeout: La extracción tardó más de 3 minutos")), 180000)
         )
       ]);
@@ -170,25 +162,25 @@ export default function ImportEmployees() {
         if (!Array.isArray(result.output)) {
           throw new Error("El formato de respuesta no es válido");
         }
-        
+
         if (result.output.length === 0) {
           throw new Error("El archivo está vacío o no contiene empleados válidos");
         }
 
         console.log("✅ Extracción exitosa:", result.output.length, "empleados");
         console.log("Muestra:", result.output.slice(0, 2));
-        
+
         setPreviewData(result.output);
         setUploadProgress("");
         toast.success(`✓ ${result.output.length} empleados listos para importar`, { id: "upload", duration: 5000 });
       } else {
         let errorMsg = result.details || result.error || "No se pudo procesar el archivo. Verifica el formato.";
-        
+
         // Detectar problema de delimitador
         if (errorMsg.includes("delimiter") || errorMsg.includes("CSV Error") || errorMsg.includes("byte sequence")) {
           errorMsg = "El archivo CSV tiene un formato incorrecto. Por favor, descarga y usa la plantilla proporcionada. Asegúrate de usar comas (,) como separadores, no punto y coma (;).";
         }
-        
+
         console.error("❌ Error en extracción:", result);
         throw new Error(errorMsg);
       }
@@ -196,9 +188,9 @@ export default function ImportEmployees() {
       console.error("❌ ERROR EN:", currentStep);
       console.error("❌ Error completo:", error);
       console.error("❌ Stack:", error.stack);
-      
+
       let userMessage = "";
-      
+
       if (error.message.includes("Timeout")) {
         userMessage = "El proceso está tardando demasiado. Intenta con un archivo más pequeño o con menos empleados.";
       } else if (error.message.includes("network") || error.message.includes("fetch") || error.message.includes("Failed to fetch")) {
@@ -210,7 +202,7 @@ export default function ImportEmployees() {
       } else {
         userMessage = `Error: ${error.message || "Ocurrió un problema desconocido"}`;
       }
-      
+
       setUploadError(userMessage);
       setUploadProgress("");
       toast.error(userMessage, { id: "upload", duration: 10000 });
@@ -235,16 +227,16 @@ export default function ImportEmployees() {
     onSuccess: (result) => {
       console.log("Importación exitosa, resultado:", result);
       const count = Array.isArray(result) ? result.length : (result ? 1 : 0);
-      
+
       queryClient.invalidateQueries(["allEmployees"]);
-      
+
       setImportResult({
         success: true,
         count: count
       });
-      
+
       toast.success(`✓ ${count} empleados importados exitosamente`, { id: "import", duration: 5000 });
-      
+
       // Limpiar vista previa después de un breve delay
       setTimeout(() => {
         setPreviewData(null);
@@ -265,7 +257,7 @@ export default function ImportEmployees() {
     const errors = [];
     const validatedEmployees = employees.map((emp, index) => {
       const validated = { ...emp };
-      
+
       // Validar campos requeridos
       if (!validated.employee_code) {
         errors.push(`Fila ${index + 1}: Falta código de empleado`);
@@ -279,18 +271,18 @@ export default function ImportEmployees() {
       if (!validated.last_name) {
         errors.push(`Fila ${index + 1}: Falta apellido`);
       }
-      
+
       // Validar y limpiar número de documento
       if (validated.document_number) {
         validated.document_number = String(validated.document_number).replace(/\D/g, '');
         const maxLength = validated.document_type === 'DNI' ? 8 : 20;
         validated.document_number = validated.document_number.slice(0, maxLength);
-        
+
         if (validated.document_type === 'DNI' && validated.document_number.length !== 8) {
           errors.push(`Fila ${index + 1}: DNI debe tener 8 dígitos (tiene ${validated.document_number.length})`);
         }
       }
-      
+
       // Validar y limpiar teléfonos (no son obligatorios, solo si existen)
       if (validated.mobile) {
         validated.mobile = String(validated.mobile).replace(/\D/g, '').slice(0, 9);
@@ -301,7 +293,7 @@ export default function ImportEmployees() {
       if (validated.emergency_contact_phone) {
         validated.emergency_contact_phone = String(validated.emergency_contact_phone).replace(/\D/g, '').slice(0, 9);
       }
-      
+
       // Validar y limpiar cuentas bancarias (no obligatorias)
       if (validated.bank_account) {
         validated.bank_account = String(validated.bank_account).replace(/\D/g, '').slice(0, 20);
@@ -316,7 +308,7 @@ export default function ImportEmployees() {
       if (validated.cts_account_number) {
         validated.cts_account_number = String(validated.cts_account_number).replace(/\D/g, '').slice(0, 20);
       }
-      
+
       // Validar CUSPP solo si hay sistema de pensiones AFP
       if (validated.cuspp) {
         validated.cuspp = String(validated.cuspp).replace(/\D/g, '');
@@ -324,22 +316,22 @@ export default function ImportEmployees() {
           errors.push(`Fila ${index + 1}: CUSPP de AFP debe tener 12 dígitos (tiene ${validated.cuspp.length})`);
         }
       }
-      
+
       return validated;
     });
-    
+
     console.log("Validación completada:", {
       total: employees.length,
       errores: errors.length,
       validados: validatedEmployees.length
     });
-    
+
     return { validatedEmployees, errors };
   };
 
   const handleImport = async () => {
     console.log("🔵 handleImport llamado");
-    
+
     if (!previewData || previewData.length === 0) {
       toast.error("No hay datos para importar");
       return;
@@ -347,7 +339,7 @@ export default function ImportEmployees() {
 
     console.log("🚀 Iniciando importación de", previewData.length, "empleados");
     console.log("Datos a importar:", previewData);
-    
+
     // Importar directamente sin validación estricta - solo limpieza
     const cleanedEmployees = previewData.map(emp => ({
       ...emp,
@@ -365,13 +357,13 @@ export default function ImportEmployees() {
       emergency_contact_phone: emp.emergency_contact_phone ? String(emp.emergency_contact_phone).replace(/\D/g, '') : undefined,
     }));
 
-    console.log("✅ Datos limpiados, ejecutando importación...");
-    
+    console.log("Datos limpiados, ejecutando importación...");
+
     try {
       await importMutation.mutateAsync(cleanedEmployees);
-      console.log("✅ Importación completada exitosamente");
+      console.log("Importación completada exitosamente");
     } catch (error) {
-      console.error("❌ Error al ejecutar mutación:", error);
+      console.error("Error al ejecutar mutación:", error);
       toast.error("Error en la importación: " + error.message);
     }
   };

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import React, { useState } from "react";
+import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,39 +16,16 @@ import { es } from "date-fns/locale";
 import { createPageUrl } from "../utils";
 
 export default function Payslips() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [searchTerm, setSearchTerm] = useState("");
   const [yearFilter, setYearFilter] = useState("all");
   const [selectedPayslip, setSelectedPayslip] = useState(null);
-
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        // const employees = await base44.entities.Employee.filter({
-        const employees = await entitiesAPI.Employee.filter({
-          work_email: user.email
-        });
-
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
 
   const { data: payslips = [], isLoading } = useQuery({
     queryKey: ["payslips", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return [];
-      // return await base44.entities.Payslip.filter(
       return await entitiesAPI.Payslip.filter(
         { employee_id: employee.id },
         "-year,-month"

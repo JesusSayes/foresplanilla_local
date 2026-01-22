@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import React, { useState } from "react";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { 
-  Calendar, Plus, Edit, Trash2, Bell, FileText, 
+import {
+  Calendar, Plus, Edit, Trash2, Bell, FileText,
   CheckCircle, AlertTriangle, Settings
 } from "lucide-react";
 import { format, addDays, differenceInDays, addMonths } from "date-fns";
@@ -17,8 +18,8 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 
 export default function ContractRenewalAutomation() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [showRuleForm, setShowRuleForm] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
   const [ruleData, setRuleData] = useState({
@@ -36,51 +37,30 @@ export default function ContractRenewalAutomation() {
 
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
-
   const { data: rules = [] } = useQuery({
     queryKey: ["contractRenewalRules"],
     queryFn: async () => {
-      return await base44.entities.ContractRenewalRule.list("-created_date");
+      return await entitiesAPI.ContractRenewalRule.list("-created_date");
     },
   });
 
   const { data: contracts = [] } = useQuery({
     queryKey: ["allContracts"],
     queryFn: async () => {
-      return await base44.entities.Contract.list("-created_date");
+      return await entitiesAPI.Contract.list("-created_date");
     },
   });
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
 
   const createRuleMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.ContractRenewalRule.create(data);
+      return await entitiesAPI.ContractRenewalRule.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contractRenewalRules"]);
@@ -91,7 +71,7 @@ export default function ContractRenewalAutomation() {
 
   const updateRuleMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.ContractRenewalRule.update(id, data);
+      return await entitiesAPI.ContractRenewalRule.update(id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contractRenewalRules"]);
@@ -102,7 +82,7 @@ export default function ContractRenewalAutomation() {
 
   const deleteRuleMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.ContractRenewalRule.delete(id);
+      return await entitiesAPI.ContractRenewalRule.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contractRenewalRules"]);
@@ -112,7 +92,7 @@ export default function ContractRenewalAutomation() {
 
   const createDraftContractMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.Contract.create(data);
+      return await entitiesAPI.Contract.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["allContracts"]);
@@ -122,7 +102,7 @@ export default function ContractRenewalAutomation() {
 
   const createNotificationMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.Notification.create(data);
+      return await entitiesAPI.Notification.create(data);
     },
     onSuccess: () => {
       toast.success("Notificación enviada");

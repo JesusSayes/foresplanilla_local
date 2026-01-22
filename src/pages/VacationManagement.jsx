@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,69 +8,60 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { 
-  Calendar, Users, CheckCircle, XCircle, Clock, 
+import {
+  Calendar, Users, CheckCircle, XCircle, Clock,
   TrendingUp, AlertCircle, Search, FileText, Eye
 } from "lucide-react";
 import { format, differenceInDays, addYears } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { createPageUrl } from "../utils";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function VacationManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
   const queryClient = useQueryClient();
 
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
+
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
 
   const { data: vacationRequests = [] } = useQuery({
     queryKey: ["vacationRequests"],
     queryFn: async () => {
-      return await base44.entities.VacationRequest.list("-created_date");
+      return await entitiesAPI.VacationRequest.list("-created_date");
     },
   });
 
   const { data: vacationBalances = [] } = useQuery({
     queryKey: ["vacationBalances"],
     queryFn: async () => {
-      return await base44.entities.VacationBalance.list("-created_date");
+      return await entitiesAPI.VacationBalance.list("-created_date");
     },
   });
 
   const calculateVacationBalance = (emp) => {
     const empBalance = vacationBalances.find(vb => vb.employee_id === emp.id && vb.is_active);
-    
+
     if (empBalance) {
       return {
         total: empBalance.total_entitled_days,
@@ -96,7 +88,7 @@ export default function VacationManagement() {
 
   const createVacationBalanceMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.VacationBalance.create(data);
+      return await entitiesAPI.VacationBalance.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["vacationBalances"]);
@@ -332,9 +324,9 @@ export default function VacationManagement() {
                               </Badge>
                             </div>
                           </div>
-                          
+
                           <Progress value={percentage} className="h-2" />
-                          
+
                           <div className="grid grid-cols-4 gap-3 text-xs">
                             <div className="bg-slate-50 rounded p-2 text-center">
                               <p className="text-slate-600 mb-1">Total</p>
@@ -487,11 +479,11 @@ export default function VacationManagement() {
 
       {/* Employee Detail Modal */}
       {selectedEmployee && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
           onClick={() => setSelectedEmployee(null)}
         >
-          <Card 
+          <Card
             className="max-w-2xl w-full"
             onClick={(e) => e.stopPropagation()}
           >
@@ -509,7 +501,7 @@ export default function VacationManagement() {
               {(() => {
                 const balance = calculateVacationBalance(selectedEmployee);
                 const empRequests = vacationRequests.filter(r => r.employee_id === selectedEmployee.id);
-                
+
                 return (
                   <div className="space-y-6">
                     <div className="bg-blue-50 rounded-lg p-4">

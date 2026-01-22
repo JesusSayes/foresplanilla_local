@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import React, { useState } from "react";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { 
-  Award, Download, FileText, Plus, Clock, 
+import {
+  Award, Download, FileText, Plus, Clock,
   CheckCircle, AlertCircle, Calendar
 } from "lucide-react";
 import { format } from "date-fns";
@@ -17,8 +18,8 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 
 export default function Certificates() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestType, setRequestType] = useState("Certificado de Trabajo");
   const [requestDescription, setRequestDescription] = useState("");
@@ -27,31 +28,10 @@ export default function Certificates() {
 
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
-
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
     enabled: employee?.role === "admin",
   });
@@ -62,7 +42,7 @@ export default function Certificates() {
     queryKey: ["certificates", targetEmployeeId],
     queryFn: async () => {
       if (!targetEmployeeId) return [];
-      return await base44.entities.Certificate.filter(
+      return await entitiesAPI.Certificate.filter(
         { employee_id: targetEmployeeId },
         "-created_date"
       );
@@ -72,7 +52,7 @@ export default function Certificates() {
 
   const requestCertificateMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.Certificate.create(data);
+      return await entitiesAPI.Certificate.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["certificates"]);

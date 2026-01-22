@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import React, { useState } from "react";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
+import {
   FileText, Plus, Edit, Download, Search, Calendar,
   CheckCircle, AlertCircle, XCircle, Users, Star
 } from "lucide-react";
@@ -19,8 +20,8 @@ import { toast } from "sonner";
 import { generateContractPDF } from "../components/contracts/ContractTemplate";
 
 export default function ContractManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [showForm, setShowForm] = useState(false);
   const [editingContract, setEditingContract] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -34,38 +35,17 @@ export default function ContractManagement() {
 
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
-
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
 
   const { data: positions = [] } = useQuery({
     queryKey: ["positions"],
     queryFn: async () => {
-      const allPositions = await base44.entities.Position.list("name");
+      const allPositions = await entitiesAPI.Position.list("name");
       return allPositions.filter(p => p.is_active);
     },
   });
@@ -73,7 +53,7 @@ export default function ContractManagement() {
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
-      const allDepartments = await base44.entities.Department.list("name");
+      const allDepartments = await entitiesAPI.Department.list("name");
       return allDepartments.filter(d => d.is_active);
     },
   });
@@ -81,7 +61,7 @@ export default function ContractManagement() {
   const { data: sites = [] } = useQuery({
     queryKey: ["sites"],
     queryFn: async () => {
-      const allSites = await base44.entities.Site.list("name");
+      const allSites = await entitiesAPI.Site.list("name");
       return allSites.filter(s => s.is_active);
     },
   });
@@ -89,14 +69,14 @@ export default function ContractManagement() {
   const { data: contracts = [], isLoading } = useQuery({
     queryKey: ["contracts"],
     queryFn: async () => {
-      return await base44.entities.Contract.list("-created_date");
+      return await entitiesAPI.Contract.list("-created_date");
     },
   });
 
   const { data: contractTemplates = [] } = useQuery({
     queryKey: ["contractTemplates"],
     queryFn: async () => {
-      const templates = await base44.entities.ContractTemplate.list("-created_date");
+      const templates = await entitiesAPI.ContractTemplate.list("-created_date");
       return templates.filter(t => t.is_active);
     },
     enabled: !!employee,
@@ -108,7 +88,7 @@ export default function ContractManagement() {
   const { data: companyInfo } = useQuery({
     queryKey: ["companyInfo"],
     queryFn: async () => {
-      const info = await base44.entities.CompanyInfo.list("-created_date");
+      const info = await entitiesAPI.CompanyInfo.list("-created_date");
       return info.length > 0 ? info[0] : null;
     },
     enabled: !!employee,
@@ -119,15 +99,15 @@ export default function ContractManagement() {
       // Generar número de contrato automáticamente si no existe
       if (!data.contract_number) {
         const year = new Date().getFullYear();
-        const existingContracts = await base44.entities.Contract.list("-created_date");
-        const contractsThisYear = existingContracts.filter(c => 
+        const existingContracts = await entitiesAPI.Contract.list("-created_date");
+        const contractsThisYear = existingContracts.filter(c =>
           c.contract_number?.startsWith(`CTR-${year}`)
         );
         const nextNumber = contractsThisYear.length + 1;
         data.contract_number = `CTR-${year}-${String(nextNumber).padStart(3, '0')}`;
       }
-      
-      return await base44.entities.Contract.create(data);
+
+      return await entitiesAPI.Contract.create(data);
     },
     onSuccess: (newContract) => {
       queryClient.invalidateQueries(["contracts"]);
@@ -141,7 +121,7 @@ export default function ContractManagement() {
 
   const updateContractMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.Contract.update(id, data);
+      return await entitiesAPI.Contract.update(id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contracts"]);
@@ -155,7 +135,7 @@ export default function ContractManagement() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }) => {
-      return await base44.entities.Contract.update(id, { status });
+      return await entitiesAPI.Contract.update(id, { status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contracts"]);
@@ -282,8 +262,8 @@ export default function ContractManagement() {
 
     try {
       // Recargar plantillas y datos de empresa antes de generar PDF
-      const templates = await base44.entities.ContractTemplate.list("-created_date");
-      
+      const templates = await entitiesAPI.ContractTemplate.list("-created_date");
+
       // Buscar la plantilla específica del contrato o usar la default
       let template = null;
       if (contract.template_id) {

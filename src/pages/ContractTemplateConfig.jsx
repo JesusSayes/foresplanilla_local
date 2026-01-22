@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -82,31 +82,13 @@ export default function ContractTemplateConfig() {
 
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
 
   const { data: companyInfo } = useQuery({
     queryKey: ["companyInfo"],
     queryFn: async () => {
-      const info = await base44.entities.CompanyInfo.list("-created_date");
+      const info = await entitiesAPI.CompanyInfo.list("-created_date");
       return info.length > 0 ? info[0] : null;
     },
     enabled: !!employee,
@@ -115,7 +97,7 @@ export default function ContractTemplateConfig() {
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["contractTemplates"],
     queryFn: async () => {
-      return await base44.entities.ContractTemplate.list("-created_date");
+      return await entitiesAPI.ContractTemplate.list("-created_date");
     },
     enabled: !!employee,
   });
@@ -123,21 +105,20 @@ export default function ContractTemplateConfig() {
   const { data: clauses = [] } = useQuery({
     queryKey: ["contractClauses"],
     queryFn: async () => {
-      return await base44.entities.ContractClause.list("order");
+      return await entitiesAPI.ContractClause.list("order");
     },
     enabled: !!employee,
   });
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      // Si esta plantilla se marca como default, quitar el default de las demás
       if (data.is_default) {
         const currentDefault = templates.find(t => t.is_default);
         if (currentDefault) {
-          await base44.entities.ContractTemplate.update(currentDefault.id, { is_default: false });
+          await entitiesAPI.ContractTemplate.update(currentDefault.id, { is_default: false });
         }
       }
-      return await base44.entities.ContractTemplate.create(data);
+      return await entitiesAPI.ContractTemplate.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contractTemplates"]);
@@ -155,10 +136,10 @@ export default function ContractTemplateConfig() {
       if (data.is_default) {
         const currentDefault = templates.find(t => t.is_default && t.id !== id);
         if (currentDefault) {
-          await base44.entities.ContractTemplate.update(currentDefault.id, { is_default: false });
+          await entitiesAPI.ContractTemplate.update(currentDefault.id, { is_default: false });
         }
       }
-      return await base44.entities.ContractTemplate.update(id, data);
+      return await entitiesAPI.ContractTemplate.update(id, data);
     },
     onSuccess: async () => {
       // Actualizar todas las plantillas existentes con los nuevos datos de empresa
@@ -168,17 +149,17 @@ export default function ContractTemplateConfig() {
           company_ruc: companyInfo.ruc || "",
           company_address: companyInfo.address || "",
           company_representative: companyInfo.legal_representative || "",
-          company_representative_doc: companyInfo.legal_representative_dni 
+          company_representative_doc: companyInfo.legal_representative_dni
             ? `DNI ${companyInfo.legal_representative_dni}` : "",
         };
-        
+
         // Actualizar todas las plantillas en paralelo
-        const updatePromises = templates.map(t => 
-          base44.entities.ContractTemplate.update(t.id, updatedCompanyData)
+        const updatePromises = templates.map(t =>
+          entitiesAPI.ContractTemplate.update(t.id, updatedCompanyData)
         );
         await Promise.all(updatePromises);
       }
-      
+
       queryClient.invalidateQueries(["contractTemplates"]);
       toast.success("Plantilla actualizada correctamente");
       resetForm();
@@ -190,7 +171,7 @@ export default function ContractTemplateConfig() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.ContractTemplate.delete(id);
+      return await entitiesAPI.ContractTemplate.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contractTemplates"]);
@@ -205,10 +186,10 @@ export default function ContractTemplateConfig() {
     mutationFn: async (templateId) => {
       // Quitar el default de todas
       for (const t of templates.filter(t => t.is_default)) {
-        await base44.entities.ContractTemplate.update(t.id, { is_default: false });
+        await entitiesAPI.ContractTemplate.update(t.id, { is_default: false });
       }
       // Establecer el nuevo default
-      return await base44.entities.ContractTemplate.update(templateId, { is_default: true });
+      return await entitiesAPI.ContractTemplate.update(templateId, { is_default: true });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contractTemplates"]);
@@ -218,7 +199,7 @@ export default function ContractTemplateConfig() {
 
   const createClauseMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.ContractClause.create(data);
+      return await entitiesAPI.ContractClause.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contractClauses"]);
@@ -229,7 +210,7 @@ export default function ContractTemplateConfig() {
 
   const updateClauseMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.ContractClause.update(id, data);
+      return await entitiesAPI.ContractClause.update(id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contractClauses"]);
@@ -240,7 +221,7 @@ export default function ContractTemplateConfig() {
 
   const deleteClauseMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.ContractClause.delete(id);
+      return await entitiesAPI.ContractClause.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contractClauses"]);

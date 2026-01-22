@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import React, { useState } from "react";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { 
-  Calendar as CalendarIcon, Plus, Clock, CheckCircle, 
+import {
+  Calendar as CalendarIcon, Plus, Clock, CheckCircle,
   XCircle, AlertCircle, Upload, FileText, Trash2
 } from "lucide-react";
 import { format, differenceInBusinessDays, differenceInDays } from "date-fns";
@@ -18,8 +19,8 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 
 export default function VacationRequest() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [showForm, setShowForm] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
@@ -33,31 +34,10 @@ export default function VacationRequest() {
 
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
-
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
     enabled: employee?.role === "admin",
   });
@@ -68,7 +48,7 @@ export default function VacationRequest() {
     queryKey: ["vacationBalance", targetEmployeeId],
     queryFn: async () => {
       if (!targetEmployeeId) return null;
-      const balances = await base44.entities.VacationBalance.filter(
+      const balances = await entitiesAPI.VacationBalance.filter(
         { employee_id: targetEmployeeId, is_active: true },
         "-period_start",
         1
@@ -82,7 +62,7 @@ export default function VacationRequest() {
     queryKey: ["vacationRequests", targetEmployeeId],
     queryFn: async () => {
       if (!targetEmployeeId) return [];
-      return await base44.entities.VacationRequest.filter(
+      return await entitiesAPI.VacationRequest.filter(
         { employee_id: targetEmployeeId },
         "-created_date"
       );
@@ -92,7 +72,7 @@ export default function VacationRequest() {
 
   const createRequestMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.VacationRequest.create(data);
+      return await entitiesAPI.VacationRequest.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["vacationRequests"]);
@@ -108,7 +88,7 @@ export default function VacationRequest() {
 
   const deleteRequestMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.VacationRequest.delete(id);
+      return await entitiesAPI.VacationRequest.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["vacationRequests"]);
