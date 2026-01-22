@@ -3,13 +3,16 @@ import { appParams } from '@/lib/app-params';
 
 const { appId, token, functionsVersion } = appParams;
 
-export const base44 = createClient({
-  appId,
-  token,
-  functionsVersion,
-  serverUrl: '',
-  requiresAuth: false,
-  analytics: {
-    enabled: false
-  }
-});
+// export const base44 = createClient({
+  // appId,
+  // token,
+  // functionsVersion,
+  // serverUrl: '',
+  // requiresAuth: false,
+  // analytics: {
+    // enabled: false
+  // }
+// });
+
+//TEMPORAL: desactivar SDK
+export const base44 = null;

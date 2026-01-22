@@ -632,16 +632,44 @@ export default function EmployeeManagement() {
     ? [...new Set(ubigeos.filter(u => u.departamento === selectedDepartamento && u.provincia === selectedProvincia).map(u => u.distrito))].sort()
     : [];
 
+  // const filteredEmployees = allEmployees.filter(emp => {
+    // const matchesSearch = emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          // emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          // emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          // emp.document_number.includes(searchTerm);
+    // const matchesStatus = statusFilter === "all" || emp.status === statusFilter;
+    // const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
+    // const matchesSite = siteFilter === "all" || emp.site === siteFilter || (siteFilter === "sin_sede" && !emp.site);
+    // return matchesSearch && matchesStatus && matchesDept && matchesSite;
+  // });
   const filteredEmployees = allEmployees.filter(emp => {
-    const matchesSearch = emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          emp.document_number.includes(searchTerm);
-    const matchesStatus = statusFilter === "all" || emp.status === statusFilter;
-    const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
-    const matchesSite = siteFilter === "all" || emp.site === siteFilter || (siteFilter === "sin_sede" && !emp.site);
+    const search = (searchTerm || '').toLowerCase();
+
+    const firstName = (emp.first_name || '').toLowerCase();
+    const lastName = (emp.last_name || '').toLowerCase();
+    const employeeCode = (emp.employee_code || '').toLowerCase();
+    const documentNumber = (emp.document_number || '').toLowerCase();
+
+    const matchesSearch =
+      firstName.includes(search) ||
+      lastName.includes(search) ||
+      employeeCode.includes(search) ||
+      documentNumber.includes(search);
+
+    const matchesStatus =
+      statusFilter === "all" || emp.status === statusFilter;
+
+    const matchesDept =
+      departmentFilter === "all" || emp.department_name === departmentFilter;
+
+    const matchesSite =
+      siteFilter === "all" ||
+      emp.site === siteFilter ||
+      (siteFilter === "sin_sede" && !emp.site);
+
     return matchesSearch && matchesStatus && matchesDept && matchesSite;
   });
+
 
   const getStatusConfig = (status) => {
     const configs = {

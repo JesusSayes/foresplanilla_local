@@ -19,7 +19,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    console.log('🔍 Intentando login con email:', email);
+    console.log('Intentando login con email:', email);
 
     // Buscar usuario por email
     const result = await query(
@@ -27,7 +27,7 @@ router.post('/login', async (req, res) => {
       [email.toLowerCase()]
     );
 
-    console.log('📊 Usuarios encontrados:', result.rows.length);
+    console.log('Usuarios encontrados:', result.rows.length);
 
     if (result.rows.length === 0) {
       return res.status(401).json({
@@ -37,11 +37,11 @@ router.post('/login', async (req, res) => {
     }
 
     const user = result.rows[0];
-    console.log('👤 Usuario encontrado:', user.email, '| Hash existe:', !!user.password_hash);
+    console.log('Usuario encontrado:', user.email, '| Hash existe:', !!user.password_hash);
 
     // Verificar contraseña
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
-    console.log('🔐 Contraseña válida:', isValidPassword);
+    console.log('Contraseña válida:', isValidPassword);
 
     if (!isValidPassword) {
       return res.status(401).json({
@@ -85,54 +85,97 @@ router.post('/login', async (req, res) => {
 });
 
 // GET /api/auth/me - Obtener usuario actual
+// router.get('/me', authenticateToken, async (req, res) => {
+  // try {
+    // const user = await prisma.users.findUnique({
+      // where: { id: req.user.userId },
+      // select: {
+        // id: true,
+        // email: true,
+        // full_name: true,
+        // role: true,
+        // is_active: true,
+        // created_at: true,
+        // updated_at: true
+      // }
+    // });
+
+    // if (!user) {
+      // return res.status(404).json({ error: 'Usuario no encontrado' });
+    // }
+
+    // NUEVO: Buscar empleado asociado
+    // const employee = await prisma.employee.findFirst({
+      // where: { work_email: user.email },
+      // select: {
+        // id: true,
+        // employee_code: true,
+        // first_name: true,
+        // last_name: true,
+        // role: true,
+        // status: true,
+        // position_name: true,
+        // department_name: true
+      // }
+    // });
+
+    // res.json({
+      // user: {
+        // ...user,
+        // employee: employee || null  // Incluir datos de empleado
+      // }
+    // });
+  // } catch (error) {
+    // console.error('Error en /me:', error);
+    // res.status(500).json({ error: 'Error al obtener usuario' });
+  // }
+// });
+// GET /api/auth/me - Obtener usuario actual
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    // Obtener datos del usuario
+    // Obtener datos del usuario desde la tabla users
     const userResult = await query(
-      'SELECT id, email, full_name, role, is_active, created_at FROM users WHERE id = $1 AND is_active = true',
-      [req.user.userId]
+      'SELECT id, email, full_name, role, is_active, created_at, updated_at FROM users WHERE id = $1',
+      [req.user.userId]  // viene del JWT (authenticateToken)
     );
 
     if (userResult.rows.length === 0) {
-      return res.status(404).json({
-        error: 'Usuario no encontrado',
-        message: 'El usuario no existe o está inactivo'
-      });
+      return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
     const user = userResult.rows[0];
 
-    // Obtener datos del empleado asociado
+    // Buscar empleado asociado por correo (work_email)
     const employeeResult = await query(
-      'SELECT * FROM employee WHERE work_email = $1 OR personal_email = $1',
+      `SELECT
+         id,
+         employee_code,
+         first_name,
+         last_name,
+         role,
+         status,
+         department_name
+       FROM employee
+       WHERE work_email = $1
+       LIMIT 1`,
       [user.email]
     );
 
-    // Construir respuesta
-    const response = {
-      id: user.id,
-      email: user.email,
-      full_name: user.full_name,
-      role: user.role,
-      is_active: user.is_active,
-      created_at: user.created_at
-    };
+    const employee = employeeResult.rows[0] || null;
 
-    // Agregar datos del empleado si existe
-    if (employeeResult.rows.length > 0) {
-      response.employee = employeeResult.rows[0];
-    }
-
-    res.json(response);
-
+    // Responder con user + employee
+    res.json({
+      user: {
+        ...user,
+        employee,
+      },
+    });
   } catch (error) {
     console.error('Error en /me:', error);
-    res.status(500).json({
-      error: 'Error del servidor',
-      message: 'Ocurrió un error al obtener los datos del usuario'
-    });
+    res.status(500).json({ error: 'Error al obtener usuario' });
   }
 });
+
 
 // POST /api/auth/logout - Cerrar sesión (opcional, el logout es del lado del cliente)
 router.post('/logout', authenticateToken, (req, res) => {

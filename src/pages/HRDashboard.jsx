@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+// import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Users, TrendingUp, TrendingDown, Clock, Calendar, 
-  AlertCircle, CheckCircle, FileText, Briefcase, 
+import {
+  Users, TrendingUp, TrendingDown, Clock, Calendar,
+  AlertCircle, CheckCircle, FileText, Briefcase,
   DollarSign, UserCheck, UserX, ChevronRight, ArrowRight,
   CalendarDays, Shield, Database, Settings
 } from "lucide-react";
@@ -18,57 +20,73 @@ import PermissionGuard from "../components/PermissionGuard";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function HRDashboard() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  // const [currentUser, setCurrentUser] = useState(null);
+  // const [employee, setEmployee] = useState(null);
+
+  // useEffect(() => {
+    // const loadUserData = async () => {
+      // try {
+        // const user = await base44.auth.me();
+        // setCurrentUser(user);
+
+        // const employees = await base44.entities.Employee.filter({
+          // work_email: user.email
+        // });
+
+        // if (employees && employees.length > 0) {
+          // setEmployee(employees[0]);
+
+          // Ejecutar actualización automática de estados de empleados (solo para admin)
+          // if (employees[0].role === "admin" || employees[0].role === "super_admin") {
+            // updateEmployeeStatuses().then(result => {
+              // if (result.success && result.updatedCount > 0) {
+                // console.log(`✅ ${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
+              // }
+            // });
+          // }
+        // }
+      // } catch (error) {
+        // console.error("Error loading user:", error);
+      // }
+    // };
+
+    // loadUserData();
+  // }, []);
+
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-          
-          // Ejecutar actualización automática de estados de empleados (solo para admin)
-          if (employees[0].role === "admin" || employees[0].role === "super_admin") {
-            updateEmployeeStatuses().then(result => {
-              if (result.success && result.updatedCount > 0) {
-                console.log(`✅ ${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
-              }
-            });
-          }
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.list("-created_date");
+      // return await base44.entities.Employee.list("-created_date");
+      return await entitiesAPI.Employee.list("-created_date");
     },
   });
 
   const { data: attendanceRecords = [] } = useQuery({
     queryKey: ["allAttendanceRecords"],
     queryFn: async () => {
-      return await base44.entities.AttendanceRecord.list("-date", 1000);
+      // return await base44.entities.AttendanceRecord.list("-date", 1000);
+      return await entitiesAPI.AttendanceRecord.list("-date", 1000);
     },
   });
 
   const { data: pendingIncidents = [] } = useQuery({
     queryKey: ["pendingIncidents"],
     queryFn: async () => {
-      return await base44.entities.AttendanceIncident.filter(
+      // return await base44.entities.AttendanceIncident.filter(
+      return await entitiesAPI.AttendanceIncident.filter(
         { status: "Pendiente" },
         "-created_date"
       );
@@ -78,21 +96,24 @@ export default function HRDashboard() {
   const { data: vacationRequests = [] } = useQuery({
     queryKey: ["allVacationRequests"],
     queryFn: async () => {
-      return await base44.entities.VacationRequest.list("-created_date", 200);
+      // return await base44.entities.VacationRequest.list("-created_date", 200);
+      return await entitiesAPI.VacationRequest.list("-created_date", 200);
     },
   });
 
   const { data: payslips = [] } = useQuery({
     queryKey: ["allPayslips"],
     queryFn: async () => {
-      return await base44.entities.Payslip.list("-created_date", 500);
+      // return await base44.entities.Payslip.list("-created_date", 500);
+      return await entitiesAPI.Payslip.list("-created_date", 500);
     },
   });
 
   const { data: contracts = [] } = useQuery({
     queryKey: ["allContracts"],
     queryFn: async () => {
-      return await base44.entities.Contract.list("-created_date");
+      // return await base44.entities.Contract.list("-created_date");
+      return await entitiesAPI.Contract.list("-created_date");
     },
   });
 
@@ -100,13 +121,13 @@ export default function HRDashboard() {
   const calculateMetrics = () => {
     const activeEmployees = allEmployees.filter(e => e.status === "Activo");
     const totalEmployees = allEmployees.length;
-    
+
     // Rotación de personal (últimos 3 meses)
     const threeMonthsAgo = subMonths(new Date(), 3);
-    const recentTerminations = allEmployees.filter(e => 
+    const recentTerminations = allEmployees.filter(e =>
       e.status === "Cesado" && e.updated_date && new Date(e.updated_date) >= threeMonthsAgo
     ).length;
-    const turnoverRate = activeEmployees.length > 0 
+    const turnoverRate = activeEmployees.length > 0
       ? ((recentTerminations / activeEmployees.length) * 100).toFixed(1)
       : 0;
 
