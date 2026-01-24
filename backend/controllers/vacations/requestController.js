@@ -3,12 +3,24 @@ const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
   try {
-    const requests = await prisma.vacationRequest.findMany({
-      include: { employee: true },
-      orderBy: { createdAt: 'desc' }
+    // const { sort = '-created_date' } = req.query;
+    // const desc = sort.startsWith('-');
+    // const field = sort.replace('-', '');
+
+    // mapea nombre lógico a campo real del modelo - actualizar tabla
+    // const sortField =
+      // field === 'created_date' ? 'created_date' :
+      // field === 'request_date' ? 'request_date' :
+      // field;
+    const sortField = 'id';
+
+    const requests = await prisma.vacatin_request.findMany({
+      // orderBy: { [sortField]: desc ? 'desc' : 'asc' },
+      orderBy: { [sortField]: 'desc' },
     });
     res.json(requests);
   } catch (error) {
+    console.error('Error obteniendo vacation requests', error);
     res.status(500).json({ error: error.message });
   }
 };

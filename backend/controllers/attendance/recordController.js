@@ -3,16 +3,21 @@ const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
   try {
-    const records = await prisma.attendanceRecord.findMany({
-      include: {
-        employee: true,
-        schedule: true,
-        incidents: true
-      },
+    const { sort = '-date' } = req.query;
+    const desc = sort.startsWith('-');
+    const field = sort.replace('-', '');
+
+    const records = await prisma.attendance_record.findMany({
+      // include: {
+        // employee: true,
+        // schedule: true,
+        // incidents: true
+      // },
       orderBy: { date: 'desc' }
     });
     res.json(records);
   } catch (error) {
+    console.error('Error obteniendo attendance record', error);
     res.status(500).json({ error: error.message });
   }
 };

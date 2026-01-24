@@ -1,14 +1,28 @@
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
+const MODEL = prisma.payslip;
+
 export const getAll = async (req, res) => {
   try {
-    const payslips = await prisma.payslip.findMany({
-      include: { employee: true },
-      orderBy: [{ year: 'desc' }, { month: 'desc' }]
+    // const { sort = '-created_date' } = req.query;
+
+    // const desc = sort.startsWith('-');
+    // const field = sort.replace('-', '');
+
+    // const sortField =
+      // field === 'created_date' ? 'created_date' :
+      // field === 'payment_date' ? 'payment_date' :
+      // field;
+    const desc = true;
+    const sortField = 'id'
+
+    const payslips = await MODEL.findMany({
+      orderBy: { [sortField]: desc ? 'desc' : 'asc' },
     });
     res.json(payslips);
   } catch (error) {
+    console.error('Error obteniendo payslips', error);
     res.status(500).json({ error: error.message });
   }
 };

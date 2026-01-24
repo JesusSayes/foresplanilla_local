@@ -13,6 +13,59 @@ export const getAll = async (req, res) => {
   }
 };
 
+export const filter = async (req, res) => {
+  try {
+    const { sort = '-created_date' } = req.query;
+    const filters = req.body || {};
+
+    // Mapea filtros simples a where de Prisma
+    const where = {};
+
+    if (filters.employee_id) {
+      where.employeeId = filters.employee_id;
+    }
+
+    if (filters.status) {
+      where.status = filters.status;
+    }
+
+    if (filters.incident_type) {
+      where.incident_type = filters.incident_type;
+    }
+
+    // rango de fechas (ajusta nombres de campos a tu schema)
+    if (filters.date_from || filters.date_to) {
+      where.incident_date = {};
+      if (filters.date_from) where.incident_date.gte = new Date(filters.date_from);
+      if (filters.date_to)   where.incident_date.lte = new Date(filters.date_to);
+    }
+
+    // sort: "-created_date" → createdAt desc, "created_date" → createdAt asc
+    let orderBy = { created_date: 'desc' };
+    if (sort) {
+      const desc = sort.startsWith('-');
+      const field = sort.replace('-', '');
+      // mapea nombre lógico a campo real
+      const sortField =
+        field === 'created_date' ? 'created_date' :
+        field === 'incident_date' ? 'incident_date' :
+        field; // fallback
+
+      orderBy = { [sortField]: desc ? 'desc' : 'asc' };
+    }
+
+    const incidents = await prisma.attendance_incident.findMany({
+      where,
+      orderBy
+    });
+
+    res.json(incidents);
+  } catch (error) {
+    console.error('Error filtrando incidents', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const getById =  async (req, res) => {
   try {
     const incident = await prisma.attendanceIncident.findUnique({
@@ -66,6 +119,7 @@ const controller = {
   create,
   update,
   delete: remove, // aquí sí usamos la clave "delete"
+  filter,
 }
 
 export default controller
