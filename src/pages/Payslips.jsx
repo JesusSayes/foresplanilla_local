@@ -26,7 +26,7 @@ export default function Payslips() {
     queryKey: ["payslips", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return [];
-      return await entitiesAPI.Payslip.filter(
+      return await prisma.payslip.filter(
         { employee_id: employee.id },
         "-year,-month"
       );

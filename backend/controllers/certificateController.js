@@ -29,7 +29,8 @@ export const getById =  async (req, res) => {
 export const create = async (req, res) => {
   try {
     const certificate = await prisma.certificate.create({
-      data: req.body
+      // data: req.body
+      data: {}
     });
     res.status(201).json(certificate);
   } catch (error) {

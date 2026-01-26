@@ -48,14 +48,14 @@ export default function VacationManagement() {
   const { data: vacationRequests = [] } = useQuery({
     queryKey: ["vacationRequests"],
     queryFn: async () => {
-      return await entitiesAPI.VacationRequest.list("-created_date");
+      return await entitiesAPI.Vacation_request.list("-created_date");
     },
   });
 
   const { data: vacationBalances = [] } = useQuery({
     queryKey: ["vacationBalances"],
     queryFn: async () => {
-      return await entitiesAPI.VacationBalance.list("-created_date");
+      return await entitiesAPI.vacation_balance.list("-created_date");
     },
   });
 
@@ -122,8 +122,8 @@ export default function VacationManagement() {
           is_active: true,
           deadline: format(addYears(hireDate, 2), "yyyy-MM-dd")
         });
-      }
-    }
+      };
+    };
 
     toast.success(`${employeesWithoutBalance.length} saldos inicializados`);
   };
