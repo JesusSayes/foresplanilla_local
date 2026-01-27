@@ -3,7 +3,7 @@ const prisma = new PrismaClient();
 
 export const getAll = async (req, res) => {
   try {
-    const clauses = await prisma.contractClause.findMany({
+    const clauses = await prisma.contract_clause.findMany({
       include: { contract: true },
       orderBy: { order: 'asc' }
     });
@@ -15,7 +15,7 @@ export const getAll = async (req, res) => {
 
 export const getById =  async (req, res) => {
   try{
-    const clause = await prisma.contractClause.findUnique({
+    const clause = await prisma.contract_clause.findUnique({
       where: { id: parseInt(req.params.id) },
       include: { contract: true }
     });
@@ -28,7 +28,7 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const clause = await prisma.contractClause.create({
+    const clause = await prisma.contract_clause.create({
       data: req.body
     });
     res.status(201).json(clause);
@@ -39,7 +39,7 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const clause = await prisma.contractClause.update({
+    const clause = await prisma.contract_clause.update({
       where: { id: parseInt(req.params.id) },
       data: req.body
     });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle, 
+import {
+  Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle,
   AlertCircle, Users, Search, FileText, Download, Database, History, Eye, Printer
 } from "lucide-react";
 import * as XLSX from 'xlsx';
@@ -23,8 +24,8 @@ import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
 
 export default function AttendanceManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSite, setSelectedSite] = useState("all");
@@ -54,13 +55,13 @@ export default function AttendanceManagement() {
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        const user = await base44.auth.me();
+        const user = await entitiesAPI.auth.me();
         setCurrentUser(user);
 
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
+        const employees = await base44.entities.Employee.filter({
+          work_email: user.email
         });
-        
+
         if (employees && employees.length > 0) {
           setEmployee(employees[0]);
         }
@@ -155,14 +156,14 @@ export default function AttendanceManagement() {
   useEffect(() => {
     const generateExemptClockings = async () => {
       if (!employee || employee.role !== "admin") return;
-      
+
       const result = await generateAutoClockings(selectedDate);
       if (result.success && result.recordsCreated > 0) {
         queryClient.invalidateQueries(["todayAttendance"]);
         toast.success(`✓ ${result.recordsCreated} marcación(es) automática(s) generada(s)`);
       }
     };
-    
+
     generateExemptClockings();
   }, [selectedDate, employee]);
 
@@ -244,12 +245,12 @@ export default function AttendanceManagement() {
       // Aquí iría la lógica real de importación desde la BD externa
       // Por ahora simulamos la importación
       toast.info("Iniciando importación desde base de datos externa...");
-      
+
       return new Promise((resolve) => {
         setTimeout(() => {
-          resolve({ 
-            success: true, 
-            imported: 45, 
+          resolve({
+            success: true,
+            imported: 45,
             errors: 2,
             message: "Importación completada"
           });
@@ -279,18 +280,18 @@ export default function AttendanceManagement() {
   const getEmployeeSchedule = (empId) => {
     // Buscar horario individual primero
     let schedule = workSchedules.find(s => s.employee_id === empId && s.is_active);
-    
+
     // Si no hay individual, buscar por departamento
     if (!schedule) {
       const emp = allEmployees.find(e => e.id === empId);
       if (emp?.department_name) {
-        schedule = workSchedules.find(s => 
-          s.is_active && 
+        schedule = workSchedules.find(s =>
+          s.is_active &&
           (s.departments?.includes(emp.department_name) || s.department_name === emp.department_name)
         );
       }
     }
-    
+
     return schedule;
   };
 
@@ -313,7 +314,7 @@ export default function AttendanceManagement() {
     if (clockIn && clockOut) {
       const [inHour, inMin] = clockIn.split(":").map(Number);
       const [outHour, outMin] = clockOut.split(":").map(Number);
-      
+
       // Calcular horas trabajadas (descontando 60 minutos de break)
       const totalMinutes = (outHour * 60 + outMin) - (inHour * 60 + inMin) - 60;
       workedHours = Math.max(0, totalMinutes / 60);
@@ -322,14 +323,14 @@ export default function AttendanceManagement() {
       const [schedHour, schedMin] = scheduledStart.split(":").map(Number);
       const scheduledMinutes = schedHour * 60 + schedMin;
       const actualMinutes = inHour * 60 + inMin;
-      
+
       lateMinutes = Math.max(0, actualMinutes - scheduledMinutes);
       isLate = lateMinutes > 0;
 
       // Verificar si hay horas extras sin autorización
       if (workedHours > 8 && !isOvertimeAuthorized(editingRecord.employee_id)) {
         const overtimeHours = workedHours - 8;
-        
+
         // Crear alerta de horas extras no autorizadas
         await base44.entities.OvertimeAlert.create({
           employee_id: editingRecord.employee_id,
@@ -359,8 +360,8 @@ export default function AttendanceManagement() {
 
   const handleApproveIncident = async (incident) => {
     // Actualizar el registro de asistencia con los ajustes
-    const attendanceRecord = todayRecords.find(r => 
-      r.employee_id === incident.employee_id && 
+    const attendanceRecord = todayRecords.find(r =>
+      r.employee_id === incident.employee_id &&
       r.date === incident.incident_date
     );
 
@@ -405,12 +406,12 @@ export default function AttendanceManagement() {
 
   const handleJustifyClick = (emp, record) => {
     setJustifyingEmployee(emp);
-    
+
     // Determinar el tipo de incidente basado en el estado del registro
     let incidentType = "Olvido de Marcación";
     let startTime = record?.scheduled_start || "09:00";
     let endTime = record?.scheduled_end || "18:00";
-    
+
     if (record) {
       if (record.is_absent) {
         incidentType = "Falta";
@@ -424,7 +425,7 @@ export default function AttendanceManagement() {
         endTime = record.scheduled_end || "18:00";
       }
     }
-    
+
     setJustificationData({
       incident_type: incidentType,
       justification: "",
@@ -469,14 +470,14 @@ export default function AttendanceManagement() {
     } else if (justificationData.justified_time_start && justificationData.justified_time_end) {
       const [startHour, startMin] = justificationData.justified_time_start.split(":").map(Number);
       const [endHour, endMin] = justificationData.justified_time_end.split(":").map(Number);
-      
+
       const startMinutes = startHour * 60 + startMin;
       const endMinutes = endHour * 60 + endMin;
       const totalMinutes = endMinutes - startMinutes;
-      
+
       // Calcular horas (máximo 8 horas regulares, sin extras)
       hoursToAdjust = Math.min(totalMinutes / 60, 8);
-      
+
       // Si es tardanza, calcular minutos de tardanza a ajustar
       if (justificationData.incident_type === "Tardanza") {
         const record = todayRecords.find(r => r.employee_id === justifyingEmployee.id);
@@ -484,7 +485,7 @@ export default function AttendanceManagement() {
           const scheduledStart = record.scheduled_start || "09:00";
           const [schedHour, schedMin] = scheduledStart.split(":").map(Number);
           const scheduledMinutes = schedHour * 60 + schedMin;
-          
+
           // Si el tiempo justificado cubre la tardanza
           if (startMinutes <= scheduledMinutes && endMinutes >= startMinutes) {
             lateMinutesToAdjust = record.late_minutes || 0;
@@ -516,20 +517,20 @@ export default function AttendanceManagement() {
                           emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDept = selectedDepartment === "all" || emp.department_name === selectedDepartment;
     const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
-    
+
     // Para empleados cesados, solo mostrar si tienen asistencias pasadas
     if (emp.status === "Cesado") {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const selected = new Date(selectedDate);
       selected.setHours(0, 0, 0, 0);
-      
+
       // Solo mostrar cesados si la fecha seleccionada es anterior a hoy
       if (selected >= today) {
         return false;
       }
     }
-    
+
     return matchesSearch && matchesDept && matchesSite;
   });
 
@@ -551,7 +552,7 @@ export default function AttendanceManagement() {
       const overtimeHours = Math.max(0, workedHours - 8);
       const he25 = Math.min(overtimeHours, 2);
       const he35 = Math.max(0, overtimeHours - 2);
-      
+
       return {
         'Código': emp.employee_code,
         'Nombres': emp.first_name,
@@ -572,15 +573,15 @@ export default function AttendanceManagement() {
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Asistencia');
-    
+
     const filterText = attendanceFilter === "all" ? "Todos" :
                       attendanceFilter === "sin_entrada" ? "Sin_Entrada" :
                       attendanceFilter === "sin_salida" ? "Sin_Salida" :
                       attendanceFilter === "con_tardanza" ? "Con_Tardanza" : "Filtrado";
-    
+
     const fileName = `Asistencia_${format(selectedDate, "yyyy-MM-dd")}_${filterText}.xlsx`;
     XLSX.writeFile(wb, fileName);
-    
+
     toast.success('✓ Archivo Excel generado correctamente');
   };
 
@@ -602,8 +603,8 @@ export default function AttendanceManagement() {
       <head>
         <title>Reporte de Asistencia</title>
         <style>
-          body { 
-            font-family: Arial, sans-serif; 
+          body {
+            font-family: Arial, sans-serif;
             padding: 20px;
             font-size: 12px;
           }
@@ -615,18 +616,18 @@ export default function AttendanceManagement() {
           }
           .header h1 { margin: 5px 0; font-size: 24px; }
           .header p { margin: 3px 0; color: #666; }
-          table { 
-            width: 100%; 
-            border-collapse: collapse; 
+          table {
+            width: 100%;
+            border-collapse: collapse;
             margin-top: 20px;
           }
-          th, td { 
-            border: 1px solid #ddd; 
-            padding: 8px; 
+          th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
             text-align: left;
           }
-          th { 
-            background-color: #4f46e5; 
+          th {
+            background-color: #4f46e5;
             color: white;
             font-weight: bold;
           }
@@ -653,7 +654,7 @@ export default function AttendanceManagement() {
           <p><strong>Filtro aplicado:</strong> ${filterText}</p>
           <p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p>
         </div>
-        
+
         <table>
           <thead>
             <tr>
@@ -695,11 +696,11 @@ export default function AttendanceManagement() {
             }).join('')}
           </tbody>
         </table>
-        
+
         <div class="footer">
           <p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p>
         </div>
-        
+
         <script>
           window.onload = function() {
             window.print();
@@ -765,7 +766,7 @@ export default function AttendanceManagement() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button 
+                <Button
                   variant="outline"
                   onClick={() => window.location.href = "/DatabaseConfig"}
                 >
@@ -1020,7 +1021,7 @@ export default function AttendanceManagement() {
                       const StatusIcon = statusConfig.icon;
 
                       return (
-                        <div 
+                        <div
                           key={emp.id}
                           className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all"
                         >
@@ -1029,7 +1030,7 @@ export default function AttendanceManagement() {
                               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold">
                                 {emp.first_name[0]}{emp.last_name[0]}
                               </div>
-                              
+
                               <div className="flex-1">
                                 <h4 className="font-bold text-slate-900">
                                   {emp.first_name} {emp.last_name}
@@ -1169,9 +1170,9 @@ export default function AttendanceManagement() {
                       {overtimeAlerts.map(alert => {
                         const emp = allEmployees.find(e => e.id === alert.employee_id);
                         const record = todayRecords.find(r => r.id === alert.attendance_record_id);
-                        
+
                         return (
-                          <div 
+                          <div
                             key={alert.id}
                             className="p-4 border-2 border-red-200 bg-red-50 rounded-lg"
                           >
@@ -1201,7 +1202,7 @@ export default function AttendanceManagement() {
 
                             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
                               <p className="text-sm text-yellow-900">
-                                ⚠️ Este empleado NO está autorizado para realizar horas extras. 
+                                ⚠️ Este empleado NO está autorizado para realizar horas extras.
                                 Por favor, verifica la marcación o autoriza las horas extras desde Gestión de Horarios.
                               </p>
                             </div>
@@ -1322,7 +1323,7 @@ export default function AttendanceManagement() {
                           {pendingIncidents.map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
-                              <div 
+                              <div
                                 key={incident.id}
                                 className="p-4 border border-slate-200 rounded-lg"
                               >
@@ -1419,7 +1420,7 @@ export default function AttendanceManagement() {
                           {approvedIncidents.map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
-                              <div 
+                              <div
                                 key={incident.id}
                                 className="p-4 border border-green-200 bg-green-50/30 rounded-lg"
                               >
@@ -1496,7 +1497,7 @@ export default function AttendanceManagement() {
                           {rejectedIncidents.map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
-                              <div 
+                              <div
                                 key={incident.id}
                                 className="p-4 border border-red-200 bg-red-50/30 rounded-lg"
                               >
@@ -1560,11 +1561,11 @@ export default function AttendanceManagement() {
 
         {/* Edit Record Modal */}
         {showEditModal && editingRecord && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             onClick={() => setShowEditModal(false)}
           >
-            <Card 
+            <Card
               className="max-w-2xl w-full"
               onClick={(e) => e.stopPropagation()}
             >
@@ -1573,8 +1574,8 @@ export default function AttendanceManagement() {
                   <CardTitle className="text-xl font-bold">
                     Editar Registro de Asistencia
                   </CardTitle>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="icon"
                     onClick={() => setShowEditModal(false)}
                   >
@@ -1618,7 +1619,7 @@ export default function AttendanceManagement() {
                     <label className="block text-sm font-semibold text-slate-900 mb-2">
                       Estado
                     </label>
-                    <Select 
+                    <Select
                       value={editingRecord.status}
                       onValueChange={(value) => setEditingRecord({ ...editingRecord, status: value })}
                     >
@@ -1670,14 +1671,14 @@ export default function AttendanceManagement() {
 
         {/* Review Incident Modal */}
         {showIncidentModal && reviewingIncident && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             onClick={() => {
               setShowIncidentModal(false);
               setReviewComments("");
             }}
           >
-            <Card 
+            <Card
               className="max-w-2xl w-full"
               onClick={(e) => e.stopPropagation()}
             >
@@ -1686,8 +1687,8 @@ export default function AttendanceManagement() {
                   <CardTitle className="text-xl font-bold">
                     Revisar Justificación
                   </CardTitle>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="icon"
                     onClick={() => {
                       setShowIncidentModal(false);
@@ -1769,19 +1770,19 @@ export default function AttendanceManagement() {
 
       {/* History Modal */}
       {showHistory && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
           onClick={() => {
             setShowHistory(false);
             setHistoryEmployeeId(null);
           }}
         >
-          <div 
+          <div
             className="max-w-4xl w-full"
             onClick={(e) => e.stopPropagation()}
           >
-            <IncidentHistory 
-              incidents={employeeIncidents} 
+            <IncidentHistory
+              incidents={employeeIncidents}
               isLoading={false}
               employeeName={historyEmployeeId ? allEmployees.find(e => e.id === historyEmployeeId)?.first_name + ' ' + allEmployees.find(e => e.id === historyEmployeeId)?.last_name : ""}
             />
@@ -1801,14 +1802,14 @@ export default function AttendanceManagement() {
 
       {/* Justify Modal */}
       {showJustifyModal && justifyingEmployee && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
           onClick={() => {
             setShowJustifyModal(false);
             setJustifyingEmployee(null);
           }}
         >
-          <Card 
+          <Card
             className="max-w-2xl w-full"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1820,8 +1821,8 @@ export default function AttendanceManagement() {
                     {justifyingEmployee.first_name} {justifyingEmployee.last_name} • {format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}
                   </p>
                 </div>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   onClick={() => {
                     setShowJustifyModal(false);
@@ -1838,7 +1839,7 @@ export default function AttendanceManagement() {
                   <label className="block text-sm font-semibold text-slate-900 mb-2">
                     Tipo de Incidente
                   </label>
-                  <Select 
+                  <Select
                     value={justificationData.incident_type}
                     onValueChange={(value) => setJustificationData({ ...justificationData, incident_type: value })}
                   >
@@ -1863,8 +1864,8 @@ export default function AttendanceManagement() {
                       <input
                         type="checkbox"
                         checked={justificationData.full_day_justification}
-                        onChange={(e) => setJustificationData({ 
-                          ...justificationData, 
+                        onChange={(e) => setJustificationData({
+                          ...justificationData,
                           full_day_justification: e.target.checked,
                           justified_time_start: e.target.checked ? "09:00" : justificationData.justified_time_start,
                           justified_time_end: e.target.checked ? "18:00" : justificationData.justified_time_end,
@@ -1903,7 +1904,7 @@ export default function AttendanceManagement() {
 
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <p className="text-xs text-blue-900">
-                        <strong>Nota:</strong> Las horas extras NO se ajustan con justificaciones. 
+                        <strong>Nota:</strong> Las horas extras NO se ajustan con justificaciones.
                         Solo se ajustan las horas regulares (máximo 8h) y las tardanzas.
                       </p>
                     </div>
@@ -1939,7 +1940,7 @@ export default function AttendanceManagement() {
                     {justificationData.supporting_document_url && (
                       <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
                         <FileText className="w-4 h-4 text-green-600" />
-                        <a 
+                        <a
                           href={justificationData.supporting_document_url}
                           target="_blank"
                           rel="noopener noreferrer"

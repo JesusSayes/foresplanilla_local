@@ -9,6 +9,8 @@ import contractRoutes from './routes/contracts.js';
 import userRolesRoutes from './routes/userRoles.js';
 
 import clausesRoutes from './routes/contracts/clauses.js';
+import templatesContractRoutes from './routes/contracts/templates.js';
+import renewalRulesRoutes from './routes/contracts/renewal-rules.js';
 import recordsRoutes from './routes/attendance/records.js';
 import incidentsRoutes from './routes/attendance/incidents.js';
 import schedulesRoutes from './routes/attendance/schedules.js';
@@ -61,6 +63,9 @@ app.use('/api/contracts', contractRoutes);
 app.use('/api/users/roles', userRolesRoutes);
 
 app.use('/api/contracts/clauses', clausesRoutes);
+app.use('/api/contracts/templates', templatesContractRoutes);
+app.use('/api/contracts/renewal-rules', renewalRulesRoutes);
+
 app.use('/api/attendance/records', recordsRoutes);
 app.use('/api/attendance/incidents', incidentsRoutes);
 app.use('/api/attendance/schedules', schedulesRoutes);

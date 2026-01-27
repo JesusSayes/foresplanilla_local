@@ -3,8 +3,8 @@ const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
   try {
-    const companies = await prisma.companyInfo.findMany({
-      orderBy: { createdAt: 'desc' }
+    const companies = await prisma.company_info.findMany({
+      orderBy: { created_date: 'desc' }
     });
     res.json(companies);
   } catch (error) {
@@ -14,7 +14,7 @@ export const getAll = async (req, res) => {
 
 export const getById =  async (req, res) => {
   try {
-    const company = await prisma.companyInfo.findUnique({
+    const company = await prisma.company_info.findUnique({
       where: { id: parseInt(req.params.id) }
     });
     if (!company) return res.status(404).json({ error: 'Company not found' });
@@ -26,7 +26,7 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const company = await prisma.companyInfo.create({
+    const company = await prisma.company_info.create({
       data: req.body
     });
     res.status(201).json(company);
@@ -37,7 +37,7 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const company = await prisma.companyInfo.update({
+    const company = await prisma.company_info.update({
       where: { id: parseInt(req.params.id) },
       data: req.body
     });
@@ -49,7 +49,7 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
-    await prisma.companyInfo.delete({
+    await prisma.company_info.delete({
       where: { id: parseInt(req.params.id) }
     });
     res.status(204).send();
