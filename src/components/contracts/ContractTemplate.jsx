@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { entitiesAPI } from "@/api/entitiesClient";
 
 export const generateContractPDF = async (employee, contract, companyData = {}, templateData = null) => {
   const doc = new jsPDF();
@@ -12,11 +13,13 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   // Cargar plantilla si no se proporciona
   let template = templateData;
   let customClauses = [];
-  
+
   if (!template) {
     try {
-      const { base44 } = await import("@/api/base44Client");
-      const templates = await base44.entities.ContractTemplate?.list();
+      // const { base44 } = await import("@/api/base44Client");
+      // const templates = await base44.entities.ContractTemplate?.list();
+      const templates = await entitiesAPI.ContractTemplate.list();
+
       if (templates && templates.length > 0) {
         // Si el contrato tiene una plantilla específica, usarla
         if (contract.template_id) {
@@ -24,7 +27,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
         }
         // Si no, buscar una plantilla específica para el tipo de contrato
         if (!template) {
-          template = templates.find(t => 
+          template = templates.find(t =>
             t.contract_types?.includes(contract.contract_type) && t.is_active
           );
         }
@@ -39,12 +42,13 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
       }
 
       // Cargar cláusulas personalizadas
-      const clauses = await base44.entities.ContractClause?.list("order");
+      // const clauses = await base44.entities.ContractClause?.list("order");
+      const clauses = await entitiesAPI.ContractClause.list("order")
       if (clauses && clauses.length > 0) {
-        customClauses = clauses.filter(c => 
-          c.is_active && 
-          (c.type === "obligatoria" || 
-           !c.contract_types?.length || 
+        customClauses = clauses.filter(c =>
+          c.is_active &&
+          (c.type === "obligatoria" ||
+           !c.contract_types?.length ||
            c.contract_types.includes(contract.contract_type))
         );
       }
@@ -56,8 +60,10 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   // IMPORTANTE: Cargar datos ACTUALES de la empresa desde CompanyInfo SIEMPRE
   let freshCompanyData = {};
   try {
-    const { base44 } = await import("@/api/base44Client");
-    const companyInfoList = await base44.entities.CompanyInfo?.list("-created_date");
+    // const { base44 } = await import("@/api/base44Client");
+    // const companyInfoList = await base44.entities.CompanyInfo?.list("-created_date");
+    const companyInfoList = await entitiesAPI.CompanyInfo.list("-created_date");
+
     if (companyInfoList && companyInfoList.length > 0) {
       const info = companyInfoList[0];
       freshCompanyData = {
@@ -125,9 +131,9 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   const addText = (text, fontSize = 10, isBold = false) => {
     doc.setFontSize(fontSize);
     doc.setFont(undefined, isBold ? 'bold' : 'normal');
-    
+
     const lines = doc.splitTextToSize(text, pageWidth - 2 * margin);
-    
+
     lines.forEach(line => {
       if (y > pageHeight - 30) {
         doc.addPage();
@@ -148,7 +154,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   doc.setFontSize(12);
   doc.text(`${contract.contract_type.toUpperCase()}`, pageWidth / 2, y, { align: "center" });
   y += 8;
-  
+
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
   doc.text(`Contrato N° ${contract.contract_number || "S/N"}`, pageWidth / 2, y, { align: "center" });
@@ -157,7 +163,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   y += 10;
 
   // Conste por el presente documento
-  const introText = template?.introduction_text || 
+  const introText = template?.introduction_text ||
     `Conste por el presente documento el Contrato de Trabajo ${contract.contract_type}, que celebran al amparo del Texto Único Ordenado del Decreto Legislativo N° 728, Ley de Productividad y Competitividad Laboral, aprobado por Decreto Supremo N° 003-97-TR, y normas complementarias:`;
   addText(replaceVariables(introText), 10);
   y += 3;
@@ -196,7 +202,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
 
   // Vigencia
   addText("V. VIGENCIA DEL CONTRATO:", 11, true);
-  
+
   if (contract.contract_type === "Indeterminado") {
     const durationText = template?.duration_indeterminate_text ||
       `El presente contrato tiene carácter de INDETERMINADO, iniciando su vigencia el {start_date}.`;
@@ -206,7 +212,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
       `El presente contrato tendrá una duración determinada, iniciando el {start_date} y finalizando el {end_date}{renewable_clause}.`;
     addText(replaceVariables(durationText));
   }
-  
+
   if (contract.trial_period_days > 0) {
     const trialText = template?.trial_period_text ||
       `El contrato está sujeto a un período de prueba de {trial_period_days} días calendario, durante el cual cualquiera de las partes puede darlo por terminado sin expresión de causa.`;
@@ -219,7 +225,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   const salaryText = template?.salary_text ||
     `EL EMPLEADOR pagará a EL TRABAJADOR una remuneración mensual de S/ {salary} ({salary_words} SOLES), pagadera mensualmente, sujeta a los descuentos de ley.`;
   addText(replaceVariables(salaryText));
-  
+
   if (contract.benefits) {
     addText(`Beneficios adicionales: ${contract.benefits}`);
   }
@@ -230,7 +236,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   const scheduleText = template?.schedule_text ||
     `La jornada laboral será de {weekly_hours} horas semanales, distribuidas de la siguiente manera: {work_schedule}.`;
   addText(replaceVariables(scheduleText));
-  
+
   const locationText = template?.work_location_text ||
     `EL TRABAJADOR prestará sus servicios en: {work_location}.`;
   addText(replaceVariables(locationText));
@@ -281,11 +287,11 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     for (const clause of customClauses) {
       const romanNumerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
       const numeral = clauseNumber < romanNumerals.length ? romanNumerals[clauseNumber - 1] : `${clauseNumber}`;
-      
+
       addText(`${numeral}. ${clause.title.toUpperCase()}:`, 11, true);
       addText(replaceVariables(clause.content));
       y += 3;
-      
+
       clauseNumber++;
     }
   }
@@ -299,7 +305,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
 
   // Firma
   const signatureY = y > pageHeight - 60 ? (doc.addPage(), 40) : y;
-  
+
   doc.setFontSize(10);
   doc.text(
     `Lima, ${format(new Date(contract.signed_date || contract.start_date), "dd 'de' MMMM 'de' yyyy", { locale: es })}`,
@@ -311,20 +317,20 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   const sigY = signatureY + 30;
   doc.line(30, sigY, 80, sigY);
   doc.line(pageWidth - 80, sigY, pageWidth - 30, sigY);
-  
+
   doc.text("EL EMPLEADOR", 55, sigY + 5, { align: "center" });
   doc.text("EL TRABAJADOR", pageWidth - 55, sigY + 5, { align: "center" });
-  
+
   doc.setFontSize(8);
   doc.text(company.representative, 55, sigY + 10, { align: "center" });
   doc.text(company.representativeDoc, 55, sigY + 14, { align: "center" });
-  
+
   doc.text(`${employee.first_name} ${employee.last_name}`, pageWidth - 55, sigY + 10, { align: "center" });
   doc.text(`${employee.document_type} ${employee.document_number}`, pageWidth - 55, sigY + 14, { align: "center" });
 
   // Guardar PDF
   doc.save(`Contrato_${employee.last_name}_${employee.first_name}_${contract.contract_number || contract.id}.pdf`);
-  
+
   return doc;
 };
 
@@ -333,9 +339,9 @@ const numberToWords = (num) => {
   const units = ["", "UN", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
   const tens = ["", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
   const hundreds = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
-  
+
   const n = Math.floor(num);
-  
+
   if (n === 0) return "CERO";
   if (n < 10) return units[n];
   if (n < 100) {
@@ -353,6 +359,6 @@ const numberToWords = (num) => {
     const rest = n % 1000;
     return (thousand === 1 ? "MIL" : units[thousand] + " MIL") + (rest ? " " + numberToWords(rest) : "");
   }
-  
+
   return num.toString();
 };

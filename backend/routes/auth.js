@@ -71,7 +71,7 @@ router.post('/login', async (req, res) => {
         id: user.id,
         email: user.email,
         full_name: user.full_name,
-        created_at: user.created_at
+        created_date: user.created_date
       }
     });
 
@@ -135,7 +135,7 @@ router.get('/me', authenticateToken, async (req, res) => {
   try {
     // Obtener datos del usuario desde la tabla users
     const userResult = await query(
-      'SELECT id, email, full_name, role, is_active, created_at, updated_at FROM users WHERE id = $1',
+      'SELECT id, email, full_name, role, is_active, created_date, updated_date FROM users WHERE id = $1',
       [req.user.userId]  // viene del JWT (authenticateToken)
     );
 
@@ -219,7 +219,7 @@ router.post('/register', async (req, res) => {
 
     // Insertar nuevo usuario
     const result = await query(
-      'INSERT INTO users (email, password_hash, full_name) VALUES ($1, $2, $3) RETURNING id, email, full_name, created_at',
+      'INSERT INTO users (email, password_hash, full_name) VALUES ($1, $2, $3) RETURNING id, email, full_name, created_date',
       [email.toLowerCase(), passwordHash, full_name || null]
     );
 
