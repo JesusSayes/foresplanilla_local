@@ -1,6 +1,15 @@
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';  // ← FIJO: sin 'path'
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import morgan from 'morgan';
+
 import authRoutes from './routes/auth.js';
 import employeeRoutes from './routes/employees.js';
 import masterDataRoutes from './routes/masterData.js';
@@ -31,41 +40,66 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Crear directorio logs
+const logsDir = join(__dirname, 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
 // Middlewares
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true
 }));
-app.use(express.json());
+
+// Morgan logs
+const accessLogStream = fs.createWriteStream(join(logsDir, 'access.log'), { flags: 'a' });
+app.use(morgan('combined', { stream: accessLogStream, skip: (req, res) => res.statusCode < 400 }));
+app.use(morgan('dev', { skip: (req, res) => res.statusCode >= 400 }));
+
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Logging middleware
+// Request logging
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log(`📥 ${new Date().toISOString()} ${req.method} ${req.path}`);
   next();
 });
 
 // Health check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
+app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+app.use((err, req, res, next) => {
+  const errorInfo = {
     timestamp: new Date().toISOString(),
-    service: 'Foresplanilla API'
+    method: req.method,
+    url: req.originalUrl,
+    status: err.status || 500,
+    message: err.message,
+    stack: err.stack,
+    query: req.query,
+    body: req.body,
+    headers: req.headers.authorization ? 'Bearer ***' : 'No auth'
+  };
+
+  console.error('🚨 ERROR DETALLADO:', JSON.stringify(errorInfo, null, 2));
+
+  res.status(err.status || 500).json({
+    error: err.message,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 });
 
-// Rutas
+// TUS RUTAS (exactas)
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/master-data', masterDataRoutes);
 app.use('/api/employees/changelog', employeeChangelogRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/users/roles', userRolesRoutes);
-
 app.use('/api/contracts/clauses', clausesRoutes);
 app.use('/api/contracts/templates', templatesContractRoutes);
 app.use('/api/contracts/renewal-rules', renewalRulesRoutes);
-
 app.use('/api/attendance/records', recordsRoutes);
 app.use('/api/attendance/incidents', incidentsRoutes);
 app.use('/api/attendance/schedules', schedulesRoutes);
@@ -81,26 +115,26 @@ app.use('/api/cost-centers', costcentersRoutes);
 app.use('/api/database/connections', connectionsRoutes);
 app.use('/api/sync/logs', logsRoutes);
 
-// Ruta 404
+// 404
 app.use((req, res) => {
-  res.status(404).json({
-    error: 'Ruta no encontrada',
-    message: `La ruta ${req.path} no existe`
-  });
+  console.log(`404 ${req.method} ${req.path}`);
+  res.status(404).json({ error: 'Not Found', path: req.path });
 });
 
-// Error handler global
-app.use((err, req, res, next) => {
-  console.error('Error no manejado:', err);
-  res.status(500).json({
-    error: 'Error del servidor',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Ocurrió un error inesperado'
+// ERROR HANDLER
+app.use((err, req, res) => {
+  console.error('ERROR:', {
+    time: new Date().toISOString(),
+    method: req.method,
+    url: req.url,
+    message: err.message,
+    stack: err.stack
   });
+  res.status(500).json({ error: 'Server Error', ...(process.env.NODE_ENV === 'development' && { message: err.message }) });
 });
 
-// Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`SERVER: Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`ENVIRONMENT: Ambiente: ${process.env.NODE_ENV}`);
-  console.log(`CORS: CORS habilitado para: ${process.env.CORS_ORIGIN}`);
+  console.log(`http://localhost:${PORT}`);
+  console.log(`Logs: ${logsDir}`);
 });
+

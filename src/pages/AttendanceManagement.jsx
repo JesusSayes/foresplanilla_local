@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function AttendanceManagement() {
   const { user: currentUser } = useAuth();
@@ -52,26 +53,37 @@ export default function AttendanceManagement() {
 
   const queryClient = useQueryClient();
 
+  // useEffect(() => {
+    // const loadUserData = async () => {
+      // try {
+        // const user = await entitiesAPI.auth.me();
+        // setCurrentUser(user);
+
+        // const employees = await base44.entities.Employee.filter({
+          // work_email: user.email
+        // });
+
+        // if (employees && employees.length > 0) {
+          // setEmployee(employees[0]);
+        // }
+      // } catch (error) {
+        // console.error("Error loading user:", error);
+      // }
+    // };
+
+    // loadUserData();
+  // }, []);
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await entitiesAPI.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({
-          work_email: user.email
-        });
-
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
+      });
+    }
+  }, [currentUser]);
 
-    loadUserData();
-  }, []);
+
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],

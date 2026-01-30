@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from '@/api/entitiesClient';
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
