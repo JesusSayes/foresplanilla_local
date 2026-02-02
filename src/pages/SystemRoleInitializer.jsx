@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,32 +10,23 @@ import { toast } from "sonner";
 import { AVAILABLE_PERMISSIONS } from "../components/hooks/usePermissions";
 
 export default function SystemRoleInitializer() {
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [existingRoles, setExistingRoles] = useState([]);
   const [initialized, setInitialized] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const user = await base44.auth.me();
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-
-        const roles = await base44.entities.Role.list();
-        setExistingRoles(roles);
-      } catch (error) {
-        console.error("Error loading data:", error);
-      }
-    };
-
-    loadData();
-  }, []);
+      });
+    }
+    const roles = await entitiesAPI.Role.list();
+    setExistingRoles(roles);
+  }, [currentUser]);
 
   const SYSTEM_ROLES = [
     {
@@ -143,17 +135,17 @@ export default function SystemRoleInitializer() {
   const initializeRolesMutation = useMutation({
     mutationFn: async () => {
       const createdRoles = [];
-      
+
       for (const roleData of SYSTEM_ROLES) {
         // Verificar si el rol ya existe
         const exists = existingRoles.find(r => r.name === roleData.name);
-        
+
         if (!exists) {
-          const newRole = await base44.entities.Role.create(roleData);
+          const newRole = await entitiesAPI.Role.create(roleData);
           createdRoles.push(newRole);
         }
       }
-      
+
       return createdRoles;
     },
     onSuccess: (createdRoles) => {
@@ -202,7 +194,7 @@ export default function SystemRoleInitializer() {
             <div className="space-y-4 mb-6">
               {SYSTEM_ROLES.map((role, idx) => {
                 const exists = existingRoles.find(r => r.name === role.name);
-                
+
                 return (
                   <div key={idx} className="p-4 border border-slate-200 rounded-lg">
                     <div className="flex items-start justify-between mb-2">
@@ -235,7 +227,7 @@ export default function SystemRoleInitializer() {
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <p className="text-sm text-blue-900">
-                <strong>Nota:</strong> Los roles que ya existen no serán modificados. 
+                <strong>Nota:</strong> Los roles que ya existen no serán modificados.
                 Solo se crearán los roles que aún no están en el sistema.
               </p>
             </div>
