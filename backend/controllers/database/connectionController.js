@@ -3,8 +3,9 @@ const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
   try {
-    const connections = await prisma.databaseConnection.findMany({
-      orderBy: { name: 'asc' }
+    const connections = await prisma.database_connection.findMany({
+      // orderBy: { name: 'asc' }
+      orderBy: { id: 'asc' }
     });
     res.json(connections);
   } catch (error) {
@@ -14,7 +15,7 @@ export const getAll = async (req, res) => {
 
 export const getById =  async (req, res) => {
   try {
-    const connection = await prisma.databaseConnection.findUnique({
+    const connection = await prisma.database_connection.findUnique({
       where: { id: parseInt(req.params.id) }
     });
     if (!connection) return res.status(404).json({ error: 'Connection not found' });
@@ -26,7 +27,7 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const connection = await prisma.databaseConnection.create({
+    const connection = await prisma.database_connection.create({
       data: req.body
     });
     res.status(201).json(connection);
@@ -37,7 +38,7 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const connection = await prisma.databaseConnection.update({
+    const connection = await prisma.database_connection.update({
       where: { id: parseInt(req.params.id) },
       data: req.body
     });
@@ -49,7 +50,7 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
-    await prisma.databaseConnection.delete({
+    await prisma.database_connection.delete({
       where: { id: parseInt(req.params.id) }
     });
     res.status(204).send();

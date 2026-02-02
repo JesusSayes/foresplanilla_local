@@ -1,13 +1,14 @@
 import express from 'express';
-import { getAllHolidays, getHolidayById, createHoliday, updateHoliday, deleteHoliday } from '../controllers/holidayController.js';
+import controller from '../controllers/holidayController.js';
+const router = express.Router();
 import { authenticateToken } from '../middleware/auth.js';
 
-const router = express.Router();
+router.use(authenticateToken);
 
-router.get('/', authenticateToken, getAllHolidays);
-router.get('/:id', authenticateToken, getHolidayById);
-router.post('/', authenticateToken, createHoliday);
-router.put('/:id', authenticateToken, updateHoliday);
-router.delete('/:id', authenticateToken, deleteHoliday);
+router.get('/', controller.getAll);
+router.get('/:id', controller.getById);
+router.post('/', controller.create);
+router.put('/:id', controller.update);
+router.delete('/:id', controller.delete);
 
 export default router;

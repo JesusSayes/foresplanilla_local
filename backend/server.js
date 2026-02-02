@@ -34,6 +34,8 @@ import infoRoutes from './routes/company/info.js';
 import costcentersRoutes from './routes/cost-centers.js';
 import connectionsRoutes from './routes/database/connections.js';
 import logsRoutes from './routes/sync/logs.js';
+import holidaysRoutes from './routes/holidays.js';
+import attendanceIncidentsRoutes from './routes/attendance/incidents.js';
 
 dotenv.config();
 
@@ -114,6 +116,8 @@ app.use('/api/company/info', infoRoutes);
 app.use('/api/cost-centers', costcentersRoutes);
 app.use('/api/database/connections', connectionsRoutes);
 app.use('/api/sync/logs', logsRoutes);
+app.use('/api/holidays', holidaysRoutes);
+app.use('/api/attendance/incidents', attendanceIncidentsRoutes);
 
 // 404
 app.use((req, res) => {

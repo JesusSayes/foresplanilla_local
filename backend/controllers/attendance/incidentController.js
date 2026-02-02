@@ -3,9 +3,9 @@ const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
   try {
-    const incidents = await prisma.attendanceIncident.findMany({
-      include: { attendance: true },
-      orderBy: { createdAt: 'desc' }
+    const incidents = await prisma.attendance_incident.findMany({
+      // include: { attendance: true },
+      orderBy: { created_date: 'desc' }
     });
     res.json(incidents);
   } catch (error) {
@@ -68,7 +68,7 @@ export const filter = async (req, res) => {
 
 export const getById =  async (req, res) => {
   try {
-    const incident = await prisma.attendanceIncident.findUnique({
+    const incident = await prisma.attendance_incident.findUnique({
       where: { id: parseInt(req.params.id) },
       include: { attendance: true }
     });
@@ -81,7 +81,7 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const incident = await prisma.attendanceIncident.create({
+    const incident = await prisma.attendance_incident.create({
       data: req.body
     });
     res.status(201).json(incident);
@@ -92,7 +92,7 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const incident = await prisma.attendanceIncident.update({
+    const incident = await prisma.attendance_incident.update({
       where: { id: parseInt(req.params.id) },
       data: req.body
     });
@@ -104,7 +104,7 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
-    await prisma.attendanceIncident.delete({
+    await prisma.attendance_incident.delete({
       where: { id: parseInt(req.params.id) }
     });
     res.status(204).send();

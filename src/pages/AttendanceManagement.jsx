@@ -88,7 +88,7 @@ export default function AttendanceManagement() {
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      const allEmps = await base44.entities.Employee.list("-created_date");
+      const allEmps = await entitiesAPI.Employee.list("-created_date");
       return allEmps;
     },
   });
@@ -97,7 +97,7 @@ export default function AttendanceManagement() {
     queryKey: ["todayAttendance", selectedDate],
     queryFn: async () => {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      const records = await base44.entities.AttendanceRecord.filter(
+      const records = await entitiesAPI.AttendanceRecord.filter(
         { date: dateStr },
         "-created_date"
       );
@@ -108,14 +108,14 @@ export default function AttendanceManagement() {
   const { data: holidays = [] } = useQuery({
     queryKey: ["holidays"],
     queryFn: async () => {
-      return await base44.entities.Holiday.list("-date");
+      return await entitiesAPI.Holiday.list("-date");
     },
   });
 
   const { data: dbConnections = [] } = useQuery({
     queryKey: ["databaseConnections"],
     queryFn: async () => {
-      const conns = await base44.entities.DatabaseConnection.list("-created_date");
+      const conns = await entitiesAPI.DatabaseConnection.list("-created_date");
       return conns.filter(c => c.is_active);
     },
   });
@@ -123,7 +123,7 @@ export default function AttendanceManagement() {
   const { data: sites = [] } = useQuery({
     queryKey: ["sites"],
     queryFn: async () => {
-      const allSites = await base44.entities.Site.list("name");
+      const allSites = await entitiesAPI.Site.list("name");
       return allSites.filter(s => s.is_active);
     },
   });
@@ -139,7 +139,7 @@ export default function AttendanceManagement() {
   const { data: allIncidents = [] } = useQuery({
     queryKey: ["allIncidents"],
     queryFn: async () => {
-      return await base44.entities.AttendanceIncident.list("-created_date", 500);
+      return await entitiesAPI.AttendanceIncident.list("-created_date", 500);
     },
   });
 
@@ -150,7 +150,7 @@ export default function AttendanceManagement() {
   const { data: overtimeAlerts = [] } = useQuery({
     queryKey: ["overtimeAlerts"],
     queryFn: async () => {
-      return await base44.entities.OvertimeAlert.filter(
+      return await entitiesAPI.OvertimeAlert.filter(
         { status: "Pendiente" },
         "-created_date"
       );
@@ -160,7 +160,7 @@ export default function AttendanceManagement() {
   const { data: workSchedules = [] } = useQuery({
     queryKey: ["workSchedules"],
     queryFn: async () => {
-      return await base44.entities.WorkSchedule.list("-created_date");
+      return await entitiesAPI.WorkSchedule.list("-created_date");
     },
   });
 
@@ -183,7 +183,7 @@ export default function AttendanceManagement() {
     queryKey: ["employeeIncidents", historyEmployeeId],
     queryFn: async () => {
       if (!historyEmployeeId) return [];
-      return await base44.entities.AttendanceIncident.filter(
+      return await entitiesAPI.AttendanceIncident.filter(
         { employee_id: historyEmployeeId },
         "-created_date"
       );
@@ -193,7 +193,7 @@ export default function AttendanceManagement() {
 
   const updateRecordMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.AttendanceRecord.update(id, data);
+      return await entitiesAPI.AttendanceRecord.update(id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["todayAttendance"]);
@@ -209,7 +209,7 @@ export default function AttendanceManagement() {
 
   const reviewIncidentMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.AttendanceIncident.update(id, data);
+      return await entitiesAPI.AttendanceIncident.update(id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["allIncidents"]);
@@ -226,7 +226,7 @@ export default function AttendanceManagement() {
 
   const createJustificationMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.AttendanceIncident.create(data);
+      return await entitiesAPI.AttendanceIncident.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["allIncidents"]);
@@ -344,7 +344,7 @@ export default function AttendanceManagement() {
         const overtimeHours = workedHours - 8;
 
         // Crear alerta de horas extras no autorizadas
-        await base44.entities.OvertimeAlert.create({
+        await entitiesAPI.OvertimeAlert.create({
           employee_id: editingRecord.employee_id,
           attendance_record_id: editingRecord.id,
           alert_date: editingRecord.date,
@@ -381,7 +381,7 @@ export default function AttendanceManagement() {
       const adjustedWorkedHours = (attendanceRecord.worked_hours || 0) + incident.hours_to_adjust;
       const adjustedLateMinutes = Math.max(0, (attendanceRecord.late_minutes || 0) - incident.late_minutes_to_adjust);
 
-      await base44.entities.AttendanceRecord.update(attendanceRecord.id, {
+      await entitiesAPI.AttendanceRecord.update(attendanceRecord.id, {
         worked_hours: Math.min(adjustedWorkedHours, 8), // Máximo 8 horas regulares
         late_minutes: adjustedLateMinutes,
         is_late: adjustedLateMinutes > 0,
@@ -1241,7 +1241,7 @@ export default function AttendanceManagement() {
                                     // Actualizar horario del empleado para autorizar HE
                                     const schedule = getEmployeeSchedule(emp.id);
                                     if (schedule) {
-                                      await base44.entities.WorkSchedule.update(schedule.id, {
+                                      await entitiesAPI.WorkSchedule.update(schedule.id, {
                                         overtime_authorized: true
                                       });
                                     } else {
@@ -1250,7 +1250,7 @@ export default function AttendanceManagement() {
                                     }
 
                                     // Marcar alerta como autorizada
-                                    await base44.entities.OvertimeAlert.update(alert.id, {
+                                    await entitiesAPI.OvertimeAlert.update(alert.id, {
                                       status: "Autorizado",
                                       resolved_by: currentUser.email,
                                       resolution_date: format(new Date(), "yyyy-MM-dd"),
@@ -1271,7 +1271,7 @@ export default function AttendanceManagement() {
                                 variant="outline"
                                 className="text-slate-600"
                                 onClick={async () => {
-                                  await base44.entities.OvertimeAlert.update(alert.id, {
+                                  await entitiesAPI.OvertimeAlert.update(alert.id, {
                                     status: "Descartado",
                                     resolved_by: currentUser.email,
                                     resolution_date: format(new Date(), "yyyy-MM-dd"),
