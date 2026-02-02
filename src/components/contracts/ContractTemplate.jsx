@@ -16,8 +16,6 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
 
   if (!template) {
     try {
-      // const { base44 } = await import("@/api/base44Client");
-      // const templates = await base44.entities.ContractTemplate?.list();
       const templates = await entitiesAPI.ContractTemplate.list();
 
       if (templates && templates.length > 0) {
@@ -42,7 +40,6 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
       }
 
       // Cargar cláusulas personalizadas
-      // const clauses = await base44.entities.ContractClause?.list("order");
       const clauses = await entitiesAPI.ContractClause.list("order")
       if (clauses && clauses.length > 0) {
         customClauses = clauses.filter(c =>
@@ -60,8 +57,6 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   // IMPORTANTE: Cargar datos ACTUALES de la empresa desde CompanyInfo SIEMPRE
   let freshCompanyData = {};
   try {
-    // const { base44 } = await import("@/api/base44Client");
-    // const companyInfoList = await base44.entities.CompanyInfo?.list("-created_date");
     const companyInfoList = await entitiesAPI.CompanyInfo.list("-created_date");
 
     if (companyInfoList && companyInfoList.length > 0) {

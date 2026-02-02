@@ -214,7 +214,6 @@ export const usePermissions = () => {
   const getAccessibleEmployeeIds = async () => {
     // Super Admin ve todo
     if (employee?.role === "super_admin" || employee?.role === "admin") {
-      // const allEmployees = await base44.entities.Employee.list();
       const allEmployees = await entitiesAPI.Employee.list();
       return allEmployees.map(e => e.id);
     }
@@ -226,7 +225,6 @@ export const usePermissions = () => {
 
     // Manager por departamento
     if (employee?.department_name) {
-      // const deptEmployees = await base44.entities.Employee.filter({
       const deptEmployees = await entitiesAPI.Employee.filter({
         department_name: employee.department_name
       });

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
-  Bell, X, CheckCircle, XCircle, Calendar, FileText, 
-  AlertCircle, Clock, Settings 
+import {
+  Bell, X, CheckCircle, XCircle, Calendar, FileText,
+  AlertCircle, Clock, Settings
 } from "lucide-react";
 import { createPageUrl } from "../../utils";
 import { format } from "date-fns";
@@ -50,7 +51,7 @@ export default function NotificationCenter({ userEmail }) {
 
   const deleteNotificationMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.Notification.delete(id);
+      return await entitiesAPI.Notification.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["notifications"]);
@@ -101,8 +102,8 @@ export default function NotificationCenter({ userEmail }) {
       {/* Notification Dropdown */}
       {isOpen && (
         <>
-          <div 
-            className="fixed inset-0 z-40" 
+          <div
+            className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
           <Card className="absolute right-0 top-full mt-2 w-96 max-h-[600px] overflow-hidden shadow-2xl z-50 border-0">
@@ -151,8 +152,8 @@ export default function NotificationCenter({ userEmail }) {
                     <div
                       key={notification.id}
                       className={`p-4 transition-colors cursor-pointer ${
-                        notification.is_read 
-                          ? 'bg-white hover:bg-slate-50' 
+                        notification.is_read
+                          ? 'bg-white hover:bg-slate-50'
                           : 'bg-blue-50 hover:bg-blue-100'
                       }`}
                       onClick={() => handleNotificationClick(notification)}
