@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,15 +9,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
+import {
   Clock, Plus, Edit, Trash2, Users, User, Calendar, Search, ChevronsUpDown, Check
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 
 export default function ScheduleManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [showForm, setShowForm] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -52,41 +53,30 @@ export default function ScheduleManagement() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: schedules = [] } = useQuery({
     queryKey: ["workSchedules"],
-    queryFn: async () => await base44.entities.WorkSchedule.list("-created_date"),
+    queryFn: async () => await entitiesAPI.WorkSchedule.list("-created_date"),
   });
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
 
   const createScheduleMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.WorkSchedule.create(data);
+      return await entitiesAPI.WorkSchedule.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["workSchedules"]);
@@ -98,7 +88,7 @@ export default function ScheduleManagement() {
 
   const updateScheduleMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.WorkSchedule.update(id, data);
+      return await entitiesAPI.WorkSchedule.update(id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["workSchedules"]);
@@ -110,7 +100,7 @@ export default function ScheduleManagement() {
 
   const deleteScheduleMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.WorkSchedule.delete(id);
+      return await entitiesAPI.WorkSchedule.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["workSchedules"]);
@@ -151,7 +141,7 @@ export default function ScheduleManagement() {
 
   const handleEdit = (schedule) => {
     setEditingSchedule(schedule);
-    
+
     // Cargar departamentos: convertir department_name a array si existe
     let depts = [];
     if (schedule.departments && schedule.departments.length > 0) {
@@ -159,13 +149,13 @@ export default function ScheduleManagement() {
     } else if (schedule.department_name) {
       depts = [schedule.department_name];
     }
-    
+
     setFormData({
       ...schedule,
       departments: depts,
       employee_id: schedule.employee_id || null
     });
-    
+
     if (schedule.employee_id) {
       const emp = allEmployees.find(e => e.id === schedule.employee_id);
       if (emp) {
@@ -174,7 +164,7 @@ export default function ScheduleManagement() {
     } else {
       setEmployeeSearch("");
     }
-    
+
     setShowEmployeeDropdown(false);
     setShowForm(true);
   };
@@ -247,7 +237,7 @@ export default function ScheduleManagement() {
 
   const filteredIndividual = individualSchedules.filter(s => {
     const empName = getEmployeeName(s.employee_id).toLowerCase();
-    return empName.includes(searchTerm.toLowerCase()) || 
+    return empName.includes(searchTerm.toLowerCase()) ||
            s.schedule_name.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
@@ -520,11 +510,11 @@ export default function ScheduleManagement() {
 
       {/* Form Modal */}
       {showForm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
           onClick={resetForm}
         >
-          <Card 
+          <Card
             className="max-w-4xl w-full my-8"
             onClick={(e) => e.stopPropagation()}
           >
@@ -561,7 +551,7 @@ export default function ScheduleManagement() {
                         </span>
                         <ChevronsUpDown className="w-4 h-4 text-slate-400" />
                       </button>
-                      
+
                       {showEmployeeDropdown && (
                         <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
                           <div className="p-2 border-b">
@@ -651,7 +641,7 @@ export default function ScheduleManagement() {
 
                 <div className="space-y-4">
                   <h3 className="font-semibold text-slate-900">Horario Semanal</h3>
-                  
+
                   {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map(day => {
                     const dayLabels = {
                       monday: "Lunes",
@@ -709,7 +699,7 @@ export default function ScheduleManagement() {
 
                 <div className="space-y-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
                   <h3 className="font-semibold text-slate-900 mb-2">Configuración Especial</h3>
-                  
+
                   <div className="flex items-start gap-3">
                     <input
                       type="checkbox"

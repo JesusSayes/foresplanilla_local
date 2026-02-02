@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,8 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  FileText, Save, Star, Users, Calendar, DollarSign, 
+import {
+  FileText, Save, Star, Users, Calendar, DollarSign,
   Clock, Plus, Trash2, Play, TrendingUp
 } from "lucide-react";
 import { toast } from "sonner";
@@ -26,6 +27,8 @@ const REPORT_TYPES = [
 ];
 
 export default function Reports() {
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const { employee, hasPermission } = usePermissions();
   const [reportType, setReportType] = useState("employees");
   const [reportConfig, setReportConfig] = useState({
@@ -44,15 +47,15 @@ export default function Reports() {
 
   const { data: savedReports = [] } = useQuery({
     queryKey: ["reportConfigurations"],
-    queryFn: async () => await base44.entities.ReportConfiguration.list("-created_date"),
+    queryFn: async () => await entitiesAPI.ReportConfiguration.list("-created_date"),
   });
 
   const saveReportMutation = useMutation({
     mutationFn: async (data) => {
       if (selectedSaved) {
-        return await base44.entities.ReportConfiguration.update(selectedSaved.id, data);
+        return await entitiesAPI.ReportConfiguration.update(selectedSaved.id, data);
       }
-      return await base44.entities.ReportConfiguration.create(data);
+      return await entitiesAPI.ReportConfiguration.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["reportConfigurations"]);
@@ -64,7 +67,7 @@ export default function Reports() {
   });
 
   const deleteReportMutation = useMutation({
-    mutationFn: async (id) => await base44.entities.ReportConfiguration.delete(id),
+    mutationFn: async (id) => await entitiesAPI.ReportConfiguration.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(["reportConfigurations"]);
       toast.success("Reporte eliminado");
@@ -73,7 +76,7 @@ export default function Reports() {
 
   const toggleFavoriteMutation = useMutation({
     mutationFn: async ({ id, isFavorite }) => {
-      return await base44.entities.ReportConfiguration.update(id, { is_favorite: !isFavorite });
+      return await entitiesAPI.ReportConfiguration.update(id, { is_favorite: !isFavorite });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["reportConfigurations"]);
@@ -114,36 +117,36 @@ export default function Reports() {
     setIsGenerating(true);
     try {
       let data = [];
-      
+
       switch (reportType) {
         case "employees":
-          data = await base44.entities.Employee.list();
+          data = await entitiesAPI.Employee.list();
           break;
         case "attendance":
-          data = await base44.entities.AttendanceRecord.list();
+          data = await entitiesAPI.AttendanceRecord.list();
           // Add employee names
-          const employees = await base44.entities.Employee.list();
+          const employees = await entitiesAPI.Employee.list();
           data = data.map(record => ({
             ...record,
-            employee_name: employees.find(e => e.id === record.employee_id)?.first_name + ' ' + 
+            employee_name: employees.find(e => e.id === record.employee_id)?.first_name + ' ' +
                           employees.find(e => e.id === record.employee_id)?.last_name
           }));
           break;
         case "vacations":
-          data = await base44.entities.VacationRequest.list();
-          const emps = await base44.entities.Employee.list();
+          data = await entitiesAPI.VacationRequest.list();
+          const emps = await entitiesAPI.Employee.list();
           data = data.map(req => ({
             ...req,
-            employee_name: emps.find(e => e.id === req.employee_id)?.first_name + ' ' + 
+            employee_name: emps.find(e => e.id === req.employee_id)?.first_name + ' ' +
                           emps.find(e => e.id === req.employee_id)?.last_name
           }));
           break;
         case "payroll":
-          data = await base44.entities.Payslip.list();
-          const allEmps = await base44.entities.Employee.list();
+          data = await entitiesAPI.Payslip.list();
+          const allEmps = await entitiesAPI.Employee.list();
           data = data.map(payslip => ({
             ...payslip,
-            employee_name: allEmps.find(e => e.id === payslip.employee_id)?.first_name + ' ' + 
+            employee_name: allEmps.find(e => e.id === payslip.employee_id)?.first_name + ' ' +
                           allEmps.find(e => e.id === payslip.employee_id)?.last_name
           }));
           break;
@@ -155,7 +158,7 @@ export default function Reports() {
           return Object.entries(reportConfig.filters).every(([field, filter]) => {
             const value = item[field];
             const filterValue = filter.value;
-            
+
             switch (filter.operator) {
               case "equals":
                 return String(value).toLowerCase() === String(filterValue).toLowerCase();
@@ -177,7 +180,7 @@ export default function Reports() {
         data.sort((a, b) => {
           const aVal = a[reportConfig.sort_by];
           const bVal = b[reportConfig.sort_by];
-          
+
           if (reportConfig.sort_order === "asc") {
             return aVal > bVal ? 1 : -1;
           } else {
@@ -487,17 +490,17 @@ function ReportCard({ report, onLoad, onDelete, onToggleFavorite }) {
           className="flex-shrink-0"
         >
           <Star className={`w-5 h-5 ${
-            report.is_favorite 
-              ? "text-amber-500 fill-amber-500" 
+            report.is_favorite
+              ? "text-amber-500 fill-amber-500"
               : "text-slate-300 hover:text-amber-500"
           }`} />
         </button>
       </div>
-      
+
       {report.description && (
         <p className="text-xs text-slate-600 mb-3 line-clamp-2">{report.description}</p>
       )}
-      
+
       <div className="text-xs text-slate-500 mb-3">
         {report.columns?.length || 0} columnas • {Object.keys(report.filters || {}).length} filtros
       </div>
