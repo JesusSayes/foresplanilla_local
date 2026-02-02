@@ -77,7 +77,6 @@ export default function AttendanceReports() {
   const { data: workSchedules = [] } = useQuery({
     queryKey: ["workSchedules"],
     queryFn: async () => {
-      // return await base44.entities.WorkSchedule.list("-created_date");
       return await entitiesAPI.WorkSchedule.list("-created_date");
     },
   });
@@ -85,7 +84,6 @@ export default function AttendanceReports() {
   const { data: attendanceRecords = [] } = useQuery({
     queryKey: ["allAttendanceRecords", appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      // const records = await base44.entities.AttendanceRecord.list("-date");
       const records = await entitiesAPI.AttendanceRecord.list("-date");
       return records.filter(r => {
         const recordDate = new Date(r.date);
@@ -97,7 +95,6 @@ export default function AttendanceReports() {
   const { data: incidents = [] } = useQuery({
     queryKey: ["allIncidents", appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      // const allIncidents = await base44.entities.AttendanceIncident.list("-created_date");
       const allIncidents = await entitiesAPI.AttendanceIncident.list("-created_date");
       return allIncidents.filter(i => {
         const incidentDate = new Date(i.incident_date);
@@ -109,7 +106,6 @@ export default function AttendanceReports() {
   const { data: holidays = [] } = useQuery({
     queryKey: ["holidays"],
     queryFn: async () => {
-      // return await base44.entities.Holiday.list("-date");
       return await entitiesAPI.Holiday.list("-date");
     },
   });
@@ -117,7 +113,6 @@ export default function AttendanceReports() {
   const { data: vacationRequests = [] } = useQuery({
     queryKey: ["vacationRequests", appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      // const allRequests = await base44.entities.VacationRequest.list("-created_date");
       const allRequests = await entitiesAPI.VacationRequest.list("-created_date");
       return allRequests.filter(v => {
         if (v.status !== "Aprobada") return false;
