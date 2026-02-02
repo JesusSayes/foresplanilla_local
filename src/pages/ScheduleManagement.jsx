@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function ScheduleManagement() {
   const { user: currentUser } = useAuth();
