@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
-import { entitiesAPI } from "@/api/entitiesClient";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,8 +50,8 @@ const AVAILABLE_FIELDS = {
 };
 
 export default function PayslipTemplateConfig() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -74,35 +74,25 @@ export default function PayslipTemplateConfig() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-        // const employees = await base44.entities.Employee.filter({ work_email: user.email });
-        const employees = await entitiesAPI.Employee.filter({ work_email: user.email });
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: templates = [] } = useQuery({
     queryKey: ["payslipTemplates"],
-    // queryFn: async () => await base44.entities.PayslipTemplate.list("-created_date"),
     queryFn: async () => await entitiesAPI.PayslipTemplate.list("-created_date"),
   });
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       if (editingTemplate) {
-        // return await base44.entities.PayslipTemplate.update(editingTemplate.id, data);
         return await entitiesAPI.PayslipTemplate.update(editingTemplate.id, data);
       } else {
-        // return await base44.entities.PayslipTemplate.create(data);
         return await entitiesAPI.PayslipTemplate.create(data);
       }
     },
@@ -115,7 +105,6 @@ export default function PayslipTemplateConfig() {
   });
 
   const deleteMutation = useMutation({
-    // mutationFn: async (id) => await base44.entities.PayslipTemplate.delete(id),
     mutationFn: async (id) => await entitiesAPI.PayslipTemplate.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(["payslipTemplates"]);

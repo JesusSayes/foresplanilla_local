@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +10,8 @@ import { Download, Database, FileJson, FileCode, Loader2, CheckCircle2 } from "l
 import { toast } from "sonner";
 
 export default function DataExport() {
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, entity: "" });
@@ -33,26 +35,18 @@ export default function DataExport() {
   ];
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        const employees = await base44.entities.Employee.filter({ work_email: user.email });
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadUserData();
-
+      });
+    }
     // Seleccionar todas las entidades por defecto
     const selected = {};
     entities.forEach(e => selected[e] = true);
     setSelectedEntities(selected);
-  }, []);
+  }, [currentUser]);
 
   const toggleEntity = (entity) => {
     setSelectedEntities(prev => ({ ...prev, [entity]: !prev[entity] }));
@@ -81,7 +75,7 @@ export default function DataExport() {
         setProgress({ current: i + 1, total: selectedList.length, entity: entityName });
 
         try {
-          const data = await base44.entities[entityName].list();
+          const data = await entitiesAPI[entityName].list();
           exportData.entities[entityName] = data;
           toast.success(`✓ ${entityName}: ${data.length} registros`);
         } catch (error) {
@@ -96,7 +90,8 @@ export default function DataExport() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `base44_export_${new Date().toISOString().split('T')[0]}.json`;
+      // a.download = `base44_export_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `LocalApi_export_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -118,18 +113,18 @@ export default function DataExport() {
     setProgress({ current: 0, total: selectedList.length, entity: "" });
 
     try {
-      let sqlScript = `-- Base44 Data Export\n-- Generated: ${new Date().toISOString()}\n\n`;
+      let sqlScript = `-- LocalApi Data Export\n-- Generated: ${new Date().toISOString()}\n\n`;
 
       for (let i = 0; i < selectedList.length; i++) {
         const entityName = selectedList[i];
         setProgress({ current: i + 1, total: selectedList.length, entity: entityName });
 
         try {
-          const data = await base44.entities[entityName].list();
-          
+          const data = await entitiesAPI[entityName].list();
+
           if (data.length > 0) {
             sqlScript += `-- Table: ${entityName}\n`;
-            
+
             data.forEach(record => {
               const columns = Object.keys(record).filter(k => k !== 'id');
               const values = columns.map(col => {
@@ -157,7 +152,7 @@ export default function DataExport() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `base44_export_${new Date().toISOString().split('T')[0]}.sql`;
+      a.download = `LocalApi_export_${new Date().toISOString().split('T')[0]}.sql`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
