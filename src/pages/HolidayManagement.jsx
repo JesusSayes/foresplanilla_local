@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { 
-  Calendar as CalendarIcon, Plus, Edit, Trash2, 
+import {
+  Calendar as CalendarIcon, Plus, Edit, Trash2,
   Sun, Building, Briefcase, Download, Upload
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
@@ -19,8 +20,8 @@ import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
 
 export default function HolidayManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [showForm, setShowForm] = useState(false);
   const [editingHoliday, setEditingHoliday] = useState(null);
   const [formData, setFormData] = useState({
@@ -37,30 +38,19 @@ export default function HolidayManagement() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: holidays = [] } = useQuery({
     queryKey: ["holidays", selectedYear],
     queryFn: async () => {
-      const allHolidays = await base44.entities.Holiday.list("-date");
+      const allHolidays = await entitiesAPI.Holiday.list("-date");
       return allHolidays.filter(h => {
         const year = parseInt(h.date.split('-')[0]);
         return year === selectedYear;
@@ -70,7 +60,7 @@ export default function HolidayManagement() {
 
   const createHolidayMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.Holiday.create(data);
+      return await entitiesAPI.Holiday.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["holidays"]);
@@ -85,7 +75,7 @@ export default function HolidayManagement() {
 
   const updateHolidayMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.Holiday.update(id, data);
+      return await entitiesAPI.Holiday.update(id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["holidays"]);
@@ -100,7 +90,7 @@ export default function HolidayManagement() {
 
   const deleteHolidayMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.Holiday.delete(id);
+      return await entitiesAPI.Holiday.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["holidays"]);
@@ -114,7 +104,7 @@ export default function HolidayManagement() {
 
   const importHolidaysMutation = useMutation({
     mutationFn: async (holidaysData) => {
-      return await base44.entities.Holiday.bulkCreate(holidaysData);
+      return await entitiesAPI.Holiday.bulkCreate(holidaysData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["holidays"]);
@@ -249,16 +239,16 @@ export default function HolidayManagement() {
 
     try {
       // Verificar si ya existen para no duplicar
-      const existingHolidays = await base44.entities.Holiday.list();
+      const existingHolidays = await entitiesAPI.Holiday.list();
       const existingForYear = existingHolidays.filter(h => parseInt(h.date.split('-')[0]) === year);
-      
+
       if (existingForYear.length > 0) {
         if (!confirm(`Ya existen ${existingForYear.length} feriados del ${year}. ¿Desea reemplazarlos?`)) {
           return;
         }
         // Eliminar existentes
         for (const holiday of existingForYear) {
-          await base44.entities.Holiday.delete(holiday.id);
+          await entitiesAPI.Holiday.delete(holiday.id);
         }
       }
 
@@ -275,7 +265,7 @@ export default function HolidayManagement() {
       'Día de la Independencia', '2025-07-28', 'Nacional', 'SI', 'Fiestas Patrias',
       'Día no laborable', '2025-12-24', 'Laboral', 'SI', 'Cierre de fin de año'
     ];
-    
+
     const csv = [headers, example].map(row => row.join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
@@ -296,10 +286,10 @@ export default function HolidayManagement() {
     try {
       const text = await file.text();
       const lines = text.split('\n').filter(line => line.trim());
-      
+
       // Saltar header
       const dataLines = lines.slice(1);
-      
+
       const holidaysToImport = dataLines.map(line => {
         const [name, date, type, isMandatory, description] = line.split(',').map(s => s.trim());
         return {
@@ -322,7 +312,7 @@ export default function HolidayManagement() {
       toast.error("Error al procesar el archivo CSV");
       console.error(error);
     }
-    
+
     // Limpiar input
     event.target.value = '';
   };
@@ -399,8 +389,8 @@ export default function HolidayManagement() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between h-full">
                   <div>
-                    <Select 
-                      value={selectedYear.toString()} 
+                    <Select
+                      value={selectedYear.toString()}
                       onValueChange={(val) => setSelectedYear(parseInt(val))}
                     >
                       <SelectTrigger className="w-32">
@@ -498,7 +488,7 @@ export default function HolidayManagement() {
                           const TypeIcon = typeConfig.icon;
 
                           return (
-                            <div 
+                            <div
                               key={holiday.id}
                               className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all"
                             >
@@ -571,11 +561,11 @@ export default function HolidayManagement() {
 
         {/* Create/Edit Modal */}
         {showForm && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             onClick={resetForm}
           >
-            <Card 
+            <Card
               className="max-w-2xl w-full"
               onClick={(e) => e.stopPropagation()}
             >
@@ -584,8 +574,8 @@ export default function HolidayManagement() {
                   <CardTitle className="text-xl font-bold">
                     {editingHoliday ? "Editar Feriado" : "Nuevo Feriado"}
                   </CardTitle>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="icon"
                     onClick={resetForm}
                   >
@@ -633,7 +623,7 @@ export default function HolidayManagement() {
                       <label className="block text-sm font-semibold text-slate-900 mb-2">
                         Tipo de Feriado *
                       </label>
-                      <Select 
+                      <Select
                         value={formData.type}
                         onValueChange={(value) => setFormData({ ...formData, type: value })}
                       >
@@ -690,8 +680,8 @@ export default function HolidayManagement() {
                       onClick={handleSubmit}
                       disabled={createHolidayMutation.isPending || updateHolidayMutation.isPending}
                     >
-                      {(createHolidayMutation.isPending || updateHolidayMutation.isPending) 
-                        ? "Guardando..." 
+                      {(createHolidayMutation.isPending || updateHolidayMutation.isPending)
+                        ? "Guardando..."
                         : (editingHoliday ? "Actualizar" : "Crear Feriado")}
                     </Button>
                   </div>
@@ -703,11 +693,11 @@ export default function HolidayManagement() {
 
         {/* Load Holidays Modal */}
         {showLoadHolidaysModal && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             onClick={() => setShowLoadHolidaysModal(false)}
           >
-            <Card 
+            <Card
               className="max-w-md w-full"
               onClick={(e) => e.stopPropagation()}
             >
@@ -716,8 +706,8 @@ export default function HolidayManagement() {
                   <CardTitle className="text-xl font-bold">
                     Cargar Feriados Nacionales
                   </CardTitle>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="icon"
                     onClick={() => setShowLoadHolidaysModal(false)}
                   >
@@ -731,8 +721,8 @@ export default function HolidayManagement() {
                     <label className="block text-sm font-semibold text-slate-900 mb-2">
                       Seleccione el año
                     </label>
-                    <Select 
-                      value={yearToLoad.toString()} 
+                    <Select
+                      value={yearToLoad.toString()}
                       onValueChange={(val) => setYearToLoad(parseInt(val))}
                     >
                       <SelectTrigger>
@@ -752,7 +742,7 @@ export default function HolidayManagement() {
 
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-900">
-                      Se cargarán los feriados oficiales del Perú para el año {yearToLoad}. 
+                      Se cargarán los feriados oficiales del Perú para el año {yearToLoad}.
                       {yearToLoad > 2026 && (
                         <span className="block mt-2 text-xs text-blue-700">
                           ⚠️ Los feriados móviles como Semana Santa no se incluyen para años futuros sin fecha definida.

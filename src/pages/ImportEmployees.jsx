@@ -121,7 +121,7 @@ export default function ImportEmployees() {
       // Paso 1: Subir archivo
       currentStep = "subiendo archivo";
       setUploadProgress("Paso 1/2: Subiendo archivo al servidor...");
-      console.log("📤 PASO 1: Iniciando subida de archivo...");
+      console.log("PASO 1: Iniciando subida de archivo...");
       toast.loading("Subiendo archivo al servidor...", { id: "upload" });
 
       const uploadResult = await Promise.race([
@@ -131,19 +131,19 @@ export default function ImportEmployees() {
         )
       ]);
 
-      console.log("✅ PASO 1 COMPLETADO - Archivo subido:", uploadResult);
+      console.log("PASO 1 COMPLETADO - Archivo subido:", uploadResult);
 
       if (!uploadResult || !uploadResult.file_url) {
         throw new Error("Error del servidor: No se recibió la URL del archivo");
       }
 
       const { file_url } = uploadResult;
-      console.log("🔗 URL del archivo obtenida:", file_url);
+      console.log("URL del archivo obtenida:", file_url);
 
       // Paso 2: Extraer datos
       currentStep = "extrayendo datos del archivo";
       setUploadProgress("Paso 2/2: Extrayendo datos de empleados...");
-      console.log("🔄 PASO 2: Iniciando extracción de datos...");
+      console.log("PASO 2: Iniciando extracción de datos...");
       toast.loading("Extrayendo datos de empleados...", { id: "upload" });
 
       const result = await Promise.race([
@@ -156,7 +156,7 @@ export default function ImportEmployees() {
         )
       ]);
 
-      console.log("📊 PASO 2 COMPLETADO - Resultado:", result);
+      console.log("PASO 2 COMPLETADO - Resultado:", result);
 
       if (result.status === "success" && result.output) {
         if (!Array.isArray(result.output)) {
@@ -167,7 +167,7 @@ export default function ImportEmployees() {
           throw new Error("El archivo está vacío o no contiene empleados válidos");
         }
 
-        console.log("✅ Extracción exitosa:", result.output.length, "empleados");
+        console.log("Extracción exitosa:", result.output.length, "empleados");
         console.log("Muestra:", result.output.slice(0, 2));
 
         setPreviewData(result.output);
@@ -181,13 +181,13 @@ export default function ImportEmployees() {
           errorMsg = "El archivo CSV tiene un formato incorrecto. Por favor, descarga y usa la plantilla proporcionada. Asegúrate de usar comas (,) como separadores, no punto y coma (;).";
         }
 
-        console.error("❌ Error en extracción:", result);
+        console.error("Error en extracción:", result);
         throw new Error(errorMsg);
       }
     } catch (error) {
-      console.error("❌ ERROR EN:", currentStep);
-      console.error("❌ Error completo:", error);
-      console.error("❌ Stack:", error.stack);
+      console.error("ERROR EN:", currentStep);
+      console.error("Error completo:", error);
+      console.error("Stack:", error.stack);
 
       let userMessage = "";
 
@@ -220,7 +220,7 @@ export default function ImportEmployees() {
     mutationFn: async (data) => {
       console.log("Ejecutando importación de", data.length, "empleados");
       toast.loading(`Importando ${data.length} empleados, por favor espera...`, { id: "import" });
-      const result = await base44.entities.Employee.bulkCreate(data);
+      const result = await entitiesAPI.Employee.bulkCreate(data);
       console.log("Importación completada:", result);
       return result;
     },
