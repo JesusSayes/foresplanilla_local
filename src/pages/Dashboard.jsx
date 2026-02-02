@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useAuth } from "@/lib/AuthContext";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,8 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 export default function Dashboard() {
-  const { user, isLoadingAuth } = useAuth();
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function Dashboard() {
     queryKey: ["latestPayslip", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return null;
-      const payslips = await base44.entities.Payslip.filter(
+      const payslips = await entitiesAPI.Payslip.filter(
         { employee_id: employee.id },
         "-year,-month",
         1
@@ -47,7 +47,7 @@ export default function Dashboard() {
     queryKey: ["vacationBalance", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return null;
-      const balances = await base44.entities.VacationBalance.filter(
+      const balances = await entitiesAPI.VacationBalance.filter(
         { employee_id: employee.id, is_active: true },
         "-period_start",
         1
@@ -61,7 +61,7 @@ export default function Dashboard() {
     queryKey: ["pendingRequests", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return [];
-      return await base44.entities.VacationRequest.filter(
+      return await entitiesAPI.VacationRequest.filter(
         { employee_id: employee.id, status: "Pendiente" }
       );
     },
@@ -97,7 +97,7 @@ export default function Dashboard() {
     );
   }
 
-  const yearsOfService = employee.hire_date 
+  const yearsOfService = employee.hire_date
     ? Math.floor((new Date() - new Date(employee.hire_date)) / (365.25 * 24 * 60 * 60 * 1000))
     : 0;
 
@@ -141,8 +141,8 @@ export default function Dashboard() {
             <div className="flex gap-6">
               <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-xl">
                 {employee.photo_url ? (
-                  <img 
-                    src={employee.photo_url} 
+                  <img
+                    src={employee.photo_url}
                     alt={employee.first_name}
                     className="w-full h-full rounded-2xl object-cover"
                   />
@@ -391,10 +391,10 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <div className="w-full bg-slate-200 rounded-full h-3">
-                      <div 
+                      <div
                         className="bg-gradient-to-r from-green-500 to-emerald-500 h-3 rounded-full transition-all duration-500"
-                        style={{ 
-                          width: `${(vacationBalance.days_taken / vacationBalance.total_entitled_days) * 100}%` 
+                        style={{
+                          width: `${(vacationBalance.days_taken / vacationBalance.total_entitled_days) * 100}%`
                         }}
                       />
                     </div>

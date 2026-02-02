@@ -17,15 +17,27 @@ export default function SystemRoleInitializer() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
-      updateEmployeeStatuses().then(result => {
-        if (result.success && result.updatedCount > 0) {
-          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
+    const initializeData = async () => {
+      if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+        try {
+          const result = await updateEmployeeStatuses();
+          if (result.success && result.updatedCount > 0) {
+            console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
+          }
+        } catch (error) {
+          console.error('Error actualizando estados:', error);
         }
-      });
-    }
-    const roles = await entitiesAPI.Role.list();
-    setExistingRoles(roles);
+      }
+
+      try {
+        const roles = await entitiesAPI.Role.list();
+        setExistingRoles(roles);
+      } catch (error) {
+        console.error('Error cargando roles:', error);
+      }
+    };
+
+    initializeData();
   }, [currentUser]);
 
   const SYSTEM_ROLES = [

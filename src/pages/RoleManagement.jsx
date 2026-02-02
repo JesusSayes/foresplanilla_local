@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Shield, Plus, Edit, Trash2, Users, CheckSquare, 
+import {
+  Shield, Plus, Edit, Trash2, Users, CheckSquare,
   Search, UserPlus, X
 } from "lucide-react";
 import { toast } from "sonner";
@@ -17,8 +18,8 @@ import PermissionGuard from "../components/PermissionGuard";
 import PermissionMatrix from "../components/roles/PermissionMatrix";
 
 export default function RoleManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [showRoleForm, setShowRoleForm] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
   const [roleFormData, setRoleFormData] = useState({
@@ -35,50 +36,39 @@ export default function RoleManagement() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: roles = [] } = useQuery({
     queryKey: ["roles"],
     queryFn: async () => {
-      return await base44.entities.Role.list("-created_date");
+      return await entitiesAPI.Role.list("-created_date");
     },
   });
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
 
   const { data: userRoles = [] } = useQuery({
     queryKey: ["userRoles"],
     queryFn: async () => {
-      return await base44.entities.UserRole.list("-created_date");
+      return await entitiesAPI.UserRole.list("-created_date");
     },
   });
 
   const createRoleMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.Role.create(data);
+      return await entitiesAPI.Role.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["roles"]);
@@ -92,7 +82,7 @@ export default function RoleManagement() {
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.Role.update(id, data);
+      return await entitiesAPI.Role.update(id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["roles"]);
@@ -106,7 +96,7 @@ export default function RoleManagement() {
 
   const deleteRoleMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.Role.delete(id);
+      return await entitiesAPI.Role.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["roles"]);
@@ -121,7 +111,7 @@ export default function RoleManagement() {
     mutationFn: async ({ employeeId, roleIds }) => {
       // Eliminar asignaciones existentes
       const existing = userRoles.filter(ur => ur.employee_id === employeeId);
-      await Promise.all(existing.map(ur => base44.entities.UserRole.delete(ur.id)));
+      await Promise.all(existing.map(ur => entitiesAPI.UserRole.delete(ur.id)));
 
       // Crear nuevas asignaciones
       const assignments = roleIds.map(roleId => ({
@@ -130,8 +120,8 @@ export default function RoleManagement() {
         assigned_by: employee.work_email,
         assigned_date: new Date().toISOString().split('T')[0],
       }));
-      
-      await Promise.all(assignments.map(a => base44.entities.UserRole.create(a)));
+
+      await Promise.all(assignments.map(a => entitiesAPI.UserRole.create(a)));
 
       // Actualizar el campo role en Employee para mantener compatibilidad
       const emp = allEmployees.find(e => e.id === employeeId);
@@ -145,7 +135,7 @@ export default function RoleManagement() {
           } else if (primaryRole.name.toLowerCase().includes("manager") || primaryRole.name.toLowerCase().includes("gerente")) {
             legacyRole = "manager";
           }
-          await base44.entities.Employee.update(employeeId, { role: legacyRole });
+          await entitiesAPI.Employee.update(employeeId, { role: legacyRole });
         }
       }
     },
@@ -221,8 +211,8 @@ export default function RoleManagement() {
   };
 
   const toggleRoleSelection = (roleId) => {
-    setSelectedRoles(prev => 
-      prev.includes(roleId) 
+    setSelectedRoles(prev =>
+      prev.includes(roleId)
         ? prev.filter(id => id !== roleId)
         : [...prev, roleId]
     );
@@ -243,23 +233,23 @@ export default function RoleManagement() {
 
   const permissionCategories = {
     "Empleados": [
-      "employees.view", "employees.edit", "employees.create", "employees.delete", 
+      "employees.view", "employees.edit", "employees.create", "employees.delete",
       "employees.import", "employees.export", "employees.change_status"
     ],
     "Asistencia": [
-      "attendance.view_own", "attendance.view_all", "attendance.view_department", 
+      "attendance.view_own", "attendance.view_all", "attendance.view_department",
       "attendance.edit", "attendance.approve_incidents", "attendance.manage", "attendance.export"
     ],
     "Vacaciones": [
-      "vacations.view_own", "vacations.view_all", "vacations.view_department", 
+      "vacations.view_own", "vacations.view_all", "vacations.view_department",
       "vacations.approve", "vacations.manage", "vacations.calendar"
     ],
     "Nómina": [
-      "payroll.view_own", "payroll.view_all", "payroll.edit", "payroll.create", 
+      "payroll.view_own", "payroll.view_all", "payroll.edit", "payroll.create",
       "payroll.delete", "payroll.calculate", "payroll.approve"
     ],
     "Certificados": [
-      "certificates.view_own", "certificates.view_all", "certificates.approve", 
+      "certificates.view_own", "certificates.view_all", "certificates.approve",
       "certificates.create", "certificates.request"
     ],
     "Horarios": [
@@ -281,7 +271,7 @@ export default function RoleManagement() {
       "banks.view", "banks.create", "banks.edit", "banks.delete"
     ],
     "Reportes": [
-      "reports.view", "reports.export", "reports.attendance", "reports.payroll", 
+      "reports.view", "reports.export", "reports.attendance", "reports.payroll",
       "reports.vacations", "reports.employees"
     ],
     "Administración": [
@@ -517,11 +507,11 @@ export default function RoleManagement() {
 
         {/* Role Form Modal */}
         {showRoleForm && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             onClick={resetRoleForm}
           >
-            <Card 
+            <Card
               className="max-w-4xl w-full max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
@@ -601,7 +591,7 @@ export default function RoleManagement() {
 
         {/* Assign Roles Modal */}
         {showAssignModal && selectedEmployee && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             onClick={() => {
               setShowAssignModal(false);
@@ -609,7 +599,7 @@ export default function RoleManagement() {
               setSelectedRoles([]);
             }}
           >
-            <Card 
+            <Card
               className="max-w-2xl w-full"
               onClick={(e) => e.stopPropagation()}
             >
@@ -621,8 +611,8 @@ export default function RoleManagement() {
                       {selectedEmployee.first_name} {selectedEmployee.last_name}
                     </p>
                   </div>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="icon"
                     onClick={() => {
                       setShowAssignModal(false);
