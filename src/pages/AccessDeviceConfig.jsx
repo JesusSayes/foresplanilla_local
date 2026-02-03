@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,21 +10,23 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Fingerprint, Plus, Trash2, Edit2, CheckCircle, 
+import {
+  Fingerprint, Plus, Trash2, Edit2, CheckCircle,
   AlertCircle, Activity, Users, Server, KeyRound
 } from "lucide-react";
 import { toast } from "sonner";
 import DeviceEventMonitor from "../components/attendance/DeviceEventMonitor";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function AccessDeviceConfig() {
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [showDeviceForm, setShowDeviceForm] = useState(false);
   const [showMappingForm, setShowMappingForm] = useState(false);
   const [editingDevice, setEditingDevice] = useState(null);
   const [editingMapping, setEditingMapping] = useState(null);
   const [selectedDevice, setSelectedDevice] = useState(null);
-  
+
   const [deviceFormData, setDeviceFormData] = useState({
     device_name: "",
     device_type: "Lector de Huella",
@@ -52,51 +55,42 @@ export default function AccessDeviceConfig() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadEmployee = async () => {
-      try {
-        const user = await base44.auth.me();
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading employee:", error);
-      }
-    };
-
-    loadEmployee();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: devices = [] } = useQuery({
     queryKey: ["accessDevices"],
     queryFn: async () => {
-      return await base44.entities.AccessDevice.list("-created_date");
+      return await entitiesAPI.AccessDevice.list("-created_date");
     },
   });
 
   const { data: mappings = [] } = useQuery({
     queryKey: ["employeeMappings"],
     queryFn: async () => {
-      return await base44.entities.EmployeeAccessMapping.list("-created_date");
+      return await entitiesAPI.EmployeeAccessMapping.list("-created_date");
     },
   });
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
 
   const createDeviceMutation = useMutation({
     mutationFn: async (data) => {
       if (editingDevice) {
-        return await base44.entities.AccessDevice.update(editingDevice.id, data);
+        return await entitiesAPI.AccessDevice.update(editingDevice.id, data);
       }
-      return await base44.entities.AccessDevice.create(data);
+      return await entitiesAPI.AccessDevice.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["accessDevices"]);
@@ -110,7 +104,7 @@ export default function AccessDeviceConfig() {
 
   const deleteDeviceMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.AccessDevice.delete(id);
+      return await entitiesAPI.AccessDevice.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["accessDevices"]);
@@ -121,9 +115,9 @@ export default function AccessDeviceConfig() {
   const createMappingMutation = useMutation({
     mutationFn: async (data) => {
       if (editingMapping) {
-        return await base44.entities.EmployeeAccessMapping.update(editingMapping.id, data);
+        return await entitiesAPI.EmployeeAccessMapping.update(editingMapping.id, data);
       }
-      return await base44.entities.EmployeeAccessMapping.create(data);
+      return await entitiesAPI.EmployeeAccessMapping.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["employeeMappings"]);
@@ -137,7 +131,7 @@ export default function AccessDeviceConfig() {
 
   const deleteMappingMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.EmployeeAccessMapping.delete(id);
+      return await entitiesAPI.EmployeeAccessMapping.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["employeeMappings"]);

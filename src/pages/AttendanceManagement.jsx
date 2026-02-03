@@ -83,8 +83,6 @@ export default function AttendanceManagement() {
     }
   }, [currentUser]);
 
-
-
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {

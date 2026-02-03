@@ -19,6 +19,7 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import ClockInOutWidget from "../components/attendance/ClockInOutWidget";
 import IncidentHistory from "../components/attendance/IncidentHistory";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function Attendance() {
   const { user: currentUser } = useAuth();
