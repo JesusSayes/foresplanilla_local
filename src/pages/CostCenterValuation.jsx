@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
+import {
   DollarSign, Download, FileSpreadsheet, Search, Calendar,
   Building2, Users, TrendingUp, ArrowLeft
 } from "lucide-react";
@@ -17,47 +18,41 @@ import * as XLSX from 'xlsx';
 import { createPageUrl } from "../utils";
 
 export default function CostCenterValuation() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-        const employees = await base44.entities.Employee.filter({ work_email: user.email });
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: costCenters = [] } = useQuery({
     queryKey: ["costCenters"],
-    queryFn: () => base44.entities.CostCenter.list("code"),
+    queryFn: () => entitiesAPI.CostCenter.list("code"),
   });
 
   const { data: assignments = [] } = useQuery({
     queryKey: ["costCenterAssignments"],
-    queryFn: () => base44.entities.CostCenterAssignment.list("-created_date"),
+    queryFn: () => entitiesAPI.CostCenterAssignment.list("-created_date"),
   });
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
-    queryFn: () => base44.entities.Employee.list("first_name"),
+    queryFn: () => entitiesAPI.Employee.list("first_name"),
   });
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
-      const allDepts = await base44.entities.Department.list("name");
+      const allDepts = await entitiesAPI.Department.list("name");
       return allDepts.filter(d => d.is_active);
     },
   });
@@ -69,8 +64,8 @@ export default function CostCenterValuation() {
     costCenters.forEach(cc => {
       if (!cc.is_active) return;
 
-      const ccAssignments = assignments.filter(a => 
-        a.cost_center_id === cc.id && 
+      const ccAssignments = assignments.filter(a =>
+        a.cost_center_id === cc.id &&
         a.is_active &&
         (!a.end_date || new Date(a.end_date) >= new Date())
       );
@@ -103,12 +98,12 @@ export default function CostCenterValuation() {
       ccAssignments
         .filter(a => a.assignment_type === "Departamento")
         .forEach(assignment => {
-          const deptEmployees = allEmployees.filter(e => 
-            e.department_name === assignment.department_name && 
+          const deptEmployees = allEmployees.filter(e =>
+            e.department_name === assignment.department_name &&
             e.status === "Activo" &&
             e.base_salary
           );
-          
+
           deptEmployees.forEach(emp => {
             const salaryPortion = (emp.base_salary * assignment.percentage) / 100;
             totalSalary += salaryPortion;
@@ -141,7 +136,7 @@ export default function CostCenterValuation() {
   }, [costCenters, assignments, allEmployees]);
 
   const filteredData = valuationData.filter(item => {
-    const matchesSearch = 
+    const matchesSearch =
       item.costCenter.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.costCenter.code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === "all" || item.costCenter.category === categoryFilter;

@@ -39,7 +39,7 @@ export default function HRDashboard() {
           // if (employees[0].role === "admin" || employees[0].role === "super_admin") {
             // updateEmployeeStatuses().then(result => {
               // if (result.success && result.updatedCount > 0) {
-                // console.log(`✅ ${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
+                // console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
               // }
             // });
           // }
@@ -58,6 +58,7 @@ export default function HRDashboard() {
   useEffect(() => {
     if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
       updateEmployeeStatuses().then(result => {
+        // Ejecutar actualización automática de estados de empleados (solo para admin)
         if (result.success && result.updatedCount > 0) {
           console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }

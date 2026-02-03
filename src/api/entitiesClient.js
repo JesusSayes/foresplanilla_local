@@ -48,8 +48,6 @@ export const entitiesAPI = {
   UserRole: createEntityAPI('/api/users/roles'),
   EmployeeChangeLog: createEntityAPI('/api/employees/changelog'),
   Contract: createEntityAPI('/api/contracts'),
-
-  // TODO: Implementar en backend
   ContractTemplate: createEntityAPI('/api/contracts/templates'),
   ContractClause: createEntityAPI('/api/contracts/clauses'),
   ContractRenewalRule: createEntityAPI('/api/contracts/renewal-rules'),

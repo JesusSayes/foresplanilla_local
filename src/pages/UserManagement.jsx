@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Users, Mail, UserPlus, Search, Shield, 
+import {
+  Users, Mail, UserPlus, Search, Shield,
   CheckCircle2, XCircle, AlertCircle, Send, Edit2, Trash2, Ban
 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,8 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function UserManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showInviteModal, setShowInviteModal] = useState(null);
@@ -33,30 +34,19 @@ export default function UserManagement() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.list();
+      return await entitiesAPI.Employee.list();
     },
     enabled: !!employee && ["admin", "super_admin"].includes(employee.role),
   });
@@ -64,7 +54,7 @@ export default function UserManagement() {
   const { data: allUsers = [] } = useQuery({
     queryKey: ["allUsers"],
     queryFn: async () => {
-      return await base44.entities.User.list();
+      return await entitiesAPI.User.list();
     },
     enabled: !!employee && ["admin", "super_admin"].includes(employee.role),
   });
@@ -72,7 +62,7 @@ export default function UserManagement() {
   const { data: allInvitations = [] } = useQuery({
     queryKey: ["allInvitations"],
     queryFn: async () => {
-      return await base44.entities.UserInvitation.list("-invited_at");
+      return await entitiesAPI.UserInvitation.list("-invited_at");
     },
     enabled: !!employee && ["admin", "super_admin"].includes(employee.role),
   });
@@ -81,16 +71,16 @@ export default function UserManagement() {
     mutationFn: async ({ email, name, role, employeeId }) => {
       // Usar la función oficial de Base44 para invitar usuarios
       await base44.users.inviteUser(email, role || "user");
-      
+
       // Registrar la invitación en la base de datos
-      await base44.entities.UserInvitation.create({
+      await entitiesAPI.UserInvitation.create({
         employee_id: employeeId,
         email: email,
         invited_by: currentUser?.email || "Sistema",
         invited_at: new Date().toISOString(),
         status: "Enviada"
       });
-      
+
       // Opcionalmente enviar email adicional con información
       try {
         await base44.integrations.Core.SendEmail({
@@ -112,7 +102,7 @@ Equipo de Recursos Humanos
       } catch (emailError) {
         console.log("Email adicional no enviado:", emailError);
       }
-      
+
       return { email, name, employeeId };
     },
     onSuccess: (data) => {
@@ -147,7 +137,7 @@ Equipo de Recursos Humanos
 
   const updateUserMutation = useMutation({
     mutationFn: async ({ userId, userData }) => {
-      return await base44.entities.User.update(userId, userData);
+      return await entitiesAPI.User.update(userId, userData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["allUsers"]);
@@ -161,7 +151,7 @@ Equipo de Recursos Humanos
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId) => {
-      return await base44.entities.User.delete(userId);
+      return await entitiesAPI.User.delete(userId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["allUsers"]);
@@ -174,7 +164,7 @@ Equipo de Recursos Humanos
 
   const updateEmployeeRoleMutation = useMutation({
     mutationFn: async ({ employeeId, role }) => {
-      return await base44.entities.Employee.update(employeeId, { role });
+      return await entitiesAPI.Employee.update(employeeId, { role });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["allEmployees"]);
@@ -214,7 +204,7 @@ Equipo de Recursos Humanos
     }
 
     const emp = allEmployees.find(e => e.work_email === inviteEmail);
-    
+
     if (!emp) {
       toast.error("El email no corresponde a ningún empleado registrado en el sistema");
       return;
@@ -227,7 +217,7 @@ Equipo de Recursos Humanos
     if (emp.role === "admin" || emp.role === "super_admin") {
       inviteRole = "admin";
     }
-    
+
     sendInviteMutation.mutate({
       email: inviteEmail,
       name: `${emp.first_name} ${emp.last_name}`,
@@ -280,7 +270,7 @@ Equipo de Recursos Humanos
   const handleSuspendUser = async (emp, currentStatus) => {
     const newStatus = currentStatus === "Activo" ? "Suspendido" : "Activo";
     try {
-      await base44.entities.Employee.update(emp.id, { status: newStatus });
+      await entitiesAPI.Employee.update(emp.id, { status: newStatus });
       queryClient.invalidateQueries(["allEmployees"]);
       toast.success(`Usuario ${newStatus === "Suspendido" ? "suspendido" : "reactivado"} correctamente`);
     } catch (error) {
@@ -307,32 +297,32 @@ Equipo de Recursos Humanos
   };
 
   const allCorporateEmployees = allEmployees.filter(emp => emp.work_email);
-  
+
   const applyFilters = (employees) => {
     let filtered = employees;
-    
+
     // Aplicar filtro de búsqueda
     if (searchTerm) {
-      filtered = filtered.filter(emp => 
+      filtered = filtered.filter(emp =>
         emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.work_email.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     // Aplicar filtro de estado
     if (statusFilter !== "all") {
       filtered = filtered.filter(emp => emp.status === statusFilter);
     }
-    
+
     return filtered;
   };
 
   const employeesWithUsers = applyFilters(
     allCorporateEmployees.filter(emp => getUserForEmployee(emp.work_email))
   );
-  
+
   const employeesWithoutUsers = applyFilters(
     allCorporateEmployees.filter(emp => !getUserForEmployee(emp.work_email))
   );
@@ -544,7 +534,7 @@ Equipo de Recursos Humanos
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <Badge 
+                            <Badge
                               className={
                                 emp.status === "Cesado"
                                   ? "bg-red-100 text-red-700 border-red-200"
@@ -555,7 +545,7 @@ Equipo de Recursos Humanos
                             >
                               {emp.status}
                             </Badge>
-                            <Badge 
+                            <Badge
                               className={
                                 emp.role === "admin" || emp.role === "super_admin"
                                   ? "bg-purple-100 text-purple-700"
@@ -657,7 +647,7 @@ Equipo de Recursos Humanos
                         <div
                           key={emp.id}
                           className={`flex items-center justify-between p-4 border-2 rounded-lg hover:shadow-md transition-all ${
-                            hasBeenInvited 
+                            hasBeenInvited
                               ? 'border-blue-200 bg-blue-50/30'
                               : 'border-orange-200 bg-orange-50/30'
                           }`}
@@ -691,7 +681,7 @@ Equipo de Recursos Humanos
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <Badge 
+                            <Badge
                               className={
                                 emp.status === "Cesado"
                                   ? "bg-red-100 text-red-700 border-red-200"
@@ -749,11 +739,11 @@ Equipo de Recursos Humanos
 
       {/* Edit User Modal */}
       {showUserModal && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
           onClick={() => resetUserForm()}
         >
-          <Card 
+          <Card
             className="max-w-lg w-full"
             onClick={(e) => e.stopPropagation()}
           >
@@ -762,9 +752,9 @@ Equipo de Recursos Humanos
                 <CardTitle className="text-xl font-bold">
                   {editingUser ? "Editar Usuario" : "Nuevo Usuario"}
                 </CardTitle>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => resetUserForm()}
                 >
                   ✕
@@ -821,7 +811,7 @@ Equipo de Recursos Humanos
                     <div className="text-sm text-blue-900">
                       <p className="font-semibold mb-1">Información:</p>
                       <p>
-                        Los cambios se aplicarán inmediatamente. 
+                        Los cambios se aplicarán inmediatamente.
                         El usuario verá reflejado su nuevo rol en el próximo inicio de sesión.
                       </p>
                     </div>
@@ -830,9 +820,9 @@ Equipo de Recursos Humanos
               )}
 
               <div className="flex gap-3 pt-4">
-                <Button 
-                  variant="outline" 
-                  className="flex-1" 
+                <Button
+                  variant="outline"
+                  className="flex-1"
                   onClick={() => resetUserForm()}
                 >
                   Cancelar
@@ -856,20 +846,20 @@ Equipo de Recursos Humanos
 
       {/* Manual Invite Modal */}
       {showInviteModal && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
           onClick={() => setShowInviteModal(false)}
         >
-          <Card 
+          <Card
             className="max-w-md w-full"
             onClick={(e) => e.stopPropagation()}
           >
             <CardHeader className="border-b">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl font-bold">Invitar Usuario Manualmente</CardTitle>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setShowInviteModal(false)}
                 >
                   ✕
@@ -910,7 +900,7 @@ Equipo de Recursos Humanos
                   <div className="text-sm text-blue-900">
                     <p className="font-semibold mb-1">Importante:</p>
                     <p>
-                      Se enviará un email de invitación a esta dirección. 
+                      Se enviará un email de invitación a esta dirección.
                       El usuario podrá acceder al sistema con su email corporativo.
                     </p>
                   </div>
@@ -918,9 +908,9 @@ Equipo de Recursos Humanos
               </div>
 
               <div className="flex gap-3 pt-4">
-                <Button 
-                  variant="outline" 
-                  className="flex-1" 
+                <Button
+                  variant="outline"
+                  className="flex-1"
                   onClick={() => setShowInviteModal(false)}
                 >
                   Cancelar

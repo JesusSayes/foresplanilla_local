@@ -81,9 +81,9 @@ export const filter = async (req, res) => {
 
     const where = {};
 
-    if (filters.employee_id) {
-      where.employee_id = filters.employee_id;
-    }
+    // if (filters.employee_id) {
+      // where.employee_id = filters.employee_id;
+    // }
 
     // Parse sort: "-year,-month"
     // const sortParts = sort.split(',');
@@ -94,9 +94,10 @@ export const filter = async (req, res) => {
     // });
     const sortParts = 'id';
     const desc = true;
-    const field = 'desc';
+    const field = 'id';
+    const orderBy = { [field]: desc ? 'desc' : 'asc' };
 
-    const payslips = await entitiesAPI.Payslip.findMany({
+    const payslips = await MODEL.findMany({
       where,
       orderBy,
     });

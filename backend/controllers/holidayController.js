@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 
-export const getAllHolidays = async (req, res) => {
+export const getAll = async (req, res) => {
   try {
     const { year } = req.query;
 
@@ -29,7 +29,7 @@ export const getAllHolidays = async (req, res) => {
   }
 };
 
-export const getHolidayById = async (req, res) => {
+export const getById = async (req, res) => {
   try {
     const { id } = req.params;
     const holiday = await prisma.holiday.findUnique({
@@ -47,7 +47,7 @@ export const getHolidayById = async (req, res) => {
   }
 };
 
-export const createHoliday = async (req, res) => {
+export const create = async (req, res) => {
   try {
     const { name, date, type, is_mandatory, description } = req.body;
 
@@ -73,7 +73,7 @@ export const createHoliday = async (req, res) => {
   }
 };
 
-export const updateHoliday = async (req, res) => {
+export const update = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, date, type, is_mandatory, description } = req.body;
@@ -97,7 +97,7 @@ export const updateHoliday = async (req, res) => {
   }
 };
 
-export const deleteHoliday = async (req, res) => {
+export const remove = async (req, res) => {
   try {
     const { id } = req.params;
     await prisma.holiday.delete({
@@ -109,3 +109,13 @@ export const deleteHoliday = async (req, res) => {
     res.status(500).json({ error: 'Error al eliminar feriado' });
   }
 };
+
+const controller = {
+  getAll,
+  getById,
+  create,
+  update,
+  delete: remove, // aquí sí usamos la clave "delete"
+}
+
+export default controller;

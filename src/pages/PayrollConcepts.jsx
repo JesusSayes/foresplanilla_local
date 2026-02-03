@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -182,8 +182,8 @@ const PREDEFINED_CONCEPTS = {
 };
 
 export default function PayrollConcepts() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [activeTab, setActiveTab] = useState("general");
   const [showForm, setShowForm] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -213,31 +213,18 @@ export default function PayrollConcepts() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        // const employees = await base44.entities.Employee.filter({
-        const employees = await entitiesAPI.Employee.filter({
-          work_email: user.email
-        });
-
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      // return await base44.entities.Employee.filter({ status: "Activo" });
       return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
@@ -245,7 +232,6 @@ export default function PayrollConcepts() {
   const { data: afps = [] } = useQuery({
     queryKey: ["afps"],
     queryFn: async () => {
-      // const allAFPs = await base44.entities.AFP.list("name");
       const allAFPs = await entitiesAPI.AFP.list("name");
       return allAFPs.filter(a => a.is_active);
     },
@@ -256,11 +242,9 @@ export default function PayrollConcepts() {
     queryFn: async () => {
       if (activeTab === "general") {
         // Para configuración general, traer solo conceptos generales
-        // return await base44.entities.PayrollConcept.filter({ employee_id: "general" }, "-created_date");
         return await entitiesAPI.PayrollConcept.filter({ employee_id: "general" }, "-created_date");
       } else {
         // Para configuración individual, traer conceptos generales + conceptos del empleado
-        // const allConcepts = await base44.entities.PayrollConcept.list("-created_date");
         const allConcepts = await entitiesAPI.PayrollConcept.list("-created_date");
 
         // Filtrar conceptos generales o del empleado seleccionado
@@ -275,10 +259,8 @@ export default function PayrollConcepts() {
   const createConceptMutation = useMutation({
     mutationFn: async (data) => {
       if (editingConcept) {
-        // return await base44.entities.PayrollConcept.update(editingConcept.id, data);
         return await entitiesAPI.PayrollConcept.update(editingConcept.id, data);
       }
-      // return await base44.entities.PayrollConcept.create(data);
       return await entitiesAPI.PayrollConcept.create(data);
     },
     onSuccess: () => {
@@ -293,7 +275,6 @@ export default function PayrollConcepts() {
 
   const deleteConceptMutation = useMutation({
     mutationFn: async (id) => {
-      // return await base44.entities.PayrollConcept.delete(id);
       return await entitiesAPI.PayrollConcept.delete(id);
     },
     onSuccess: () => {
@@ -307,7 +288,6 @@ export default function PayrollConcepts() {
 
   const clearAllConceptsMutation = useMutation({
     mutationFn: async () => {
-      // const allConcepts = await base44.entities.PayrollConcept.list();
       const allConcepts = await entitiesAPI.PayrollConcept.list();
 
       // Filtrar conceptos a eliminar (todos excepto AFP y ONP automáticos)
@@ -316,7 +296,6 @@ export default function PayrollConcepts() {
       );
 
       for (const concept of conceptsToDelete) {
-        // await base44.entities.PayrollConcept.delete(concept.id);
         await entitiesAPI.PayrollConcept.delete(concept.id);
       }
 
@@ -339,7 +318,6 @@ export default function PayrollConcepts() {
         throw new Error("No hay empleados con sistema ONP");
       }
 
-      // const allConcepts = await base44.entities.PayrollConcept.list();
       const allConcepts = await entitiesAPI.PayrollConcept.list();
       let syncedCount = 0;
 
@@ -351,7 +329,6 @@ export default function PayrollConcepts() {
 
         if (!hasONP) {
           // Crear concepto ONP para este empleado
-          // await base44.entities.PayrollConcept.create({
           await entitiesAPI.PayrollConcept.create({
             employee_id: emp.id,
             concept_type: "Descuento",
@@ -463,7 +440,6 @@ export default function PayrollConcepts() {
       // Crear conceptos individuales para cada empleado con ONP
       for (const emp of onpEmployees) {
         try {
-          // await base44.entities.PayrollConcept.create({
           await entitiesAPI.PayrollConcept.create({
             ...conceptData,
             employee_id: emp.id,
@@ -596,7 +572,6 @@ export default function PayrollConcepts() {
             }
           }
 
-          // await base44.entities.PayrollConcept.create({
           await entitiesAPI.PayrollConcept.create({
             employee_id: emp.id,
             concept_type: concept.concept_type || "Ingreso",

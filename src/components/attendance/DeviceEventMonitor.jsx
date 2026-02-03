@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  CheckCircle, XCircle, AlertTriangle, Activity, 
+import {
+  CheckCircle, XCircle, AlertTriangle, Activity,
   Play, Square, Clock
 } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +14,8 @@ import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 
 export default function DeviceEventMonitor({ deviceId }) {
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationInterval, setSimulationInterval] = useState(null);
   const queryClient = useQueryClient();
@@ -20,7 +23,7 @@ export default function DeviceEventMonitor({ deviceId }) {
   const { data: events = [] } = useQuery({
     queryKey: ["deviceEvents", deviceId],
     queryFn: async () => {
-      const allEvents = await base44.entities.DeviceEvent.filter(
+      const allEvents = await entitiesAPI.DeviceEvent.filter(
         { device_id: deviceId },
         "-event_timestamp",
         20
@@ -33,7 +36,7 @@ export default function DeviceEventMonitor({ deviceId }) {
   const { data: device } = useQuery({
     queryKey: ["device", deviceId],
     queryFn: async () => {
-      const devices = await base44.entities.AccessDevice.list();
+      const devices = await entitiesAPI.AccessDevice.list();
       return devices.find(d => d.id === deviceId);
     },
   });
@@ -41,14 +44,14 @@ export default function DeviceEventMonitor({ deviceId }) {
   const { data: mappings = [] } = useQuery({
     queryKey: ["mappings"],
     queryFn: async () => {
-      return await base44.entities.EmployeeAccessMapping.filter({ is_active: true });
+      return await entitiesAPI.EmployeeAccessMapping.filter({ is_active: true });
     },
   });
 
   const { data: employees = [] } = useQuery({
     queryKey: ["employees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
 
@@ -56,10 +59,10 @@ export default function DeviceEventMonitor({ deviceId }) {
     mutationFn: async (event) => {
       // Buscar mapeo para este identificador
       const mapping = mappings.find(m => m.identifier_value === event.identifier_value);
-      
+
       if (!mapping) {
         // No se encontró mapeo
-        await base44.entities.DeviceEvent.update(event.id, {
+        await entitiesAPI.DeviceEvent.update(event.id, {
           processing_status: "No Identificado",
           error_message: "No se encontró mapeo para este identificador"
         });
@@ -68,7 +71,7 @@ export default function DeviceEventMonitor({ deviceId }) {
 
       const employee = employees.find(e => e.id === mapping.employee_id);
       if (!employee) {
-        await base44.entities.DeviceEvent.update(event.id, {
+        await entitiesAPI.DeviceEvent.update(event.id, {
           processing_status: "Fallido",
           error_message: "Empleado no encontrado"
         });
@@ -77,16 +80,16 @@ export default function DeviceEventMonitor({ deviceId }) {
 
       // Buscar o crear registro de asistencia para hoy
       const today = new Date().toISOString().split("T")[0];
-      const existingRecords = await base44.entities.AttendanceRecord.filter({
+      const existingRecords = await entitiesAPI.AttendanceRecord.filter({
         employee_id: employee.id,
         date: today
       });
 
       let attendanceRecord;
-      
+
       if (existingRecords.length === 0) {
         // Crear nuevo registro
-        attendanceRecord = await base44.entities.AttendanceRecord.create({
+        attendanceRecord = await entitiesAPI.AttendanceRecord.create({
           employee_id: employee.id,
           date: today,
           clock_in: event.event_type === "Entrada" ? new Date(event.event_timestamp).toTimeString().slice(0, 5) : null,
@@ -97,12 +100,12 @@ export default function DeviceEventMonitor({ deviceId }) {
         // Actualizar registro existente
         attendanceRecord = existingRecords[0];
         const updateData = {};
-        
+
         if (event.event_type === "Entrada" && !attendanceRecord.clock_in) {
           updateData.clock_in = new Date(event.event_timestamp).toTimeString().slice(0, 5);
         } else if (event.event_type === "Salida") {
           updateData.clock_out = new Date(event.event_timestamp).toTimeString().slice(0, 5);
-          
+
           // Calcular horas trabajadas si hay entrada y salida
           if (attendanceRecord.clock_in) {
             const [inHour, inMin] = attendanceRecord.clock_in.split(":").map(Number);
@@ -112,12 +115,12 @@ export default function DeviceEventMonitor({ deviceId }) {
             updateData.status = "Completo";
           }
         }
-        
-        await base44.entities.AttendanceRecord.update(attendanceRecord.id, updateData);
+
+        await entitiesAPI.AttendanceRecord.update(attendanceRecord.id, updateData);
       }
 
       // Actualizar evento como procesado
-      await base44.entities.DeviceEvent.update(event.id, {
+      await entitiesAPI.DeviceEvent.update(event.id, {
         employee_id: employee.id,
         processing_status: "Procesado",
         attendance_record_id: attendanceRecord.id
@@ -141,8 +144,8 @@ export default function DeviceEventMonitor({ deviceId }) {
       // Simular un evento de dispositivo
       const randomMapping = mappings[Math.floor(Math.random() * mappings.length)];
       const eventType = Math.random() > 0.5 ? "Entrada" : "Salida";
-      
-      const event = await base44.entities.DeviceEvent.create({
+
+      const event = await entitiesAPI.DeviceEvent.create({
         device_id: deviceId,
         event_timestamp: new Date().toISOString(),
         identifier_value: randomMapping ? randomMapping.identifier_value : `UNKNOWN_${Math.floor(Math.random() * 1000)}`,
@@ -261,7 +264,7 @@ export default function DeviceEventMonitor({ deviceId }) {
             ) : (
               events.map((event) => {
                 const employee = employees.find(e => e.id === event.employee_id);
-                
+
                 return (
                   <div
                     key={event.id}

@@ -83,11 +83,13 @@ export const filter = async (req, res) => {
   }
 };
 
-export default {
+const controller = {
   getAll,
   getById,
   create,
   update,
   delete: deleteTemplate,
-  filter
+  filter,
 };
+
+export default controller;

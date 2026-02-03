@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  DollarSign, FileText, Calendar, Users, Download, 
+import {
+  DollarSign, FileText, Calendar, Users, Download,
   Eye, CheckCircle, AlertCircle, Plus, Search, Lock, Edit2
 } from "lucide-react";
 import { format } from "date-fns";
@@ -22,8 +23,8 @@ import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
 
 export default function PayrollManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [payrollType, setPayrollType] = useState("Mensual");
@@ -40,37 +41,26 @@ export default function PayrollManagement() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
 
   const { data: existingPayslips = [] } = useQuery({
     queryKey: ["payslips", selectedMonth, selectedYear],
     queryFn: async () => {
-      return await base44.entities.Payslip.filter({ 
+      return await entitiesAPI.Payslip.filter({
         month: selectedMonth,
         year: selectedYear
       }, "-created_date");
@@ -82,8 +72,8 @@ export default function PayrollManagement() {
     queryFn: async () => {
       const startDate = new Date(selectedYear, selectedMonth - 1, 1);
       const endDate = new Date(selectedYear, selectedMonth, 0);
-      
-      const records = await base44.entities.AttendanceRecord.list("-date");
+
+      const records = await entitiesAPI.AttendanceRecord.list("-date");
       return records.filter(r => {
         const recordDate = new Date(r.date);
         return recordDate >= startDate && recordDate <= endDate;
@@ -94,19 +84,19 @@ export default function PayrollManagement() {
   const { data: payrollConcepts = [] } = useQuery({
     queryKey: ["payrollConcepts", selectedMonth, selectedYear],
     queryFn: async () => {
-      const allConcepts = await base44.entities.PayrollConcept.list();
-      
+      const allConcepts = await entitiesAPI.PayrollConcept.list();
+
       // Filtrar conceptos generales y específicos del mes/año
       return allConcepts.filter(c => {
         // Conceptos recurrentes
         if (c.is_recurring && !c.is_applied) return true;
-        
+
         // Conceptos específicos del mes/año
         if (c.month === selectedMonth && c.year === selectedYear && !c.is_applied) return true;
-        
+
         // Conceptos generales (sin mes/año específico)
         if (c.employee_id === "general" && !c.is_applied) return true;
-        
+
         return false;
       });
     },
@@ -115,7 +105,7 @@ export default function PayrollManagement() {
   const { data: rmvData } = useQuery({
     queryKey: ["rmv"],
     queryFn: async () => {
-      const rmvs = await base44.entities.RMV.filter({ is_active: true }, "-effective_date");
+      const rmvs = await entitiesAPI.RMV.filter({ is_active: true }, "-effective_date");
       return rmvs.length > 0 ? rmvs[0] : { amount: 1025 };
     },
   });
@@ -123,28 +113,28 @@ export default function PayrollManagement() {
   const { data: companyInfo } = useQuery({
     queryKey: ["companyInfo"],
     queryFn: async () => {
-      const companies = await base44.entities.CompanyInfo.filter({ is_active: true });
+      const companies = await entitiesAPI.CompanyInfo.filter({ is_active: true });
       return companies.length > 0 ? companies[0] : null;
     },
   });
 
   const createPayslipsMutation = useMutation({
     mutationFn: async (payslips) => {
-      const createdPayslips = await base44.entities.Payslip.bulkCreate(payslips);
-      
+      const createdPayslips = await entitiesAPI.Payslip.bulkCreate(payslips);
+
       // Marcar conceptos como aplicados
       const conceptsToUpdate = additionalConcepts.map(c => ({
         ...c,
         is_applied: true,
         payslip_id: createdPayslips.find(p => p.employee_id === c.employee_id)?.id
       }));
-      
+
       if (conceptsToUpdate.length > 0) {
-        await Promise.all(conceptsToUpdate.map(c => 
-          base44.entities.PayrollConcept.create(c)
+        await Promise.all(conceptsToUpdate.map(c =>
+          entitiesAPI.PayrollConcept.create(c)
         ));
       }
-      
+
       return createdPayslips;
     },
     onSuccess: () => {
@@ -163,7 +153,7 @@ export default function PayrollManagement() {
 
   const updatePayslipStatusMutation = useMutation({
     mutationFn: async ({ id, status }) => {
-      return await base44.entities.Payslip.update(id, { status });
+      return await entitiesAPI.Payslip.update(id, { status });
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries(["payslips"]);
@@ -177,23 +167,23 @@ export default function PayrollManagement() {
 
   const calculatePayroll = async () => {
     const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
-    
+
     // Filtrar empleados según búsqueda y departamento
     let filteredEmployees = allEmployees;
-    
+
     // Filtrar por tipo de contrato si es SNP
     if (payrollType === "SNP") {
       filteredEmployees = filteredEmployees.filter(emp => emp.contract_type === "SNP");
     }
-    
+
     if (searchTerm) {
-      filteredEmployees = filteredEmployees.filter(emp => 
+      filteredEmployees = filteredEmployees.filter(emp =>
         emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     if (departmentFilter !== "all") {
       filteredEmployees = filteredEmployees.filter(emp => emp.department_name === departmentFilter);
     }
@@ -205,7 +195,7 @@ export default function PayrollManagement() {
       // Preparar datos de asistencia
       const empAttendance = attendanceRecords.filter(r => r.employee_id === emp.id);
       const workedDays = payrollType === "Quincenal" ? 15 : empAttendance.filter(r => r.status === "Completo" || r.status === "Incompleto").length;
-      
+
       const attendanceData = {
         worked_days: workedDays,
         regular_hours: empAttendance.reduce((sum, r) => sum + (r.worked_hours || 0), 0),
@@ -235,8 +225,8 @@ export default function PayrollManagement() {
       let advanceDeduction = 0;
       let advancePaymentId = null;
       if (payrollType === "Mensual") {
-        const quincenalPayslip = existingPayslips.find(p => 
-          p.employee_id === emp.id && 
+        const quincenalPayslip = existingPayslips.find(p =>
+          p.employee_id === emp.id &&
           p.payroll_type === "Quincenal" &&
           p.month === selectedMonth &&
           p.year === selectedYear
@@ -296,39 +286,39 @@ export default function PayrollManagement() {
   const generatePDF = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-    
+
     doc.setFontSize(18);
     doc.text("Planilla de Pagos", pageWidth / 2, 20, { align: "center" });
-    
+
     doc.setFontSize(12);
     doc.text(`Tipo: ${payrollType}`, 14, 35);
     doc.text(`Periodo: ${format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}`, 14, 42);
-    
+
     let yPos = 55;
     previewData.forEach((payslip, index) => {
       if (yPos > 270) {
         doc.addPage();
         yPos = 20;
       }
-      
+
       doc.setFontSize(10);
       doc.setFont(undefined, 'bold');
       doc.text(`${payslip.employee_code} - ${payslip.employee_name}`, 14, yPos);
       doc.setFont(undefined, 'normal');
-      
+
       doc.text(`Salario Base: S/ ${payslip.base_salary.toFixed(2)}`, 14, yPos + 6);
       doc.text(`Total Descuentos: S/ ${payslip.total_deductions.toFixed(2)}`, 100, yPos + 6);
       doc.text(`Neto a Pagar: S/ ${payslip.net_pay.toFixed(2)}`, 14, yPos + 12);
-      
+
       doc.line(14, yPos + 16, pageWidth - 14, yPos + 16);
       yPos += 22;
     });
-    
+
     const totalNeto = previewData.reduce((sum, p) => sum + p.net_pay, 0);
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
     doc.text(`Total General: S/ ${totalNeto.toFixed(2)}`, 14, yPos + 5);
-    
+
     doc.save(`Planilla_${payrollType}_${selectedMonth}_${selectedYear}.pdf`);
     toast.success("PDF generado exitosamente");
   };
@@ -356,23 +346,23 @@ export default function PayrollManagement() {
   // Obtener empleados no incluidos en la planilla actual
   const getExcludedEmployeesData = () => {
     const includedIds = previewData.map(p => p.employee_id);
-    
+
     // Empleados que están en el filtro pero no en la preview
     let baseEmployees = allEmployees;
-    
+
     if (searchTerm) {
-      baseEmployees = baseEmployees.filter(emp => 
+      baseEmployees = baseEmployees.filter(emp =>
         emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     if (departmentFilter !== "all") {
       baseEmployees = baseEmployees.filter(emp => emp.department_name === departmentFilter);
     }
 
-    return baseEmployees.filter(emp => 
+    return baseEmployees.filter(emp =>
       !includedIds.includes(emp.id) || excludedEmployees.includes(emp.id)
     );
   };
@@ -380,15 +370,15 @@ export default function PayrollManagement() {
   const filteredPayslips = existingPayslips.filter(p => {
     const emp = allEmployees.find(e => e.id === p.employee_id);
     if (!emp) return false;
-    
+
     const matchesSearch = searchTerm ? (
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase())
     ) : true;
-    
+
     const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
-    
+
     return matchesSearch && matchesDept;
   });
 
@@ -962,11 +952,11 @@ export default function PayrollManagement() {
 
         {/* Modal de Vista Previa de Boleta */}
         {previewPayslip && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
             onClick={() => setPreviewPayslip(null)}
           >
-            <div 
+            <div
               className="max-w-4xl w-full my-8"
               onClick={(e) => e.stopPropagation()}
             >
@@ -979,8 +969,8 @@ export default function PayrollManagement() {
                   ✕ Cerrar
                 </Button>
               </div>
-              <PayslipPreview 
-                payslip={previewPayslip} 
+              <PayslipPreview
+                payslip={previewPayslip}
                 employee={allEmployees.find(e => e.id === previewPayslip.employee_id)}
                 companyInfo={companyInfo}
               />

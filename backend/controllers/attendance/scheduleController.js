@@ -3,8 +3,8 @@ const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
   try {
-    const schedules = await prisma.workSchedule.findMany({
-      orderBy: { name: 'asc' }
+    const schedules = await prisma.work_schedule.findMany({
+      orderBy: { schedule_name: 'asc' }
     });
     res.json(schedules);
   } catch (error) {
@@ -14,7 +14,7 @@ export const getAll = async (req, res) => {
 
 export const getById =  async (req, res) => {
   try {
-    const schedule = await prisma.workSchedule.findUnique({
+    const schedule = await prisma.work_schedule.findUnique({
       where: { id: parseInt(req.params.id) }
     });
     if (!schedule) return res.status(404).json({ error: 'Schedule not found' });
@@ -26,7 +26,7 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const schedule = await prisma.workSchedule.create({
+    const schedule = await prisma.work_schedule.create({
       data: req.body
     });
     res.status(201).json(schedule);
@@ -37,7 +37,7 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const schedule = await prisma.workSchedule.update({
+    const schedule = await prisma.work_schedule.update({
       where: { id: parseInt(req.params.id) },
       data: req.body
     });
@@ -49,7 +49,7 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
-    await prisma.workSchedule.delete({
+    await prisma.work_schedule.delete({
       where: { id: parseInt(req.params.id) }
     });
     res.status(204).send();

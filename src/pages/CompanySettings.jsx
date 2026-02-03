@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Building2, Save, Upload, Phone, Mail, 
+import {
+  Building2, Save, Upload, Phone, Mail,
   Globe, User, CreditCard, MapPin, FileText
 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function CompanySettings() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [logoFile, setLogoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
@@ -33,30 +34,19 @@ export default function CompanySettings() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: companyInfo, isLoading } = useQuery({
     queryKey: ["companyInfo"],
     queryFn: async () => {
-      const info = await base44.entities.CompanyInfo.list("-created_date");
+      const info = await entitiesAPI.CompanyInfo.list("-created_date");
       return info.length > 0 ? info[0] : null;
     },
   });
@@ -81,9 +71,9 @@ export default function CompanySettings() {
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       if (companyInfo) {
-        return await base44.entities.CompanyInfo.update(companyInfo.id, data);
+        return await entitiesAPI.CompanyInfo.update(companyInfo.id, data);
       } else {
-        return await base44.entities.CompanyInfo.create(data);
+        return await entitiesAPI.CompanyInfo.create(data);
       }
     },
     onSuccess: () => {
@@ -174,9 +164,9 @@ export default function CompanySettings() {
               <div className="flex items-center gap-6">
                 {formData.logo_url ? (
                   <div className="w-32 h-32 border-2 border-slate-200 rounded-lg overflow-hidden bg-white flex items-center justify-center">
-                    <img 
-                      src={formData.logo_url} 
-                      alt="Logo" 
+                    <img
+                      src={formData.logo_url}
+                      alt="Logo"
                       className="max-w-full max-h-full object-contain"
                     />
                   </div>
@@ -185,7 +175,7 @@ export default function CompanySettings() {
                     <Building2 className="w-12 h-12 text-slate-300" />
                   </div>
                 )}
-                
+
                 <div className="flex-1">
                   <Label htmlFor="logo" className="cursor-pointer">
                     <div className="flex items-center gap-2 px-4 py-2 border-2 border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors w-fit">

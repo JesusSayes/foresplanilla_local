@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,15 +10,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
+import {
   Building, MapPin, Briefcase, CreditCard, Plus, Edit, Trash2, Search, DollarSign, Target, Shield
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 
 export default function MasterDataManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [activeTab, setActiveTab] = useState("sites");
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -28,79 +29,68 @@ export default function MasterDataManagement() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: sites = [] } = useQuery({
     queryKey: ["sites"],
-    queryFn: async () => await base44.entities.Site.list("name"),
+    queryFn: async () => await entitiesAPI.Site.list("name"),
   });
 
   const { data: positions = [] } = useQuery({
     queryKey: ["positions"],
-    queryFn: async () => await base44.entities.Position.list("name"),
+    queryFn: async () => await entitiesAPI.Position.list("name"),
   });
 
   const { data: banks = [] } = useQuery({
     queryKey: ["banks"],
-    queryFn: async () => await base44.entities.Bank.list("name"),
+    queryFn: async () => await entitiesAPI.Bank.list("name"),
   });
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
-    queryFn: async () => await base44.entities.Department.list("name"),
+    queryFn: async () => await entitiesAPI.Department.list("name"),
   });
 
   const { data: rmvRecords = [] } = useQuery({
     queryKey: ["rmvs"],
-    queryFn: async () => await base44.entities.RMV.list("-effective_date"),
+    queryFn: async () => await entitiesAPI.RMV.list("-effective_date"),
   });
 
   const { data: afps = [] } = useQuery({
     queryKey: ["afps"],
-    queryFn: async () => await base44.entities.AFP.list("name"),
+    queryFn: async () => await entitiesAPI.AFP.list("name"),
   });
 
   const { data: professions = [] } = useQuery({
     queryKey: ["professions"],
-    queryFn: async () => await base44.entities.Profession.list("name"),
+    queryFn: async () => await entitiesAPI.Profession.list("name"),
   });
 
   const { data: costCenters = [] } = useQuery({
     queryKey: ["costcenters"],
-    queryFn: async () => await base44.entities.CostCenter.list("code"),
+    queryFn: async () => await entitiesAPI.CostCenter.list("code"),
   });
 
   const { data: seguroVidaLey = [] } = useQuery({
     queryKey: ["segurovida"],
-    queryFn: async () => await base44.entities.SeguroVidaLey.list("age_range_start"),
+    queryFn: async () => await entitiesAPI.SeguroVidaLey.list("age_range_start"),
   });
 
   const { data: uitRecords = [] } = useQuery({
     queryKey: ["uit"],
-    queryFn: async () => await base44.entities.UIT.list("-year"),
+    queryFn: async () => await entitiesAPI.UIT.list("-year"),
   });
 
   const createMutation = useMutation({
     mutationFn: async ({ entity, data }) => {
-      return await base44.entities[entity].create(data);
+      return await entitiesAPI[entity].create(data);
     },
     onSuccess: (_, { entity }) => {
       queryClient.invalidateQueries([entity.toLowerCase() + "s"]);
@@ -112,7 +102,7 @@ export default function MasterDataManagement() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ entity, id, data }) => {
-      return await base44.entities[entity].update(id, data);
+      return await entitiesAPI[entity].update(id, data);
     },
     onSuccess: (_, { entity }) => {
       queryClient.invalidateQueries([entity.toLowerCase() + "s"]);
@@ -124,7 +114,7 @@ export default function MasterDataManagement() {
 
   const deleteMutation = useMutation({
     mutationFn: async ({ entity, id }) => {
-      return await base44.entities[entity].delete(id);
+      return await entitiesAPI[entity].delete(id);
     },
     onSuccess: (_, { entity }) => {
       queryClient.invalidateQueries([entity.toLowerCase() + "s"]);
@@ -173,7 +163,7 @@ export default function MasterDataManagement() {
       try {
         const activeRMVs = rmvRecords.filter(r => r.is_active);
         for (const rmv of activeRMVs) {
-          await base44.entities.RMV.update(rmv.id, { is_active: false });
+          await entitiesAPI.RMV.update(rmv.id, { is_active: false });
         }
         queryClient.invalidateQueries(["rmvs"]);
       } catch (error) {
@@ -194,44 +184,44 @@ export default function MasterDataManagement() {
     setShowForm(false);
   };
 
-  const filteredSites = sites.filter(s => 
+  const filteredSites = sites.filter(s =>
     s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.code?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredPositions = positions.filter(p => 
+  const filteredPositions = positions.filter(p =>
     p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.department?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredDepartments = departments.filter(d => 
+  const filteredDepartments = departments.filter(d =>
     d.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     d.code?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredBanks = banks.filter(b => 
+  const filteredBanks = banks.filter(b =>
     b.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     b.code?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredRMVs = rmvRecords.filter(r => 
+  const filteredRMVs = rmvRecords.filter(r =>
     r.amount?.toString().includes(searchTerm) ||
     r.notes?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const activeRMV = rmvRecords.find(r => r.is_active);
 
-  const filteredAFPs = afps.filter(a => 
+  const filteredAFPs = afps.filter(a =>
     a.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     a.code?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredProfessions = professions.filter(p => 
+  const filteredProfessions = professions.filter(p =>
     p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredCostCenters = costCenters.filter(c => 
+  const filteredCostCenters = costCenters.filter(c =>
     c.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.category?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -1046,7 +1036,7 @@ export default function MasterDataManagement() {
                 {["Administración", "Ventas", "Transportes", "Oxapampa", "Lima - VES", "Operaciones Generales"].map(category => {
                   const categoryCenters = filteredCostCenters.filter(c => c.category === category);
                   if (categoryCenters.length === 0) return null;
-                  
+
                   return (
                     <div key={category} className="mb-6">
                       <h3 className="text-lg font-bold text-slate-900 mb-3 pb-2 border-b border-slate-200">
@@ -1232,11 +1222,11 @@ export default function MasterDataManagement() {
 
       {/* Form Modal */}
       {showForm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
           onClick={resetForm}
         >
-          <Card 
+          <Card
             className="max-w-2xl w-full"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1244,12 +1234,12 @@ export default function MasterDataManagement() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl font-bold">
                   {editingItem ? "Editar" : "Nuevo"} {
-                    activeTab === "sites" ? "Sede" : 
-                    activeTab === "positions" ? "Cargo" : 
-                    activeTab === "departments" ? "Departamento" : 
-                    activeTab === "banks" ? "Banco" : 
-                    activeTab === "rmv" ? "RMV" : 
-                    activeTab === "afp" ? "AFP" : 
+                    activeTab === "sites" ? "Sede" :
+                    activeTab === "positions" ? "Cargo" :
+                    activeTab === "departments" ? "Departamento" :
+                    activeTab === "banks" ? "Banco" :
+                    activeTab === "rmv" ? "RMV" :
+                    activeTab === "afp" ? "AFP" :
                     activeTab === "professions" ? "Profesión" :
                     activeTab === "costcenters" ? "Centro de Costos" :
                     activeTab === "segurovida" ? "Seguro Vida Ley" :
@@ -1318,8 +1308,8 @@ export default function MasterDataManagement() {
                     </div>
                     <div>
                       <Label>Nivel Jerárquico</Label>
-                      <Select 
-                        value={formData.level || ""} 
+                      <Select
+                        value={formData.level || ""}
                         onValueChange={(val) => setFormData({ ...formData, level: val })}
                       >
                         <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
@@ -1603,8 +1593,8 @@ export default function MasterDataManagement() {
                     </div>
                     <div>
                       <Label>Categoría *</Label>
-                      <Select 
-                        value={formData.category || ""} 
+                      <Select
+                        value={formData.category || ""}
                         onValueChange={(val) => setFormData({ ...formData, category: val })}
                       >
                         <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>

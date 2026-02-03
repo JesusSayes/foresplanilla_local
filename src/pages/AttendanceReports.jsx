@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,10 +22,11 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import PermissionGuard from "../components/PermissionGuard";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function AttendanceReports() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [startDate, setStartDate] = useState(startOfMonth(new Date()));
   const [endDate, setEndDate] = useState(endOfMonth(new Date()));
   const [selectedDepartment, setSelectedDepartment] = useState("all");
@@ -57,31 +58,18 @@ export default function AttendanceReports() {
   };
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        // const employees = await base44.entities.Employee.filter({
-        const employees = await entitiesAPI.Employee.filter({
-          work_email: user.email
-        });
-
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      // return await base44.entities.Employee.filter({ status: "Activo" });
       return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
@@ -89,7 +77,6 @@ export default function AttendanceReports() {
   const { data: workSchedules = [] } = useQuery({
     queryKey: ["workSchedules"],
     queryFn: async () => {
-      // return await base44.entities.WorkSchedule.list("-created_date");
       return await entitiesAPI.WorkSchedule.list("-created_date");
     },
   });
@@ -97,7 +84,6 @@ export default function AttendanceReports() {
   const { data: attendanceRecords = [] } = useQuery({
     queryKey: ["allAttendanceRecords", appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      // const records = await base44.entities.AttendanceRecord.list("-date");
       const records = await entitiesAPI.AttendanceRecord.list("-date");
       return records.filter(r => {
         const recordDate = new Date(r.date);
@@ -109,7 +95,6 @@ export default function AttendanceReports() {
   const { data: incidents = [] } = useQuery({
     queryKey: ["allIncidents", appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      // const allIncidents = await base44.entities.AttendanceIncident.list("-created_date");
       const allIncidents = await entitiesAPI.AttendanceIncident.list("-created_date");
       return allIncidents.filter(i => {
         const incidentDate = new Date(i.incident_date);
@@ -121,7 +106,6 @@ export default function AttendanceReports() {
   const { data: holidays = [] } = useQuery({
     queryKey: ["holidays"],
     queryFn: async () => {
-      // return await base44.entities.Holiday.list("-date");
       return await entitiesAPI.Holiday.list("-date");
     },
   });
@@ -129,7 +113,6 @@ export default function AttendanceReports() {
   const { data: vacationRequests = [] } = useQuery({
     queryKey: ["vacationRequests", appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      // const allRequests = await base44.entities.VacationRequest.list("-created_date");
       const allRequests = await entitiesAPI.VacationRequest.list("-created_date");
       return allRequests.filter(v => {
         if (v.status !== "Aprobada") return false;

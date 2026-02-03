@@ -60,7 +60,6 @@ export default function EmployeeManagement() {
   const { data: allEmployees = [], isLoading } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      // return await base44.entities.Employee.list("-created_date");
       return await entitiesAPI.Employee.list("-created_date");
     },
   });
@@ -68,7 +67,6 @@ export default function EmployeeManagement() {
   const { data: positions = [] } = useQuery({
     queryKey: ["positions"],
     queryFn: async () => {
-      // const allPositions = await base44.entities.Position.list("name");
       const allPositions = await entitiesAPI.Position.list("name");
       return allPositions.filter(p => p.is_active);
     },
@@ -77,7 +75,6 @@ export default function EmployeeManagement() {
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
-      // const allDepartments = await base44.entities.Department.list("name");
       const allDepartments = await entitiesAPI.Department.list("name");
       return allDepartments.filter(d => d.is_active);
     },
@@ -86,7 +83,6 @@ export default function EmployeeManagement() {
   const { data: banks = [] } = useQuery({
     queryKey: ["banks"],
     queryFn: async () => {
-      // const allBanks = await base44.entities.Bank.list("name");
       const allBanks = await entitiesAPI.Bank.list("name");
       return allBanks.filter(b => b.is_active);
     },
@@ -95,7 +91,6 @@ export default function EmployeeManagement() {
   const { data: sites = [] } = useQuery({
     queryKey: ["sites"],
     queryFn: async () => {
-      // const allSites = await base44.entities.Site.list("name");
       const allSites = await entitiesAPI.Site.list("name");
       return allSites.filter(s => s.is_active);
     },
@@ -104,7 +99,6 @@ export default function EmployeeManagement() {
   const { data: afps = [] } = useQuery({
     queryKey: ["afps"],
     queryFn: async () => {
-      // const allAFPs = await base44.entities.AFP.list("name");
       const allAFPs = await entitiesAPI.AFP.list("name");
       return allAFPs.filter(a => a.is_active);
     },
@@ -113,7 +107,6 @@ export default function EmployeeManagement() {
   const { data: ubigeos = [] } = useQuery({
     queryKey: ["ubigeos"],
     queryFn: async () => {
-      // return await base44.entities.Ubigeo.list("departamento");
       return await entitiesAPI.Ubigeo.list("departamento");
     },
   });
@@ -121,7 +114,6 @@ export default function EmployeeManagement() {
   const { data: professions = [] } = useQuery({
     queryKey: ["professions"],
     queryFn: async () => {
-      // const allProfessions = await base44.entities.Profession.list("name");
       const allProfessions = await entitiesAPI.Profession.list("name");
       return allProfessions.filter(p => p.is_active);
     },
@@ -131,7 +123,6 @@ export default function EmployeeManagement() {
     queryKey: ["employeeChanges", historyEmployeeId],
     queryFn: async () => {
       if (!historyEmployeeId) return [];
-      // return await base44.entities.EmployeeChangeLog.filter(
       return await entitiesAPI.EmployeeChangeLog.filter(
         { employee_id: historyEmployeeId },
         "-created_date"
@@ -143,20 +134,17 @@ export default function EmployeeManagement() {
   const { data: allContracts = [] } = useQuery({
     queryKey: ["allContracts"],
     queryFn: async () => {
-      // return await base44.entities.Contract.list("-created_date");
       return await entitiesAPI.Contract.list("-created_date");
     },
   });
 
   const createChangeLogMutation = useMutation({
     mutationFn: async (changeData) => {
-      // return await base44.entities.EmployeeChangeLog.create(changeData);
       return await entitiesAPI.EmployeeChangeLog.create(changeData);
     },
   });
 
   const handleCreateEmployee = async (data) => {
-    // const newEmployee = await base44.entities.Employee.create(data);
     const newEmployee = await entitiesAPI.Employee.create(data);
 
     // Si seleccionó ONP, agregar concepto automáticamente
@@ -228,7 +216,6 @@ export default function EmployeeManagement() {
 
       console.log("OK: Datos limpios a enviar:", cleanData);
 
-      // const updatedEmployee = await base44.entities.Employee.update(id, cleanData);
       const updatedEmployee = await entitiesAPI.Employee.update(id, cleanData);
       console.log("OK: Empleado actualizado:", updatedEmployee);
 
@@ -359,7 +346,6 @@ export default function EmployeeManagement() {
       ];
 
       for (const concept of afpConcepts) {
-        // await base44.entities.PayrollConcept.create(concept);
         await entitiesAPI.PayrollConcept.create(concept);
       }
 
@@ -371,7 +357,6 @@ export default function EmployeeManagement() {
 
   const removeAFPConcepts = async (employeeId) => {
     try {
-      // const allConcepts = await base44.entities.PayrollConcept.filter({ employee_id: employeeId });
       const allConcepts = await entitiesAPI.PayrollConcept.filter({ employee_id: employeeId });
       const afpConcepts = allConcepts.filter(c =>
         c.concept_name.includes("AFP - Comisión") ||
@@ -380,7 +365,6 @@ export default function EmployeeManagement() {
       );
 
       for (const concept of afpConcepts) {
-        // await base44.entities.PayrollConcept.delete(concept.id);
         await entitiesAPI.PayrollConcept.delete(concept.id);
       }
     } catch (error) {
@@ -394,7 +378,6 @@ export default function EmployeeManagement() {
       const month = currentDate.getMonth() + 1;
       const year = currentDate.getFullYear();
 
-      // await base44.entities.PayrollConcept.create({
       await entitiesAPI.PayrollConcept.create({
         employee_id: employeeId,
         concept_type: "Descuento",
@@ -417,12 +400,10 @@ export default function EmployeeManagement() {
 
   const removeONPConcept = async (employeeId) => {
     try {
-      // const allConcepts = await base44.entities.PayrollConcept.filter({ employee_id: employeeId });
       const allConcepts = await entitiesAPI.PayrollConcept.filter({ employee_id: employeeId });
       const onpConcepts = allConcepts.filter(c => c.concept_name === "ONP");
 
       for (const concept of onpConcepts) {
-        // await base44.entities.PayrollConcept.delete(concept.id);
         await entitiesAPI.PayrollConcept.delete(concept.id);
       }
     } catch (error) {
@@ -587,7 +568,6 @@ export default function EmployeeManagement() {
     }
 
     try {
-      // await base44.entities.Employee.update(emp.id, { status: newStatus });
       await entitiesAPI.Employee.update(emp.id, { status: newStatus });
 
       // Registrar cambio de estado
@@ -951,7 +931,6 @@ export default function EmployeeManagement() {
                                   className="text-blue-600"
                                   onClick={() => {
                                     if (confirm("¿Reactivar empleado cesado? Esto cambiará el estado a Activo y limpiará la fecha de cese.")) {
-                                      // base44.entities.Employee.update(emp.id, {
                                       entitiesAPI.Employee.update(emp.id, {
                                         status: "Activo",
                                         termination_date: null

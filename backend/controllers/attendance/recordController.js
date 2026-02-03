@@ -73,12 +73,41 @@ export const remove = async (req, res) => {
   }
 };
 
+export const filter = async (req, res) => {
+  try {
+    const { sort = '-created_date' } = req.query;
+    const filters = req.body;
+
+    // ← FIX: Convertir date string → ISO DateTime
+    if (filters.date) {
+      filters.date = {
+        gte: new Date(filters.date + 'T00:00:00.000Z'),  // 2026-01-30 → rango día
+        lte: new Date(filters.date + 'T23:59:59.999Z')
+      };
+      delete filters.date;  // Quita string original
+    }
+
+    const where = filters;
+
+    const records = await prisma.attendance_record.findMany({
+      where,
+      orderBy: { created_date: 'desc' }
+    });
+
+    res.json(records);
+  } catch (error) {
+    console.error('Filter records error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const controller = {
   getAll,
   getById,
   create,
   update,
   delete: remove, // aquí sí usamos la clave "delete"
+  filter,
 }
 
 export default controller
