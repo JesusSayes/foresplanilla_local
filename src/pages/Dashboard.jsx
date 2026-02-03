@@ -14,20 +14,30 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "../utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function Dashboard() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
   const [loading, setLoading] = useState(true);
 
+  // useEffect(() => {
+    // if (!isLoadingAuth && user) {
+      // if (user.employee) {
+        // setEmployee(user.employee);
+      // }
+      // setLoading(false);
+    // }
+  // }, [user, isLoadingAuth]);
   useEffect(() => {
-    if (!isLoadingAuth && user) {
-      if (user.employee) {
-        setEmployee(user.employee);
-      }
-      setLoading(false);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
+        }
+      });
     }
-  }, [user, isLoadingAuth]);
+  }, [currentUser]);
 
   const { data: latestPayslip } = useQuery({
     queryKey: ["latestPayslip", employee?.id],

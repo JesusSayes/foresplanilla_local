@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { 
-  Clock, Calendar as CalendarIcon, AlertCircle, CheckCircle, 
+import {
+  Clock, Calendar as CalendarIcon, AlertCircle, CheckCircle,
   XCircle, TrendingUp, FileText, Upload, Filter, ChevronDown, History
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInMinutes, parseISO } from "date-fns";
@@ -20,8 +21,8 @@ import ClockInOutWidget from "../components/attendance/ClockInOutWidget";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 
 export default function Attendance() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [dateRange, setDateRange] = useState("month");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showJustifyForm, setShowJustifyForm] = useState(false);
@@ -37,55 +38,44 @@ export default function Attendance() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: workSchedule } = useQuery({
     queryKey: ["workSchedule", employee?.id, employee?.department_name],
     queryFn: async () => {
       if (!employee?.id) return null;
-      
+
       // First try to find individual schedule
-      const individualSchedules = await base44.entities.WorkSchedule.filter(
+      const individualSchedules = await entitiesAPI.WorkSchedule.filter(
         { employee_id: employee.id, is_active: true },
         "-created_date",
         1
       );
-      
+
       if (individualSchedules && individualSchedules.length > 0) {
         return individualSchedules[0];
       }
-      
+
       // If not found, try department schedule
       if (employee.department_name) {
-        const departmentSchedules = await base44.entities.WorkSchedule.filter(
+        const departmentSchedules = await entitiesAPI.WorkSchedule.filter(
           { department_name: employee.department_name, is_active: true },
           "-created_date",
           1
         );
-        
+
         if (departmentSchedules && departmentSchedules.length > 0) {
           return departmentSchedules[0];
         }
       }
-      
+
       return null;
     },
     enabled: !!employee?.id,
@@ -95,7 +85,7 @@ export default function Attendance() {
     queryKey: ["attendanceRecords", employee?.id, dateRange, selectedDate],
     queryFn: async () => {
       if (!employee?.id) return [];
-      
+
       let startDate, endDate;
       if (dateRange === "week") {
         startDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
@@ -105,7 +95,7 @@ export default function Attendance() {
         endDate = endOfMonth(selectedDate);
       }
 
-      const records = await base44.entities.AttendanceRecord.filter(
+      const records = await entitiesAPI.AttendanceRecord.filter(
         { employee_id: employee.id },
         "-date"
       );
@@ -126,7 +116,7 @@ export default function Attendance() {
     queryKey: ["attendanceIncidents", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return [];
-      return await base44.entities.AttendanceIncident.filter(
+      return await entitiesAPI.AttendanceIncident.filter(
         { employee_id: employee.id },
         "-created_date"
       );
@@ -136,7 +126,7 @@ export default function Attendance() {
 
   const createIncidentMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.AttendanceIncident.create(data);
+      return await entitiesAPI.AttendanceIncident.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["attendanceIncidents"]);
@@ -216,7 +206,7 @@ export default function Attendance() {
 
   const getScheduleForDay = (date) => {
     if (!workSchedule) return { start: "09:00", end: "18:00" };
-    
+
     const dayOfWeek = format(new Date(date), "EEEE", { locale: es }).toLowerCase();
     const dayMapping = {
       "lunes": { start: workSchedule.monday_start, end: workSchedule.monday_end },
@@ -227,19 +217,19 @@ export default function Attendance() {
       "sábado": { start: workSchedule.saturday_start, end: workSchedule.saturday_end },
       "domingo": { start: workSchedule.sunday_start, end: workSchedule.sunday_end },
     };
-    
+
     return dayMapping[dayOfWeek] || { start: "09:00", end: "18:00" };
   };
 
   const calculateWorkedHours = (clockIn, clockOut, breakMinutes = 60) => {
     if (!clockIn || !clockOut) return 0;
-    
+
     const [inHour, inMin] = clockIn.split(":").map(Number);
     const [outHour, outMin] = clockOut.split(":").map(Number);
-    
+
     const inMinutes = inHour * 60 + inMin;
     const outMinutes = outHour * 60 + outMin;
-    
+
     const totalMinutes = outMinutes - inMinutes - breakMinutes;
     return totalMinutes / 60;
   };
@@ -259,9 +249,9 @@ export default function Attendance() {
 
   const handleClockAction = async (data, isUpdate = false) => {
     if (isUpdate) {
-      await base44.entities.AttendanceRecord.update(data.id, data);
+      await entitiesAPI.AttendanceRecord.update(data.id, data);
     } else {
-      await base44.entities.AttendanceRecord.create(data);
+      await entitiesAPI.AttendanceRecord.create(data);
     }
     refetchRecords();
   };
@@ -365,7 +355,7 @@ export default function Attendance() {
                     <Filter className="w-5 h-5 text-slate-500" />
                     <span className="text-sm font-semibold text-slate-700">Periodo:</span>
                   </div>
-                  
+
                   <Select value={dateRange} onValueChange={setDateRange}>
                     <SelectTrigger className="w-32">
                       <SelectValue />
@@ -469,13 +459,13 @@ export default function Attendance() {
                       const StatusIcon = getStatusConfig(record.status).icon;
                       const daySchedule = getScheduleForDay(record.date);
                       const expectedHours = calculateWorkedHours(
-                        daySchedule.start, 
-                        daySchedule.end, 
+                        daySchedule.start,
+                        daySchedule.end,
                         workSchedule?.break_duration_minutes || 60
                       );
-                      
+
                       return (
-                        <div 
+                        <div
                           key={record.id}
                           className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all"
                         >
@@ -587,7 +577,7 @@ export default function Attendance() {
                     {incidents.slice(0, 5).map((incident) => {
                       const StatusIcon = getIncidentStatusConfig(incident.status).icon;
                       return (
-                        <div 
+                        <div
                           key={incident.id}
                           className="p-4 border border-slate-200 rounded-lg"
                         >
@@ -605,7 +595,7 @@ export default function Attendance() {
                               {incident.status}
                             </Badge>
                           </div>
-                          
+
                           <p className="text-sm text-slate-600 mb-2 line-clamp-2">
                             {incident.justification}
                           </p>
@@ -623,7 +613,7 @@ export default function Attendance() {
                           )}
 
                           {incident.supporting_document_url && (
-                            <a 
+                            <a
                               href={incident.supporting_document_url}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -654,16 +644,16 @@ export default function Attendance() {
 
         {/* History Modal */}
         {showHistory && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             onClick={() => setShowHistory(false)}
           >
-            <div 
+            <div
               className="max-w-4xl w-full"
               onClick={(e) => e.stopPropagation()}
             >
-              <IncidentHistory 
-                incidents={incidents} 
+              <IncidentHistory
+                incidents={incidents}
                 isLoading={false}
                 employeeName={`${employee.first_name} ${employee.last_name}`}
               />
@@ -680,7 +670,7 @@ export default function Attendance() {
 
         {/* Justification Modal */}
         {showJustifyForm && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             onClick={() => {
               setShowJustifyForm(false);
@@ -688,7 +678,7 @@ export default function Attendance() {
               resetForm();
             }}
           >
-            <Card 
+            <Card
               className="max-w-2xl w-full"
               onClick={(e) => e.stopPropagation()}
             >
@@ -697,8 +687,8 @@ export default function Attendance() {
                   <CardTitle className="text-xl font-bold">
                     Justificar Incidencia
                   </CardTitle>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="icon"
                     onClick={() => {
                       setShowJustifyForm(false);
@@ -734,7 +724,7 @@ export default function Attendance() {
                     <label className="block text-sm font-semibold text-slate-900 mb-2">
                       Tipo de Incidencia
                     </label>
-                    <Select 
+                    <Select
                       value={justificationForm.incident_type}
                       onValueChange={(value) => setJustificationForm({ ...justificationForm, incident_type: value })}
                     >

@@ -615,8 +615,13 @@ model users {
   work_schedule          work_schedule[]
 }
 
-model vacatin_request {
-  id Int @id @default(autoincrement())
+model vacation_request {
+  id            Int      @id @default(autoincrement())
+  employee_id   String?   @db.VarChar(50)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  status        String?   @db.VarChar(50)
+  @@map("vacatin_request") // tabla física existente
 }
 
 model vacation_balance {

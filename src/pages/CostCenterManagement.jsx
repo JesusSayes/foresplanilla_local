@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Building2, Plus, Edit, Trash2, Users, GitBranch, History, 
+import {
+  Building2, Plus, Edit, Trash2, Users, GitBranch, History,
   Download, FileSpreadsheet, FileText, DollarSign, Search, Calendar, Grid3x3, List
 } from "lucide-react";
 import { format } from "date-fns";
@@ -22,8 +23,8 @@ import 'jspdf-autotable';
 import { createPageUrl } from "../utils";
 
 export default function CostCenterManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [showCCForm, setShowCCForm] = useState(false);
   const [showAssignmentForm, setShowAssignmentForm] = useState(false);
   const [editingCC, setEditingCC] = useState(null);
@@ -41,53 +42,47 @@ export default function CostCenterManagement() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-        const employees = await base44.entities.Employee.filter({ work_email: user.email });
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: costCenters = [] } = useQuery({
     queryKey: ["costCenters"],
-    queryFn: () => base44.entities.CostCenter.list("code"),
+    queryFn: () => entitiesAPI.CostCenter.list("code"),
   });
 
   const { data: assignments = [] } = useQuery({
     queryKey: ["costCenterAssignments"],
-    queryFn: () => base44.entities.CostCenterAssignment.list("-created_date"),
+    queryFn: () => entitiesAPI.CostCenterAssignment.list("-created_date"),
   });
 
   const { data: changeLogs = [] } = useQuery({
     queryKey: ["costCenterChangeLogs"],
-    queryFn: () => base44.entities.CostCenterChangeLog.list("-change_date", 200),
+    queryFn: () => entitiesAPI.CostCenterChangeLog.list("-change_date", 200),
   });
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
-    queryFn: () => base44.entities.Employee.list("first_name"),
+    queryFn: () => entitiesAPI.Employee.list("first_name"),
   });
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
-      const allDepts = await base44.entities.Department.list("name");
+      const allDepts = await entitiesAPI.Department.list("name");
       return allDepts.filter(d => d.is_active);
     },
   });
 
   const createCCMutation = useMutation({
     mutationFn: async (data) => {
-      const cc = await base44.entities.CostCenter.create(data);
-      await base44.entities.CostCenterChangeLog.create({
+      const cc = await entitiesAPI.CostCenter.create(data);
+      await entitiesAPI.CostCenterChangeLog.create({
         cost_center_id: cc.id,
         change_type: "Creación Centro Costo",
         entity_type: "CostCenter",
@@ -110,11 +105,11 @@ export default function CostCenterManagement() {
 
   const updateCCMutation = useMutation({
     mutationFn: async ({ id, data, oldData }) => {
-      const cc = await base44.entities.CostCenter.update(id, data);
-      
+      const cc = await entitiesAPI.CostCenter.update(id, data);
+
       Object.keys(data).forEach(async (key) => {
         if (oldData[key] !== data[key]) {
-          await base44.entities.CostCenterChangeLog.create({
+          await entitiesAPI.CostCenterChangeLog.create({
             cost_center_id: id,
             change_type: "Modificación Centro Costo",
             entity_type: "CostCenter",
@@ -127,7 +122,7 @@ export default function CostCenterManagement() {
           });
         }
       });
-      
+
       return cc;
     },
     onSuccess: () => {
@@ -140,14 +135,14 @@ export default function CostCenterManagement() {
 
   const createAssignmentMutation = useMutation({
     mutationFn: async (data) => {
-      const assignment = await base44.entities.CostCenterAssignment.create(data);
-      
+      const assignment = await entitiesAPI.CostCenterAssignment.create(data);
+
       const cc = costCenters.find(c => c.id === data.cost_center_id);
-      const entityName = data.assignment_type === "Empleado" 
+      const entityName = data.assignment_type === "Empleado"
         ? allEmployees.find(e => e.id === data.employee_id)?.first_name + " " + allEmployees.find(e => e.id === data.employee_id)?.last_name
         : data.department_name;
-      
-      await base44.entities.CostCenterChangeLog.create({
+
+      await entitiesAPI.CostCenterChangeLog.create({
         cost_center_id: data.cost_center_id,
         assignment_id: assignment.id,
         change_type: data.assignment_type === "Empleado" ? "Asignación Empleado" : "Asignación Departamento",
@@ -159,7 +154,7 @@ export default function CostCenterManagement() {
         changed_by: currentUser?.email || "Sistema",
         change_date: new Date().toISOString(),
       });
-      
+
       return assignment;
     },
     onSuccess: () => {
@@ -172,9 +167,9 @@ export default function CostCenterManagement() {
 
   const updateAssignmentMutation = useMutation({
     mutationFn: async ({ id, data, oldData }) => {
-      const assignment = await base44.entities.CostCenterAssignment.update(id, data);
-      
-      await base44.entities.CostCenterChangeLog.create({
+      const assignment = await entitiesAPI.CostCenterAssignment.update(id, data);
+
+      await entitiesAPI.CostCenterChangeLog.create({
         cost_center_id: data.cost_center_id || oldData.cost_center_id,
         assignment_id: id,
         change_type: "Reasignación",
@@ -186,7 +181,7 @@ export default function CostCenterManagement() {
         changed_by: currentUser?.email || "Sistema",
         change_date: new Date().toISOString(),
       });
-      
+
       return assignment;
     },
     onSuccess: () => {
@@ -199,7 +194,7 @@ export default function CostCenterManagement() {
 
   const deleteAssignmentMutation = useMutation({
     mutationFn: async (assignment) => {
-      await base44.entities.CostCenterChangeLog.create({
+      await entitiesAPI.CostCenterChangeLog.create({
         cost_center_id: assignment.cost_center_id,
         assignment_id: assignment.id,
         change_type: "Finalización Asignación",
@@ -211,8 +206,8 @@ export default function CostCenterManagement() {
         changed_by: currentUser?.email || "Sistema",
         change_date: new Date().toISOString(),
       });
-      
-      return await base44.entities.CostCenterAssignment.delete(assignment.id);
+
+      return await entitiesAPI.CostCenterAssignment.delete(assignment.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["costCenterAssignments"]);
@@ -290,10 +285,10 @@ export default function CostCenterManagement() {
     }
 
     if (editingAssignment) {
-      updateAssignmentMutation.mutate({ 
-        id: editingAssignment.id, 
+      updateAssignmentMutation.mutate({
+        id: editingAssignment.id,
         data: assignmentFormData,
-        oldData: editingAssignment 
+        oldData: editingAssignment
       });
     } else {
       createAssignmentMutation.mutate(assignmentFormData);
@@ -312,7 +307,7 @@ export default function CostCenterManagement() {
       const ccAssignments = assignments.filter(a => a.cost_center_id === cc.id && a.is_active);
       const employeeAssignments = ccAssignments.filter(a => a.assignment_type === "Empleado");
       const deptAssignments = ccAssignments.filter(a => a.assignment_type === "Departamento");
-      
+
       return {
         'Código': cc.code,
         'Nombre': cc.name,
@@ -333,12 +328,12 @@ export default function CostCenterManagement() {
 
   const exportToPDF = () => {
     const doc = new jsPDF();
-    
+
     doc.setFontSize(18);
     doc.text("Reporte de Centros de Costo", 14, 20);
     doc.setFontSize(11);
     doc.text(`Fecha: ${format(new Date(), "dd/MM/yyyy")}`, 14, 28);
-    
+
     const tableData = costCenters.map(cc => {
       const ccAssignments = assignments.filter(a => a.cost_center_id === cc.id && a.is_active);
       return [
@@ -376,27 +371,27 @@ export default function CostCenterManagement() {
   const employeesWithoutCC = useMemo(() => {
     const activeEmployees = allEmployees.filter(e => e.status === "Activo");
     return activeEmployees.filter(emp => {
-      const hasIndividualAssignment = assignments.some(a => 
-        a.assignment_type === "Empleado" && 
-        a.employee_id === emp.id && 
+      const hasIndividualAssignment = assignments.some(a =>
+        a.assignment_type === "Empleado" &&
+        a.employee_id === emp.id &&
         a.is_active &&
         (!a.end_date || new Date(a.end_date) >= new Date())
       );
-      
+
       if (hasIndividualAssignment) return false;
-      
-      const hasDepartmentAssignment = emp.department_name && assignments.some(a => 
-        a.assignment_type === "Departamento" && 
-        a.department_name === emp.department_name && 
+
+      const hasDepartmentAssignment = emp.department_name && assignments.some(a =>
+        a.assignment_type === "Departamento" &&
+        a.department_name === emp.department_name &&
         a.is_active &&
         (!a.end_date || new Date(a.end_date) >= new Date())
       );
-      
+
       return !hasDepartmentAssignment;
     });
   }, [allEmployees, assignments]);
 
-  const filteredHistory = historyFilter 
+  const filteredHistory = historyFilter
     ? changeLogs.filter(log => log.cost_center_id === historyFilter)
     : changeLogs;
 
@@ -516,7 +511,7 @@ export default function CostCenterManagement() {
                       const ccAssignments = assignments.filter(a => a.cost_center_id === cc.id && a.is_active);
                       const employeeCount = ccAssignments.filter(a => a.assignment_type === "Empleado").length;
                       const deptCount = ccAssignments.filter(a => a.assignment_type === "Departamento").length;
-                      
+
                       return (
                         <Card key={cc.id} className="border-2 hover:shadow-lg transition-all">
                           <CardContent className="p-5">
@@ -602,7 +597,7 @@ export default function CostCenterManagement() {
                           const ccAssignments = assignments.filter(a => a.cost_center_id === cc.id && a.is_active);
                           const employeeCount = ccAssignments.filter(a => a.assignment_type === "Empleado").length;
                           const deptCount = ccAssignments.filter(a => a.assignment_type === "Departamento").length;
-                          
+
                           return (
                             <tr key={cc.id} className="border-b hover:bg-slate-50">
                               <td className="p-3">
@@ -747,10 +742,10 @@ export default function CostCenterManagement() {
                 <div className="space-y-3">
                   {assignments.filter(a => a.is_active).map(assignment => {
                     const cc = costCenters.find(c => c.id === assignment.cost_center_id);
-                    const emp = assignment.assignment_type === "Empleado" 
+                    const emp = assignment.assignment_type === "Empleado"
                       ? allEmployees.find(e => e.id === assignment.employee_id)
                       : null;
-                    
+
                     return (
                       <div key={assignment.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
                         <div className="flex items-center justify-between">
@@ -760,8 +755,8 @@ export default function CostCenterManagement() {
                                 {assignment.assignment_type}
                               </Badge>
                               <h4 className="font-bold text-slate-900">
-                                {assignment.assignment_type === "Empleado" 
-                                  ? `${emp?.first_name} ${emp?.last_name}` 
+                                {assignment.assignment_type === "Empleado"
+                                  ? `${emp?.first_name} ${emp?.last_name}`
                                   : assignment.department_name}
                               </h4>
                               <span className="text-slate-500">→</span>
@@ -925,8 +920,8 @@ export default function CostCenterManagement() {
             <CardContent className="p-6 space-y-4">
               <div>
                 <Label>Centro de Costo *</Label>
-                <Select 
-                  value={assignmentFormData.cost_center_id} 
+                <Select
+                  value={assignmentFormData.cost_center_id}
                   onValueChange={(v) => setAssignmentFormData({ ...assignmentFormData, cost_center_id: v })}
                 >
                   <SelectTrigger><SelectValue placeholder="Seleccionar centro" /></SelectTrigger>
@@ -942,8 +937,8 @@ export default function CostCenterManagement() {
 
               <div>
                 <Label>Tipo de Asignación *</Label>
-                <Select 
-                  value={assignmentFormData.assignment_type} 
+                <Select
+                  value={assignmentFormData.assignment_type}
                   onValueChange={(v) => setAssignmentFormData({ ...assignmentFormData, assignment_type: v })}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -957,8 +952,8 @@ export default function CostCenterManagement() {
               {assignmentFormData.assignment_type === "Empleado" && (
                 <div>
                   <Label>Empleado *</Label>
-                  <Select 
-                    value={assignmentFormData.employee_id} 
+                  <Select
+                    value={assignmentFormData.employee_id}
                     onValueChange={(v) => setAssignmentFormData({ ...assignmentFormData, employee_id: v })}
                   >
                     <SelectTrigger><SelectValue placeholder="Seleccionar empleado" /></SelectTrigger>
@@ -973,7 +968,7 @@ export default function CostCenterManagement() {
                         />
                       </div>
                       {allEmployees
-                        .filter(e => 
+                        .filter(e =>
                           e.first_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
                           e.last_name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
                         )
@@ -990,8 +985,8 @@ export default function CostCenterManagement() {
               {assignmentFormData.assignment_type === "Departamento" && (
                 <div>
                   <Label>Departamento *</Label>
-                  <Select 
-                    value={assignmentFormData.department_name} 
+                  <Select
+                    value={assignmentFormData.department_name}
                     onValueChange={(v) => setAssignmentFormData({ ...assignmentFormData, department_name: v })}
                   >
                     <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>

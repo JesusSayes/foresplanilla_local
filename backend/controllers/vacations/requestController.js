@@ -1,22 +1,13 @@
-import { PrismaClient } from '@prisma/client'
-const prisma = new PrismaClient()
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
+
+const MODEL = prisma.vacation_request;
 
 export const getAll = async (req, res) => {
   try {
-    // const { sort = '-created_date' } = req.query;
-    // const desc = sort.startsWith('-');
-    // const field = sort.replace('-', '');
-
-    // mapea nombre lógico a campo real del modelo - actualizar tabla
-    // const sortField =
-      // field === 'created_date' ? 'created_date' :
-      // field === 'request_date' ? 'request_date' :
-      // field;
-    const sortField = 'id';
-
-    const requests = await prisma.vacatin_request.findMany({
-      // orderBy: { [sortField]: desc ? 'desc' : 'asc' },
-      orderBy: { [sortField]: 'desc' },
+    const requests = await MODEL.findMany({
+      orderBy: { created_date: 'desc' },
+      // include: { employee: true },
     });
     res.json(requests);
   } catch (error) {
@@ -25,11 +16,11 @@ export const getAll = async (req, res) => {
   }
 };
 
-export const getById =  async (req, res) => {
+export const getById = async (req, res) => {
   try {
-    const request = await prisma.vacatin_request.findUnique({
+    const request = await MODEL.findUnique({
       where: { id: parseInt(req.params.id) },
-      include: { employee: true }
+      // include: { employee: true },
     });
     if (!request) return res.status(404).json({ error: 'Request not found' });
     res.json(request);
@@ -40,34 +31,67 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const request = await prisma.vacatin_request.create({
-      data: {}   // no usamos req.body porque el modelo solo tiene id
+    const request = await MODEL.create({
+      data: {
+        employee_id: req.body.employee_id,
+        start_date: req.body.start_date,
+        end_date: req.body.end_date,
+        status: req.body.status ?? 'Pendiente',
+      },
     });
     res.status(201).json(request);
   } catch (error) {
+    console.error('Error creando vacation request', error);
     res.status(500).json({ error: error.message });
   }
 };
 
 export const update = async (req, res) => {
   try {
-    const request = await prisma.vacatin_request.update({
+    const request = await MODEL.update({
       where: { id: parseInt(req.params.id) },
-      data: req.body
+      data: req.body,
     });
     res.json(request);
   } catch (error) {
+    console.error('Error actualizando vacation request', error);
     res.status(500).json({ error: error.message });
   }
 };
 
 export const remove = async (req, res) => {
   try {
-    await prisma.vacatin_request.delete({
-      where: { id: parseInt(req.params.id) }
+    await MODEL.delete({
+      where: { id: parseInt(req.params.id) },
     });
     res.status(204).send();
   } catch (error) {
+    console.error('Error eliminando vacation request', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const filter = async (req, res) => {
+  try {
+    const filters = req.body || {};
+    const where = {};
+
+    if (filters.employee_id && !Number.isNaN(Number(filters.employee_id))) {
+      where.employee_id = parseInt(filters.employee_id);
+    }
+    if (filters.status) {
+      where.status = filters.status;
+    }
+
+    const requests = await MODEL.findMany({
+      where,
+      orderBy: { created_date: 'desc' },
+      // include: { employee: true },
+    });
+
+    res.json(requests);
+  } catch (error) {
+    console.error('Error filtrando vacation requests', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -77,7 +101,8 @@ const controller = {
   getById,
   create,
   update,
-  delete: remove, // aquí sí usamos la clave "delete"
-}
+  delete: remove,
+  filter,
+};
 
-export default controller
+export default controller;
