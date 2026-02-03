@@ -17,6 +17,7 @@ export default function DataExport() {
 
   // Lista de todas las entidades
   const entities = [
+    "User",
     "Employee", "Contract", "ContractTemplate", "ContractClause", "ContractRenewalRule",
     "AttendanceRecord", "AttendanceIncident", "OvertimeAlert", "WorkSchedule",
     "VacationRequest", "VacationBalance",
