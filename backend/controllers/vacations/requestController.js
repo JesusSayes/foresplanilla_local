@@ -3,19 +3,31 @@ const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
   try {
-    const requests = await prisma.vacationRequest.findMany({
-      include: { employee: true },
-      orderBy: { createdAt: 'desc' }
+    // const { sort = '-created_date' } = req.query;
+    // const desc = sort.startsWith('-');
+    // const field = sort.replace('-', '');
+
+    // mapea nombre lógico a campo real del modelo - actualizar tabla
+    // const sortField =
+      // field === 'created_date' ? 'created_date' :
+      // field === 'request_date' ? 'request_date' :
+      // field;
+    const sortField = 'id';
+
+    const requests = await prisma.vacatin_request.findMany({
+      // orderBy: { [sortField]: desc ? 'desc' : 'asc' },
+      orderBy: { [sortField]: 'desc' },
     });
     res.json(requests);
   } catch (error) {
+    console.error('Error obteniendo vacation requests', error);
     res.status(500).json({ error: error.message });
   }
 };
 
 export const getById =  async (req, res) => {
   try {
-    const request = await prisma.vacationRequest.findUnique({
+    const request = await prisma.vacatin_request.findUnique({
       where: { id: parseInt(req.params.id) },
       include: { employee: true }
     });
@@ -28,8 +40,8 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const request = await prisma.vacationRequest.create({
-      data: req.body
+    const request = await prisma.vacatin_request.create({
+      data: {}   // no usamos req.body porque el modelo solo tiene id
     });
     res.status(201).json(request);
   } catch (error) {
@@ -39,7 +51,7 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const request = await prisma.vacationRequest.update({
+    const request = await prisma.vacatin_request.update({
       where: { id: parseInt(req.params.id) },
       data: req.body
     });
@@ -51,7 +63,7 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
-    await prisma.vacationRequest.delete({
+    await prisma.vacatin_request.delete({
       where: { id: parseInt(req.params.id) }
     });
     res.status(204).send();

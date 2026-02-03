@@ -1,10 +1,11 @@
-const { PrismaClient } = require('@prisma/client');
+import { PrismaClient } from '@prisma/client';
+
 const prisma = new PrismaClient();
 
-exports.getAll = async (req, res) => {
+export const getAll = async (req, res) => {
   try {
-    const templates = await prisma.contractTemplate.findMany({
-      orderBy: { createdAt: 'desc' }
+    const templates = await prisma.contract_template.findMany({
+      orderBy: { created_date: 'desc' }
     });
     res.json(templates);
   } catch (error) {
@@ -12,9 +13,9 @@ exports.getAll = async (req, res) => {
   }
 };
 
-exports.getById = async (req, res) => {
+export const getById = async (req, res) => {
   try {
-    const template = await prisma.contractTemplate.findUnique({
+    const template = await prisma.contract_template.findUnique({
       where: { id: parseInt(req.params.id) }
     });
     if (!template) return res.status(404).json({ error: 'Template not found' });
@@ -24,9 +25,9 @@ exports.getById = async (req, res) => {
   }
 };
 
-exports.create = async (req, res) => {
+export const create = async (req, res) => {
   try {
-    const template = await prisma.contractTemplate.create({
+    const template = await prisma.contract_template.create({
       data: req.body
     });
     res.status(201).json(template);
@@ -35,11 +36,9 @@ exports.create = async (req, res) => {
   }
 };
 
-exports.update = async (req, res)
-
- => {
+export const update = async (req, res) => {
   try {
-    const template = await prisma.contractTemplate.update({
+    const template = await prisma.contract_template.update({
       where: { id: parseInt(req.params.id) },
       data: req.body
     });
@@ -49,13 +48,46 @@ exports.update = async (req, res)
   }
 };
 
-exports.delete = async (req, res) => {
+export const deleteTemplate = async (req, res) => {
   try {
-    await prisma.contractTemplate.delete({
+    await prisma.contract_template.delete({
       where: { id: parseInt(req.params.id) }
     });
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+};
+
+export const filter = async (req, res) => {
+  try {
+    const { filters, sort, pagination } = req.body;
+    const where = {};
+
+    if (filters) {
+      Object.keys(filters).forEach(key => {
+        if (filters[key]) where[key] = { contains: filters[key] };
+      });
+    }
+
+    const templates = await prisma.contract_template.findMany({
+      where,
+      orderBy: sort || { created_date: 'desc' },
+      skip: pagination?.offset || 0,
+      take: pagination?.limit || 50
+    });
+
+    res.json(templates);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export default {
+  getAll,
+  getById,
+  create,
+  update,
+  delete: deleteTemplate,
+  filter
 };

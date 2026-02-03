@@ -161,11 +161,11 @@ export default function ContractManagement() {
     // Determinar la plantilla a usar
     const contractType = contract?.contract_type || "Indeterminado";
     let selectedTemplateId = contract?.template_id || "";
-    
+
     // Si no tiene plantilla asignada, buscar la más adecuada
     if (!selectedTemplateId && contractTemplates.length > 0) {
       // Buscar plantilla específica para el tipo de contrato
-      const typeSpecificTemplate = contractTemplates.find(t => 
+      const typeSpecificTemplate = contractTemplates.find(t =>
         t.contract_types?.includes(contractType)
       );
       // Si no hay específica, usar la default
@@ -280,9 +280,9 @@ export default function ContractManagement() {
       if (!template && templates.length > 0) {
         template = templates[0];
       }
-      
+
       const companyData = companyInfo || {};
-      
+
       await generateContractPDF(emp, contract, companyData, template);
       toast.success("PDF generado exitosamente");
     } catch (error) {
@@ -526,8 +526,8 @@ export default function ContractManagement() {
                         </div>
 
                         <div className="flex gap-2 ml-4">
-                          <Select 
-                            value={contract.status} 
+                          <Select
+                            value={contract.status}
                             onValueChange={(newStatus) => updateStatusMutation.mutate({ id: contract.id, status: newStatus })}
                           >
                             <SelectTrigger className="w-32 h-9">
@@ -569,11 +569,11 @@ export default function ContractManagement() {
 
       {/* Form Modal */}
       {showForm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
           onClick={resetForm}
         >
-          <Card 
+          <Card
             className="max-w-4xl w-full my-8"
             onClick={(e) => e.stopPropagation()}
           >
@@ -606,8 +606,8 @@ export default function ContractManagement() {
 
                   <div>
                     <Label>Empleado *</Label>
-                    <Select 
-                      value={formData.employee_id} 
+                    <Select
+                      value={formData.employee_id}
                       onValueChange={(v) => {
                         const emp = allEmployees.find(e => e.id === v);
                         initializeForm(null, emp);
@@ -628,7 +628,7 @@ export default function ContractManagement() {
                           />
                         </div>
                         {allEmployees
-                          .filter(emp => 
+                          .filter(emp =>
                             emp.first_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
                             emp.last_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
                             emp.employee_code.toLowerCase().includes(employeeSearchTerm.toLowerCase())
@@ -645,15 +645,15 @@ export default function ContractManagement() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>Tipo de Contrato *</Label>
-                      <Select 
-                        value={formData.contract_type} 
+                      <Select
+                        value={formData.contract_type}
                         onValueChange={(v) => {
                           // Al cambiar tipo de contrato, actualizar plantilla sugerida
-                          const typeSpecificTemplate = contractTemplates.find(t => 
+                          const typeSpecificTemplate = contractTemplates.find(t =>
                             t.contract_types?.includes(v) && t.is_active
                           );
                           setFormData({
-                            ...formData, 
+                            ...formData,
                             contract_type: v,
                             template_id: typeSpecificTemplate?.id || defaultTemplate?.id || formData.template_id
                           });
@@ -679,8 +679,8 @@ export default function ContractManagement() {
                           <FileText className="w-4 h-4" />
                           Plantilla de Contrato
                         </Label>
-                        <Select 
-                          value={formData.template_id} 
+                        <Select
+                          value={formData.template_id}
                           onValueChange={(v) => setFormData({...formData, template_id: v})}
                         >
                           <SelectTrigger>
@@ -706,7 +706,7 @@ export default function ContractManagement() {
                         </Select>
                         {formData.template_id && (
                           <p className="text-xs text-slate-500 mt-1">
-                            {contractTemplates.find(t => t.id === formData.template_id)?.description || 
+                            {contractTemplates.find(t => t.id === formData.template_id)?.description ||
                               "Esta plantilla se usará al generar el PDF del contrato"}
                           </p>
                         )}
@@ -970,11 +970,11 @@ export default function ContractManagement() {
 
       {/* Conflict Modal */}
       {conflictingContract && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-6"
           onClick={() => setConflictingContract(null)}
         >
-          <Card 
+          <Card
             className="max-w-lg w-full"
             onClick={(e) => e.stopPropagation()}
           >

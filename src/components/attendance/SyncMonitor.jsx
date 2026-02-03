@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  CheckCircle, XCircle, AlertTriangle, Clock, 
-  RefreshCw, Bell, BellOff 
+import {
+  CheckCircle, XCircle, AlertTriangle, Clock,
+  RefreshCw, Bell, BellOff
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -19,20 +19,26 @@ export default function SyncMonitor({ connectionId, connectionName }) {
   const { data: logs = [] } = useQuery({
     queryKey: ["syncLogs", connectionId],
     queryFn: async () => {
-      const allLogs = await base44.entities.SyncLog.filter(
-        { connection_id: connectionId },
-        "-sync_date",
-        10
-      );
-      return allLogs;
+      // Si el backend ya implementa /api/sync/logs/filter:
+      // const allLogs = await entitiesAPI.SyncLog.filter(
+      //   { connection_id: connectionId },
+      //   "-sync_date"
+      // );
+      // return allLogs.slice(0, 10);
+
+      // Opción simple: traer todo y limitar en frontend
+      const allLogs = await entitiesAPI.SyncLog.list("-sync_date");
+      return allLogs
+        .filter(log => log.connection_id === connectionId)
+        .slice(0, 10);
     },
-    refetchInterval: autoRefresh ? 30000 : false, // Refrescar cada 30 segundos
+    // refetchInterval: autoRefresh ? 30000 : false, // Refrescar cada 30 segundos
   });
 
   const { data: connection } = useQuery({
     queryKey: ["connection", connectionId],
     queryFn: async () => {
-      const conns = await base44.entities.DatabaseConnection.list();
+      const conns = await entitiesAPI.DatabaseConnection.list();
       return conns.find(c => c.id === connectionId);
     },
   });
@@ -40,17 +46,17 @@ export default function SyncMonitor({ connectionId, connectionName }) {
   const runSyncMutation = useMutation({
     mutationFn: async () => {
       const startTime = Date.now();
-      
+
       try {
         // Simular sincronización (en producción, aquí iría la lógica real)
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
         const success = Math.random() > 0.2; // 80% éxito
         const recordsImported = success ? Math.floor(Math.random() * 100) + 20 : 0;
         const recordsFailed = success ? Math.floor(Math.random() * 5) : Math.floor(Math.random() * 50) + 10;
-        
+
         const executionTime = (Date.now() - startTime) / 1000;
-        
+
         const logData = {
           connection_id: connectionId,
           sync_date: new Date().toISOString(),
@@ -64,18 +70,18 @@ export default function SyncMonitor({ connectionId, connectionName }) {
             triggered_by: "manual"
           }
         };
-        
-        await base44.entities.SyncLog.create(logData);
-        
+
+        await entitiesAPI.SyncLog.create(logData);
+
         // Actualizar last_sync en la conexión
-        await base44.entities.DatabaseConnection.update(connectionId, {
+        await entitiesAPI.DatabaseConnection.update(connectionId, {
           last_sync: new Date().toISOString()
         });
-        
+
         return logData;
       } catch (error) {
         const executionTime = (Date.now() - startTime) / 1000;
-        
+
         const logData = {
           connection_id: connectionId,
           sync_date: new Date().toISOString(),
@@ -85,15 +91,15 @@ export default function SyncMonitor({ connectionId, connectionName }) {
           error_message: error.message || "Error desconocido",
           execution_time: executionTime
         };
-        
-        await base44.entities.SyncLog.create(logData);
+
+        await entitiesAPI.SyncLog.create(logData);
         throw error;
       }
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries(["syncLogs", connectionId]);
       queryClient.invalidateQueries(["connection", connectionId]);
-      
+
       if (result.status === "Exitosa") {
         toast.success(`✓ ${result.records_imported} registros sincronizados correctamente`);
       } else if (result.status === "Parcial") {
@@ -110,19 +116,19 @@ export default function SyncMonitor({ connectionId, connectionName }) {
 
   useEffect(() => {
     if (!connection) return;
-    
+
     // Verificar si debe ejecutarse sincronización automática
     const checkAutoSync = () => {
       if (connection.sync_frequency === "Manual") return;
-      
+
       const lastSync = connection.last_sync ? new Date(connection.last_sync) : null;
       if (!lastSync) return;
-      
+
       const now = new Date();
       const hoursSinceLastSync = (now - lastSync) / (1000 * 60 * 60);
-      
+
       let shouldSync = false;
-      
+
       switch (connection.sync_frequency) {
         case "Cada hora":
           shouldSync = hoursSinceLastSync >= 1;
@@ -134,17 +140,17 @@ export default function SyncMonitor({ connectionId, connectionName }) {
           shouldSync = hoursSinceLastSync >= 24;
           break;
       }
-      
+
       if (shouldSync) {
         console.log("Ejecutando sincronización automática...");
         runSyncMutation.mutate();
       }
     };
-    
+
     // Verificar cada minuto
     const interval = setInterval(checkAutoSync, 60000);
     checkAutoSync(); // Verificar inmediatamente
-    
+
     return () => clearInterval(interval);
   }, [connection]);
 
@@ -192,14 +198,14 @@ export default function SyncMonitor({ connectionId, connectionName }) {
               {lastLog ? formatDistanceToNow(new Date(lastLog.sync_date), { addSuffix: true, locale: es }) : "Nunca"}
             </p>
           </div>
-          
+
           <div className="text-center p-4 bg-green-50 rounded-lg">
             <p className="text-xs text-slate-600 mb-1">Sincronizaciones Exitosas</p>
             <p className="text-2xl font-bold text-green-600">
               {logs.filter(l => l.status === "Exitosa").length}
             </p>
           </div>
-          
+
           <div className="text-center p-4 bg-red-50 rounded-lg">
             <p className="text-xs text-slate-600 mb-1">Sincronizaciones Fallidas</p>
             <p className="text-2xl font-bold text-red-600">{failedLogs}</p>
@@ -236,8 +242,8 @@ export default function SyncMonitor({ connectionId, connectionName }) {
                 <div
                   key={log.id}
                   className={`p-3 rounded-lg border-2 ${
-                    log.status === "Exitosa" 
-                      ? "bg-green-50 border-green-200" 
+                    log.status === "Exitosa"
+                      ? "bg-green-50 border-green-200"
                       : log.status === "Parcial"
                       ? "bg-yellow-50 border-yellow-200"
                       : "bg-red-50 border-red-200"
@@ -255,8 +261,8 @@ export default function SyncMonitor({ connectionId, connectionName }) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge className={
-                            log.status === "Exitosa" 
-                              ? "bg-green-100 text-green-700" 
+                            log.status === "Exitosa"
+                              ? "bg-green-100 text-green-700"
                               : log.status === "Parcial"
                               ? "bg-yellow-100 text-yellow-700"
                               : "bg-red-100 text-red-700"

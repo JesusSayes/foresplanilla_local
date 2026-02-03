@@ -48,7 +48,7 @@ export default function VacationRequest() {
     queryKey: ["vacationBalance", targetEmployeeId],
     queryFn: async () => {
       if (!targetEmployeeId) return null;
-      const balances = await entitiesAPI.VacationBalance.filter(
+      const balances = await entitiesAPI.vacation_balance.filter(
         { employee_id: targetEmployeeId, is_active: true },
         "-period_start",
         1
@@ -62,7 +62,7 @@ export default function VacationRequest() {
     queryKey: ["vacationRequests", targetEmployeeId],
     queryFn: async () => {
       if (!targetEmployeeId) return [];
-      return await entitiesAPI.VacationRequest.filter(
+      return await entitiesAPI.vacation_request.filter(
         { employee_id: targetEmployeeId },
         "-created_date"
       );
@@ -262,10 +262,10 @@ export default function VacationRequest() {
                       </span>
                     </div>
                     <div className="w-full bg-slate-200 rounded-full h-3">
-                      <div 
+                      <div
                         className="bg-gradient-to-r from-green-500 to-emerald-500 h-3 rounded-full transition-all duration-500"
-                        style={{ 
-                          width: `${Math.min((vacationBalance.days_taken / vacationBalance.total_entitled_days) * 100, 100)}%` 
+                        style={{
+                          width: `${Math.min((vacationBalance.days_taken / vacationBalance.total_entitled_days) * 100, 100)}%`
                         }}
                       />
                     </div>
@@ -293,7 +293,7 @@ export default function VacationRequest() {
                   <p className="text-slate-600 mb-6">
                     Solicita vacaciones o permisos de manera fácil y rápida
                   </p>
-                  <Button 
+                  <Button
                     className="bg-indigo-600 hover:bg-indigo-700"
                     onClick={() => setShowForm(true)}
                   >
@@ -307,8 +307,8 @@ export default function VacationRequest() {
                 <CardHeader className="border-b">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-xl font-bold">Nueva Solicitud</CardTitle>
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       size="icon"
                       onClick={() => {
                         setShowForm(false);
@@ -326,7 +326,7 @@ export default function VacationRequest() {
                         <label className="block text-sm font-semibold text-slate-900 mb-2">
                           Empleado *
                         </label>
-                        <Select 
+                        <Select
                           value={selectedEmployeeId || ""}
                           onValueChange={(value) => setSelectedEmployeeId(value)}
                         >
@@ -372,7 +372,7 @@ export default function VacationRequest() {
                       <label className="block text-sm font-semibold text-slate-900 mb-2">
                         Tipo de solicitud
                       </label>
-                      <Select 
+                      <Select
                         value={formData.request_type}
                         onValueChange={(value) => setFormData({ ...formData, request_type: value })}
                       >
@@ -395,12 +395,12 @@ export default function VacationRequest() {
                         </label>
                         <Popover>
                           <PopoverTrigger asChild>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               className="w-full justify-start text-left"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {formData.start_date 
+                              {formData.start_date
                                 ? format(formData.start_date, "dd MMM yyyy", { locale: es })
                                 : "Seleccionar"}
                             </Button>
@@ -422,12 +422,12 @@ export default function VacationRequest() {
                         </label>
                         <Popover>
                           <PopoverTrigger asChild>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               className="w-full justify-start text-left"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {formData.end_date 
+                              {formData.end_date
                                 ? format(formData.end_date, "dd MMM yyyy", { locale: es })
                                 : "Seleccionar"}
                             </Button>
@@ -500,7 +500,7 @@ export default function VacationRequest() {
                     </div>
 
                     <div className="flex gap-3">
-                      <Button 
+                      <Button
                         type="button"
                         variant="outline"
                         className="flex-1"
@@ -511,7 +511,7 @@ export default function VacationRequest() {
                       >
                         Cancelar
                       </Button>
-                      <Button 
+                      <Button
                         type="submit"
                         className="flex-1 bg-indigo-600 hover:bg-indigo-700"
                         disabled={createRequestMutation.isPending}
@@ -548,7 +548,7 @@ export default function VacationRequest() {
                     {requests.map((request) => {
                       const StatusIcon = getStatusConfig(request.status).icon;
                       return (
-                        <div 
+                        <div
                           key={request.id}
                           className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all"
                         >
@@ -566,7 +566,7 @@ export default function VacationRequest() {
                               {request.status}
                             </Badge>
                           </div>
-                          
+
                           <div className="text-sm text-slate-600 mb-3">
                             <strong>{request.total_days}</strong> días ({request.business_days} hábiles)
                           </div>

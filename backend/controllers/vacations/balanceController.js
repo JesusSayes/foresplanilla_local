@@ -1,13 +1,9 @@
-// const { PrismaClient } = require('@prisma/client');
-// const prisma = new PrismaClient();
-
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
-// exports.getAll = async (req, res) => {
 export const getAll = async (req, res) => {
   try {
-    const balances = await prisma.vacationBalance.findMany({
+    const balances = await prisma.vacation_balance.findMany({
       include: { employee: true },
       orderBy: { year: 'desc' }
     });
@@ -19,7 +15,7 @@ export const getAll = async (req, res) => {
 
 export const getById =  async (req, res) => {
   try {
-    const balance = await prisma.vacationBalance.findUnique({
+    const balance = await prisma.vacation_balance.findUnique({
       where: { id: parseInt(req.params.id) },
       include: { employee: true }
     });
@@ -32,7 +28,7 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const balance = await prisma.vacationBalance.create({
+    const balance = await prisma.vacation_balance.create({
       data: req.body
     });
     res.status(201).json(balance);
@@ -43,7 +39,7 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const balance = await prisma.vacationBalance.update({
+    const balance = await prisma.vacation_balance.update({
       where: { id: parseInt(req.params.id) },
       data: req.body
     });
@@ -55,7 +51,7 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
-    await prisma.vacationBalance.delete({
+    await prisma.vacation_balance.delete({
       where: { id: parseInt(req.params.id) }
     });
     res.status(204).send();

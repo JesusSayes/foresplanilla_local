@@ -1,14 +1,28 @@
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
+const MODEL = prisma.payslip;
+
 export const getAll = async (req, res) => {
   try {
-    const payslips = await prisma.payslip.findMany({
-      include: { employee: true },
-      orderBy: [{ year: 'desc' }, { month: 'desc' }]
+    // const { sort = '-created_date' } = req.query;
+
+    // const desc = sort.startsWith('-');
+    // const field = sort.replace('-', '');
+
+    // const sortField =
+      // field === 'created_date' ? 'created_date' :
+      // field === 'payment_date' ? 'payment_date' :
+      // field;
+    const desc = true;
+    const sortField = 'id'
+
+    const payslips = await MODEL.findMany({
+      orderBy: { [sortField]: desc ? 'desc' : 'asc' },
     });
     res.json(payslips);
   } catch (error) {
+    console.error('Error obteniendo payslips', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -60,12 +74,47 @@ export const remove = async (req, res) => {
   }
 };
 
+export const filter = async (req, res) => {
+  try {
+    const { sort = '-year,-month' } = req.query;
+    const filters = req.body || {};
+
+    const where = {};
+
+    if (filters.employee_id) {
+      where.employee_id = filters.employee_id;
+    }
+
+    // Parse sort: "-year,-month"
+    // const sortParts = sort.split(',');
+    // const orderBy = sortParts.map((part) => {
+      // const desc = part.startsWith('-');
+      // const field = part.replace('-', '');
+      // return { [field]: desc ? 'desc' : 'asc' };
+    // });
+    const sortParts = 'id';
+    const desc = true;
+    const field = 'desc';
+
+    const payslips = await entitiesAPI.Payslip.findMany({
+      where,
+      orderBy,
+    });
+
+    res.json(payslips);
+  } catch (error) {
+    console.error('Error filtrando payslips', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const controller = {
   getAll,
   getById,
   create,
   update,
   delete: remove, // aquí sí usamos la clave "delete"
+  filter,
 }
 
 export default controller

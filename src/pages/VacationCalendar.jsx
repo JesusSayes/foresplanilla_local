@@ -38,7 +38,7 @@ export default function VacationCalendar() {
   const { data: vacationRequests = [] } = useQuery({
     queryKey: ["calendarVacationRequests", currentMonth],
     queryFn: async () => {
-      const requests = await entitiesAPI.VacationRequest.filter(
+      const requests = await entitiesAPI.vacation_request.filter(
         { status: "Aprobada" },
         "-start_date"
       );
@@ -55,7 +55,7 @@ export default function VacationCalendar() {
 
     const matchesDept = filterDepartment === "all" || emp.department_name === filterDepartment;
     const matchesEmp = filterEmployee === "all" || request.employee_id === filterEmployee;
-    
+
     return matchesDept && matchesEmp;
   });
 
@@ -133,7 +133,7 @@ export default function VacationCalendar() {
                 <Filter className="w-5 h-5 text-slate-500" />
                 <span className="text-sm font-semibold text-slate-700">Filtros:</span>
               </div>
-              
+
               <Select value={filterDepartment} onValueChange={setFilterDepartment}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Departamento" />
@@ -178,11 +178,11 @@ export default function VacationCalendar() {
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
-                  
+
                   <CardTitle className="text-2xl font-bold text-center">
                     {format(currentMonth, "MMMM yyyy", { locale: es })}
                   </CardTitle>
-                  
+
                   <Button
                     variant="outline"
                     size="icon"
@@ -223,7 +223,7 @@ export default function VacationCalendar() {
                         `}>
                           {format(day, "d")}
                         </div>
-                        
+
                         <div className="space-y-1">
                           {vacations.slice(0, 2).map(vacation => (
                             <div
@@ -289,7 +289,7 @@ export default function VacationCalendar() {
                         </div>
                       </div>
                     ))}
-                  
+
                   {filteredRequests.filter(r => new Date(r.start_date) >= new Date()).length === 0 && (
                     <p className="text-slate-500 text-sm text-center py-4">
                       No hay vacaciones próximas
