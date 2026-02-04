@@ -119,7 +119,9 @@ export default function DataExport() {
     setProgress({ current: 0, total: selectedList.length, entity: "" });
 
     try {
-      let sqlScript = `-- Base44 Data Export\n-- Generated: ${new Date().toISOString()}\n\n`;
+      let sqlScript = `-- Base44 Data Export\n-- Generated: ${new Date().toISOString()}\n`;
+      sqlScript += `-- Full database export with CREATE TABLE and INSERT statements\n`;
+      sqlScript += `-- All IDs are included\n\n`;
 
       for (let i = 0; i < selectedList.length; i++) {
         const entityName = selectedList[i];
@@ -129,26 +131,70 @@ export default function DataExport() {
           const data = await base44.entities[entityName].list();
           
           if (data.length > 0) {
+            sqlScript += `-- ====================================\n`;
             sqlScript += `-- Table: ${entityName}\n`;
+            sqlScript += `-- ====================================\n\n`;
             
+            // Generar CREATE TABLE basado en el primer registro
+            const sampleRecord = data[0];
+            const columns = Object.keys(sampleRecord);
+            
+            sqlScript += `CREATE TABLE IF NOT EXISTS ${entityName} (\n`;
+            const columnDefs = columns.map(col => {
+              const val = sampleRecord[col];
+              let sqlType = 'TEXT';
+              
+              if (col === 'id') {
+                sqlType = 'VARCHAR(255) PRIMARY KEY';
+              } else if (typeof val === 'number') {
+                sqlType = Number.isInteger(val) ? 'INTEGER' : 'DECIMAL(18,2)';
+              } else if (typeof val === 'boolean') {
+                sqlType = 'BOOLEAN';
+              } else if (typeof val === 'string') {
+                if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
+                  sqlType = 'TIMESTAMP';
+                } else if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+                  sqlType = 'DATE';
+                } else {
+                  sqlType = 'TEXT';
+                }
+              } else if (val === null) {
+                sqlType = 'TEXT';
+              } else if (typeof val === 'object') {
+                sqlType = 'JSON';
+              }
+              
+              return `  ${col} ${sqlType}`;
+            });
+            
+            sqlScript += columnDefs.join(',\n');
+            sqlScript += `\n);\n\n`;
+            
+            // Generar INSERTs con todos los campos incluyendo ID
             data.forEach(record => {
-              const columns = Object.keys(record).filter(k => k !== 'id');
-              const values = columns.map(col => {
+              const allColumns = Object.keys(record);
+              const values = allColumns.map(col => {
                 const val = record[col];
                 if (val === null || val === undefined) return 'NULL';
                 if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`;
+                if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
                 if (typeof val === 'object') return `'${JSON.stringify(val).replace(/'/g, "''")}'`;
                 return val;
               });
 
-              sqlScript += `INSERT INTO ${entityName} (${columns.join(', ')}) VALUES (${values.join(', ')});\n`;
+              sqlScript += `INSERT INTO ${entityName} (${allColumns.join(', ')}) VALUES (${values.join(', ')});\n`;
             });
 
             sqlScript += `\n`;
-            toast.success(`✓ ${entityName}: ${data.length} registros`);
+            toast.success(`✓ ${entityName}: ${data.length} registros con CREATE TABLE`);
+          } else {
+            sqlScript += `-- Table: ${entityName} (sin datos)\n`;
+            sqlScript += `-- No se pudo generar CREATE TABLE sin registros\n\n`;
+            toast.warning(`⚠ ${entityName}: sin datos`);
           }
         } catch (error) {
           console.error(`Error exportando ${entityName}:`, error);
+          sqlScript += `-- ERROR en ${entityName}: ${error.message}\n\n`;
           toast.error(`✗ Error en ${entityName}`);
         }
       }
@@ -158,13 +204,13 @@ export default function DataExport() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `base44_export_${new Date().toISOString().split('T')[0]}.sql`;
+      a.download = `base44_full_export_${new Date().toISOString().split('T')[0]}.sql`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("✅ Exportación SQL completa");
+      toast.success("✅ Exportación SQL completa con CREATE TABLE + INSERT");
     } catch (error) {
       toast.error("Error en la exportación");
       console.error(error);
@@ -530,9 +576,9 @@ export default function DataExport() {
                 <h3 className="font-bold text-amber-900 mb-2">ℹ️ Información</h3>
                 <ul className="text-sm text-amber-800 space-y-2">
                   <li>• <strong>Datos JSON:</strong> Registros completos con IDs</li>
-                  <li>• <strong>Datos SQL:</strong> Scripts INSERT para importar</li>
+                  <li>• <strong>Datos SQL:</strong> CREATE TABLE + INSERT con todos los IDs</li>
                   <li>• <strong>Esquemas:</strong> Estructura de tablas (campos y tipos)</li>
-                  <li>• Los esquemas no incluyen datos, solo definiciones</li>
+                  <li>• SQL incluye sentencias CREATE TABLE completas</li>
                 </ul>
               </CardContent>
             </Card>
