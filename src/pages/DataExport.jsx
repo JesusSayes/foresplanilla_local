@@ -130,14 +130,18 @@ export default function DataExport() {
         try {
           const data = await base44.entities[entityName].list();
           
-          if (data.length > 0) {
-            sqlScript += `-- ====================================\n`;
-            sqlScript += `-- Table: ${entityName}\n`;
-            sqlScript += `-- ====================================\n\n`;
-            
-            // Generar CREATE TABLE basado en el primer registro
+          sqlScript += `-- ====================================\n`;
+          sqlScript += `-- Table: ${entityName}\n`;
+          sqlScript += `-- ====================================\n\n`;
+          
+          // SIEMPRE generar CREATE TABLE
+          let columns = [];
+          let hasData = data.length > 0;
+          
+          if (hasData) {
+            // Si hay datos, inferir esquema del primer registro
             const sampleRecord = data[0];
-            const columns = Object.keys(sampleRecord);
+            columns = Object.keys(sampleRecord);
             
             sqlScript += `CREATE TABLE IF NOT EXISTS ${entityName} (\n`;
             const columnDefs = columns.map(col => {
@@ -169,8 +173,51 @@ export default function DataExport() {
             
             sqlScript += columnDefs.join(',\n');
             sqlScript += `\n);\n\n`;
-            
-            // Generar INSERTs con todos los campos incluyendo ID
+          } else {
+            // Si NO hay datos, intentar obtener esquema o generar estructura básica
+            try {
+              const schema = await base44.entities[entityName].schema();
+              const schemaProps = schema.properties || {};
+              
+              sqlScript += `CREATE TABLE IF NOT EXISTS ${entityName} (\n`;
+              sqlScript += `  id VARCHAR(255) PRIMARY KEY,\n`;
+              sqlScript += `  created_date TIMESTAMP,\n`;
+              sqlScript += `  updated_date TIMESTAMP,\n`;
+              sqlScript += `  created_by TEXT`;
+              
+              Object.keys(schemaProps).forEach(prop => {
+                const propDef = schemaProps[prop];
+                let sqlType = 'TEXT';
+                
+                if (propDef.type === 'number' || propDef.type === 'integer') {
+                  sqlType = propDef.type === 'integer' ? 'INTEGER' : 'DECIMAL(18,2)';
+                } else if (propDef.type === 'boolean') {
+                  sqlType = 'BOOLEAN';
+                } else if (propDef.format === 'date') {
+                  sqlType = 'DATE';
+                } else if (propDef.format === 'date-time') {
+                  sqlType = 'TIMESTAMP';
+                } else if (propDef.type === 'array' || propDef.type === 'object') {
+                  sqlType = 'JSON';
+                }
+                
+                sqlScript += `,\n  ${prop} ${sqlType}`;
+              });
+              
+              sqlScript += `\n);\n\n`;
+            } catch (schemaError) {
+              // Si falla obtener el esquema, generar tabla básica
+              sqlScript += `CREATE TABLE IF NOT EXISTS ${entityName} (\n`;
+              sqlScript += `  id VARCHAR(255) PRIMARY KEY,\n`;
+              sqlScript += `  created_date TIMESTAMP,\n`;
+              sqlScript += `  updated_date TIMESTAMP,\n`;
+              sqlScript += `  created_by TEXT\n`;
+              sqlScript += `);\n\n`;
+            }
+          }
+          
+          // Generar INSERTs solo si hay datos
+          if (hasData) {
             data.forEach(record => {
               const allColumns = Object.keys(record);
               const values = allColumns.map(col => {
@@ -184,13 +231,11 @@ export default function DataExport() {
 
               sqlScript += `INSERT INTO ${entityName} (${allColumns.join(', ')}) VALUES (${values.join(', ')});\n`;
             });
-
             sqlScript += `\n`;
-            toast.success(`✓ ${entityName}: ${data.length} registros con CREATE TABLE`);
+            toast.success(`✓ ${entityName}: CREATE TABLE + ${data.length} registros`);
           } else {
-            sqlScript += `-- Table: ${entityName} (sin datos)\n`;
-            sqlScript += `-- No se pudo generar CREATE TABLE sin registros\n\n`;
-            toast.warning(`⚠ ${entityName}: sin datos`);
+            sqlScript += `-- Tabla creada sin datos\n\n`;
+            toast.success(`✓ ${entityName}: CREATE TABLE generado (sin datos)`);
           }
         } catch (error) {
           console.error(`Error exportando ${entityName}:`, error);
