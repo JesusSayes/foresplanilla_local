@@ -36,7 +36,7 @@ export const create = async (req, res) => {
         employee_id: req.body.employee_id,
         start_date: req.body.start_date,
         end_date: req.body.end_date,
-        status: req.body.status ?? 'Pendiente',
+        // status: req.body.status ?? 'Pendiente',
       },
     });
     res.status(201).json(request);
@@ -79,9 +79,9 @@ export const filter = async (req, res) => {
     if (filters.employee_id && !Number.isNaN(Number(filters.employee_id))) {
       where.employee_id = parseInt(filters.employee_id);
     }
-    if (filters.status) {
-      where.status = filters.status;
-    }
+    // if (filters.status) {
+      // where.status = filters.status;
+    // }
 
     const requests = await MODEL.findMany({
       where,

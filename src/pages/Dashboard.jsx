@@ -48,7 +48,7 @@ export default function Dashboard() {
         "-year,-month",
         1
       );
-      return payslips[0];
+      return payslips[0] ?? null;;
     },
     enabled: !!employee?.id,
   });
@@ -71,9 +71,10 @@ export default function Dashboard() {
     queryKey: ["pendingRequests", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return [];
-      return await entitiesAPI.VacationRequest.filter(
+      const result = await entitiesAPI.VacationRequest.filter(
         { employee_id: employee.id, status: "Pendiente" }
       );
+      return result ?? [];
     },
     enabled: !!employee?.id,
   });
