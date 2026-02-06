@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,15 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Database, Plus, Trash2, Edit2, CheckCircle, 
+import {
+  Database, Plus, Trash2, Edit2, CheckCircle,
   AlertCircle, RefreshCw, Server, Key, Activity
 } from "lucide-react";
 import { toast } from "sonner";
 import SyncMonitor from "../components/attendance/SyncMonitor";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function DatabaseConfig() {
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [showForm, setShowForm] = useState(false);
   const [editingConnection, setEditingConnection] = useState(null);
   const [showMonitor, setShowMonitor] = useState(null);
@@ -44,37 +47,28 @@ export default function DatabaseConfig() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadEmployee = async () => {
-      try {
-        const user = await base44.auth.me();
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading employee:", error);
-      }
-    };
-
-    loadEmployee();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: connections = [] } = useQuery({
     queryKey: ["databaseConnections"],
     queryFn: async () => {
-      return await base44.entities.DatabaseConnection.list("-created_date");
+      return await entitiesAPI.DatabaseConnection.list("-created_date");
     },
   });
 
   const createConnectionMutation = useMutation({
     mutationFn: async (data) => {
       if (editingConnection) {
-        return await base44.entities.DatabaseConnection.update(editingConnection.id, data);
+        return await entitiesAPI.DatabaseConnection.update(editingConnection.id, data);
       }
-      return await base44.entities.DatabaseConnection.create(data);
+      return await entitiesAPI.DatabaseConnection.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["databaseConnections"]);
@@ -88,7 +82,7 @@ export default function DatabaseConfig() {
 
   const deleteConnectionMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.DatabaseConnection.delete(id);
+      return await entitiesAPI.DatabaseConnection.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["databaseConnections"]);
@@ -225,7 +219,7 @@ export default function DatabaseConfig() {
                 Cerrar Monitor
               </Button>
             </div>
-            <SyncMonitor 
+            <SyncMonitor
               connectionId={showMonitor}
               connectionName={connections.find(c => c.id === showMonitor)?.connection_name}
             />
@@ -278,7 +272,7 @@ export default function DatabaseConfig() {
                       <span className="text-slate-600">Base de datos:</span>
                       <span className="font-semibold">{conn.database_name}</span>
                     </div>
-                    
+
                     <div className="flex items-center gap-2 text-sm">
                       <Key className="w-4 h-4 text-slate-500" />
                       <span className="text-slate-600">Tabla:</span>
@@ -351,11 +345,11 @@ export default function DatabaseConfig() {
 
       {/* Form Modal */}
       {showForm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
           onClick={resetForm}
         >
-          <Card 
+          <Card
             className="max-w-3xl w-full my-8"
             onClick={(e) => e.stopPropagation()}
           >
@@ -371,7 +365,7 @@ export default function DatabaseConfig() {
               {/* Basic Info */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-slate-900">Información Básica</h3>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Nombre de la Conexión *</Label>
@@ -384,8 +378,8 @@ export default function DatabaseConfig() {
 
                   <div>
                     <Label>Tipo de Base de Datos *</Label>
-                    <Select 
-                      value={formData.connection_type} 
+                    <Select
+                      value={formData.connection_type}
                       onValueChange={(v) => setFormData({...formData, connection_type: v})}
                     >
                       <SelectTrigger>
@@ -456,7 +450,7 @@ export default function DatabaseConfig() {
               {/* Table Configuration */}
               <div className="space-y-4 pt-4 border-t">
                 <h3 className="font-semibold text-slate-900">Configuración de Tabla</h3>
-                
+
                 <div>
                   <Label>Nombre de Tabla</Label>
                   <Input
@@ -500,12 +494,12 @@ export default function DatabaseConfig() {
               {/* Sync Config */}
               <div className="space-y-4 pt-4 border-t">
                 <h3 className="font-semibold text-slate-900">Sincronización</h3>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Frecuencia de Sincronización</Label>
-                    <Select 
-                      value={formData.sync_frequency} 
+                    <Select
+                      value={formData.sync_frequency}
                       onValueChange={(v) => setFormData({...formData, sync_frequency: v})}
                     >
                       <SelectTrigger>
@@ -545,8 +539,8 @@ export default function DatabaseConfig() {
               </div>
 
               <div className="flex gap-3 pt-4">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => testConnectionMutation.mutate(formData)}
                   disabled={testConnectionMutation.isPending}
                   className="flex-1"

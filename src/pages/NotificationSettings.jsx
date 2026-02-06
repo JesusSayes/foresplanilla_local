@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { 
-  Bell, Clock, Calendar, FileText, AlertCircle, CheckCircle, 
-  XCircle, Mail 
+import {
+  Bell, Clock, Calendar, FileText, AlertCircle, CheckCircle,
+  XCircle, Mail
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,31 +19,20 @@ export default function NotificationSettings() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: existingPreferences, isLoading } = useQuery({
     queryKey: ["notificationPreferences", currentUser?.email],
     queryFn: async () => {
       if (!currentUser?.email) return null;
-      const prefs = await base44.entities.NotificationPreference.filter({
+      const prefs = await entitiesAPI.NotificationPreference.filter({
         user_email: currentUser.email
       });
       return prefs.length > 0 ? prefs[0] : null;
@@ -76,12 +66,12 @@ export default function NotificationSettings() {
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       if (existingPreferences) {
-        return await base44.entities.NotificationPreference.update(
+        return await entitiesAPI.NotificationPreference.update(
           existingPreferences.id,
           data
         );
       } else {
-        return await base44.entities.NotificationPreference.create(data);
+        return await entitiesAPI.NotificationPreference.create(data);
       }
     },
     onSuccess: () => {
@@ -210,7 +200,7 @@ export default function NotificationSettings() {
               {notificationTypes.map((type) => {
                 const Icon = type.icon;
                 return (
-                  <div 
+                  <div
                     key={type.key}
                     className="flex items-start gap-4 p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all"
                   >
