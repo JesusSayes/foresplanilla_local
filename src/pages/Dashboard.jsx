@@ -37,6 +37,9 @@ export default function Dashboard() {
         }
       });
     }
+    if (currentUser !== undefined) {
+      setLoading(false);
+    }
   }, [currentUser]);
 
   const { data: latestPayslip } = useQuery({
