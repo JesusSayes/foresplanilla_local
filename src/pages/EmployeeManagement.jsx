@@ -445,7 +445,8 @@ export default function EmployeeManagement() {
       document_number: emp?.document_number || "",
       first_name: emp?.first_name || "",
       last_name: emp?.last_name || "",
-      birth_date: emp?.birth_date || "",
+      // birth_date: emp?.birth_date || "",
+      birth_date: emp?.birth_date.split("T")[0] || "",
       gender: emp?.gender || "M",
       personal_email: emp?.personal_email || "",
       work_email: emp?.work_email || "",
@@ -1908,7 +1909,7 @@ export default function EmployeeManagement() {
                     <p><strong>Contrato:</strong> {selectedEmployee.contract_type}</p>
                     <p><strong>Sistema Pensión:</strong> {selectedEmployee.pension_system || "N/A"}</p>
                     {selectedEmployee.cuspp && <p><strong>CUSPP:</strong> {selectedEmployee.cuspp}</p>}
-                    <p><strong>Estado:</strong> <Badge className={getStatusConfig(selectedEmployee.status).color}>{selectedEmployee.status}</Badge></p>
+                    <div><strong>Estado:</strong> <Badge className={getStatusConfig(selectedEmployee.status).color}>{selectedEmployee.status}</Badge></div>
                   </div>
                 </div>
 
