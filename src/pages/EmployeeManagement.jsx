@@ -872,6 +872,9 @@ export default function EmployeeManagement() {
                     className="pl-10"
                   />
                 </div>
+                <p className="text-xs text-slate-600 mt-1">
+                  Mostrando {filteredEmployees.length} de {allEmployees.length} empleados
+                </p>
               </div>
 
               <Select value={statusFilter} onValueChange={setStatusFilter}>
