@@ -872,9 +872,6 @@ export default function EmployeeManagement() {
                     className="pl-10"
                   />
                 </div>
-                <p className="text-xs text-slate-600 mt-1">
-                  Mostrando {filteredEmployees.length} de {allEmployees.length} empleados
-                </p>
               </div>
 
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -913,6 +910,12 @@ export default function EmployeeManagement() {
                   ))}
                 </SelectContent>
               </Select>
+
+              <div className="px-4 py-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <p className="text-sm font-medium text-indigo-900">
+                  {filteredEmployees.length} / {allEmployees.length}
+                </p>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-6">
