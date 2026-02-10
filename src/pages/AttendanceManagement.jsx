@@ -168,6 +168,7 @@ export default function AttendanceManagement() {
       if (!employee || employee.role !== "admin") return;
 
       const result = await generateAutoClockings(selectedDate);
+      console.log('payload generado:', result?.payload || '(no payload)');
       if (result.success && result.recordsCreated > 0) {
         queryClient.invalidateQueries(["todayAttendance"]);
         toast.success(`✓ ${result.recordsCreated} marcación(es) automática(s) generada(s)`);
@@ -1066,7 +1067,7 @@ export default function AttendanceManagement() {
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Horas</p>
                                   <p className="font-semibold text-slate-900">
-                                    {emp.record?.worked_hours?.toFixed(2) || "0.00"}h
+                                    {Number(emp.record?.worked_hours ?? 0).toFixed(2)}h
                                   </p>
                                 </div>
                                 <div className="text-center">

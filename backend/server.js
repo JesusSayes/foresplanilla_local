@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';  // ← FIJO: sin 'path'
+import { dirname, join } from 'path';
 import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,51 +48,33 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Middlewares
+// CORS
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true
+  credentials: true,
 }));
+
+// Body parsers (DEBEN ir antes de las rutas)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // Morgan logs
 const accessLogStream = fs.createWriteStream(join(logsDir, 'access.log'), { flags: 'a' });
 app.use(morgan('combined', { stream: accessLogStream, skip: (req, res) => res.statusCode < 400 }));
 app.use(morgan('dev', { skip: (req, res) => res.statusCode >= 400 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// Request logging
+// Request logging simple
 app.use((req, res, next) => {
-  console.log(`📥 ${new Date().toISOString()} ${req.method} ${req.path}`);
+  console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
   next();
 });
 
 // Health check
-app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
-
-app.use((err, req, res, next) => {
-  const errorInfo = {
-    timestamp: new Date().toISOString(),
-    method: req.method,
-    url: req.originalUrl,
-    status: err.status || 500,
-    message: err.message,
-    stack: err.stack,
-    query: req.query,
-    body: req.body,
-    headers: req.headers.authorization ? 'Bearer ***' : 'No auth'
-  };
-
-  console.error('🚨 ERROR DETALLADO:', JSON.stringify(errorInfo, null, 2));
-
-  res.status(err.status || 500).json({
-    error: err.message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// TUS RUTAS (exactas)
+// RUTAS API
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/master-data', masterDataRoutes);
@@ -119,26 +101,35 @@ app.use('/api/sync/logs', logsRoutes);
 app.use('/api/holidays', holidaysRoutes);
 app.use('/api/attendance/incidents', attendanceIncidentsRoutes);
 
-// 404
+// 404 handler
 app.use((req, res) => {
   console.log(`404 ${req.method} ${req.path}`);
   res.status(404).json({ error: 'Not Found', path: req.path });
 });
 
-// ERROR HANDLER
-app.use((err, req, res) => {
-  console.error('ERROR:', {
-    time: new Date().toISOString(),
+// Error handler (AL FINAL)
+app.use((err, req, res, next) => {
+  const errorInfo = {
+    timestamp: new Date().toISOString(),
     method: req.method,
-    url: req.url,
+    url: req.originalUrl,
+    status: err.status || 500,
     message: err.message,
-    stack: err.stack
+    stack: err.stack,
+    query: req.query,
+    body: req.body,
+    headers: req.headers.authorization ? 'Bearer ***' : 'No auth',
+  };
+
+  console.error('ERROR DETALLADO:', JSON.stringify(errorInfo, null, 2));
+
+  res.status(err.status || 500).json({
+    error: err.message,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
-  res.status(500).json({ error: 'Server Error', ...(process.env.NODE_ENV === 'development' && { message: err.message }) });
 });
 
 app.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
   console.log(`Logs: ${logsDir}`);
 });
-
