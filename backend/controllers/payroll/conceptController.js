@@ -3,8 +3,9 @@ const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
   try {
-    const concepts = await prisma.payrollConcept.findMany({
-      orderBy: { code: 'asc' }
+    const concepts = await prisma.payroll_concept.findMany({
+      // orderBy: { code: 'asc' }
+      orderBy: { created_date: 'asc' }
     });
     res.json(concepts);
   } catch (error) {
