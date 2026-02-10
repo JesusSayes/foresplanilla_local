@@ -58,12 +58,30 @@ export const remove = async (req, res) => {
   }
 };
 
+export const filter = async (req, res) => {
+  try {
+    const { sort = '-created_date' } = req.query;
+    const desc = sort.startsWith('-');
+    const field = sort.replace('-', '');
+
+    const companies = await prisma.company_info.findMany({
+      orderBy: { [field]: desc ? 'desc' : 'asc' }
+    });
+
+    res.json(companies);
+  } catch (error) {
+    console.error('Error filtering company info:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const controller = {
   getAll,
   getById,
   create,
   update,
   delete: remove, // aquí sí usamos la clave "delete"
+  filter,
 }
 
 export default controller

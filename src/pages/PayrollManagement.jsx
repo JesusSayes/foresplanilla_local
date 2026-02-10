@@ -21,6 +21,7 @@ import ConceptsManager from "../components/payroll/ConceptsManager";
 import { createPageUrl } from "../utils";
 import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function PayrollManagement() {
   const { user: currentUser } = useAuth();
