@@ -22,7 +22,7 @@ export const filter = async (req, res) => {
     const where = {};
 
     if (filters.employee_id) {
-      where.employeeId = filters.employee_id;
+      where.employee_id = filters.employee_id;
     }
 
     if (filters.status) {

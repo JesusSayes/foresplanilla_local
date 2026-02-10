@@ -1,9 +1,15 @@
-export const buildFilterQuery = (baseQuery, filters, params = []) => {
+export const buildFilterQuery = (baseQuery, filters = {}, params = []) => {
   let query = baseQuery;
   const conditions = [];
   let paramIndex = params.length + 1;
 
-  Object.entries(filters).forEach(([key, value]) => {
+  // Asegurar que filters sea siempre un objeto
+  const safeFilters =
+    filters && typeof filters === 'object'
+      ? filters
+      : {};
+
+  Object.entries(safeFilters).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       conditions.push(`${key} = $${paramIndex}`);
       params.push(value);

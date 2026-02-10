@@ -18,7 +18,7 @@ export const listEmployees = async (req, res) => {
 
 export const filterEmployees = async (req, res) => {
   try {
-    const filters = req.body;
+    const filters = req.body || {};
     const { sort = '-created_date' } = req.query;
 
     const { query: sql, params } = buildFilterQuery(
