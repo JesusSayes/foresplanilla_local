@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { AVAILABLE_PERMISSIONS } from "../components/hooks/usePermissions";
 import PermissionGuard from "../components/PermissionGuard";
 import PermissionMatrix from "../components/roles/PermissionMatrix";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function RoleManagement() {
   const { user: currentUser } = useAuth();
