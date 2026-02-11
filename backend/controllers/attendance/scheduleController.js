@@ -58,12 +58,57 @@ export const remove = async (req, res) => {
   }
 };
 
+export const filter = async (req, res) => {
+  try {
+    const { sort = 'schedule_name' } = req.query;
+    const desc = sort.startsWith('-');
+    const field = sort.replace('-', '');
+
+    const filters = req.body || {};
+    const where = {};
+
+    if (filters.schedule_name) {
+      where.schedule_name = {
+        contains: filters.schedule_name,
+        mode: 'insensitive',
+      };
+    }
+
+    if (filters.is_active !== undefined) {
+      where.is_active = filters.is_active;
+    }
+
+    if (filters.exempt_from_clocking !== undefined) {
+      where.exempt_from_clocking = filters.exempt_from_clocking;
+    }
+
+    if (filters.employee_id) {
+      where.employee_id = filters.employee_id;
+    }
+
+    if (filters.department_name) {
+      where.department_name = filters.department_name;
+    }
+
+    const schedules = await prisma.work_schedule.findMany({
+      where,
+      orderBy: { [field]: desc ? 'desc' : 'asc' },
+    });
+
+    res.json(schedules);
+  } catch (error) {
+    console.error('Error filtering schedules:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const controller = {
   getAll,
   getById,
   create,
   update,
   delete: remove, // aquí sí usamos la clave "delete"
+  filter,
 }
 
 export default controller
