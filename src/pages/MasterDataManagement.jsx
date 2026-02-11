@@ -23,6 +23,7 @@ export default function MasterDataManagement() {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
+  const [elementoFilter, setElementoFilter] = useState("all");
 
   const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -255,11 +256,13 @@ export default function MasterDataManagement() {
 
   const activeUIT = uitRecords.find(u => u.year === new Date().getFullYear());
 
-  const filteredAccountingAccounts = accountingAccounts.filter(a =>
-    a.cuenta?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.elemento?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredAccountingAccounts = accountingAccounts.filter(a => {
+    const matchesSearch = a.cuenta?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.elemento?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesElemento = elementoFilter === "all" || a.elemento === elementoFilter;
+    return matchesSearch && matchesElemento;
+  });
 
   if (!employee || permissionsLoading) {
     return (
@@ -1278,14 +1281,38 @@ export default function MasterDataManagement() {
               </CardHeader>
               <CardContent className="p-6">
                 <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar cuenta contable..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex-1 min-w-64">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                        <Input
+                          placeholder="Buscar cuenta contable..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+
+                    <Select value={elementoFilter} onValueChange={setElementoFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Elemento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los elementos</SelectItem>
+                        <SelectItem value="Activos">Activos</SelectItem>
+                        <SelectItem value="Pasivos">Pasivos</SelectItem>
+                        <SelectItem value="Patrimonio">Patrimonio</SelectItem>
+                        <SelectItem value="Ingresos">Ingresos</SelectItem>
+                        <SelectItem value="Gastos">Gastos</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <div className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <p className="text-sm font-medium text-emerald-900">
+                        {filteredAccountingAccounts.length} / {accountingAccounts.length}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
