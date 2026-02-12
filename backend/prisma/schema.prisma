@@ -403,10 +403,17 @@ model notification_preference {
 }
 
 model overtime_alert {
-  id           String    @id(map: "overtimealert_pkey") @db.VarChar(255)
-  created_date DateTime? @db.Timestamp(6)
-  updated_date DateTime? @db.Timestamp(6)
-  created_by   String?
+  id                   String    @id @db.VarChar(255)
+  employee_id          String    // FK a employee.id
+  attendance_record_id String    // FK a attendance_record.id
+  alert_date           DateTime?
+  overtime_hours       Float     @default(0)
+  status               String    @default("Pendiente")
+  created_date         DateTime? @db.Timestamp(6)
+  updated_date         DateTime? @db.Timestamp(6)
+  created_by           String?
+
+  @@map("overtime_alerts")
 }
 
 model payroll_concept {
