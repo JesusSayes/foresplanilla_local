@@ -61,6 +61,29 @@ export const AVAILABLE_PERMISSIONS = {
   "reports.view": "Ver reportes",
   "reports.export": "Exportar reportes",
   "reports.advanced": "Acceso a reportes avanzados",
+  "reports.attendance": "Ver reportes de asistencia",
+  "reports.payroll": "Ver reportes de nómina",
+  "reports.vacations": "Ver reportes de vacaciones",
+  "reports.employees": "Ver reportes de empleados",
+
+  // Centros de Costo
+  "cost_centers.view": "Ver centros de costo",
+  "cost_centers.create": "Crear centros de costo",
+  "cost_centers.edit": "Editar centros de costo",
+  "cost_centers.delete": "Eliminar centros de costo",
+  "cost_centers.assign": "Asignar centros de costo",
+  "cost_centers.view_amounts": "Ver montos de centros de costo",
+
+  // Planillas
+  "payroll.view_amounts": "Ver montos en planillas",
+  "payroll.view_department": "Ver planillas del departamento",
+
+  // Contratos
+  "contracts.view": "Ver contratos",
+  "contracts.view_amounts": "Ver montos de contratos",
+  "contracts.create": "Crear contratos",
+  "contracts.edit": "Editar contratos",
+  "contracts.delete": "Eliminar contratos",
 
   // Configuración
   "settings.company": "Configurar información de empresa",
@@ -82,6 +105,8 @@ export const AVAILABLE_PERMISSIONS = {
   "roles.delete": "Eliminar roles",
   "roles.manage": "Gestionar roles y permisos",
   "roles.assign": "Asignar roles a usuarios",
+  //
+  // Administración
   "system.admin": "Acceso administrativo completo",
   "system.settings": "Configurar ajustes del sistema",
 };
@@ -258,12 +283,14 @@ const getBasicPermissionsByRole = (role) => {
       "employees.view", "employees.edit", "employees.create", "employees.delete", "employees.import",
       "attendance.view_all", "attendance.edit", "attendance.approve_incidents", "attendance.manage",
       "vacations.view_all", "vacations.approve", "vacations.manage",
-      "payroll.view_all", "payroll.edit", "payroll.create", "payroll.delete",
+      "payroll.view_all", "payroll.view_amounts", "payroll.edit", "payroll.create", "payroll.delete",
       "certificates.view_all", "certificates.approve", "certificates.create",
       "schedules.view", "schedules.edit", "schedules.create",
       "holidays.view", "holidays.manage",
       "reports.view", "reports.export",
       "roles.view", "roles.manage",
+      "cost_centers.view", "cost_centers.create", "cost_centers.edit", "cost_centers.assign", "cost_centers.view_amounts",
+      "contracts.view", "contracts.view_amounts", "contracts.create", "contracts.edit",
     ],
     hr_readonly: [
       "employees.view",

@@ -24,6 +24,7 @@ export default function MasterDataManagement() {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
+  const [elementoFilter, setElementoFilter] = useState("all");
 
   const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -86,6 +87,11 @@ export default function MasterDataManagement() {
   const { data: uitRecords = [] } = useQuery({
     queryKey: ["uit"],
     queryFn: async () => await entitiesAPI.UIT.list("-year"),
+  });
+
+  const { data: accountingAccounts = [] } = useQuery({
+    queryKey: ["accountingaccounts"],
+    queryFn: async () => await base44.entities.AccountingAccount.list("cuenta"),
   });
 
   const createMutation = useMutation({
@@ -155,6 +161,7 @@ export default function MasterDataManagement() {
       costcenters: "CostCenter",
       segurovida: "SeguroVidaLey",
       uit: "UIT",
+      accountingaccounts: "AccountingAccount",
     };
     const entity = entityMap[activeTab];
 
@@ -239,6 +246,14 @@ export default function MasterDataManagement() {
 
   const activeUIT = uitRecords.find(u => u.year === new Date().getFullYear());
 
+  const filteredAccountingAccounts = accountingAccounts.filter(a => {
+    const matchesSearch = a.cuenta?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.elemento?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesElemento = elementoFilter === "all" || a.elemento === elementoFilter;
+    return matchesSearch && matchesElemento;
+  });
+
   if (!employee || permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -278,7 +293,7 @@ export default function MasterDataManagement() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-10 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-11 gap-6 mb-8">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-3">
@@ -418,10 +433,24 @@ export default function MasterDataManagement() {
               <p className="text-slate-600 text-sm">UIT {new Date().getFullYear()}</p>
             </CardContent>
           </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-emerald-100 rounded-xl">
+                  <DollarSign className="w-6 h-6 text-emerald-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">
+                {accountingAccounts.length}
+              </div>
+              <p className="text-slate-600 text-sm">Cuentas</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-7xl grid-cols-10">
+          <TabsList className="grid w-full max-w-7xl grid-cols-11">
             <TabsTrigger value="sites">Sedes</TabsTrigger>
             <TabsTrigger value="positions">Cargos</TabsTrigger>
             <TabsTrigger value="departments">Departamentos</TabsTrigger>
@@ -432,6 +461,7 @@ export default function MasterDataManagement() {
             <TabsTrigger value="costcenters">Centros Costos</TabsTrigger>
             <TabsTrigger value="segurovida">Seguro Vida</TabsTrigger>
             <TabsTrigger value="uit">UIT</TabsTrigger>
+            <TabsTrigger value="accountingaccounts">Cuentas</TabsTrigger>
           </TabsList>
 
           <TabsContent value="sites" className="space-y-6">
@@ -1217,6 +1247,116 @@ export default function MasterDataManagement() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="accountingaccounts" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Cuentas Contables</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Plan contable con elementos, cuentas y nombres
+                    </p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button
+                      onClick={() => handleCreate("accountingaccounts")}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nueva Cuenta
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-6">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex-1 min-w-64">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                        <Input
+                          placeholder="Buscar cuenta contable..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+
+                    <Select value={elementoFilter} onValueChange={setElementoFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Elemento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los elementos</SelectItem>
+                        <SelectItem value="Activos">Activos</SelectItem>
+                        <SelectItem value="Pasivos">Pasivos</SelectItem>
+                        <SelectItem value="Patrimonio">Patrimonio</SelectItem>
+                        <SelectItem value="Ingresos">Ingresos</SelectItem>
+                        <SelectItem value="Gastos">Gastos</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <div className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <p className="text-sm font-medium text-emerald-900">
+                        {filteredAccountingAccounts.length} / {accountingAccounts.length}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {["Activos", "Pasivos", "Patrimonio", "Ingresos", "Gastos"].map(elemento => {
+                  const elementoAccounts = filteredAccountingAccounts.filter(a => a.elemento === elemento);
+                  if (elementoAccounts.length === 0) return null;
+                  
+                  return (
+                    <div key={elemento} className="mb-6">
+                      <h3 className="text-lg font-bold text-slate-900 mb-3 pb-2 border-b border-slate-200">
+                        {elemento}
+                      </h3>
+                      <div className="space-y-2">
+                        {elementoAccounts.map(acc => (
+                          <div key={acc.id} className="p-3 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Badge className="bg-emerald-100 text-emerald-700 font-mono">{acc.cuenta}</Badge>
+                                <span className="font-medium text-slate-900">{acc.nombre}</span>
+                                {!acc.is_active && (
+                                  <Badge className="bg-red-100 text-red-700">Inactiva</Badge>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                {hasAnyPermission(["system.admin"]) && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEdit(acc, "accountingaccounts")}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {hasAnyPermission(["system.admin"]) && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-red-600"
+                                    onClick={() => handleDelete(acc, "AccountingAccount")}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </TabsContent>
           </Tabs>
           </div>
 
@@ -1243,7 +1383,8 @@ export default function MasterDataManagement() {
                     activeTab === "professions" ? "Profesión" :
                     activeTab === "costcenters" ? "Centro de Costos" :
                     activeTab === "segurovida" ? "Seguro Vida Ley" :
-                    activeTab === "uit" ? "UIT" : ""
+                    activeTab === "uit" ? "UIT" :
+                    activeTab === "accountingaccounts" ? "Cuenta Contable" : ""
                   }
                 </CardTitle>
                 <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
@@ -1696,6 +1837,53 @@ export default function MasterDataManagement() {
                         className="w-4 h-4 rounded"
                       />
                       <label htmlFor="is_active_uit" className="text-sm">Activo</label>
+                    </div>
+                  </>
+                )}
+
+                {activeTab === "accountingaccounts" && (
+                  <>
+                    <div>
+                      <Label>Elemento *</Label>
+                      <Select 
+                        value={formData.elemento || ""} 
+                        onValueChange={(val) => setFormData({ ...formData, elemento: val })}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Seleccionar elemento" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Activos">Activos</SelectItem>
+                          <SelectItem value="Pasivos">Pasivos</SelectItem>
+                          <SelectItem value="Patrimonio">Patrimonio</SelectItem>
+                          <SelectItem value="Ingresos">Ingresos</SelectItem>
+                          <SelectItem value="Gastos">Gastos</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Código de Cuenta *</Label>
+                      <Input
+                        value={formData.cuenta || ""}
+                        onChange={(e) => setFormData({ ...formData, cuenta: e.target.value })}
+                        placeholder="Ej: 2011100"
+                      />
+                    </div>
+                    <div>
+                      <Label>Nombre de la Cuenta *</Label>
+                      <Input
+                        value={formData.nombre || ""}
+                        onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                        placeholder="Ej: MERCADERIAS COSTO"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_active_accounting"
+                        checked={formData.is_active !== false}
+                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="is_active_accounting" className="text-sm">Activa</label>
                     </div>
                   </>
                 )}

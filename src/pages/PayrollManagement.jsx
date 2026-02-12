@@ -13,6 +13,7 @@ import {
   DollarSign, FileText, Calendar, Users, Download,
   Eye, CheckCircle, AlertCircle, Plus, Search, Lock, Edit2
 } from "lucide-react";
+import { usePermissions } from "../components/hooks/usePermissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -26,6 +27,9 @@ import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUp
 export default function PayrollManagement() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
+
+  const { hasPermission, canAccessDepartment, loading: permissionsLoading } = usePermissions();
+
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [payrollType, setPayrollType] = useState("Mensual");
@@ -38,6 +42,11 @@ export default function PayrollManagement() {
   const [selectedPayslipForClose, setSelectedPayslipForClose] = useState(null);
   const [previewPayslip, setPreviewPayslip] = useState(null);
   const [excludedEmployees, setExcludedEmployees] = useState([]);
+  const [historySearchTerm, setHistorySearchTerm] = useState("");
+  const [historyYearFilter, setHistoryYearFilter] = useState(new Date().getFullYear());
+  const [historyMonthFilter, setHistoryMonthFilter] = useState("all");
+  const [historyTypeFilter, setHistoryTypeFilter] = useState("all");
+  const [selectedPayrollToDelete, setSelectedPayrollToDelete] = useState(null);
 
   const queryClient = useQueryClient();
 
@@ -65,6 +74,13 @@ export default function PayrollManagement() {
         month: selectedMonth,
         year: selectedYear
       }, "-created_date");
+    },
+  });
+
+  const { data: allPayslips = [] } = useQuery({
+    queryKey: ["allPayslips"],
+    queryFn: async () => {
+      return await base44.entities.Payslip.list("-created_date", 500);
     },
   });
 
@@ -158,6 +174,7 @@ export default function PayrollManagement() {
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries(["payslips"]);
+      queryClient.invalidateQueries(["allPayslips"]);
       toast.success(`Planilla ${status === "Aprobada" ? "aprobada" : "marcada como pagada"}`);
       setSelectedPayslipForClose(null);
     },
@@ -166,11 +183,26 @@ export default function PayrollManagement() {
     },
   });
 
+  const deletePayslipMutation = useMutation({
+    mutationFn: async (id) => {
+      return await entitiesAPI.Payslip.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["payslips"]);
+      queryClient.invalidateQueries(["allPayslips"]);
+      toast.success("Planilla eliminada exitosamente");
+    },
+    onError: () => {
+      toast.error("Error al eliminar la planilla");
+    },
+  });
+
   const calculatePayroll = async () => {
     const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
 
     // Filtrar empleados según búsqueda y departamento
-    let filteredEmployees = allEmployees;
+    //let filteredEmployees = allEmployees;
+    let filteredEmployees = getFilteredEmployees();
 
     // Filtrar por tipo de contrato si es SNP
     if (payrollType === "SNP") {
@@ -393,18 +425,144 @@ export default function PayrollManagement() {
     total: existingPayslips.reduce((sum, p) => sum + (p.net_pay || 0), 0),
   };
 
-  if (!employee || employee.role !== "admin") {
+  const getLatestPayslipsByMonth = () => {
+    const grouped = {};
+    allPayslips.forEach(p => {
+      const key = `${p.year}-${p.month}-${p.payroll_type}`;
+      if (!grouped[key] || new Date(p.created_date) > new Date(grouped[key].created_date)) {
+        grouped[key] = p;
+      }
+    });
+    return Object.values(grouped);
+  };
+
+  const handleDeletePayroll = async () => {
+    if (!selectedPayrollToDelete) return;
+
+    const toDelete = allPayslips.filter(p =>
+      p.year === selectedPayrollToDelete.year &&
+      p.month === selectedPayrollToDelete.month &&
+      p.payroll_type === selectedPayrollToDelete.type
+    );
+
+    try {
+      await Promise.all(toDelete.map(p => base44.entities.Payslip.delete(p.id)));
+      queryClient.invalidateQueries(["payslips"]);
+      queryClient.invalidateQueries(["allPayslips"]);
+      toast.success(`${toDelete.length} planilla(s) eliminada(s)`);
+      setSelectedPayrollToDelete(null);
+    } catch (error) {
+      toast.error("Error al eliminar las planillas");
+      console.error(error);
+    }
+  };
+
+  const generatePayslipPDF = async (payslip, employee) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFontSize(16);
+    doc.text("BOLETA DE PAGO", pageWidth / 2, 20, { align: "center" });
+
+    // Employee Info
+    doc.setFontSize(10);
+    doc.text(`Empleado: ${employee.first_name} ${employee.last_name}`, 14, 35);
+    doc.text(`Código: ${employee.employee_code}`, 14, 42);
+    doc.text(`Periodo: ${payslip.period}`, 14, 49);
+    doc.text(`Tipo: ${payslip.payroll_type}`, 120, 49);
+
+    // Income
+    let yPos = 65;
+    doc.setFont(undefined, 'bold');
+    doc.text("INGRESOS", 14, yPos);
+    doc.setFont(undefined, 'normal');
+    yPos += 7;
+    doc.text(`Salario Base:`, 14, yPos);
+    doc.text(`S/ ${payslip.base_salary.toFixed(2)}`, 160, yPos, { align: "right" });
+    yPos += 7;
+    doc.text(`Total Ingresos:`, 14, yPos);
+    doc.setFont(undefined, 'bold');
+    doc.text(`S/ ${payslip.total_income.toFixed(2)}`, 160, yPos, { align: "right" });
+
+    // Deductions
+    yPos += 15;
+    doc.setFont(undefined, 'bold');
+    doc.text("DESCUENTOS", 14, yPos);
+    doc.setFont(undefined, 'normal');
+    yPos += 7;
+    if (payslip.pension_deduction > 0) {
+      doc.text(`Pensiones:`, 14, yPos);
+      doc.text(`S/ ${payslip.pension_deduction.toFixed(2)}`, 160, yPos, { align: "right" });
+      yPos += 7;
+    }
+    if (payslip.income_tax > 0) {
+      doc.text(`Renta 5ta:`, 14, yPos);
+      doc.text(`S/ ${payslip.income_tax.toFixed(2)}`, 160, yPos, { align: "right" });
+      yPos += 7;
+    }
+    doc.text(`Total Descuentos:`, 14, yPos);
+    doc.setFont(undefined, 'bold');
+    doc.text(`S/ ${payslip.total_deductions.toFixed(2)}`, 160, yPos, { align: "right" });
+
+    // Net Pay
+    yPos += 15;
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text("NETO A PAGAR:", 14, yPos);
+    doc.text(`S/ ${payslip.net_pay.toFixed(2)}`, 160, yPos, { align: "right" });
+
+    doc.save(`Boleta_${employee.employee_code}_${payslip.period}.pdf`);
+    toast.success("Boleta generada");
+  };
+
+  const generateMassivePayslipsPDF = async (payslips) => {
+    for (const payslip of payslips) {
+      const emp = allEmployees.find(e => e.id === payslip.employee_id);
+      if (emp) {
+        await generatePayslipPDF(payslip, emp);
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+    }
+    toast.success(`${payslips.length} boletas generadas`);
+  };
+
+  if (permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <Card className="max-w-md">
           <CardContent className="p-8 text-center">
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
-            <p className="text-slate-600">Solo administradores pueden gestionar planillas</p>
+            <p className="text-slate-600">Cargando permisos...</p>
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  if (!hasPermission("payroll.view_all") && !hasPermission("payroll.view_department")) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
+            <p className="text-slate-600">No tienes permisos para gestionar planillas</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const canCreate = hasPermission("payroll.create");
+  const canEdit = hasPermission("payroll.edit");
+  const canDelete = hasPermission("payroll.delete");
+  const canViewAmounts = hasPermission("payroll.view_amounts");
+  const canViewAllDepartments = hasPermission("payroll.view_all");
+
+  // Filtrar empleados según permisos departamentales
+  const getFilteredEmployees = () => {
+    if (canViewAllDepartments) return allEmployees;
+    return allEmployees.filter(emp => canAccessDepartment(emp.department_name));
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -470,7 +628,7 @@ export default function PayrollManagement() {
                 </div>
               </div>
               <div className="text-2xl font-bold text-slate-900 mb-1">
-                S/ {stats.total.toFixed(2)}
+                {canViewAmounts ? `S/ ${stats.total.toFixed(2)}` : '🔒'}
               </div>
               <p className="text-slate-600 text-sm">Total Planillas</p>
             </CardContent>
@@ -568,13 +726,15 @@ export default function PayrollManagement() {
                   </div>
                 </div>
 
-                <Button
-                  onClick={calculatePayroll}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700"
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  Vista Previa
-                </Button>
+                {canCreate && (
+                  <Button
+                    onClick={calculatePayroll}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    Vista Previa
+                  </Button>
+                )}
 
                 <div className="pt-4 border-t">
                   <Button
@@ -693,32 +853,40 @@ export default function PayrollManagement() {
                             </div>
                           )}
 
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="text-slate-600">Salario Base</p>
-                              <p className="font-semibold text-slate-900">
-                                S/ {payslip.base_salary.toFixed(2)}
+                          {canViewAmounts ? (
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <p className="text-slate-600">Salario Base</p>
+                                <p className="font-semibold text-slate-900">
+                                  S/ {payslip.base_salary.toFixed(2)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-slate-600">Total Ingresos</p>
+                                <p className="font-semibold text-green-600">
+                                  S/ {payslip.total_income.toFixed(2)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-slate-600">Descuentos</p>
+                                <p className="font-semibold text-red-600">
+                                  -S/ {payslip.total_deductions.toFixed(2)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-slate-600 font-bold">Neto a Pagar</p>
+                                <p className="font-bold text-indigo-600 text-lg">
+                                  S/ {payslip.net_pay.toFixed(2)}
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-4 bg-slate-100 rounded-lg text-center">
+                              <p className="text-sm text-slate-600">
+                                🔒 Sin permisos para ver montos
                               </p>
                             </div>
-                            <div>
-                              <p className="text-slate-600">Total Ingresos</p>
-                              <p className="font-semibold text-green-600">
-                                S/ {payslip.total_income.toFixed(2)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-slate-600">Descuentos</p>
-                              <p className="font-semibold text-red-600">
-                                -S/ {payslip.total_deductions.toFixed(2)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-slate-600 font-bold">Neto a Pagar</p>
-                              <p className="font-bold text-indigo-600 text-lg">
-                                S/ {payslip.net_pay.toFixed(2)}
-                              </p>
-                            </div>
-                          </div>
+                          )}
 
                           {payslip.advance_deduction > 0 && (
                             <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
@@ -788,17 +956,19 @@ export default function PayrollManagement() {
                     })}
                   </div>
 
-                  <div className="mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900 text-lg">Total General:</span>
-                      <span className="font-bold text-indigo-600 text-2xl">
-                        S/ {previewData.reduce((sum, p) => sum + p.net_pay, 0).toFixed(2)}
-                      </span>
+                  {canViewAmounts && (
+                    <div className="mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900 text-lg">Total General:</span>
+                        <span className="font-bold text-indigo-600 text-2xl">
+                          S/ {previewData.reduce((sum, p) => sum + p.net_pay, 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-600 mt-1">
+                        {previewData.length} empleados
+                      </p>
                     </div>
-                    <p className="text-sm text-slate-600 mt-1">
-                      {previewData.length} empleados
-                    </p>
-                  </div>
+                  )}
 
                   {/* Empleados No Incluidos */}
                   {getExcludedEmployeesData().length > 0 && (
@@ -835,16 +1005,23 @@ export default function PayrollManagement() {
                 </CardContent>
               </Card>
             ) : (
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="border-b">
-                  <CardTitle className="text-xl font-bold">
-                    Planillas del Periodo
-                  </CardTitle>
-                  <p className="text-sm text-slate-600 mt-1">
-                    {format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}
-                  </p>
-                </CardHeader>
-                <CardContent className="p-6">
+              <Tabs defaultValue="current" className="space-y-6">
+                <TabsList>
+                  <TabsTrigger value="current">Periodo Actual</TabsTrigger>
+                  <TabsTrigger value="history">Histórico de Planillas</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="current">
+                  <Card className="border-0 shadow-lg">
+                    <CardHeader className="border-b">
+                      <CardTitle className="text-xl font-bold">
+                        Planillas del Periodo
+                      </CardTitle>
+                      <p className="text-sm text-slate-600 mt-1">
+                        {format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}
+                      </p>
+                    </CardHeader>
+                    <CardContent className="p-6">
                   {filteredPayslips.length === 0 ? (
                     <div className="text-center py-12">
                       <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
@@ -894,12 +1071,19 @@ export default function PayrollManagement() {
                                           </Badge>
                                         </div>
                                         <div className="grid grid-cols-3 gap-4 text-sm">
-                                         <div>
-                                           <p className="text-slate-600">Neto a Pagar</p>
-                                           <p className="font-bold text-indigo-600">
-                                             S/ {payslip.net_pay.toFixed(2)}
-                                           </p>
-                                         </div>
+                                         {canViewAmounts ? (
+                                           <div>
+                                             <p className="text-slate-600">Neto a Pagar</p>
+                                             <p className="font-bold text-indigo-600">
+                                               S/ {payslip.net_pay.toFixed(2)}
+                                             </p>
+                                           </div>
+                                         ) : (
+                                           <div>
+                                             <p className="text-slate-600">Neto a Pagar</p>
+                                             <p className="font-bold text-slate-400">🔒</p>
+                                           </div>
+                                         )}
                                          <div>
                                            <p className="text-slate-600">Días Trabajados</p>
                                            <p className="font-semibold text-slate-900">{payslip.worked_days}</p>
@@ -947,6 +1131,247 @@ export default function PayrollManagement() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="history">
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="border-b">
+                  <CardTitle className="text-xl font-bold">Histórico de Planillas</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="flex gap-4 mb-6 flex-wrap">
+                    <div className="flex-1 min-w-[200px] relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                      <Input
+                        placeholder="Buscar empleado..."
+                        value={historySearchTerm}
+                        onChange={(e) => setHistorySearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <Select value={String(historyYearFilter)} onValueChange={(v) => setHistoryYearFilter(parseInt(v))}>
+                      <SelectTrigger className="w-28">
+                        <SelectValue placeholder="Año" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[2023, 2024, 2025, 2026].map(year => (
+                          <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={historyMonthFilter} onValueChange={setHistoryMonthFilter}>
+                      <SelectTrigger className="w-36">
+                        <SelectValue placeholder="Mes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los meses</SelectItem>
+                        {Array.from({ length: 12 }, (_, i) => (
+                          <SelectItem key={i + 1} value={String(i + 1)}>
+                            {format(new Date(2024, i), 'MMMM', { locale: es })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={historyTypeFilter} onValueChange={setHistoryTypeFilter}>
+                      <SelectTrigger className="w-36">
+                        <SelectValue placeholder="Tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="Quincenal">Quincenal</SelectItem>
+                        <SelectItem value="Mensual">Mensual</SelectItem>
+                        <SelectItem value="Adicional">Adicional</SelectItem>
+                        <SelectItem value="SNP">SNP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(() => {
+                    const latestPayslips = getLatestPayslipsByMonth();
+                    const filtered = latestPayslips.filter(p => {
+                      if (p.year !== historyYearFilter) return false;
+                      if (historyMonthFilter !== "all" && p.month !== parseInt(historyMonthFilter)) return false;
+                      if (historyTypeFilter !== "all" && p.payroll_type !== historyTypeFilter) return false;
+                      if (historySearchTerm) {
+                        const emp = allEmployees.find(e => e.id === p.employee_id);
+                        if (!emp) return false;
+                        const searchLower = historySearchTerm.toLowerCase();
+                        return (
+                          emp.first_name.toLowerCase().includes(searchLower) ||
+                          emp.last_name.toLowerCase().includes(searchLower) ||
+                          emp.employee_code.toLowerCase().includes(searchLower)
+                        );
+                      }
+                      return true;
+                    });
+
+                    // Group by month and type
+                    const grouped = {};
+                    filtered.forEach(p => {
+                      const key = `${p.year}-${p.month}-${p.payroll_type}`;
+                      if (!grouped[key]) {
+                        grouped[key] = {
+                          year: p.year,
+                          month: p.month,
+                          type: p.payroll_type,
+                          payslips: []
+                        };
+                      }
+                      grouped[key].payslips.push(p);
+                    });
+
+                    const groups = Object.values(grouped).sort((a, b) => {
+                      if (a.year !== b.year) return b.year - a.year;
+                      if (a.month !== b.month) return b.month - a.month;
+                      return a.type.localeCompare(b.type);
+                    });
+
+                    return groups.length === 0 ? (
+                      <div className="text-center py-12">
+                        <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                        <p className="text-slate-600">No se encontraron planillas</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {groups.map((group, idx) => {
+                          const allGroupPayslips = allPayslips.filter(p =>
+                            p.year === group.year &&
+                            p.month === group.month &&
+                            p.payroll_type === group.type
+                          );
+                          const total = allGroupPayslips.reduce((sum, p) => sum + (p.net_pay || 0), 0);
+                          const isSelected = selectedPayrollToDelete?.year === group.year &&
+                                            selectedPayrollToDelete?.month === group.month &&
+                                            selectedPayrollToDelete?.type === group.type;
+
+                          return (
+                            <Card key={`${group.year}-${group.month}-${group.type}`} className={`border-2 ${isSelected ? 'border-red-400 bg-red-50' : ''}`}>
+                              <CardContent className="p-5">
+                                <div className="flex items-center justify-between mb-4">
+                                  <div className="flex items-center gap-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => setSelectedPayrollToDelete(isSelected ? null : group)}
+                                      className="w-5 h-5 rounded border-slate-300"
+                                    />
+                                    <div>
+                                      <h3 className="text-lg font-bold text-slate-900">
+                                        {format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })} - {group.type}
+                                      </h3>
+                                      <p className="text-sm text-slate-600">
+                                        {allGroupPayslips.length} empleado(s)
+                                        {canViewAmounts && ` • Total: S/ ${total.toFixed(2)}`}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        const emp = allEmployees.find(e => e.id === allGroupPayslips[0].employee_id);
+                                        if (emp) generatePayslipPDF(allGroupPayslips[0], emp);
+                                      }}
+                                    >
+                                      <Download className="w-3 h-3 mr-1" />
+                                      Boleta Individual
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => generateMassivePayslipsPDF(allGroupPayslips)}
+                                    >
+                                      <Download className="w-3 h-3 mr-1" />
+                                      Todas las Boletas
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        const doc = new jsPDF();
+                                        doc.text(`Planilla ${group.type}`, 14, 20);
+                                        doc.text(`${format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })}`, 14, 28);
+                                        let y = 40;
+                                        allGroupPayslips.forEach(p => {
+                                          const emp = allEmployees.find(e => e.id === p.employee_id);
+                                          if (emp) {
+                                            doc.text(`${emp.employee_code} - ${emp.first_name} ${emp.last_name}`, 14, y);
+                                            doc.text(`S/ ${p.net_pay.toFixed(2)}`, 160, y, { align: "right" });
+                                            y += 7;
+                                          }
+                                        });
+                                        doc.save(`Planilla_${group.type}_${group.year}_${group.month}.pdf`);
+                                      }}
+                                    >
+                                      <FileText className="w-3 h-3 mr-1" />
+                                      Resumen PDF
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  {allGroupPayslips.slice(0, 5).map(p => {
+                                    const emp = allEmployees.find(e => e.id === p.employee_id);
+                                    return emp ? (
+                                      <div key={p.id} className="flex items-center justify-between text-sm p-2 bg-slate-50 rounded">
+                                        <span>{emp.employee_code} - {emp.first_name} {emp.last_name}</span>
+                                        {canViewAmounts ? (
+                                          <span className="font-semibold">S/ {p.net_pay.toFixed(2)}</span>
+                                        ) : (
+                                          <span className="text-slate-400">🔒</span>
+                                        )}
+                                      </div>
+                                    ) : null;
+                                  })}
+                                  {allGroupPayslips.length > 5 && (
+                                    <p className="text-xs text-slate-500 text-center">
+                                      y {allGroupPayslips.length - 5} más...
+                                    </p>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {selectedPayrollToDelete && (
+                    <div className="mt-6 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-red-900 mb-1">
+                            ⚠️ Planilla seleccionada para eliminar
+                          </p>
+                          <p className="text-sm text-red-700">
+                            {format(new Date(selectedPayrollToDelete.year, selectedPayrollToDelete.month - 1), 'MMMM yyyy', { locale: es })} - {selectedPayrollToDelete.type}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedPayrollToDelete(null)}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={handleDeletePayroll}
+                          >
+                            Confirmar Eliminación
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
             )}
           </div>
         </div>

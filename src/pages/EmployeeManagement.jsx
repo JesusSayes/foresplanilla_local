@@ -47,6 +47,9 @@ export default function EmployeeManagement() {
   const [provSearchTerm, setProvSearchTerm] = useState("");
   const [distSearchTerm, setDistSearchTerm] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [showDerechohabienteForm, setShowDerechohabienteForm] = useState(false);
+  const [editingDerechohabiente, setEditingDerechohabiente] = useState(null);
+  const [derechohabienteFormData, setDerechohabienteFormData] = useState({});
 
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -117,6 +120,15 @@ export default function EmployeeManagement() {
       const allProfessions = await entitiesAPI.Profession.list("name");
       return allProfessions.filter(p => p.is_active);
     },
+  });
+
+  const { data: derechohabientes = [] } = useQuery({
+    queryKey: ["derechohabientes", editingEmployee?.id],
+    queryFn: async () => {
+      if (!editingEmployee?.id) return [];
+      return await base44.entities.Derechohabiente.filter({ employee_id: editingEmployee.id });
+    },
+    enabled: !!editingEmployee?.id,
   });
 
   const { data: employeeChanges = [], isLoading: historyLoading } = useQuery({
@@ -409,6 +421,106 @@ export default function EmployeeManagement() {
     } catch (error) {
       console.error("Error al eliminar concepto ONP:", error);
     }
+  };
+
+  const createDerechohabienteMutation = useMutation({
+    mutationFn: async (data) => {
+      return await base44.entities.Derechohabiente.create(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["derechohabientes"]);
+      toast.success("Derechohabiente agregado");
+      setShowDerechohabienteForm(false);
+      setDerechohabienteFormData({});
+    },
+    onError: (error) => {
+      toast.error("Error al agregar derechohabiente");
+      console.error(error);
+    },
+  });
+
+  const updateDerechohabienteMutation = useMutation({
+    mutationFn: async ({ id, data }) => {
+      return await base44.entities.Derechohabiente.update(id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["derechohabientes"]);
+      toast.success("Derechohabiente actualizado");
+      setShowDerechohabienteForm(false);
+      setEditingDerechohabiente(null);
+      setDerechohabienteFormData({});
+    },
+    onError: (error) => {
+      toast.error("Error al actualizar derechohabiente");
+      console.error(error);
+    },
+  });
+
+  const deleteDerechohabienteMutation = useMutation({
+    mutationFn: async (id) => {
+      return await base44.entities.Derechohabiente.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["derechohabientes"]);
+      toast.success("Derechohabiente eliminado");
+    },
+    onError: (error) => {
+      toast.error("Error al eliminar derechohabiente");
+      console.error(error);
+    },
+  });
+
+  const handleAddDerechohabiente = () => {
+    setDerechohabienteFormData({
+      employee_id: editingEmployee.id,
+      document_type: "DNI",
+      document_number: "",
+      first_name: "",
+      last_name: "",
+      gender: "M",
+      birth_date: "",
+      relationship: "Hijo/a",
+      registration_date: new Date().toISOString().split('T')[0],
+      deregistration_date: "",
+      is_active: true,
+    });
+    setEditingDerechohabiente(null);
+    setShowDerechohabienteForm(true);
+  };
+
+  const handleEditDerechohabiente = (dh) => {
+    setDerechohabienteFormData(dh);
+    setEditingDerechohabiente(dh);
+    setShowDerechohabienteForm(true);
+  };
+
+  const handleSaveDerechohabiente = () => {
+    if (!derechohabienteFormData.document_number || !derechohabienteFormData.first_name || 
+        !derechohabienteFormData.last_name || !derechohabienteFormData.birth_date) {
+      toast.error("Complete los campos obligatorios");
+      return;
+    }
+
+    if (editingDerechohabiente) {
+      updateDerechohabienteMutation.mutate({
+        id: editingDerechohabiente.id,
+        data: derechohabienteFormData,
+      });
+    } else {
+      createDerechohabienteMutation.mutate(derechohabienteFormData);
+    }
+  };
+
+  const calculateAge = (birthDate) => {
+    if (!birthDate) return "";
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
   };
 
   const initializeForm = (emp = null) => {
@@ -813,6 +925,12 @@ export default function EmployeeManagement() {
                   ))}
                 </SelectContent>
               </Select>
+
+              <div className="px-4 py-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <p className="text-sm font-medium text-indigo-900">
+                  {filteredEmployees.length} / {allEmployees.length}
+                </p>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-6">
@@ -977,12 +1095,13 @@ export default function EmployeeManagement() {
             </CardHeader>
             <CardContent className="p-6 max-h-[70vh] overflow-y-auto">
               <Tabs defaultValue="personal" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className="grid w-full grid-cols-6">
                   <TabsTrigger value="personal">Personal</TabsTrigger>
                   <TabsTrigger value="contact">Contacto</TabsTrigger>
                   <TabsTrigger value="work">Laboral</TabsTrigger>
                   <TabsTrigger value="financial">Financiero</TabsTrigger>
                   <TabsTrigger value="emergency">Emergencia</TabsTrigger>
+                  <TabsTrigger value="derechohabientes" disabled={!editingEmployee}>Derechohabientes</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="personal" className="space-y-4">
@@ -1793,6 +1912,265 @@ export default function EmployeeManagement() {
                       />
                     </div>
                   </div>
+                </TabsContent>
+
+                <TabsContent value="derechohabientes" className="space-y-4">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Derechohabientes</strong> - Familiares dependientes registrados para beneficios
+                    </p>
+                  </div>
+
+                  {editingEmployee && (
+                    <>
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={handleAddDerechohabiente}
+                          size="sm"
+                          className="bg-indigo-600 hover:bg-indigo-700"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Agregar Derechohabiente
+                        </Button>
+                      </div>
+
+                      {derechohabientes.length === 0 ? (
+                        <div className="text-center py-8 text-slate-500">
+                          No hay derechohabientes registrados
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {derechohabientes.map(dh => (
+                            <div key={dh.id} className="p-4 border rounded-lg hover:bg-slate-50">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-slate-900">
+                                    {dh.first_name} {dh.last_name}
+                                  </h4>
+                                  <div className="grid grid-cols-2 gap-4 mt-2 text-sm text-slate-600">
+                                    <div>
+                                      <span className="font-medium">Documento:</span> {dh.document_type} {dh.document_number}
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">Relación:</span> {dh.relationship}
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">Fecha Nacimiento:</span> {dh.birth_date ? format(new Date(dh.birth_date), "dd/MM/yyyy") : "N/A"}
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">Edad:</span> {calculateAge(dh.birth_date)} años
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">Fecha Alta:</span> {dh.registration_date ? format(new Date(dh.registration_date), "dd/MM/yyyy") : "N/A"}
+                                    </div>
+                                    {dh.deregistration_date && (
+                                      <div>
+                                        <span className="font-medium">Fecha Baja:</span> {format(new Date(dh.deregistration_date), "dd/MM/yyyy")}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="mt-2">
+                                    <Badge className={dh.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
+                                      {dh.is_active ? "Activo" : "Inactivo"}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEditDerechohabiente(dh)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-red-600"
+                                    onClick={() => {
+                                      if (confirm("¿Eliminar derechohabiente?")) {
+                                        deleteDerechohabienteMutation.mutate(dh.id);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Form Modal */}
+                      {showDerechohabienteForm && (
+                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-6">
+                          <Card className="max-w-2xl w-full">
+                            <CardHeader className="border-b">
+                              <div className="flex items-center justify-between">
+                                <CardTitle>
+                                  {editingDerechohabiente ? "Editar Derechohabiente" : "Agregar Derechohabiente"}
+                                </CardTitle>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => {
+                                    setShowDerechohabienteForm(false);
+                                    setEditingDerechohabiente(null);
+                                    setDerechohabienteFormData({});
+                                  }}
+                                >
+                                  ✕
+                                </Button>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="p-6 space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label>Tipo de Documento *</Label>
+                                  <Select 
+                                    value={derechohabienteFormData.document_type} 
+                                    onValueChange={(v) => setDerechohabienteFormData({...derechohabienteFormData, document_type: v})}
+                                  >
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="DNI">DNI</SelectItem>
+                                      <SelectItem value="CE">CE</SelectItem>
+                                      <SelectItem value="Pasaporte">Pasaporte</SelectItem>
+                                      <SelectItem value="Partida de Nacimiento">Partida de Nacimiento</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label>Número de Documento *</Label>
+                                  <Input
+                                    value={derechohabienteFormData.document_number}
+                                    onChange={(e) => {
+                                      const value = e.target.value.replace(/\D/g, '');
+                                      setDerechohabienteFormData({...derechohabienteFormData, document_number: value});
+                                    }}
+                                    placeholder="Solo números"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label>Nombres *</Label>
+                                  <Input
+                                    value={derechohabienteFormData.first_name}
+                                    onChange={(e) => setDerechohabienteFormData({...derechohabienteFormData, first_name: e.target.value})}
+                                  />
+                                </div>
+                                <div>
+                                  <Label>Apellidos *</Label>
+                                  <Input
+                                    value={derechohabienteFormData.last_name}
+                                    onChange={(e) => setDerechohabienteFormData({...derechohabienteFormData, last_name: e.target.value})}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                  <Label>Género *</Label>
+                                  <Select 
+                                    value={derechohabienteFormData.gender} 
+                                    onValueChange={(v) => setDerechohabienteFormData({...derechohabienteFormData, gender: v})}
+                                  >
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="M">Masculino</SelectItem>
+                                      <SelectItem value="F">Femenino</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label>Fecha de Nacimiento *</Label>
+                                  <Input
+                                    type="date"
+                                    value={derechohabienteFormData.birth_date}
+                                    onChange={(e) => setDerechohabienteFormData({...derechohabienteFormData, birth_date: e.target.value})}
+                                  />
+                                </div>
+                                <div>
+                                  <Label>Edad</Label>
+                                  <Input
+                                    value={derechohabienteFormData.birth_date ? `${calculateAge(derechohabienteFormData.birth_date)} años` : ""}
+                                    disabled
+                                    className="bg-slate-100 text-slate-700 font-medium"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                  <Label>Relación *</Label>
+                                  <Select 
+                                    value={derechohabienteFormData.relationship} 
+                                    onValueChange={(v) => setDerechohabienteFormData({...derechohabienteFormData, relationship: v})}
+                                  >
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="Cónyuge">Cónyuge</SelectItem>
+                                      <SelectItem value="Hijo/a">Hijo/a</SelectItem>
+                                      <SelectItem value="Padre">Padre</SelectItem>
+                                      <SelectItem value="Madre">Madre</SelectItem>
+                                      <SelectItem value="Otro">Otro</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label>Fecha de Alta *</Label>
+                                  <Input
+                                    type="date"
+                                    value={derechohabienteFormData.registration_date}
+                                    onChange={(e) => setDerechohabienteFormData({...derechohabienteFormData, registration_date: e.target.value})}
+                                  />
+                                </div>
+                                <div>
+                                  <Label>Fecha de Baja</Label>
+                                  <Input
+                                    type="date"
+                                    value={derechohabienteFormData.deregistration_date}
+                                    onChange={(e) => setDerechohabienteFormData({...derechohabienteFormData, deregistration_date: e.target.value})}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex gap-3 pt-4 border-t">
+                                <Button 
+                                  variant="outline" 
+                                  className="flex-1"
+                                  onClick={() => {
+                                    setShowDerechohabienteForm(false);
+                                    setEditingDerechohabiente(null);
+                                    setDerechohabienteFormData({});
+                                  }}
+                                >
+                                  Cancelar
+                                </Button>
+                                <Button
+                                  className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                                  onClick={handleSaveDerechohabiente}
+                                  disabled={createDerechohabienteMutation.isPending || updateDerechohabienteMutation.isPending}
+                                >
+                                  {(createDerechohabienteMutation.isPending || updateDerechohabienteMutation.isPending) ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                      Guardando...
+                                    </>
+                                  ) : (
+                                    "Guardar"
+                                  )}
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </TabsContent>
               </Tabs>
 
