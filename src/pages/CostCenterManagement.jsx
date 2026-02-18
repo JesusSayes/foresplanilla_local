@@ -14,6 +14,7 @@ import {
   Building2, Plus, Edit, Trash2, Users, GitBranch, History,
   Download, FileSpreadsheet, FileText, DollarSign, Search, Calendar, Grid3x3, List
 } from "lucide-react";
+import { usePermissions } from "../components/hooks/usePermissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUp
 export default function CostCenterManagement() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const [showCCForm, setShowCCForm] = useState(false);
   const [showAssignmentForm, setShowAssignmentForm] = useState(false);
   const [editingCC, setEditingCC] = useState(null);
@@ -39,6 +41,9 @@ export default function CostCenterManagement() {
   const [showHistory, setShowHistory] = useState(false);
   const [historyFilter, setHistoryFilter] = useState(null);
   const [viewMode, setViewMode] = useState("grid");
+  const [assignmentSearchTerm, setAssignmentSearchTerm] = useState("");
+  const [unassignedSearchTerm, setUnassignedSearchTerm] = useState("");
+  const [historySearchTerm, setHistorySearchTerm] = useState("");
 
   const queryClient = useQueryClient();
 
@@ -69,7 +74,10 @@ export default function CostCenterManagement() {
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
-    queryFn: () => entitiesAPI.Employee.list("first_name"),
+    queryFn: async () => {
+      const employees = await entitiesAPI.Employee.list("first_name");
+      return employees.filter(e => e.status === "Activo");
+    },
   });
 
   const { data: departments = [] } = useQuery({
@@ -379,16 +387,15 @@ export default function CostCenterManagement() {
         (!a.end_date || new Date(a.end_date) >= new Date())
       );
 
-      if (hasIndividualAssignment) return false;
-
-      const hasDepartmentAssignment = emp.department_name && assignments.some(a =>
+      // const hasDepartmentAssignment = emp.department_name && assignments.some(a =>
+      const hasDepartmentAssignment = assignments.some(a =>
         a.assignment_type === "Departamento" &&
         a.department_name === emp.department_name &&
         a.is_active &&
         (!a.end_date || new Date(a.end_date) >= new Date())
       );
 
-      return !hasDepartmentAssignment;
+      return !hasIndividualAssignment && !hasDepartmentAssignment;
     });
   }, [allEmployees, assignments]);
 
@@ -396,18 +403,36 @@ export default function CostCenterManagement() {
     ? changeLogs.filter(log => log.cost_center_id === historyFilter)
     : changeLogs;
 
-  if (!employee || (employee.role !== "admin" && employee.role !== "super_admin")) {
+  if (permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <Card className="max-w-md">
           <CardContent className="p-8 text-center">
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
-            <p className="text-slate-600">Solo administradores pueden gestionar centros de costos</p>
+            <p className="text-slate-600">Cargando permisos...</p>
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  if (!hasPermission("cost_centers.view")) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
+            <p className="text-slate-600">No tienes permisos para ver centros de costos</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const canCreate = hasPermission("cost_centers.create");
+  const canEdit = hasPermission("cost_centers.edit");
+  const canDelete = hasPermission("cost_centers.delete");
+  const canAssign = hasPermission("cost_centers.assign");
+  const canViewAmounts = hasPermission("cost_centers.view_amounts");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -475,10 +500,12 @@ export default function CostCenterManagement() {
                       <FileText className="w-4 h-4 mr-2" />
                       PDF
                     </Button>
-                    <Button onClick={handleCreateCC} className="bg-indigo-600 hover:bg-indigo-700">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Nuevo Centro
-                    </Button>
+                    {canCreate && (
+                      <Button onClick={handleCreateCC} className="bg-indigo-600 hover:bg-indigo-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Nuevo Centro
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -548,21 +575,25 @@ export default function CostCenterManagement() {
                             </div>
 
                             <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="flex-1"
-                                onClick={() => {
-                                  setSelectedCC(cc);
-                                  handleCreateAssignment(cc);
-                                }}
-                              >
-                                <Plus className="w-3 h-3 mr-1" />
-                                Asignar
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleEditCC(cc)}>
-                                <Edit className="w-3 h-3" />
-                              </Button>
+                              {canAssign && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1"
+                                  onClick={() => {
+                                    setSelectedCC(cc);
+                                    handleCreateAssignment(cc);
+                                  }}
+                                >
+                                  <Plus className="w-3 h-3 mr-1" />
+                                  Asignar
+                                </Button>
+                              )}
+                              {canEdit && (
+                                <Button size="sm" variant="outline" onClick={() => handleEditCC(cc)}>
+                                  <Edit className="w-3 h-3" />
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -624,20 +655,24 @@ export default function CostCenterManagement() {
                               </td>
                               <td className="p-3">
                                 <div className="flex gap-1 justify-center">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setSelectedCC(cc);
-                                      handleCreateAssignment(cc);
-                                    }}
-                                    title="Asignar"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                  </Button>
-                                  <Button size="sm" variant="outline" onClick={() => handleEditCC(cc)} title="Editar">
-                                    <Edit className="w-3 h-3" />
-                                  </Button>
+                                  {canAssign && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        setSelectedCC(cc);
+                                        handleCreateAssignment(cc);
+                                      }}
+                                      title="Asignar"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                  {canEdit && (
+                                    <Button size="sm" variant="outline" onClick={() => handleEditCC(cc)} title="Editar">
+                                      <Edit className="w-3 h-3" />
+                                    </Button>
+                                  )}
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -679,45 +714,87 @@ export default function CostCenterManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                {employeesWithoutCC.length === 0 ? (
+                <div className="mb-4 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <Input
+                    placeholder="Buscar empleado..."
+                    value={unassignedSearchTerm}
+                    onChange={(e) => setUnassignedSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                {employeesWithoutCC.filter(emp => {
+                  if (!unassignedSearchTerm) return true;
+                  const searchLower = unassignedSearchTerm.toLowerCase();
+                  return (
+                    emp.first_name.toLowerCase().includes(searchLower) ||
+                    emp.last_name.toLowerCase().includes(searchLower) ||
+                    emp.employee_code.toLowerCase().includes(searchLower) ||
+                    emp.department_name?.toLowerCase().includes(searchLower)
+                  );
+                }).length === 0 ? (
                   <div className="text-center py-12">
                     <Users className="w-16 h-16 text-green-300 mx-auto mb-4" />
-                    <p className="text-slate-600">Todos los empleados activos tienen centro de costo asignado</p>
+                    <p className="text-slate-600">
+                      {unassignedSearchTerm
+                        ? "No se encontraron empleados con ese criterio"
+                        : "Todos los empleados activos tienen centro de costo asignado"}
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {employeesWithoutCC.map(emp => (
-                      <div key={emp.id} className="p-4 border-2 border-orange-200 bg-orange-50/30 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-bold text-slate-900 mb-1">
-                              {emp.first_name} {emp.last_name}
-                            </h4>
-                            <p className="text-sm text-slate-600">
-                              {emp.employee_code} • {emp.position} • {emp.department_name || "Sin departamento"}
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            className="bg-indigo-600 hover:bg-indigo-700"
-                            onClick={() => {
-                              setAssignmentFormData({
-                                cost_center_id: "",
-                                assignment_type: "Empleado",
-                                employee_id: emp.id,
-                                department_name: "",
-                                percentage: 100,
-                                start_date: format(new Date(), "yyyy-MM-dd"),
-                                is_active: true,
-                                notes: "",
-                              });
-                              setEditingAssignment(null);
-                              setShowAssignmentForm(true);
-                            }}
-                          >
-                            <Plus className="w-3 h-3 mr-2" />
-                            Asignar Centro de Costo
-                          </Button>
+                    {employeesWithoutCC.filter(emp => {
+                      if (!unassignedSearchTerm) return true;
+                      const searchLower = unassignedSearchTerm.toLowerCase();
+                      return (
+                        emp.first_name.toLowerCase().includes(searchLower) ||
+                        emp.last_name.toLowerCase().includes(searchLower) ||
+                        emp.employee_code.toLowerCase().includes(searchLower) ||
+                        emp.department_name?.toLowerCase().includes(searchLower)
+                      );
+                    }).map(emp => (
+                     <div key={emp.id} className="p-4 border-2 border-orange-200 bg-orange-50/30 rounded-lg">
+                       <div className="flex items-center justify-between">
+                         <div className="flex-1">
+                           <div className="flex items-center gap-2 mb-1">
+                             <h4 className="font-bold text-slate-900">
+                               {emp.first_name} {emp.last_name}
+                             </h4>
+                             <Badge className={
+                               emp.status === "Activo" ? "bg-green-100 text-green-700" :
+                               emp.status === "Suspendido" ? "bg-yellow-100 text-yellow-700" :
+                               "bg-gray-100 text-gray-700"
+                             }>
+                               {emp.status}
+                             </Badge>
+                           </div>
+                           <p className="text-sm text-slate-600">
+                             {emp.employee_code} • {emp.position} • {emp.department_name || "Sin departamento"}
+                           </p>
+                         </div>
+                          {canAssign && (
+                            <Button
+                              size="sm"
+                              className="bg-indigo-600 hover:bg-indigo-700"
+                              onClick={() => {
+                                setAssignmentFormData({
+                                  cost_center_id: "",
+                                  assignment_type: "Empleado",
+                                  employee_id: emp.id,
+                                  department_name: "",
+                                  percentage: 100,
+                                  start_date: format(new Date(), "yyyy-MM-dd"),
+                                  is_active: true,
+                                  notes: "",
+                                });
+                                setEditingAssignment(null);
+                                setShowAssignmentForm(true);
+                              }}
+                            >
+                              <Plus className="w-3 h-3 mr-2" />
+                              Asignar Centro de Costo
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -733,34 +810,70 @@ export default function CostCenterManagement() {
               <CardHeader className="border-b bg-slate-50/50">
                 <div className="flex items-center justify-between">
                   <CardTitle>Asignaciones Activas</CardTitle>
-                  <Button onClick={() => handleCreateAssignment()} className="bg-indigo-600 hover:bg-indigo-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Nueva Asignación
-                  </Button>
+                  {canAssign && (
+                    <Button onClick={() => handleCreateAssignment()} className="bg-indigo-600 hover:bg-indigo-700">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nueva Asignación
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="p-6">
+                <div className="mb-4 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <Input
+                    placeholder="Buscar asignación..."
+                    value={assignmentSearchTerm}
+                    onChange={(e) => setAssignmentSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
                 <div className="space-y-3">
-                  {assignments.filter(a => a.is_active).map(assignment => {
+                  {assignments.filter(a => {
+                    if (!a.is_active) return false;
+                    if (!assignmentSearchTerm) return true;
+                    const cc = costCenters.find(c => c.id === a.cost_center_id);
+                    const emp = a.assignment_type === "Empleado"
+                      ? allEmployees.find(e => e.id === a.employee_id)
+                      : null;
+                    const searchLower = assignmentSearchTerm.toLowerCase();
+                    return (
+                      cc?.code.toLowerCase().includes(searchLower) ||
+                      cc?.name.toLowerCase().includes(searchLower) ||
+                      a.department_name?.toLowerCase().includes(searchLower) ||
+                      emp?.first_name.toLowerCase().includes(searchLower) ||
+                      emp?.last_name.toLowerCase().includes(searchLower) ||
+                      emp?.employee_code.toLowerCase().includes(searchLower)
+                    );
+                  }).map(assignment => {
                     const cc = costCenters.find(c => c.id === assignment.cost_center_id);
                     const emp = assignment.assignment_type === "Empleado"
                       ? allEmployees.find(e => e.id === assignment.employee_id)
                       : null;
 
                     return (
-                      <div key={assignment.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <Badge className={assignment.assignment_type === "Empleado" ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"}>
-                                {assignment.assignment_type}
-                              </Badge>
-                              <h4 className="font-bold text-slate-900">
-                                {assignment.assignment_type === "Empleado"
-                                  ? `${emp?.first_name} ${emp?.last_name}`
-                                  : assignment.department_name}
-                              </h4>
-                              <span className="text-slate-500">→</span>
+                     <div key={assignment.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                       <div className="flex items-center justify-between">
+                         <div className="flex-1">
+                           <div className="flex items-center gap-3 mb-2">
+                             <Badge className={assignment.assignment_type === "Empleado" ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"}>
+                               {assignment.assignment_type}
+                             </Badge>
+                             <h4 className="font-bold text-slate-900">
+                               {assignment.assignment_type === "Empleado"
+                                 ? `${emp?.first_name} ${emp?.last_name}`
+                                 : assignment.department_name}
+                             </h4>
+                             {assignment.assignment_type === "Empleado" && emp && (
+                               <Badge className={
+                                 emp.status === "Activo" ? "bg-green-100 text-green-700" :
+                                 emp.status === "Suspendido" ? "bg-yellow-100 text-yellow-700" :
+                                 "bg-gray-100 text-gray-700"
+                               }>
+                                 {emp.status}
+                               </Badge>
+                             )}
+                             <span className="text-slate-500">→</span>
                               <div className="flex items-center gap-2">
                                 <Building2 className="w-4 h-4 text-indigo-600" />
                                 <span className="font-semibold text-indigo-600">{cc?.code}</span>
@@ -775,21 +888,25 @@ export default function CostCenterManagement() {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleEditAssignment(assignment)}>
-                              <Edit className="w-3 h-3" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => {
-                                if (confirm("¿Eliminar esta asignación?")) {
-                                  deleteAssignmentMutation.mutate(assignment);
-                                }
-                              }}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
+                            {canEdit && (
+                              <Button size="sm" variant="outline" onClick={() => handleEditAssignment(assignment)}>
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600"
+                                onClick={() => {
+                                  if (confirm("¿Eliminar esta asignación?")) {
+                                    deleteAssignmentMutation.mutate(assignment);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -814,8 +931,28 @@ export default function CostCenterManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
+                <div className="mb-4 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <Input
+                    placeholder="Buscar en historial..."
+                    value={historySearchTerm}
+                    onChange={(e) => setHistorySearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
                 <div className="space-y-3">
-                  {filteredHistory.slice(0, 50).map(log => {
+                  {filteredHistory.filter(log => {
+                    if (!historySearchTerm) return true;
+                    const cc = costCenters.find(c => c.id === log.cost_center_id);
+                    const searchLower = historySearchTerm.toLowerCase();
+                    return (
+                      cc?.code.toLowerCase().includes(searchLower) ||
+                      cc?.name.toLowerCase().includes(searchLower) ||
+                      log.change_type.toLowerCase().includes(searchLower) ||
+                      log.field_changed.toLowerCase().includes(searchLower) ||
+                      log.changed_by.toLowerCase().includes(searchLower)
+                    );
+                  }).slice(0, 50).map(log => {
                     const cc = costCenters.find(c => c.id === log.cost_center_id);
                     return (
                       <div key={log.id} className="p-4 border border-slate-200 rounded-lg">
@@ -975,7 +1112,7 @@ export default function CostCenterManagement() {
                         )
                         .map(emp => (
                           <SelectItem key={emp.id} value={emp.id}>
-                            {emp.employee_code} - {emp.first_name} {emp.last_name}
+                            {emp.employee_code} - {emp.first_name} {emp.last_name} ({emp.status})
                           </SelectItem>
                         ))}
                     </SelectContent>

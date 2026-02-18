@@ -50,7 +50,16 @@ export default function Home() {
       }
     };
 
+    // Agregar timeout para evitar bloqueo
+    const timer = setTimeout(() => {
+      if (loading) {
+        setLoading(false);
+      }
+    }, 5000);
+
     loadEmployee();
+
+    return () => clearTimeout(timer);
   }, [user, isAuthenticated, isLoadingAuth]);
 
   const getRoleText = (role) => {

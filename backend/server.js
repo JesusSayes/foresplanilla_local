@@ -100,6 +100,7 @@ app.use('/api/database/connections', connectionsRoutes);
 app.use('/api/sync/logs', logsRoutes);
 app.use('/api/holidays', holidaysRoutes);
 app.use('/api/attendance/incidents', attendanceIncidentsRoutes);
+app.use('/api/master-data', masterDataRoutes);
 
 // 404 handler
 app.use((req, res) => {

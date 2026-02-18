@@ -3,7 +3,7 @@ const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
   try {
-    const costCenters = await prisma.costCenter.findMany({
+    const costCenters = await prisma.cost_center.findMany({
       orderBy: { code: 'asc' }
     });
     res.json(costCenters);
@@ -14,7 +14,7 @@ export const getAll = async (req, res) => {
 
 export const getById =  async (req, res) => {
   try {
-    const costCenter = await prisma.costCenter.findUnique({
+    const costCenter = await prisma.cost_center.findUnique({
       where: { id: parseInt(req.params.id) }
     });
     if (!costCenter) return res.status(404).json({ error: 'Cost center not found' });
@@ -26,7 +26,7 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const costCenter = await prisma.costCenter.create({
+    const costCenter = await prisma.cost_center.create({
       data: req.body
     });
     res.status(201).json(costCenter);
@@ -37,7 +37,7 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const costCenter = await prisma.costCenter.update({
+    const costCenter = await prisma.cost_center.update({
       where: { id: parseInt(req.params.id) },
       data: req.body
     });
@@ -49,7 +49,7 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
-    await prisma.costCenter.delete({
+    await prisma.cost_center.delete({
       where: { id: parseInt(req.params.id) }
     });
     res.status(204).send();
