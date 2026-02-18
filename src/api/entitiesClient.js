@@ -65,6 +65,9 @@ export const entitiesAPI = {
   CostCenter: createEntityAPI('/api/cost-centers'),
   DatabaseConnection: createEntityAPI('/api/database/connections'),
   SyncLog: createEntityAPI('/api/sync/logs'),
+  SeguroVidaLey: createEntityAPI('/api/master-data/segurovidaley'),
+  UIT: createEntityAPI('/api/master-data/uits'),
+  AccountingAccount: createEntityAPI('/api/master-data/accountingaccounts'),
 };
 
 export default entitiesAPI;

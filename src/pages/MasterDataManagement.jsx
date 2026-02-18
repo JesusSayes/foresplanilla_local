@@ -92,7 +92,7 @@ export default function MasterDataManagement() {
 
   const { data: accountingAccounts = [] } = useQuery({
     queryKey: ["accountingaccounts"],
-    queryFn: async () => await base44.entities.AccountingAccount.list("cuenta"),
+    queryFn: async () => await entitiesAPI.AccountingAccount.list("cuenta"),
   });
 
   const createMutation = useMutation({

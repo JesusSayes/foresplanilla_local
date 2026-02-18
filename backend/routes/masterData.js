@@ -11,6 +11,7 @@ import {
   listHolidays, createHoliday,
   listRoles, createRole
 } from '../controllers/masterDataController.js';
+import seguroVidaController from '../controllers/masterData/seguroVidaController.js';
 
 const router = express.Router();
 
@@ -45,5 +46,9 @@ router.post('/holidays', createHoliday);
 
 router.get('/roles', listRoles);
 router.post('/roles', createRole);
+
+router.get('/segurovidaley', seguroVidaController.getAll);
+router.get('/uits', uitController.getAll);
+router.get('/accountingaccounts', accountingAccountController.getAll);
 
 export default router;
