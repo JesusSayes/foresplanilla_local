@@ -20,7 +20,7 @@ export default function DataExport() {
   // Lista de todas las entidades
   const entities = [
     "User",
-    "Employee", "Contract", "ContractTemplate", "ContractClause", "ContractRenewalRule",
+    "Employee", "Contract", "ContractTemplate", "ContractClause", "ContractRenewalRule", "Derechohabiente",
     "AttendanceRecord", "AttendanceIncident", "OvertimeAlert", "WorkSchedule",
     "VacationRequest", "VacationBalance",
     "Payslip", "PayrollConcept",
@@ -29,10 +29,10 @@ export default function DataExport() {
     "Role", "UserRole",
     "Certificate",
     "EmployeeChangeLog",
-    "CompanyInfo", "PayslipTemplate", "RMV",
+    "CompanyInfo", "PayslipTemplate", "RMV", "UIT", "SeguroVidaLey",
     "DatabaseConnection", "SyncLog", "AccessDevice", "EmployeeAccessMapping", "DeviceEvent",
     "Notification", "NotificationPreference",
-    "UserInvitation", "Derechohabiente"
+    "UserInvitation", "AccountingAccount"
   ];
 
   useEffect(() => {
