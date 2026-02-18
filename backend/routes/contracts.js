@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
   try {
     const { sort = '-created_date' } = req.query;
     const orderBy = sort.startsWith('-') ? `${sort.substring(1)} DESC` : `${sort} ASC`;
-    
+
     const result = await pool.query(
       `SELECT * FROM contract ORDER BY ${orderBy}`
     );
@@ -26,7 +26,7 @@ router.post('/filter', async (req, res) => {
     const filters = req.body;
     const { sort = '-created_date' } = req.query;
     const orderBy = sort.startsWith('-') ? `${sort.substring(1)} DESC` : `${sort} ASC`;
-    
+
     const conditions = [];
     const values = [];
     let paramCount = 1;
@@ -41,7 +41,7 @@ router.post('/filter', async (req, res) => {
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const query = `SELECT * FROM contract ${whereClause} ORDER BY ${orderBy}`;
-    
+
     const result = await pool.query(query, values);
     res.json(result.rows);
   } catch (error) {
@@ -57,11 +57,11 @@ router.get('/:id', async (req, res) => {
       'SELECT * FROM contract WHERE id = $1',
       [id]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Contract not found' });
     }
-    
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error fetching contract:', error);
@@ -75,7 +75,7 @@ router.post('/', async (req, res) => {
     const fields = Object.keys(data);
     const values = Object.values(data);
     const placeholders = fields.map((_, index) => `$${index + 1}`).join(', ');
-    
+
     const result = await pool.query(
       `INSERT INTO contract (${fields.join(', ')}) VALUES (${placeholders}) RETURNING *`,
       values
@@ -92,11 +92,11 @@ router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    
+
     const fields = Object.keys(updates);
     const values = Object.values(updates);
     const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
-    
+
     const result = await pool.query(
       `UPDATE contract SET ${setClause} WHERE id = $${fields.length + 1} RETURNING *`,
       [...values, id]
