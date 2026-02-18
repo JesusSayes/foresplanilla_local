@@ -15,6 +15,7 @@ import {
   TrendingDown, Users, AlertCircle, Edit2, CheckCircle, User, Copy, Upload, FileSpreadsheet, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 // Conceptos predefinidos según legislación peruana
 const PREDEFINED_CONCEPTS = {

@@ -21,6 +21,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { createPageUrl } from "../utils";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function CostCenterManagement() {
   const { user: currentUser } = useAuth();
