@@ -12,6 +12,8 @@ import {
   listRoles, createRole
 } from '../controllers/masterDataController.js';
 import seguroVidaController from '../controllers/masterData/seguroVidaController.js';
+import uitController from '../controllers/masterData/uitController.js';
+import accountingAccountController from '../controllers/masterData/accountingAccountController.js';
 
 const router = express.Router();
 
