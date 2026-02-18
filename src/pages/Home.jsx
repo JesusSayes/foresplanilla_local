@@ -26,7 +26,7 @@ export default function Home() {
         const user = await base44.auth.me();
         const employees = await base44.entities.Employee.filter({ 
           work_email: user.email 
-        });
+        }, '', 1);
         
         if (employees && employees.length > 0) {
           setEmployee(employees[0]);
@@ -38,8 +38,17 @@ export default function Home() {
       }
     };
 
+    // Agregar timeout para evitar bloqueo
+    const timer = setTimeout(() => {
+      if (loading) {
+        setLoading(false);
+      }
+    }, 5000);
+
     loadEmployee();
-  }, []);
+
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   const getRoleText = (role) => {
     const roles = {
