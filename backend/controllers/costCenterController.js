@@ -58,12 +58,28 @@ export const remove = async (req, res) => {
   }
 };
 
+export const filter = async (req, res) => {
+  try {
+    const { sort = '-code' } = req.query;
+    const desc = sort.startsWith('-');
+    const field = sort.replace('-', '');
+
+    const costCenters = await prisma.cost_center.findMany({  // Ajusta modelo
+      orderBy: { [field]: desc ? 'desc' : 'asc' }
+    });
+    res.json(costCenters);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const controller = {
   getAll,
   getById,
   create,
   update,
   delete: remove, // aquí sí usamos la clave "delete"
+  filter,
 }
 
 export default controller

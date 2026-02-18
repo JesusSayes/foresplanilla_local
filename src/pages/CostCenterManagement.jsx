@@ -54,7 +54,7 @@ export default function CostCenterManagement() {
 
   const { data: costCenters = [] } = useQuery({
     queryKey: ["costCenters"],
-    queryFn: () => entitiesAPI.CostCenter.list("code"),
+    queryFn: () => entitiesAPI.CostCenter.filter({}, "-code"),
   });
 
   const { data: assignments = [] } = useQuery({
