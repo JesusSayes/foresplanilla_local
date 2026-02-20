@@ -92,6 +92,14 @@ export default function CostCenterManagement() {
     },
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ["costCenterCategories"],
+    queryFn: async () => {
+      const allCategories = await base44.entities.CostCenterCategory.list("code");
+      return allCategories.filter(c => c.is_active);
+    },
+  });
+
   const createCCMutation = useMutation({
     mutationFn: async (data) => {
       const cc = await base44.entities.CostCenter.create(data);
@@ -112,6 +120,7 @@ export default function CostCenterManagement() {
       queryClient.invalidateQueries(["costCenters"]);
       queryClient.invalidateQueries(["costCenterChangeLogs"]);
       toast.success("Centro de costos creado");
+      setShowCCForm(false);
       resetCCForm();
     },
   });
