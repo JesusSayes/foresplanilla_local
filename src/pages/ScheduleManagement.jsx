@@ -475,28 +475,43 @@ export default function ScheduleManagement() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <TabsList className="grid w-full max-w-3xl grid-cols-5">
-                <TabsTrigger value="templates">
-                  Plantillas ({filteredTemplates.length})
+                <TabsTrigger value="templates" className="flex items-center gap-2">
+                  <span>Plantillas</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-green-600 rounded-full">
+                    {filteredTemplates.length}
+                  </span>
                 </TabsTrigger>
-                <TabsTrigger value="individual">
-                  Asignados ({filteredIndividual.length})
+                <TabsTrigger value="individual" className="flex items-center gap-2">
+                  <span>Asignados</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-blue-600 rounded-full">
+                    {filteredIndividual.length}
+                  </span>
                 </TabsTrigger>
-                <TabsTrigger value="department">
-                  Departamentos ({filteredDepartment.length})
+                <TabsTrigger value="department" className="flex items-center gap-2">
+                  <span>Departamentos</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-purple-600 rounded-full">
+                    {filteredDepartment.length}
+                  </span>
                 </TabsTrigger>
-                <TabsTrigger value="unassigned-employees">
-                  Sin Horario ({employeesWithoutSchedule.filter(emp => {
-                    const searchLower = searchTerm.toLowerCase();
-                    return emp.first_name.toLowerCase().includes(searchLower) ||
-                      emp.last_name.toLowerCase().includes(searchLower) ||
-                      emp.employee_code.toLowerCase().includes(searchLower) ||
-                      emp.department_name?.toLowerCase().includes(searchLower);
-                  }).length})
+                <TabsTrigger value="unassigned-employees" className="flex items-center gap-2">
+                  <span>Sin Horario</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-amber-600 rounded-full">
+                    {employeesWithoutSchedule.filter(emp => {
+                      const searchLower = searchTerm.toLowerCase();
+                      return emp.first_name.toLowerCase().includes(searchLower) ||
+                        emp.last_name.toLowerCase().includes(searchLower) ||
+                        emp.employee_code.toLowerCase().includes(searchLower) ||
+                        emp.department_name?.toLowerCase().includes(searchLower);
+                    }).length}
+                  </span>
                 </TabsTrigger>
-                <TabsTrigger value="unassigned-departments">
-                  Depts Sin Horario ({departmentsWithoutSchedule.filter(dept => 
-                    dept.toLowerCase().includes(searchTerm.toLowerCase())
-                  ).length})
+                <TabsTrigger value="unassigned-departments" className="flex items-center gap-2">
+                  <span>Depts Sin Horario</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-orange-600 rounded-full">
+                    {departmentsWithoutSchedule.filter(dept => 
+                      dept.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).length}
+                  </span>
                 </TabsTrigger>
               </TabsList>
 
