@@ -475,11 +475,29 @@ export default function ScheduleManagement() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <TabsList className="grid w-full max-w-3xl grid-cols-5">
-                <TabsTrigger value="templates">Plantillas</TabsTrigger>
-                <TabsTrigger value="individual">Asignados</TabsTrigger>
-                <TabsTrigger value="department">Departamentos</TabsTrigger>
-                <TabsTrigger value="unassigned-employees">Sin Horario</TabsTrigger>
-                <TabsTrigger value="unassigned-departments">Depts Sin Horario</TabsTrigger>
+                <TabsTrigger value="templates">
+                  Plantillas ({filteredTemplates.length})
+                </TabsTrigger>
+                <TabsTrigger value="individual">
+                  Asignados ({filteredIndividual.length})
+                </TabsTrigger>
+                <TabsTrigger value="department">
+                  Departamentos ({filteredDepartment.length})
+                </TabsTrigger>
+                <TabsTrigger value="unassigned-employees">
+                  Sin Horario ({employeesWithoutSchedule.filter(emp => {
+                    const searchLower = searchTerm.toLowerCase();
+                    return emp.first_name.toLowerCase().includes(searchLower) ||
+                      emp.last_name.toLowerCase().includes(searchLower) ||
+                      emp.employee_code.toLowerCase().includes(searchLower) ||
+                      emp.department_name?.toLowerCase().includes(searchLower);
+                  }).length})
+                </TabsTrigger>
+                <TabsTrigger value="unassigned-departments">
+                  Depts Sin Horario ({departmentsWithoutSchedule.filter(dept => 
+                    dept.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).length})
+                </TabsTrigger>
               </TabsList>
 
               {hasAnyPermission(["schedules.create", "schedules.manage", "system.admin"]) && (
@@ -771,7 +789,7 @@ export default function ScheduleManagement() {
                                   setEditingAssignment(null);
                                   setShowAssignForm(true);
                                 }}
-                                className="bg-green-600 hover:bg-green-700"
+                                className="bg-indigo-600 hover:bg-indigo-700"
                               >
                                 <Plus className="w-4 h-4 mr-1" />
                                 Asignar Horario
