@@ -215,8 +215,8 @@ model cost_center {
   category      String?
   is_active     Boolean?
   id            String    @id(map: "costcenter_pkey") @db.VarChar(255)
-  created_date  DateTime? @db.Timestamp(6)
-  updated_date  DateTime? @db.Timestamp(6)
+  created_date  DateTime? @db.Timestamp(6) @default(now())
+  updated_date  DateTime? @db.Timestamp(6) @updatedAt
   created_by_id String?
   created_by    String?
   is_sample     Boolean?

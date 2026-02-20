@@ -1577,7 +1577,7 @@ export default function MasterDataManagement() {
                       <Label>Fecha de Vigencia *</Label>
                       <Input
                         type="date"
-                        value={formData.effective_date || ""}
+                        value={formData.effective_date ? formData.effective_date.toString().slice(0, 10) : ""}
                         onChange={(e) => setFormData({ ...formData, effective_date: e.target.value })}
                       />
                     </div>
