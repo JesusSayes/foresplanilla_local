@@ -755,9 +755,28 @@ export default function ScheduleManagement() {
                               </p>
                               </div>
                               </div>
+                              <div className="flex items-center gap-2">
                               <Badge className="bg-amber-100 text-amber-700 border-amber-300">
                               Sin Horario
                               </Badge>
+                              {hasAnyPermission(["schedules.create", "schedules.manage", "system.admin"]) && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setAssignFormData({
+                                    employee_id: emp.id,
+                                    departments: [],
+                                  });
+                                  setEditingAssignment(null);
+                                  setShowAssignForm(true);
+                                }}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Asignar Horario
+                              </Button>
+                              )}
+                              </div>
                               </div>
                               </div>
                               ))}

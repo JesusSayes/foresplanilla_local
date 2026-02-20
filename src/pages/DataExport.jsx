@@ -22,7 +22,7 @@ export default function DataExport() {
     "AttendanceRecord", "AttendanceIncident", "OvertimeAlert", "WorkSchedule",
     "VacationRequest", "VacationBalance",
     "Payslip", "PayrollConcept",
-    "CostCenter", "CostCenterAssignment", "CostCenterChangeLog",
+    "CostCenter", "CostCenterAssignment", "CostCenterChangeLog", "CostCenterCategory",
     "Holiday", "Position", "Department", "Bank", "Site", "AFP", "Profession", "Ubigeo",
     "Role", "UserRole",
     "Certificate",
