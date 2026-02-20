@@ -477,25 +477,25 @@ export default function ScheduleManagement() {
               <TabsList className="grid w-full max-w-3xl grid-cols-5">
                 <TabsTrigger value="templates" className="flex items-center gap-2">
                   <span>Plantillas</span>
-                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-indigo-600 rounded-full">
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-orange-400 rounded-full">
                     {filteredTemplates.length}
                   </span>
                 </TabsTrigger>
                 <TabsTrigger value="individual" className="flex items-center gap-2">
                   <span>Asignados</span>
-                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-indigo-600 rounded-full">
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-orange-400 rounded-full">
                     {filteredIndividual.length}
                   </span>
                 </TabsTrigger>
                 <TabsTrigger value="department" className="flex items-center gap-2">
                   <span>Departamentos</span>
-                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-indigo-600 rounded-full">
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-orange-400 rounded-full">
                     {filteredDepartment.length}
                   </span>
                 </TabsTrigger>
                 <TabsTrigger value="unassigned-employees" className="flex items-center gap-2">
                   <span>Sin Horario</span>
-                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-indigo-600 rounded-full">
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-orange-400 rounded-full">
                     {employeesWithoutSchedule.filter(emp => {
                       const searchLower = searchTerm.toLowerCase();
                       return emp.first_name.toLowerCase().includes(searchLower) ||
@@ -507,7 +507,7 @@ export default function ScheduleManagement() {
                 </TabsTrigger>
                 <TabsTrigger value="unassigned-departments" className="flex items-center gap-2">
                   <span>Depts Sin Horario</span>
-                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-indigo-600 rounded-full">
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-orange-400 rounded-full">
                     {departmentsWithoutSchedule.filter(dept => 
                       dept.toLowerCase().includes(searchTerm.toLowerCase())
                     ).length}
