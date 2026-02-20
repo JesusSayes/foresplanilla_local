@@ -14,6 +14,7 @@ import {
 import seguroVidaController from '../controllers/masterData/seguroVidaController.js';
 import uitController from '../controllers/masterData/uitController.js';
 import accountingAccountController from '../controllers/masterData/accountingAccountController.js';
+import rmvController from '../controllers/masterData/rmvController.js';
 
 const router = express.Router();
 
@@ -49,8 +50,28 @@ router.post('/holidays', createHoliday);
 router.get('/roles', listRoles);
 router.post('/roles', createRole);
 
+router.get('/rmvs', rmvController.getAll);
+router.get('/rmvs/:id', rmvController.getById);
+router.post('/rmvs', rmvController.create);
+router.put('/rmvs/:id', rmvController.update);
+router.delete('/rmvs/:id', rmvController.delete);
+
 router.get('/segurovidaley', seguroVidaController.getAll);
+router.get('/segurovidaley/:id', seguroVidaController.getById);
+router.post('/segurovidaley', seguroVidaController.create);
+router.put('/segurovidaley/:id', seguroVidaController.update);
+router.delete('/segurovidaley/:id', seguroVidaController.delete);
+
 router.get('/uits', uitController.getAll);
+router.get('/uits/:id', uitController.getById);
+router.post('/uits', uitController.create);
+router.put('/uits/:id', uitController.update);
+router.delete('/uits/:id', uitController.delete);
+
 router.get('/accountingaccounts', accountingAccountController.getAll);
+router.get('/accountingaccounts/:id', accountingAccountController.getById);
+router.post('/accountingaccounts', accountingAccountController.create);
+router.put('/accountingaccounts/:id', accountingAccountController.update);
+router.delete('/accountingaccounts/:id', accountingAccountController.delete);
 
 export default router;
