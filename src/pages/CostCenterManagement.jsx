@@ -239,7 +239,7 @@ export default function CostCenterManagement() {
   });
 
   const handleCreateCC = () => {
-    setCCFormData({ name: "", code: "", category: "Administración", is_active: true });
+    setCCFormData({ name: "", code: "", category_id: "", is_active: true });
     setEditingCC(null);
     setShowCCForm(true);
   };
