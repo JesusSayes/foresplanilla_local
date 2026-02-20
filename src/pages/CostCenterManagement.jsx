@@ -119,9 +119,9 @@ export default function CostCenterManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries(["costCenters"]);
       queryClient.invalidateQueries(["costCenterChangeLogs"]);
-      toast.success("Centro de costos creado");
-      setShowCCForm(false);
       resetCCForm();
+      setShowCCForm(false);
+      toast.success("Centro de costos creado");
     },
   });
 
