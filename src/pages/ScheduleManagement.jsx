@@ -120,7 +120,7 @@ export default function ScheduleManagement() {
 
   const createAssignmentMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.WorkSchedule.create(data);
+      return await entitiesAPI.WorkSchedule.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["workSchedules"]);
@@ -132,7 +132,7 @@ export default function ScheduleManagement() {
 
   const updateAssignmentMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.WorkSchedule.update(id, data);
+      return await entitiesAPI.WorkSchedule.update(id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["workSchedules"]);
