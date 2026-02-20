@@ -9,6 +9,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
+import cron from 'node-cron';
 
 import authRoutes from './routes/auth.js';
 import employeeRoutes from './routes/employees.js';
@@ -34,8 +35,10 @@ import infoRoutes from './routes/company/info.js';
 import costcentersRoutes from './routes/cost-centers.js';
 import connectionsRoutes from './routes/database/connections.js';
 import logsRoutes from './routes/sync/logs.js';
+import biotimeSyncRoutes from './routes/sync/biotime.js';
 import holidaysRoutes from './routes/holidays.js';
 import attendanceIncidentsRoutes from './routes/attendance/incidents.js';
+import { syncBiotimeAttendance } from './controllers/sync/biotimeSyncController.js';
 
 dotenv.config();
 
@@ -98,9 +101,16 @@ app.use('/api/company/info', infoRoutes);
 app.use('/api/cost-centers', costcentersRoutes);
 app.use('/api/database/connections', connectionsRoutes);
 app.use('/api/sync/logs', logsRoutes);
+app.use('/api/sync/biotime', biotimeSyncRoutes);
 app.use('/api/holidays', holidaysRoutes);
 app.use('/api/attendance/incidents', attendanceIncidentsRoutes);
 app.use('/api/master-data', masterDataRoutes);
+
+// Cron: sincronización biotime cada hora
+cron.schedule('0 * * * *', () => {
+  console.log('[Cron] Ejecutando sync biotime...');
+  syncBiotimeAttendance().catch(err => console.error('[Cron] Error en sync biotime:', err.message));
+});
 
 // 404 handler
 app.use((req, res) => {
@@ -133,4 +143,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
   console.log(`Logs: ${logsDir}`);
+  console.log('[Cron] Sync biotime programado cada hora (0 * * * *)');
 });
