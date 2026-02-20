@@ -767,6 +767,7 @@ export default function ScheduleManagement() {
                                     employee_id: emp.id,
                                     departments: [],
                                   });
+                                  setEmployeeSearch(`${emp.first_name} ${emp.last_name} - ${emp.employee_code}`);
                                   setEditingAssignment(null);
                                   setShowAssignForm(true);
                                 }}
