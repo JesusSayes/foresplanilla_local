@@ -631,7 +631,7 @@ export default function ScheduleManagement() {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <h4 className="font-bold text-slate-900 text-lg">
-                                {schedule.schedule_name}
+                                {getEmployeeName(schedule.employee_id)}
                               </h4>
                               {!schedule.is_active && (
                                 <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
@@ -645,7 +645,7 @@ export default function ScheduleManagement() {
                             </div>
                             <div className="space-y-1 text-sm">
                               <p className="text-slate-600">
-                                <strong>Empleado:</strong> {getEmployeeName(schedule.employee_id)}
+                                <strong>Horario:</strong> {schedule.schedule_name}
                               </p>
                               <p className="text-slate-600">
                                 <strong>Lun-Vie:</strong> {schedule.monday_start || "--"} - {schedule.monday_end || "--"}
