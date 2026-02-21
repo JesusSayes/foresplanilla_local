@@ -897,8 +897,8 @@ export default function AttendanceManagement() {
             <TabsContent value="attendance" className="space-y-6">
               <Card className="border-0 shadow-lg">
                 <CardContent className="p-6">
-                  <div className="flex flex-wrap items-center gap-4 mb-6">
-                    <div className="flex-1 min-w-64">
+                  <div className="flex items-center gap-3 mb-6 flex-nowrap overflow-x-auto">
+                    <div className="flex-1 min-w-[200px]">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
                         <Input
@@ -911,7 +911,7 @@ export default function AttendanceManagement() {
                     </div>
 
                     <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                      <SelectTrigger className="w-48">
+                      <SelectTrigger className="w-40">
                         <SelectValue placeholder="Departamento" />
                       </SelectTrigger>
                       <SelectContent>
@@ -923,7 +923,7 @@ export default function AttendanceManagement() {
                     </Select>
 
                     <Select value={selectedSite} onValueChange={setSelectedSite}>
-                      <SelectTrigger className="w-40">
+                      <SelectTrigger className="w-36">
                         <SelectValue placeholder="Sede" />
                       </SelectTrigger>
                       <SelectContent>
@@ -936,21 +936,21 @@ export default function AttendanceManagement() {
                     </Select>
 
                     <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
-                      <SelectTrigger className="w-52">
-                        <SelectValue placeholder="Filtro de asistencia" />
+                      <SelectTrigger className="w-44">
+                        <SelectValue placeholder="Filtro" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
                         <SelectItem value="sin_entrada">
                           <div className="flex items-center gap-2">
                             <XCircle className="w-4 h-4 text-red-600" />
-                            Sin marcar entrada
+                            Sin entrada
                           </div>
                         </SelectItem>
                         <SelectItem value="sin_salida">
                           <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4 text-yellow-600" />
-                            Sin marcar salida
+                            Sin salida
                           </div>
                         </SelectItem>
                         <SelectItem value="con_tardanza">
@@ -964,7 +964,7 @@ export default function AttendanceManagement() {
 
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="bg-green-50 border-green-200 hover:bg-green-100">
+                        <Button variant="outline" className="bg-green-50 border-green-200 hover:bg-green-100 whitespace-nowrap">
                           <CalendarIcon className="mr-2 h-4 w-4 text-green-700" />
                           <span className="text-green-700">{format(selectedDate, "dd MMM yyyy", { locale: es })}</span>
                         </Button>
@@ -982,15 +982,16 @@ export default function AttendanceManagement() {
                     <Button
                       onClick={handleExportToExcel}
                       variant="outline"
-                      className="bg-green-600 text-white hover:bg-green-700"
+                      className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap"
                     >
                       <Download className="w-4 h-4 mr-2" />
-                      Exportar Excel
+                      Excel
                     </Button>
 
                     <Button
                       onClick={handlePrint}
                       variant="outline"
+                      className="whitespace-nowrap"
                     >
                       <Printer className="w-4 h-4 mr-2" />
                       Imprimir
