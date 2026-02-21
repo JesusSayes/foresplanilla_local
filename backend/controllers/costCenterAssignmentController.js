@@ -26,12 +26,20 @@ export const getById = async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const { id, created_date, updated_date, created_by_id, created_by, is_sample, ...rest } = req.body;
     const currentUser = req.user;
+    const { cost_center_id, assignment_type, employee_id, department_name, percentage, start_date, end_date, is_active, notes } = req.body;
     const assignment = await prisma.cost_center_assignment.create({
       data: {
         id: generate24HexId(),
-        ...rest,
+        cost_center_id: cost_center_id || null,
+        assignment_type: assignment_type || null,
+        employee_id: employee_id || null,
+        department_name: department_name || null,
+        percentage: percentage ? parseInt(percentage) : null,
+        start_date: start_date ? new Date(start_date) : null,
+        end_date: end_date || null,
+        is_active: is_active ?? true,
+        notes: notes || null,
         created_by_id: currentUser?.userId || 'system',
         created_by: currentUser?.email || 'system',
         is_sample: false,
@@ -45,10 +53,20 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const { id, created_date, created_by_id, created_by, is_sample, ...rest } = req.body;
+    const { cost_center_id, assignment_type, employee_id, department_name, percentage, start_date, end_date, is_active, notes } = req.body;
     const assignment = await prisma.cost_center_assignment.update({
       where: { id: req.params.id },
-      data: { ...rest }
+      data: {
+        cost_center_id: cost_center_id || null,
+        assignment_type: assignment_type || null,
+        employee_id: employee_id || null,
+        department_name: department_name || null,
+        percentage: percentage ? parseInt(percentage) : null,
+        start_date: start_date ? new Date(start_date) : null,
+        end_date: end_date || null,
+        is_active: is_active ?? true,
+        notes: notes || null,
+      }
     });
     res.json(assignment);
   } catch (error) {
