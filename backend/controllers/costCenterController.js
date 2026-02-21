@@ -5,20 +5,16 @@ const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
   try {
-    const costCenters = await prisma.cost_center.findMany({
-      orderBy: { code: 'asc' }
-    });
+    const costCenters = await prisma.cost_center.findMany({ orderBy: { code: 'asc' } });
     res.json(costCenters);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-export const getById =  async (req, res) => {
+export const getById = async (req, res) => {
   try {
-    const costCenter = await prisma.cost_center.findUnique({
-      where: { id: parseInt(req.params.id) }
-    });
+    const costCenter = await prisma.cost_center.findUnique({ where: { id: req.params.id } });
     if (!costCenter) return res.status(404).json({ error: 'Cost center not found' });
     res.json(costCenter);
   } catch (error) {
@@ -28,20 +24,27 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const { id, created_date, updated_date, created_by_id, created_by, is_sample,...rest } = req.body; // ignorar id del cliente si viene
-
-    const currentUser = req.user; // viene del middleware de auth
+    const currentUser = req.user;
     const userId = currentUser?.userId || 'system';
     const userEmail = currentUser?.email || 'system';
+
+    const { category_id, code, name, is_active } = req.body;
+
+    let categoryName = null;
+    if (category_id) {
+      const cat = await prisma.costcentercategory.findUnique({ where: { id: category_id }, select: { name: true } });
+      if (cat) categoryName = cat.name;
+    }
 
     const costCenter = await prisma.cost_center.create({
       data: {
         id: generate24HexId(),
-        ...rest,
+        code: code || null,
+        name: name || null,
+        category: categoryName,
+        is_active: is_active ?? true,
         created_by_id: userId,
         created_by: userEmail,
-        // created_date se llena con @default(now())
-        // updated_date se llena con @updatedAt
         is_sample: false,
       }
     });
@@ -53,13 +56,17 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const { created_date, created_by_id, created_by, is_sample, id, ...rest } = req.body;
+    const { category_id, code, name, is_active } = req.body;
+
+    let categoryName = null;
+    if (category_id) {
+      const cat = await prisma.costcentercategory.findUnique({ where: { id: category_id }, select: { name: true } });
+      if (cat) categoryName = cat.name;
+    }
 
     const costCenter = await prisma.cost_center.update({
       where: { id: req.params.id },
-      data: {
-        ...rest,
-      }
+      data: { code: code || null, name: name || null, category: categoryName, is_active: is_active ?? true }
     });
     res.json(costCenter);
   } catch (error) {
@@ -69,9 +76,7 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
-    await prisma.cost_center.delete({
-      where: { id: parseInt(req.params.id) }
-    });
+    await prisma.cost_center.delete({ where: { id: req.params.id } });
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -83,8 +88,7 @@ export const filter = async (req, res) => {
     const { sort = '-code' } = req.query;
     const desc = sort.startsWith('-');
     const field = sort.replace('-', '');
-
-    const costCenters = await prisma.cost_center.findMany({  // Ajusta modelo
+    const costCenters = await prisma.cost_center.findMany({
       orderBy: { [field]: desc ? 'desc' : 'asc' }
     });
     res.json(costCenters);
@@ -98,7 +102,7 @@ const controller = {
   getById,
   create,
   update,
-  delete: remove, // aquí sí usamos la clave "delete"
+  delete: remove,
   filter,
 }
 

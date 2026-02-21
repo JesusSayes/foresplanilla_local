@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { generate24HexId } from '../../utils/idGenerator.js';
 const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
@@ -15,7 +16,7 @@ export const getAll = async (req, res) => {
 export const getById =  async (req, res) => {
   try {
     const schedule = await prisma.work_schedule.findUnique({
-      where: { id: parseInt(req.params.id) }
+      where: { id: req.params.id }
     });
     if (!schedule) return res.status(404).json({ error: 'Schedule not found' });
     res.json(schedule);
@@ -26,8 +27,12 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
+    const { id, created_date, updated_date, created_by, ...data } = req.body;
     const schedule = await prisma.work_schedule.create({
-      data: req.body
+      data: {
+        id: generate24HexId(),
+        ...data
+      }
     });
     res.status(201).json(schedule);
   } catch (error) {
@@ -37,8 +42,9 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
+    const { id, created_date, updated_date, created_by, ...data } = req.body;
     const schedule = await prisma.work_schedule.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id: req.params.id },
       data: req.body
     });
     res.json(schedule);
@@ -50,7 +56,7 @@ export const update = async (req, res) => {
 export const remove = async (req, res) => {
   try {
     await prisma.work_schedule.delete({
-      where: { id: parseInt(req.params.id) }
+      where: { id: req.params.id }
     });
     res.status(204).send();
   } catch (error) {
