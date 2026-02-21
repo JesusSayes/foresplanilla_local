@@ -68,6 +68,7 @@ export const entitiesAPI = {
   SeguroVidaLey: createEntityAPI('/api/master-data/segurovidaley'),
   UIT: createEntityAPI('/api/master-data/uits'),
   AccountingAccount: createEntityAPI('/api/master-data/accountingaccounts'),
+  RMV: createEntityAPI('/api/master-data/rmvs'),
 };
 
 export default entitiesAPI;

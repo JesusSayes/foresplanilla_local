@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { generate24HexId } from '../../utils/idGenerator.js';
 const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
@@ -26,8 +27,12 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
+    const { id, created_date, updated_date, created_by, ...data } = req.body;
     const schedule = await prisma.work_schedule.create({
-      data: req.body
+      data: {
+        id: generate24HexId(),
+        ...data
+      }
     });
     res.status(201).json(schedule);
   } catch (error) {
@@ -37,6 +42,7 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
+    const { id, created_date, updated_date, created_by, ...data } = req.body;
     const schedule = await prisma.work_schedule.update({
       where: { id: req.params.id },
       data: req.body
