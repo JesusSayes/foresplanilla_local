@@ -28,9 +28,9 @@ export const create = async (req, res) => {
     const userId = currentUser?.userId || 'system';
     const userEmail = currentUser?.email || 'system';
 
-    const { category_id, code, name, is_active } = req.body;
+    const { category_id, category, code, name, is_active } = req.body;
 
-    let categoryName = null;
+    let categoryName = category || null;
     if (category_id) {
       const cat = await prisma.costcentercategory.findUnique({ where: { id: category_id }, select: { name: true } });
       if (cat) categoryName = cat.name;
@@ -56,9 +56,9 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const { category_id, code, name, is_active } = req.body;
+    const { category_id, category, code, name, is_active } = req.body;
 
-    let categoryName = null;
+    let categoryName = category || null;
     if (category_id) {
       const cat = await prisma.costcentercategory.findUnique({ where: { id: category_id }, select: { name: true } });
       if (cat) categoryName = cat.name;
