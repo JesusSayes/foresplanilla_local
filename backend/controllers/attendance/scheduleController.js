@@ -15,7 +15,7 @@ export const getAll = async (req, res) => {
 export const getById =  async (req, res) => {
   try {
     const schedule = await prisma.work_schedule.findUnique({
-      where: { id: parseInt(req.params.id) }
+      where: { id: req.params.id }
     });
     if (!schedule) return res.status(404).json({ error: 'Schedule not found' });
     res.json(schedule);
@@ -38,7 +38,7 @@ export const create = async (req, res) => {
 export const update = async (req, res) => {
   try {
     const schedule = await prisma.work_schedule.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id: req.params.id },
       data: req.body
     });
     res.json(schedule);
@@ -50,7 +50,7 @@ export const update = async (req, res) => {
 export const remove = async (req, res) => {
   try {
     await prisma.work_schedule.delete({
-      where: { id: parseInt(req.params.id) }
+      where: { id: req.params.id }
     });
     res.status(204).send();
   } catch (error) {

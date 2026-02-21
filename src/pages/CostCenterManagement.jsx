@@ -88,6 +88,14 @@ export default function CostCenterManagement() {
     },
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ["costCenterCategories"],
+    queryFn: async () => {
+      const allCategories = await base44.entities.CostCenterCategory.list("code");
+      return allCategories.filter(c => c.is_active);
+    },
+  });
+
   const createCCMutation = useMutation({
     mutationFn: async (data) => {
       const cc = await entitiesAPI.CostCenter.create(data);
@@ -108,6 +116,7 @@ export default function CostCenterManagement() {
       queryClient.invalidateQueries(["costCenters"]);
       queryClient.invalidateQueries(["costCenterChangeLogs"]);
       toast.success("Centro de costos creado");
+      setShowCCForm(false);
       resetCCForm();
     },
   });
@@ -226,7 +235,7 @@ export default function CostCenterManagement() {
   });
 
   const handleCreateCC = () => {
-    setCCFormData({ name: "", code: "", category: "Administración", is_active: true });
+    setCCFormData({ name: "", code: "", category_id: "", is_active: true });
     setEditingCC(null);
     setShowCCForm(true);
   };
@@ -317,10 +326,11 @@ export default function CostCenterManagement() {
       const employeeAssignments = ccAssignments.filter(a => a.assignment_type === "Empleado");
       const deptAssignments = ccAssignments.filter(a => a.assignment_type === "Departamento");
 
+      const category = categories.find(c => c.id === cc.category_id);
       return {
         'Código': cc.code,
         'Nombre': cc.name,
-        'Categoría': cc.category,
+        'Categoría': category?.name || 'Sin categoría',
         'Estado': cc.is_active ? "Activo" : "Inactivo",
         'Empleados Asignados': employeeAssignments.length,
         'Departamentos Asignados': deptAssignments.length,
@@ -345,10 +355,11 @@ export default function CostCenterManagement() {
 
     const tableData = costCenters.map(cc => {
       const ccAssignments = assignments.filter(a => a.cost_center_id === cc.id && a.is_active);
+      const category = categories.find(c => c.id === cc.category_id);
       return [
         cc.code,
         cc.name,
-        cc.category,
+        category?.name || 'Sin categoría',
         cc.is_active ? "Activo" : "Inactivo",
         ccAssignments.filter(a => a.assignment_type === "Empleado").length,
         ccAssignments.filter(a => a.assignment_type === "Departamento").length,
@@ -370,11 +381,9 @@ export default function CostCenterManagement() {
   const filteredCostCenters = costCenters.filter(cc => {
     const matchesSearch = cc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          cc.code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === "all" || cc.category === categoryFilter;
+    const matchesCategory = categoryFilter === "all" || cc.category_id === categoryFilter;
     return matchesSearch && matchesCategory;
   });
-
-  const categories = ["Administración", "Ventas", "Transportes", "Oxapampa", "Lima - VES", "Operaciones Generales"];
 
   // Empleados sin asignación de centro de costo
   const employeesWithoutCC = useMemo(() => {
@@ -527,7 +536,7 @@ export default function CostCenterManagement() {
                     <SelectContent>
                       <SelectItem value="all">Todas las categorías</SelectItem>
                       {categories.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -540,6 +549,7 @@ export default function CostCenterManagement() {
                       const employeeCount = ccAssignments.filter(a => a.assignment_type === "Empleado").length;
                       const deptCount = ccAssignments.filter(a => a.assignment_type === "Departamento").length;
 
+                      const category = categories.find(c => c.id === cc.category_id);
                       return (
                         <Card key={cc.id} className="border-2 hover:shadow-lg transition-all">
                           <CardContent className="p-5">
@@ -550,7 +560,7 @@ export default function CostCenterManagement() {
                                   <h3 className="font-bold text-slate-900">{cc.code}</h3>
                                 </div>
                                 <p className="text-sm text-slate-700 mb-2">{cc.name}</p>
-                                <Badge className="bg-blue-100 text-blue-700">{cc.category}</Badge>
+                                <Badge className="bg-blue-100 text-blue-700">{category?.name || 'Sin categoría'}</Badge>
                               </div>
                               <Badge className={cc.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>
                                 {cc.is_active ? "Activo" : "Inactivo"}
@@ -629,6 +639,7 @@ export default function CostCenterManagement() {
                           const ccAssignments = assignments.filter(a => a.cost_center_id === cc.id && a.is_active);
                           const employeeCount = ccAssignments.filter(a => a.assignment_type === "Empleado").length;
                           const deptCount = ccAssignments.filter(a => a.assignment_type === "Departamento").length;
+                          const category = categories.find(c => c.id === cc.category_id);
 
                           return (
                             <tr key={cc.id} className="border-b hover:bg-slate-50">
@@ -640,7 +651,7 @@ export default function CostCenterManagement() {
                               </td>
                               <td className="p-3 text-slate-700">{cc.name}</td>
                               <td className="p-3">
-                                <Badge className="bg-blue-100 text-blue-700">{cc.category}</Badge>
+                                <Badge className="bg-blue-100 text-blue-700">{category?.name || 'Sin categoría'}</Badge>
                               </td>
                               <td className="p-3 text-center">
                                 <Badge className="bg-purple-100 text-purple-700">{employeeCount}</Badge>
@@ -1010,11 +1021,11 @@ export default function CostCenterManagement() {
                 </div>
                 <div>
                   <Label>Categoría Operacional *</Label>
-                  <Select value={ccFormData.category} onValueChange={(v) => setCCFormData({ ...ccFormData, category: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select value={ccFormData.category_id} onValueChange={(v) => setCCFormData({ ...ccFormData, category_id: v })}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
                     <SelectContent>
                       {categories.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

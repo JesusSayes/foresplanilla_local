@@ -810,15 +810,15 @@ export default function AttendanceManagement() {
           )}
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-5 gap-3 mb-8">
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-100 rounded-xl shrink-0">
-                    <Users className="w-5 h-5 text-blue-600" />
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-blue-100 rounded-lg shrink-0">
+                    <Users className="w-4 h-4 text-blue-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                    <div className="text-xl font-bold text-slate-900 leading-tight">
                       {allEmployees.length}
                     </div>
                     <p className="text-slate-600 text-xs truncate">Total empleados</p>
@@ -828,61 +828,61 @@ export default function AttendanceManagement() {
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-green-100 rounded-xl shrink-0">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-green-100 rounded-lg shrink-0">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                    <div className="text-xl font-bold text-slate-900 leading-tight">
                       {todayRecords.filter(r => r.clock_in).length}
                     </div>
-                    <p className="text-slate-600 text-xs truncate">Han marcado hoy</p>
+                    <p className="text-slate-600 text-xs truncate">Han marcado</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-yellow-100 rounded-xl shrink-0">
-                    <Clock className="w-5 h-5 text-yellow-600" />
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-yellow-100 rounded-lg shrink-0">
+                    <Clock className="w-4 h-4 text-yellow-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                    <div className="text-xl font-bold text-slate-900 leading-tight">
                       {todayRecords.filter(r => r.is_late).length}
                     </div>
-                    <p className="text-slate-600 text-xs truncate">Tardanzas hoy</p>
+                    <p className="text-slate-600 text-xs truncate">Tardanzas</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-orange-100 rounded-xl shrink-0">
-                    <AlertCircle className="w-5 h-5 text-orange-600" />
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-orange-100 rounded-lg shrink-0">
+                    <AlertCircle className="w-4 h-4 text-orange-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-2xl font-bold text-slate-900 leading-tight">
+                    <div className="text-xl font-bold text-slate-900 leading-tight">
                       {pendingIncidents.length}
                     </div>
-                    <p className="text-slate-600 text-xs truncate">Justificaciones pendientes</p>
+                    <p className="text-slate-600 text-xs truncate">Justificaciones</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg bg-red-50 border-red-200">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-red-100 rounded-xl shrink-0">
-                    <Clock className="w-5 h-5 text-red-600" />
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-red-100 rounded-lg shrink-0">
+                    <Clock className="w-4 h-4 text-red-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-2xl font-bold text-red-900 leading-tight">
+                    <div className="text-xl font-bold text-red-900 leading-tight">
                       {overtimeAlerts.length}
                     </div>
                     <p className="text-red-700 text-xs truncate">HE sin autorización</p>
@@ -976,9 +976,9 @@ export default function AttendanceManagement() {
 
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline">
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {format(selectedDate, "dd MMM yyyy", { locale: es })}
+                        <Button variant="outline" className="bg-green-50 border-green-200 hover:bg-green-100">
+                          <CalendarIcon className="mr-2 h-4 w-4 text-green-700" />
+                          <span className="text-green-700">{format(selectedDate, "dd MMM yyyy", { locale: es })}</span>
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0">
