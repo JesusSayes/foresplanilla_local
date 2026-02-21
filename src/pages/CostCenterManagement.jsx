@@ -91,7 +91,7 @@ export default function CostCenterManagement() {
   const { data: categories = [] } = useQuery({
     queryKey: ["costCenterCategories"],
     queryFn: async () => {
-      const allCategories = await base44.entities.CostCenterCategory.list("code");
+      const allCategories = await entitiesAPI.CostCenterCategory.list("code");
       return allCategories.filter(c => c.is_active);
     },
   });
@@ -379,9 +379,10 @@ export default function CostCenterManagement() {
   };
 
   const filteredCostCenters = costCenters.filter(cc => {
-    const matchesSearch = cc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         cc.code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === "all" || cc.category_id === categoryFilter;
+    const matchesSearch = (cc.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (cc.code || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const selectedCategory = categories.find(c => c.id === categoryFilter);
+    const matchesCategory = categoryFilter === "all" || cc.category === selectedCategory?.name;
     return matchesSearch && matchesCategory;
   });
 
