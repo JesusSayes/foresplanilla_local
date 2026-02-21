@@ -883,12 +883,22 @@ export default function AttendanceManagement() {
           {/* Main Content */}
           <Tabs defaultValue="attendance" className="space-y-6">
             <TabsList className="grid w-full max-w-2xl grid-cols-3">
-              <TabsTrigger value="attendance">Asistencia del Día</TabsTrigger>
-              <TabsTrigger value="incidents">Justificaciones</TabsTrigger>
+              <TabsTrigger value="attendance">
+                Asistencia del Día
+                {employeesWithRecords.length > 0 && (
+                  <Badge className="ml-2 bg-orange-500 text-white">{employeesWithRecords.length}</Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="incidents">
+                Justificaciones
+                {allIncidents.length > 0 && (
+                  <Badge className="ml-2 bg-orange-500 text-white">{allIncidents.length}</Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="overtime-alerts">
                 Alertas HE
                 {overtimeAlerts.length > 0 && (
-                  <Badge className="ml-2 bg-red-600 text-white">{overtimeAlerts.length}</Badge>
+                  <Badge className="ml-2 bg-orange-500 text-white">{overtimeAlerts.length}</Badge>
                 )}
               </TabsTrigger>
             </TabsList>
@@ -997,23 +1007,6 @@ export default function AttendanceManagement() {
                       Imprimir
                     </Button>
                   </div>
-
-                  {employeesWithRecords.length > 0 && (
-                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-900">
-                        <strong>Mostrando {employeesWithRecords.length} empleados</strong>
-                        {attendanceFilter !== "all" && (
-                          <span className="ml-2">
-                            - Filtro: {
-                              attendanceFilter === "sin_entrada" ? "Sin marcar entrada" :
-                              attendanceFilter === "sin_salida" ? "Sin marcar salida" :
-                              attendanceFilter === "con_tardanza" ? "Con tardanza" : ""
-                            }
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  )}
 
                   <div className="space-y-3">
                     {employeesWithRecords.map(emp => {
