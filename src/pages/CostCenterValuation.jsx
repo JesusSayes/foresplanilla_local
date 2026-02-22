@@ -259,11 +259,10 @@ export default function CostCenterValuation() {
           <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
             <TrendingUp className="w-5 h-5 text-green-600" />
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-slate-900">S/ {totalEmployees > 0 ? (totalValorizado / totalEmployees).toFixed(2) : '0.00'}
-              </div>
-              <p className="text-slate-600 text-sm">Promedio por Empleado</p>
-            </CardContent>
-          </Card>
+              <span className="text-xl font-bold text-slate-900">S/ {totalEmployees > 0 ? (totalValorizado / totalEmployees).toFixed(2) : '0.00'}</span>
+              <span className="text-sm text-slate-600">Promedio por Empleado</span>
+            </div>
+          </div>
         </div>
 
         {/* Filters */}
