@@ -502,7 +502,7 @@ export default function LoanManagement() {
         {/* Loan Form Modal */}
         {showLoanForm && (
           <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-40 p-6"
             onClick={resetForm}
           >
             <Card 
