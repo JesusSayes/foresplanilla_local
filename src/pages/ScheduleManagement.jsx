@@ -413,26 +413,34 @@ export default function ScheduleManagement() {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-3 mb-6">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200">
-            <Calendar className="w-4 h-4 text-green-600" />
-            <span className="text-sm font-medium text-slate-700">{templates.length}</span>
-            <span className="text-xs text-slate-500">Plantillas</span>
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Calendar className="w-5 h-5 text-green-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{templates.length}</span>
+              <span className="text-sm text-slate-600">Plantillas</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200">
-            <Clock className="w-4 h-4 text-indigo-600" />
-            <span className="text-sm font-medium text-slate-700">{assignments.length}</span>
-            <span className="text-xs text-slate-500">Asignaciones</span>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Clock className="w-5 h-5 text-indigo-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{assignments.length}</span>
+              <span className="text-sm text-slate-600">Asignaciones</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200">
-            <User className="w-4 h-4 text-blue-600" />
-            <span className="text-sm font-medium text-slate-700">{individualAssignments.length}</span>
-            <span className="text-xs text-slate-500">Individuales</span>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <User className="w-5 h-5 text-blue-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{individualAssignments.length}</span>
+              <span className="text-sm text-slate-600">Individuales</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200">
-            <Users className="w-4 h-4 text-purple-600" />
-            <span className="text-sm font-medium text-slate-700">{departmentAssignments.length}</span>
-            <span className="text-xs text-slate-500">Departamentos</span>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Users className="w-5 h-5 text-purple-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{departmentAssignments.length}</span>
+              <span className="text-sm text-slate-600">Departamentos</span>
+            </div>
           </div>
         </div>
 
