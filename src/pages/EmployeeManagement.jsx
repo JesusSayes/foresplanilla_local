@@ -791,72 +791,48 @@ export default function EmployeeManagement() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-indigo-100 rounded-xl">
-                  <Users className="w-6 h-6 text-indigo-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {allEmployees.length}
-              </div>
-              <p className="text-slate-600 text-sm">Total empleados</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <UserCheck className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {allEmployees.filter(e => e.status === "Activo").length}
-              </div>
-              <p className="text-slate-600 text-sm">Activos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-blue-100 rounded-xl">
-                  <Briefcase className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {departmentNames.length}
-              </div>
-              <p className="text-slate-600 text-sm">Departamentos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6 space-y-3">
-              {hasPermission("employees.create") && (
-                <Button
-                  onClick={handleCreate}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nuevo Empleado
-                </Button>
-              )}
-              {hasPermission("employees.import") && (
-                <Button
-                  onClick={() => window.location.href = createPageUrl("ImportEmployees")}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <Shield className="w-4 h-4 mr-2" />
-                  Importar Empleados
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap items-center gap-4 mb-6">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Users className="w-5 h-5 text-indigo-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{allEmployees.length}</span>
+              <span className="text-sm text-slate-600">Total empleados</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <UserCheck className="w-5 h-5 text-green-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{allEmployees.filter(e => e.status === "Activo").length}</span>
+              <span className="text-sm text-slate-600">Activos</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Briefcase className="w-5 h-5 text-blue-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{departmentNames.length}</span>
+              <span className="text-sm text-slate-600">Departamentos</span>
+            </div>
+          </div>
+          <div className="ml-auto flex gap-3">
+            {hasPermission("employees.create") && (
+              <Button
+                onClick={handleCreate}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Empleado
+              </Button>
+            )}
+            {hasPermission("employees.import") && (
+              <Button
+                onClick={() => window.location.href = createPageUrl("ImportEmployees")}
+                variant="outline"
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Importar Empleados
+              </Button>
+            )}
+          </div>
         </div>
 
         <Card className="border-0 shadow-lg">
