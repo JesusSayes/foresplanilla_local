@@ -134,9 +134,20 @@ export default function LoanManagement() {
       queryClient.invalidateQueries(["loans"]);
       queryClient.invalidateQueries(["loanInstallments"]);
       toast.success("Préstamo registrado correctamente");
-      resetForm();
+      // Cerrar modal inmediatamente
+      setShowLoanForm(false);
+      setEditingLoan(null);
+      setLoanFormData({
+        employee_id: "",
+        loan_type_id: "",
+        amount: "",
+        total_installments: "",
+        start_date: format(new Date(), "yyyy-MM-dd"),
+        notes: "",
+      });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Error al registrar préstamo:", error);
       toast.error("Error al registrar el préstamo");
     },
   });
@@ -148,9 +159,20 @@ export default function LoanManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries(["loans"]);
       toast.success("Préstamo actualizado correctamente");
-      resetForm();
+      // Cerrar modal inmediatamente
+      setShowLoanForm(false);
+      setEditingLoan(null);
+      setLoanFormData({
+        employee_id: "",
+        loan_type_id: "",
+        amount: "",
+        total_installments: "",
+        start_date: format(new Date(), "yyyy-MM-dd"),
+        notes: "",
+      });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Error al actualizar préstamo:", error);
       toast.error("Error al actualizar el préstamo");
     },
   });
@@ -187,6 +209,20 @@ export default function LoanManagement() {
     if (parseInt(loanFormData.total_installments) <= 0) {
       toast.error("El número de cuotas debe ser mayor a 0");
       return;
+    }
+
+    // Validar que no exista un préstamo activo del mismo tipo para el empleado
+    if (!editingLoan) {
+      const existingActiveLoan = loans.find(loan => 
+        loan.employee_id === loanFormData.employee_id && 
+        loan.loan_type_id === loanFormData.loan_type_id && 
+        loan.status === "Activo"
+      );
+
+      if (existingActiveLoan) {
+        toast.error("El empleado ya tiene un préstamo activo de este tipo");
+        return;
+      }
     }
 
     if (editingLoan) {
@@ -579,7 +615,9 @@ export default function LoanManagement() {
                       onClick={handleSubmit}
                       disabled={createLoanMutation.isPending || updateLoanMutation.isPending}
                     >
-                      {editingLoan ? "Actualizar" : "Registrar Préstamo"}
+                      {createLoanMutation.isPending || updateLoanMutation.isPending 
+                        ? "Procesando..." 
+                        : editingLoan ? "Actualizar" : "Registrar Préstamo"}
                     </Button>
                   </div>
                 </div>
