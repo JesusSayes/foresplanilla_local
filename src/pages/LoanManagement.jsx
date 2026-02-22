@@ -159,6 +159,7 @@ export default function LoanManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["loans"]);
+      queryClient.invalidateQueries(["loanInstallments"]);
       toast.success("Préstamo actualizado correctamente");
       // Cerrar modal inmediatamente
       setShowLoanForm(false);

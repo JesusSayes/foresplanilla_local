@@ -66,6 +66,7 @@ import HRDashboard from './pages/HRDashboard';
 import HolidayManagement from './pages/HolidayManagement';
 import Home from './pages/Home';
 import ImportEmployees from './pages/ImportEmployees';
+import LoanManagement from './pages/LoanManagement';
 import ManagerApprovals from './pages/ManagerApprovals';
 import MasterDataManagement from './pages/MasterDataManagement';
 import MyProfile from './pages/MyProfile';
@@ -83,7 +84,6 @@ import UserManagement from './pages/UserManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
-import LoanManagement from './pages/LoanManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -107,6 +107,7 @@ export const PAGES = {
     "HolidayManagement": HolidayManagement,
     "Home": Home,
     "ImportEmployees": ImportEmployees,
+    "LoanManagement": LoanManagement,
     "ManagerApprovals": ManagerApprovals,
     "MasterDataManagement": MasterDataManagement,
     "MyProfile": MyProfile,
@@ -124,7 +125,6 @@ export const PAGES = {
     "VacationCalendar": VacationCalendar,
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
-    "LoanManagement": LoanManagement,
 }
 
 export const pagesConfig = {
