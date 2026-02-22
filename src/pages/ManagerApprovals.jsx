@@ -217,48 +217,28 @@ export default function ManagerApprovals() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-yellow-100 rounded-xl">
-                  <Clock className="w-6 h-6 text-yellow-600" />
-                </div>
-              </div>
-              <div className="text-3xl font-bold text-slate-900 mb-1">
-                {stats.pending}
-              </div>
-              <p className="text-slate-600 text-sm">Pendientes de revisión</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <div className="text-3xl font-bold text-slate-900 mb-1">
-                {stats.approved}
-              </div>
-              <p className="text-slate-600 text-sm">Aprobadas</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-red-100 rounded-xl">
-                  <XCircle className="w-6 h-6 text-red-600" />
-                </div>
-              </div>
-              <div className="text-3xl font-bold text-slate-900 mb-1">
-                {stats.rejected}
-              </div>
-              <p className="text-slate-600 text-sm">Rechazadas</p>
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Clock className="w-5 h-5 text-yellow-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{stats.pending}</span>
+              <span className="text-sm text-slate-600">Pendientes de revisión</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <CheckCircle className="w-5 h-5 text-green-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{stats.approved}</span>
+              <span className="text-sm text-slate-600">Aprobadas</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <XCircle className="w-5 h-5 text-red-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{stats.rejected}</span>
+              <span className="text-sm text-slate-600">Rechazadas</span>
+            </div>
+          </div>
         </div>
 
         {/* Filters */}
