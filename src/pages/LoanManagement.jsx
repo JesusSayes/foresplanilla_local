@@ -196,18 +196,39 @@ export default function LoanManagement() {
   });
 
   const handleSubmit = () => {
-    if (!loanFormData.employee_id || !loanFormData.loan_type_id || !loanFormData.amount || !loanFormData.total_installments) {
-      toast.error("Por favor completa todos los campos requeridos");
+    // Validaciones específicas con mensajes orientativos
+    if (!loanFormData.employee_id) {
+      toast.error("⚠️ Debes seleccionar un empleado");
+      return;
+    }
+
+    if (!loanFormData.loan_type_id) {
+      toast.error("⚠️ Debes seleccionar el tipo de préstamo (Personal, Escolar o Vacaciones)");
+      return;
+    }
+
+    if (!loanFormData.amount) {
+      toast.error("⚠️ Debes ingresar el monto total del préstamo");
       return;
     }
 
     if (parseFloat(loanFormData.amount) <= 0) {
-      toast.error("El monto debe ser mayor a 0");
+      toast.error("⚠️ El monto del préstamo debe ser mayor a 0");
+      return;
+    }
+
+    if (!loanFormData.total_installments) {
+      toast.error("⚠️ Debes ingresar el número de cuotas mensuales");
       return;
     }
 
     if (parseInt(loanFormData.total_installments) <= 0) {
-      toast.error("El número de cuotas debe ser mayor a 0");
+      toast.error("⚠️ El número de cuotas debe ser mayor a 0");
+      return;
+    }
+
+    if (!loanFormData.start_date) {
+      toast.error("⚠️ Debes seleccionar la fecha de inicio del descuento");
       return;
     }
 
@@ -220,7 +241,9 @@ export default function LoanManagement() {
       );
 
       if (existingActiveLoan) {
-        toast.error("El empleado ya tiene un préstamo activo de este tipo");
+        const empName = getEmployeeName(loanFormData.employee_id);
+        const typeName = getLoanTypeName(loanFormData.loan_type_id);
+        toast.error(`⚠️ ${empName} ya tiene un préstamo ${typeName} activo. Debe estar pagado o cancelado antes de registrar uno nuevo.`);
         return;
       }
     }
