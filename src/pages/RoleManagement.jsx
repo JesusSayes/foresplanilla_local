@@ -321,48 +321,28 @@ export default function RoleManagement() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-indigo-100 rounded-xl">
-                    <Shield className="w-6 h-6 text-indigo-600" />
-                  </div>
-                </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {roles.length}
-                </div>
-                <p className="text-slate-600 text-sm">Roles definidos</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <Users className="w-6 h-6 text-blue-600" />
-                  </div>
-                </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {allEmployees.length}
-                </div>
-                <p className="text-slate-600 text-sm">Empleados activos</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-green-100 rounded-xl">
-                    <CheckSquare className="w-6 h-6 text-green-600" />
-                  </div>
-                </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {Object.keys(AVAILABLE_PERMISSIONS).length}
-                </div>
-                <p className="text-slate-600 text-sm">Permisos disponibles</p>
-              </CardContent>
-            </Card>
+          <div className="flex flex-wrap gap-4 mb-6">
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+              <Shield className="w-5 h-5 text-indigo-600" />
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold text-slate-900">{roles.length}</span>
+                <span className="text-sm text-slate-600">Roles definidos</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+              <Users className="w-5 h-5 text-blue-600" />
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold text-slate-900">{allEmployees.length}</span>
+                <span className="text-sm text-slate-600">Empleados activos</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+              <CheckSquare className="w-5 h-5 text-green-600" />
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold text-slate-900">{Object.keys(AVAILABLE_PERMISSIONS).length}</span>
+                <span className="text-sm text-slate-600">Permisos disponibles</span>
+              </div>
+            </div>
           </div>
 
           <Tabs defaultValue="roles" className="space-y-6">
