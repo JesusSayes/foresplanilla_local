@@ -13,6 +13,7 @@ import {
   AlertCircle, Search, Calendar, Users
 } from "lucide-react";
 import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { format, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import PermissionGuard from "../components/PermissionGuard";
@@ -326,6 +327,7 @@ export default function LoanManagement() {
 
   return (
     <PermissionGuard employee={employee} requiredRole="admin">
+      <Toaster />
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-8">
