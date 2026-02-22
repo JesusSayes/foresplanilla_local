@@ -413,62 +413,27 @@ export default function ScheduleManagement() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <Calendar className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {templates.length}
-              </div>
-              <p className="text-slate-600 text-sm">Plantillas de horario</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-indigo-100 rounded-xl">
-                  <Clock className="w-6 h-6 text-indigo-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {assignments.length}
-              </div>
-              <p className="text-slate-600 text-sm">Asignaciones totales</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-blue-100 rounded-xl">
-                  <User className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {individualAssignments.length}
-              </div>
-              <p className="text-slate-600 text-sm">Horarios individuales</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-purple-100 rounded-xl">
-                  <Users className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {departmentAssignments.length}
-              </div>
-              <p className="text-slate-600 text-sm">Horarios departamentales</p>
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap gap-3 mb-6">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200">
+            <Calendar className="w-4 h-4 text-green-600" />
+            <span className="text-sm font-medium text-slate-700">{templates.length}</span>
+            <span className="text-xs text-slate-500">Plantillas</span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200">
+            <Clock className="w-4 h-4 text-indigo-600" />
+            <span className="text-sm font-medium text-slate-700">{assignments.length}</span>
+            <span className="text-xs text-slate-500">Asignaciones</span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200">
+            <User className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-medium text-slate-700">{individualAssignments.length}</span>
+            <span className="text-xs text-slate-500">Individuales</span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200">
+            <Users className="w-4 h-4 text-purple-600" />
+            <span className="text-sm font-medium text-slate-700">{departmentAssignments.length}</span>
+            <span className="text-xs text-slate-500">Departamentos</span>
+          </div>
         </div>
 
         <Tabs defaultValue="templates" className="space-y-6">
