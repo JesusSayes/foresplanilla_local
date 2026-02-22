@@ -155,7 +155,41 @@ export default function LoanManagement() {
 
   const updateLoanMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.Loan.update(id, data);
+      const monthlyAmount = parseFloat(data.amount) / parseInt(data.total_installments);
+      const startDate = new Date(data.start_date);
+      const endDate = addMonths(startDate, parseInt(data.total_installments) - 1);
+
+      const loanData = {
+        ...data,
+        amount: parseFloat(data.amount),
+        total_installments: parseInt(data.total_installments),
+        monthly_amount: monthlyAmount,
+        end_date: format(endDate, "yyyy-MM-dd"),
+      };
+
+      // Actualizar préstamo
+      const loan = await base44.entities.Loan.update(id, loanData);
+
+      // Eliminar cuotas pendientes antiguas
+      const existingInstallments = installments.filter(i => i.loan_id === id && i.status === "Pendiente");
+      await Promise.all(existingInstallments.map(i => base44.entities.LoanInstallment.delete(i.id)));
+
+      // Crear nuevas cuotas pendientes
+      const installmentsToCreate = [];
+      for (let i = 0; i < parseInt(data.total_installments); i++) {
+        const installmentDate = addMonths(startDate, i);
+        installmentsToCreate.push({
+          loan_id: loan.id,
+          month: installmentDate.getMonth() + 1,
+          year: installmentDate.getFullYear(),
+          amount: monthlyAmount,
+          status: "Pendiente",
+        });
+      }
+
+      await base44.entities.LoanInstallment.bulkCreate(installmentsToCreate);
+
+      return loan;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["loans"]);
