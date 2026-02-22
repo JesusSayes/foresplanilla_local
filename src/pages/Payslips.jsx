@@ -135,66 +135,41 @@ export default function Payslips() {
         </div>
 
         {/* Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <TrendingUp className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                S/ {stats.averageNetPay.toFixed(2)}
-              </div>
-              <p className="text-slate-600 text-sm">Promedio mensual</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-blue-100 rounded-xl">
-                  <FileText className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {payslips.length}
-              </div>
-              <p className="text-slate-600 text-sm">Boletas registradas</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-purple-100 rounded-xl">
-                  <TrendingUp className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                S/ {stats.totalIncome.toFixed(2)}
-              </div>
-              <p className="text-slate-600 text-sm">Total ingresos acumulado</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className={`p-3 rounded-xl ${stats.lastIncrease >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-                  {stats.lastIncrease >= 0 ? (
-                    <TrendingUp className={`w-6 h-6 ${stats.lastIncrease >= 0 ? 'text-green-600' : 'text-red-600'}`} />
-                  ) : (
-                    <TrendingDown className="w-6 h-6 text-red-600" />
-                  )}
-                </div>
-              </div>
-              <div className={`text-2xl font-bold mb-1 ${stats.lastIncrease >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <TrendingUp className="w-5 h-5 text-green-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">S/ {stats.averageNetPay.toFixed(2)}</span>
+              <span className="text-sm text-slate-600">Promedio mensual</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <FileText className="w-5 h-5 text-blue-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{payslips.length}</span>
+              <span className="text-sm text-slate-600">Boletas registradas</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <TrendingUp className="w-5 h-5 text-purple-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">S/ {stats.totalIncome.toFixed(2)}</span>
+              <span className="text-sm text-slate-600">Total ingresos acumulado</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            {stats.lastIncrease >= 0 ? (
+              <TrendingUp className="w-5 h-5 text-green-600" />
+            ) : (
+              <TrendingDown className="w-5 h-5 text-red-600" />
+            )}
+            <div className="flex items-baseline gap-2">
+              <span className={`text-xl font-bold ${stats.lastIncrease >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {stats.lastIncrease >= 0 ? '+' : ''}{stats.lastIncrease.toFixed(1)}%
-              </div>
-              <p className="text-slate-600 text-sm">Variación último mes</p>
-            </CardContent>
-          </Card>
+              </span>
+              <span className="text-sm text-slate-600">Variación último mes</span>
+            </div>
+          </div>
         </div>
 
         {/* Filters */}
