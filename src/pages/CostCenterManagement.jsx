@@ -1077,19 +1077,52 @@ export default function CostCenterManagement() {
             <CardContent className="p-6 space-y-4">
               <div>
                 <Label>Centro de Costo *</Label>
-                <Select 
-                  value={assignmentFormData.cost_center_id} 
-                  onValueChange={(v) => setAssignmentFormData({ ...assignmentFormData, cost_center_id: v })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Seleccionar centro" /></SelectTrigger>
-                  <SelectContent>
-                    {costCenters.filter(c => c.is_active).map(cc => (
-                      <SelectItem key={cc.id} value={cc.id}>
-                        {cc.code} - {cc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={openCCCombobox} onOpenChange={setOpenCCCombobox}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openCCCombobox}
+                      className="w-full justify-between"
+                    >
+                      {assignmentFormData.cost_center_id
+                        ? (() => {
+                            const cc = costCenters.find(c => c.id === assignmentFormData.cost_center_id);
+                            return cc ? `${cc.code} - ${cc.name}` : "Seleccionar centro";
+                          })()
+                        : "Seleccionar centro"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar centro de costo..." />
+                      <CommandList>
+                        <CommandEmpty>No se encontró centro de costo.</CommandEmpty>
+                        <CommandGroup>
+                          {costCenters.filter(c => c.is_active).map((cc) => (
+                            <CommandItem
+                              key={cc.id}
+                              value={`${cc.code} ${cc.name}`}
+                              onSelect={() => {
+                                setAssignmentFormData({ ...assignmentFormData, cost_center_id: cc.id });
+                                setOpenCCCombobox(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  assignmentFormData.cost_center_id === cc.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {cc.code} - {cc.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div>
