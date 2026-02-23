@@ -28,6 +28,7 @@ export default function LoanManagement() {
   const [editingLoan, setEditingLoan] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [openEmployeeCombobox, setOpenEmployeeCombobox] = useState(false);
   const [loanFormData, setLoanFormData] = useState({
     employee_id: "",
     loan_type_id: "",
