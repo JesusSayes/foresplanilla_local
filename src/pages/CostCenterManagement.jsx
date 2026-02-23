@@ -45,6 +45,7 @@ export default function CostCenterManagement() {
   const [assignmentSearchTerm, setAssignmentSearchTerm] = useState("");
   const [unassignedSearchTerm, setUnassignedSearchTerm] = useState("");
   const [historySearchTerm, setHistorySearchTerm] = useState("");
+  const [openCCCombobox, setOpenCCCombobox] = useState(false);
 
   const queryClient = useQueryClient();
 
