@@ -570,21 +570,52 @@ export default function LoanManagement() {
                     <label className="block text-sm font-semibold text-slate-900 mb-2">
                       Empleado *
                     </label>
-                    <Select 
-                      value={loanFormData.employee_id}
-                      onValueChange={(value) => setLoanFormData({ ...loanFormData, employee_id: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar empleado" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allEmployees.map(emp => (
-                          <SelectItem key={emp.id} value={emp.id}>
-                            {emp.employee_code} - {emp.first_name} {emp.last_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={openEmployeeCombobox} onOpenChange={setOpenEmployeeCombobox}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={openEmployeeCombobox}
+                          className="w-full justify-between"
+                        >
+                          {loanFormData.employee_id ? 
+                            (() => {
+                              const emp = allEmployees.find(e => e.id === loanFormData.employee_id);
+                              return emp ? `${emp.employee_code} - ${emp.first_name} ${emp.last_name}` : "Seleccionar empleado";
+                            })()
+                            : "Seleccionar empleado"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Buscar empleado..." />
+                          <CommandList>
+                            <CommandEmpty>No se encontraron empleados.</CommandEmpty>
+                            <CommandGroup>
+                              {allEmployees.map((emp) => (
+                                <CommandItem
+                                  key={emp.id}
+                                  value={`${emp.employee_code} ${emp.first_name} ${emp.last_name}`}
+                                  onSelect={() => {
+                                    setLoanFormData({ ...loanFormData, employee_id: emp.id });
+                                    setOpenEmployeeCombobox(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      loanFormData.employee_id === emp.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {emp.employee_code} - {emp.first_name} {emp.last_name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   <div>
