@@ -30,7 +30,8 @@ export default function DataExport() {
     "CompanyInfo", "PayslipTemplate", "RMV", "UIT", "SeguroVidaLey",
     "DatabaseConnection", "SyncLog", "AccessDevice", "EmployeeAccessMapping", "DeviceEvent",
     "Notification", "NotificationPreference",
-    "UserInvitation", "AccountingAccount"
+    "UserInvitation", "AccountingAccount", "ReportConfiguration",
+    "LoanType", "Loan", "LoanInstallment"
   ];
 
   useEffect(() => {
