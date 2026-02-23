@@ -9,6 +9,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
+import morganBody from 'morgan-body';
 
 import authRoutes from './routes/auth.js';
 import employeeRoutes from './routes/employees.js';
@@ -65,6 +66,17 @@ app.use(express.urlencoded({ extended: true }));
 const accessLogStream = fs.createWriteStream(join(logsDir, 'access.log'), { flags: 'a' });
 app.use(morgan('combined', { stream: accessLogStream, skip: (req, res) => res.statusCode < 400 }));
 app.use(morgan('dev', { skip: (req, res) => res.statusCode >= 400 }));
+
+// Morgan-body para ver body de requests/responses en consola
+morganBody(app, {
+  maxBodyLength: 1000,          // evita logs gigantes
+  logRequestBody: true,
+  logResponseBody: true,
+  // opcional: solo loggear JSON
+  filterParameters: ['password', 'token'],
+  // sólo loguear si el status es 4xx o 5xx
+  skip: (req, res) => res.statusCode < 400,
+});
 
 // Request logging simple
 app.use((req, res, next) => {
