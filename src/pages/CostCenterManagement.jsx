@@ -14,8 +14,7 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Building2, Plus, Edit, Trash2, Users, GitBranch, History, 
-  Download, FileSpreadsheet, FileText, DollarSign, Search, Calendar, Grid3x3, List,
-  Check, ChevronsUpDown
+  Download, FileSpreadsheet, FileText, DollarSign, Search, Calendar, Grid3x3, List, Check, ChevronsUpDown
 } from "lucide-react";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { format } from "date-fns";
