@@ -473,8 +473,18 @@ export default function CostCenterManagement() {
 
         <Tabs defaultValue="centers" className="space-y-6">
           <TabsList className="grid w-full max-w-3xl grid-cols-4">
-            <TabsTrigger value="centers">Centros de Costo</TabsTrigger>
-            <TabsTrigger value="assignments">Asignaciones</TabsTrigger>
+            <TabsTrigger value="centers">
+              Centros de Costo
+              {costCenters.length > 0 && (
+                <Badge className="ml-2 bg-orange-600 text-white">{costCenters.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="assignments">
+              Asignaciones
+              {assignments.length > 0 && (
+                <Badge className="ml-2 bg-orange-600 text-white">{assignments.length}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="unassigned">
               Sin Asignar
               {employeesWithoutCC.length > 0 && (
