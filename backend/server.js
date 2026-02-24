@@ -18,6 +18,7 @@ import employeeChangelogRoutes from './routes/employeeChangelog.js';
 import contractRoutes from './routes/contracts.js';
 import userRolesRoutes from './routes/userRoles.js';
 import rolesRoutes from './routes/roles.js';
+import usersRoutes from './routes/users.js';
 
 import clausesRoutes from './routes/contracts/clauses.js';
 import templatesContractRoutes from './routes/contracts/templates.js';
@@ -97,6 +98,7 @@ app.use('/api/master-data', masterDataRoutes);
 app.use('/api/employees/changelog', employeeChangelogRoutes);
 app.use('/api/users/roles', userRolesRoutes);
 app.use('/api/roles', rolesRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/contracts/clauses', clausesRoutes);
 app.use('/api/contracts/templates', templatesContractRoutes);
 app.use('/api/contracts/renewal-rules', renewalRulesRoutes);

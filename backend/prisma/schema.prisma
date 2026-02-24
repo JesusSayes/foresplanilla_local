@@ -590,8 +590,8 @@ model user_role {
 }
 
 model users {
-  created_date  DateTime? @db.Timestamp(6)
-  updated_date  DateTime? @db.Timestamp(6)
+  created_date  DateTime? @db.Timestamp(6) @default(now())
+  updated_date  DateTime? @db.Timestamp(6) @updatedAt
   disabled      String?
   is_verified   Boolean?
   app_id        String?
