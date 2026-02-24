@@ -52,6 +52,7 @@ router.post('/roles', createRole);
 
 router.get('/rmvs', rmvController.getAll);
 router.get('/rmvs/:id', rmvController.getById);
+router.post('/rmvs/filter', rmvController.filter);
 router.post('/rmvs', rmvController.create);
 router.put('/rmvs/:id', rmvController.update);
 router.delete('/rmvs/:id', rmvController.delete);
