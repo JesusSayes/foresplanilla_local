@@ -88,6 +88,14 @@ export default function CostCenterManagement() {
     },
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ["costCenterCategories"],
+    queryFn: async () => {
+      const allCategories = await entitiesAPI.CostCenterCategory.list("code");
+      return allCategories.filter(c => c.is_active);
+    },
+  });
+
   const createCCMutation = useMutation({
     mutationFn: async (data) => {
       const cc = await entitiesAPI.CostCenter.create(data);
@@ -105,9 +113,10 @@ export default function CostCenterManagement() {
       return cc;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["costCenters"]);
-      queryClient.invalidateQueries(["costCenterChangeLogs"]);
+      queryClient.invalidateQueries({ queryKey: ["costCenters"] });
+      queryClient.invalidateQueries({ queryKey: ["costCenterChangeLogs"] });
       toast.success("Centro de costos creado");
+      setShowCCForm(false);
       resetCCForm();
     },
   });
@@ -135,8 +144,8 @@ export default function CostCenterManagement() {
       return cc;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["costCenters"]);
-      queryClient.invalidateQueries(["costCenterChangeLogs"]);
+      queryClient.invalidateQueries({ queryKey: ["costCenters"] });
+      queryClient.invalidateQueries({ queryKey: ["costCenterChangeLogs"] });
       toast.success("Centro de costos actualizado");
       resetCCForm();
     },
@@ -167,8 +176,8 @@ export default function CostCenterManagement() {
       return assignment;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["costCenterAssignments"]);
-      queryClient.invalidateQueries(["costCenterChangeLogs"]);
+      queryClient.invalidateQueries({ queryKey: ["costCenterAssignments"] });
+      queryClient.invalidateQueries({ queryKey: ["costCenterChangeLogs"] });
       toast.success("Asignación creada");
       resetAssignmentForm();
     },
@@ -194,8 +203,8 @@ export default function CostCenterManagement() {
       return assignment;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["costCenterAssignments"]);
-      queryClient.invalidateQueries(["costCenterChangeLogs"]);
+      queryClient.invalidateQueries({ queryKey: ["costCenterAssignments"] });
+      queryClient.invalidateQueries({ queryKey: ["costCenterChangeLogs"] });
       toast.success("Asignación actualizada");
       resetAssignmentForm();
     },
@@ -219,14 +228,14 @@ export default function CostCenterManagement() {
       return await entitiesAPI.CostCenterAssignment.delete(assignment.id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["costCenterAssignments"]);
-      queryClient.invalidateQueries(["costCenterChangeLogs"]);
+      queryClient.invalidateQueries({ queryKey: ["costCenterAssignments"] });
+      queryClient.invalidateQueries({ queryKey: ["costCenterChangeLogs"] });
       toast.success("Asignación eliminada");
     },
   });
 
   const handleCreateCC = () => {
-    setCCFormData({ name: "", code: "", category: "Administración", is_active: true });
+    setCCFormData({ name: "", code: "", category: "", is_active: true });
     setEditingCC(null);
     setShowCCForm(true);
   };
@@ -320,7 +329,7 @@ export default function CostCenterManagement() {
       return {
         'Código': cc.code,
         'Nombre': cc.name,
-        'Categoría': cc.category,
+        'Categoría': cc.category || 'Sin categoría',
         'Estado': cc.is_active ? "Activo" : "Inactivo",
         'Empleados Asignados': employeeAssignments.length,
         'Departamentos Asignados': deptAssignments.length,
@@ -348,7 +357,7 @@ export default function CostCenterManagement() {
       return [
         cc.code,
         cc.name,
-        cc.category,
+        cc.category || 'Sin categoría',
         cc.is_active ? "Activo" : "Inactivo",
         ccAssignments.filter(a => a.assignment_type === "Empleado").length,
         ccAssignments.filter(a => a.assignment_type === "Departamento").length,
@@ -368,13 +377,12 @@ export default function CostCenterManagement() {
   };
 
   const filteredCostCenters = costCenters.filter(cc => {
-    const matchesSearch = cc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         cc.code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === "all" || cc.category === categoryFilter;
+    const matchesSearch = (cc.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (cc.code || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const selectedCategory = categories.find(c => c.id === categoryFilter);
+    const matchesCategory = categoryFilter === "all" || cc.category === selectedCategory?.name;
     return matchesSearch && matchesCategory;
   });
-
-  const categories = ["Administración", "Ventas", "Transportes", "Oxapampa", "Lima - VES", "Operaciones Generales"];
 
   // Empleados sin asignación de centro de costo
   const employeesWithoutCC = useMemo(() => {
@@ -527,7 +535,7 @@ export default function CostCenterManagement() {
                     <SelectContent>
                       <SelectItem value="all">Todas las categorías</SelectItem>
                       {categories.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -550,7 +558,7 @@ export default function CostCenterManagement() {
                                   <h3 className="font-bold text-slate-900">{cc.code}</h3>
                                 </div>
                                 <p className="text-sm text-slate-700 mb-2">{cc.name}</p>
-                                <Badge className="bg-blue-100 text-blue-700">{cc.category}</Badge>
+                                <Badge className="bg-blue-100 text-blue-700">{cc.category || 'Sin categoría'}</Badge>
                               </div>
                               <Badge className={cc.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>
                                 {cc.is_active ? "Activo" : "Inactivo"}
@@ -640,7 +648,7 @@ export default function CostCenterManagement() {
                               </td>
                               <td className="p-3 text-slate-700">{cc.name}</td>
                               <td className="p-3">
-                                <Badge className="bg-blue-100 text-blue-700">{cc.category}</Badge>
+                                <Badge className="bg-blue-100 text-blue-700">{cc.category || 'Sin categoría'}</Badge>
                               </td>
                               <td className="p-3 text-center">
                                 <Badge className="bg-purple-100 text-purple-700">{employeeCount}</Badge>
@@ -1011,10 +1019,10 @@ export default function CostCenterManagement() {
                 <div>
                   <Label>Categoría Operacional *</Label>
                   <Select value={ccFormData.category} onValueChange={(v) => setCCFormData({ ...ccFormData, category: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
                     <SelectContent>
                       {categories.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

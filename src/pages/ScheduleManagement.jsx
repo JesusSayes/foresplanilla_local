@@ -120,7 +120,7 @@ export default function ScheduleManagement() {
 
   const createAssignmentMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.WorkSchedule.create(data);
+      return await entitiesAPI.WorkSchedule.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["workSchedules"]);
@@ -132,7 +132,7 @@ export default function ScheduleManagement() {
 
   const updateAssignmentMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.WorkSchedule.update(id, data);
+      return await entitiesAPI.WorkSchedule.update(id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["workSchedules"]);
@@ -473,11 +473,44 @@ export default function ScheduleManagement() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <TabsList className="grid w-full max-w-3xl grid-cols-5">
-                <TabsTrigger value="templates">Plantillas</TabsTrigger>
-                <TabsTrigger value="individual">Asignados</TabsTrigger>
-                <TabsTrigger value="department">Departamentos</TabsTrigger>
-                <TabsTrigger value="unassigned-employees">Sin Horario</TabsTrigger>
-                <TabsTrigger value="unassigned-departments">Depts Sin Horario</TabsTrigger>
+                <TabsTrigger value="templates" className="flex items-center gap-2">
+                  <span>Plantillas</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-orange-500 rounded-full">
+                    {filteredTemplates.length}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="individual" className="flex items-center gap-2">
+                  <span>Asignados</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-orange-500 rounded-full">
+                    {filteredIndividual.length}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="department" className="flex items-center gap-2">
+                  <span>Departamentos</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-orange-500 rounded-full">
+                    {filteredDepartment.length}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="unassigned-employees" className="flex items-center gap-2">
+                  <span>Sin Horario</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-orange-500 rounded-full">
+                    {employeesWithoutSchedule.filter(emp => {
+                      const searchLower = searchTerm.toLowerCase();
+                      return emp.first_name.toLowerCase().includes(searchLower) ||
+                        emp.last_name.toLowerCase().includes(searchLower) ||
+                        emp.employee_code.toLowerCase().includes(searchLower) ||
+                        emp.department_name?.toLowerCase().includes(searchLower);
+                    }).length}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="unassigned-departments" className="flex items-center gap-2">
+                  <span>Depts Sin Horario</span>
+                  <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-orange-500 rounded-full">
+                    {departmentsWithoutSchedule.filter(dept => 
+                      dept.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).length}
+                  </span>
+                </TabsTrigger>
               </TabsList>
 
               {hasAnyPermission(["schedules.create", "schedules.manage", "system.admin"]) && (
@@ -596,7 +629,7 @@ export default function ScheduleManagement() {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <h4 className="font-bold text-slate-900 text-lg">
-                                {schedule.schedule_name}
+                                {getEmployeeName(schedule.employee_id)}
                               </h4>
                               {!schedule.is_active && (
                                 <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
@@ -610,7 +643,7 @@ export default function ScheduleManagement() {
                             </div>
                             <div className="space-y-1 text-sm">
                               <p className="text-slate-600">
-                                <strong>Empleado:</strong> {getEmployeeName(schedule.employee_id)}
+                                <strong>Horario:</strong> {schedule.schedule_name}
                               </p>
                               <p className="text-slate-600">
                                 <strong>Lun-Vie:</strong> {schedule.monday_start || "--"} - {schedule.monday_end || "--"}
@@ -753,9 +786,29 @@ export default function ScheduleManagement() {
                               </p>
                               </div>
                               </div>
+                              <div className="flex items-center gap-2">
                               <Badge className="bg-amber-100 text-amber-700 border-amber-300">
                               Sin Horario
                               </Badge>
+                              {hasAnyPermission(["schedules.create", "schedules.manage", "system.admin"]) && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setAssignFormData({
+                                    employee_id: emp.id,
+                                    departments: [],
+                                  });
+                                  setEmployeeSearch(`${emp.first_name} ${emp.last_name} - ${emp.employee_code}`);
+                                  setEditingAssignment(null);
+                                  setShowAssignForm(true);
+                                }}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Asignar Horario
+                              </Button>
+                              )}
+                              </div>
                               </div>
                               </div>
                               ))}

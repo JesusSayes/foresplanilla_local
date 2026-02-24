@@ -1,4 +1,6 @@
+// backend/controllers/userController.js
 import { PrismaClient } from '@prisma/client';
+import { generate24HexId } from '../utils/idGenerator.js';
 
 const prisma = new PrismaClient();
 
@@ -11,10 +13,15 @@ export const getAllUsers = async (req, res) => {
         full_name: true,
         role: true,
         is_active: true,
-        created_at: true,
-        updated_at: true
+        created_date: true,
+        updated_date: true,
+        disabled: true,
+        is_verified: true,
+        app_id: true,
+        is_service: true,
+        app_role: true,
       },
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_date: 'desc' },
     });
     res.json(users);
   } catch (error) {
@@ -27,16 +34,21 @@ export const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
     const user = await prisma.users.findUnique({
-      where: { id: parseInt(id) },
+      where: { id }, // String
       select: {
         id: true,
         email: true,
         full_name: true,
         role: true,
         is_active: true,
-        created_at: true,
-        updated_at: true
-      }
+        created_date: true,
+        updated_date: true,
+        disabled: true,
+        is_verified: true,
+        app_id: true,
+        is_service: true,
+        app_role: true,
+      },
     });
 
     if (!user) {
@@ -53,16 +65,25 @@ export const getUserById = async (req, res) => {
 export const createUser = async (req, res) => {
   try {
     const { email, password, full_name, role, is_active } = req.body;
+
     const bcrypt = await import('bcrypt');
-    const password_hash = await bcrypt.hash(password, 10);
+    const password_hash = password ? await bcrypt.hash(password, 10) : null;
 
     const user = await prisma.users.create({
       data: {
+        id: generate24HexId(),              // usa tu util
         email,
         password_hash,
         full_name,
         role: role || 'user',
-        is_active: is_active !== undefined ? is_active : true
+        is_active: is_active ?? true,
+        // created_date: @default(now())
+        // updated_date: @updatedAt
+        disabled: null,
+        is_verified: false,
+        app_id: null,
+        is_service: false,
+        app_role: null,
       },
       select: {
         id: true,
@@ -70,8 +91,8 @@ export const createUser = async (req, res) => {
         full_name: true,
         role: true,
         is_active: true,
-        created_at: true
-      }
+        created_date: true,
+      },
     });
 
     res.status(201).json(user);
@@ -84,14 +105,30 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { email, full_name, role, is_active, password } = req.body;
+    const {
+      email,
+      full_name,
+      role,
+      is_active,
+      password,
+      disabled,
+      is_verified,
+      app_id,
+      is_service,
+      app_role,
+    } = req.body;
 
     const updateData = {
       email,
       full_name,
       role,
       is_active,
-      updated_at: new Date()
+      disabled,
+      is_verified,
+      app_id,
+      is_service,
+      app_role,
+      // updated_date lo maneja Prisma con @updatedAt
     };
 
     if (password) {
@@ -100,7 +137,7 @@ export const updateUser = async (req, res) => {
     }
 
     const user = await prisma.users.update({
-      where: { id: parseInt(id) },
+      where: { id }, // String, sin parseInt
       data: updateData,
       select: {
         id: true,
@@ -108,8 +145,13 @@ export const updateUser = async (req, res) => {
         full_name: true,
         role: true,
         is_active: true,
-        updated_at: true
-      }
+        updated_date: true,
+        disabled: true,
+        is_verified: true,
+        app_id: true,
+        is_service: true,
+        app_role: true,
+      },
     });
 
     res.json(user);
@@ -123,7 +165,7 @@ export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
     await prisma.users.delete({
-      where: { id: parseInt(id) }
+      where: { id }, // String
     });
     res.json({ message: 'Usuario eliminado correctamente' });
   } catch (error) {
@@ -131,3 +173,4 @@ export const deleteUser = async (req, res) => {
     res.status(500).json({ error: 'Error al eliminar usuario' });
   }
 };
+

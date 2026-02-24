@@ -260,6 +260,19 @@ model cost_center_change_log {
   is_sample      Boolean?
 }
 
+model costcentercategory {
+  id            String    @id(map: "costcentercategory_pkey") @db.VarChar(255)
+  code          String?
+  name          String?
+  description   String?
+  is_active     Boolean?
+  created_date  DateTime? @db.Timestamp(6) @default(now())
+  updated_date  DateTime? @db.Timestamp(6) @updatedAt
+  created_by_id String?
+  created_by    String?
+  is_sample     Boolean?
+}
+
 model database_connection {
   id           String    @id(map: "databaseconnection_pkey") @db.VarChar(255)
   created_date DateTime? @db.Timestamp(6)
@@ -577,8 +590,8 @@ model user_role {
 }
 
 model users {
-  created_date  DateTime? @db.Timestamp(6)
-  updated_date  DateTime? @db.Timestamp(6)
+  created_date  DateTime? @db.Timestamp(6) @default(now())
+  updated_date  DateTime? @db.Timestamp(6) @updatedAt
   disabled      String?
   is_verified   Boolean?
   app_id        String?

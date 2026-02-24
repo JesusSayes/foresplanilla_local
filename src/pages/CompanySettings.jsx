@@ -12,6 +12,7 @@ import {
   Globe, User, CreditCard, MapPin, FileText
 } from "lucide-react";
 import { toast } from "sonner";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function CompanySettings() {
   const { user: currentUser } = useAuth();

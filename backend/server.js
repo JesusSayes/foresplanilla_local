@@ -9,6 +9,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
+import morganBody from 'morgan-body';
 import cron from 'node-cron';
 
 import authRoutes from './routes/auth.js';
@@ -17,6 +18,8 @@ import masterDataRoutes from './routes/masterData.js';
 import employeeChangelogRoutes from './routes/employeeChangelog.js';
 import contractRoutes from './routes/contracts.js';
 import userRolesRoutes from './routes/userRoles.js';
+import rolesRoutes from './routes/roles.js';
+import usersRoutes from './routes/users.js';
 
 import clausesRoutes from './routes/contracts/clauses.js';
 import templatesContractRoutes from './routes/contracts/templates.js';
@@ -33,6 +36,9 @@ import certificatesRoutes from './routes/certificates.js';
 import notificationsRoutes from './routes/notifications.js';
 import infoRoutes from './routes/company/info.js';
 import costcentersRoutes from './routes/cost-centers.js';
+import costCenterCategoriesRoutes from './routes/costCenterCategories.js';
+import costCenterAssignmentsRoutes from './routes/costCenterAssignments.js';
+import costCenterChangeLogsRoutes from './routes/costCenterChangeLogs.js';
 import connectionsRoutes from './routes/database/connections.js';
 import logsRoutes from './routes/sync/logs.js';
 import biotimeSyncRoutes from './routes/sync/biotime.js';
@@ -66,6 +72,17 @@ const accessLogStream = fs.createWriteStream(join(logsDir, 'access.log'), { flag
 app.use(morgan('combined', { stream: accessLogStream, skip: (req, res) => res.statusCode < 400 }));
 app.use(morgan('dev', { skip: (req, res) => res.statusCode >= 400 }));
 
+// Morgan-body para ver body de requests/responses en consola
+morganBody(app, {
+  maxBodyLength: 1000,          // evita logs gigantes
+  logRequestBody: true,
+  logResponseBody: true,
+  // opcional: solo loggear JSON
+  filterParameters: ['password', 'token'],
+  // sólo loguear si el status es 4xx o 5xx
+  skip: (req, res) => res.statusCode < 400,
+});
+
 // Request logging simple
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
@@ -83,6 +100,8 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/master-data', masterDataRoutes);
 app.use('/api/employees/changelog', employeeChangelogRoutes);
 app.use('/api/users/roles', userRolesRoutes);
+app.use('/api/roles', rolesRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/contracts/clauses', clausesRoutes);
 app.use('/api/contracts/templates', templatesContractRoutes);
 app.use('/api/contracts/renewal-rules', renewalRulesRoutes);
@@ -99,6 +118,9 @@ app.use('/api/certificates', certificatesRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/company/info', infoRoutes);
 app.use('/api/cost-centers', costcentersRoutes);
+app.use('/api/cost-center-categories', costCenterCategoriesRoutes);
+app.use('/api/cost-center-assignments', costCenterAssignmentsRoutes);
+app.use('/api/cost-center-changelogs', costCenterChangeLogsRoutes);
 app.use('/api/database/connections', connectionsRoutes);
 app.use('/api/sync/logs', logsRoutes);
 app.use('/api/sync/biotime', biotimeSyncRoutes);
