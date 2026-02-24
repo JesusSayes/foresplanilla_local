@@ -280,8 +280,18 @@ export default function CostCenterManagement() {
     setShowAssignmentForm(true);
   };
 
+  const toDateInput = (value) => {
+    if (!value) return "";
+    const d = new Date(value);
+    return d.toISOString().slice(0, 10); // "yyyy-MM-dd"
+  };
+
   const handleEditAssignment = (assignment) => {
-    setAssignmentFormData({ ...assignment });
+    setAssignmentFormData({
+      ...assignment,
+      start_date: toDateInput(assignment.start_date),
+      end_date: assignment.end_date ? toDateInput(assignment.end_date) : "",
+    });
     setEditingAssignment(assignment);
     setShowAssignmentForm(true);
   };
@@ -1152,7 +1162,7 @@ export default function CostCenterManagement() {
                   <Label>Fecha Inicio *</Label>
                   <Input
                     type="date"
-                    value={assignmentFormData.start_date}
+                    value={assignmentFormData.start_date || ""}
                     onChange={(e) => setAssignmentFormData({ ...assignmentFormData, start_date: e.target.value })}
                   />
                 </div>
@@ -1160,7 +1170,7 @@ export default function CostCenterManagement() {
                   <Label>Fecha Fin</Label>
                   <Input
                     type="date"
-                    value={assignmentFormData.end_date}
+                    value={assignmentFormData.end_date || ""}
                     onChange={(e) => setAssignmentFormData({ ...assignmentFormData, end_date: e.target.value })}
                   />
                 </div>
