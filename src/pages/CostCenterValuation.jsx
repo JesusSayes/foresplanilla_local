@@ -16,6 +16,7 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
 import { createPageUrl } from "../utils";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function CostCenterValuation() {
   const { user: currentUser } = useAuth();

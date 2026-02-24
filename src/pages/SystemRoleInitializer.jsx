@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Shield, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AVAILABLE_PERMISSIONS } from "../components/hooks/usePermissions";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function SystemRoleInitializer() {
   const { user: currentUser } = useAuth();

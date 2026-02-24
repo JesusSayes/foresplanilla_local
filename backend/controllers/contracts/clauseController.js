@@ -4,8 +4,8 @@ const prisma = new PrismaClient();
 export const getAll = async (req, res) => {
   try {
     const clauses = await prisma.contract_clause.findMany({
-      include: { contract: true },
-      orderBy: { order: 'asc' }
+      // include: { contract: true },
+      orderBy: { contract_order: 'asc' }
     });
     res.json(clauses);
   } catch (error) {

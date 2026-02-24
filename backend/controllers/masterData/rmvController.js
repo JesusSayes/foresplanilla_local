@@ -118,12 +118,39 @@ export const remove = async (req, res) => {
   }
 };
 
+export const filter = async (req, res) => {
+  try {
+    const { sort = '-effective_date' } = req.query;
+    const desc = sort.startsWith('-');
+    const field = desc ? sort.slice(1) : sort;
+    const filters = req.body || {};
+
+    const where = {};
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== null && value !== '') {
+        where[key] = value;
+      }
+    }
+
+    const records = await prisma.rmv.findMany({
+      where,
+      orderBy: { [field]: desc ? 'desc' : 'asc' },
+    });
+
+    res.json(records);
+  } catch (error) {
+    console.error('Error filtering RMV records:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const controller = {
   getAll,
   getById,
   create,
   update,
   delete: remove,
+  filter,
 };
 
 export default controller;

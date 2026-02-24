@@ -72,6 +72,7 @@ export const entitiesAPI = {
   UIT: createEntityAPI('/api/master-data/uits'),
   AccountingAccount: createEntityAPI('/api/master-data/accountingaccounts'),
   RMV: createEntityAPI('/api/master-data/rmvs'),
+  User: createEntityAPI('/api/users'),
 };
 
 export default entitiesAPI;

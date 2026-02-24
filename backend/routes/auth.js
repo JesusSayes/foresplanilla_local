@@ -154,7 +154,26 @@ router.get('/me', authenticateToken, async (req, res) => {
          last_name,
          role,
          status,
-         department_name
+         department_name,
+         document_type,
+         document_number,
+         birth_date,
+         work_email,
+         position,
+         hire_date,
+         contract_type,
+         photo_url,
+         supervisor_name,
+         phone,
+         mobile,
+         personal_email,
+         address,
+         district,
+         province,
+         department,
+         emergency_contact_name,
+         emergency_contact_phone,
+         emergency_contact_relationship
        FROM employee
        WHERE work_email = $1
        LIMIT 1`,

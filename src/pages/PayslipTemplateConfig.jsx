@@ -13,6 +13,7 @@ import {
   Square, Settings, Palette, User, Building2
 } from "lucide-react";
 import { toast } from "sonner";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 const AVAILABLE_FIELDS = {
   header: [
@@ -225,7 +226,7 @@ export default function PayslipTemplateConfig() {
                   <p>• {template.header_fields?.length || 0} campos de encabezado</p>
                   <p>• {template.employee_info_fields?.length || 0} campos de empleado</p>
                   <p>• {template.work_period_fields?.length || 0} campos de período laboral</p>
-                  <p>• Esquema: <Badge className="bg-slate-100 text-slate-700">{template.color_scheme}</Badge></p>
+                  <div>• Esquema: <Badge className="bg-slate-100 text-slate-700">{template.color_scheme}</Badge></div>
                 </div>
                 <div className="flex gap-2">
                   <Button

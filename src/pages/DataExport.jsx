@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Download, Database, FileJson, FileCode, Loader2, CheckCircle2, FileType } from "lucide-react";
 import { toast } from "sonner";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function DataExport() {
   const { user: currentUser } = useAuth();
@@ -47,6 +48,7 @@ export default function DataExport() {
     const selected = {};
     entities.forEach(e => selected[e] = true);
     setSelectedEntities(selected);
+    setLoading(false);
   }, [currentUser]);
 
   const toggleEntity = (entity) => {
