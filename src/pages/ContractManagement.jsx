@@ -361,54 +361,35 @@ export default function ContractManagement() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-indigo-100 rounded-xl">
-                  <FileText className="w-6 h-6 text-indigo-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.total}</div>
-              <p className="text-slate-600 text-sm">Total Contratos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.vigentes}</div>
-              <p className="text-slate-600 text-sm">Vigentes</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-red-100 rounded-xl">
-                  <AlertCircle className="w-6 h-6 text-red-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.vencidos}</div>
-              <p className="text-slate-600 text-sm">Vencidos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-blue-100 rounded-xl">
-                  <Calendar className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.indeterminados}</div>
-              <p className="text-slate-600 text-sm">Indeterminados</p>
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <FileText className="w-5 h-5 text-indigo-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{stats.total}</span>
+              <span className="text-sm text-slate-600">Total Contratos</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <CheckCircle className="w-5 h-5 text-green-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{stats.vigentes}</span>
+              <span className="text-sm text-slate-600">Vigentes</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <AlertCircle className="w-5 h-5 text-red-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{stats.vencidos}</span>
+              <span className="text-sm text-slate-600">Vencidos</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Calendar className="w-5 h-5 text-blue-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{stats.indeterminados}</span>
+              <span className="text-sm text-slate-600">Indeterminados</span>
+            </div>
+          </div>
         </div>
 
         {/* Actions */}

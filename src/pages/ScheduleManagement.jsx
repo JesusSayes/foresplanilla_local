@@ -411,62 +411,35 @@ export default function ScheduleManagement() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <Calendar className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {templates.length}
-              </div>
-              <p className="text-slate-600 text-sm">Plantillas de horario</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-indigo-100 rounded-xl">
-                  <Clock className="w-6 h-6 text-indigo-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {assignments.length}
-              </div>
-              <p className="text-slate-600 text-sm">Asignaciones totales</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-blue-100 rounded-xl">
-                  <User className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {individualAssignments.length}
-              </div>
-              <p className="text-slate-600 text-sm">Horarios individuales</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-purple-100 rounded-xl">
-                  <Users className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {departmentAssignments.length}
-              </div>
-              <p className="text-slate-600 text-sm">Horarios departamentales</p>
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Calendar className="w-5 h-5 text-green-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{templates.length}</span>
+              <span className="text-sm text-slate-600">Plantillas</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Clock className="w-5 h-5 text-indigo-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{assignments.length}</span>
+              <span className="text-sm text-slate-600">Asignaciones</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <User className="w-5 h-5 text-blue-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{individualAssignments.length}</span>
+              <span className="text-sm text-slate-600">Individuales</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Users className="w-5 h-5 text-purple-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{departmentAssignments.length}</span>
+              <span className="text-sm text-slate-600">Departamentos</span>
+            </div>
+          </div>
         </div>
 
         <Tabs defaultValue="templates" className="space-y-6">
