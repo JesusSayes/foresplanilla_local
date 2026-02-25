@@ -72,7 +72,7 @@ export default function LoanManagement() {
           { name: "Escolar", description: "Préstamo escolar" },
           { name: "Vacaciones", description: "Préstamo vacacional" }
         ]);
-        return await entitiesAPI.LoanType.list("name");
+        const after = await entitiesAPI.LoanType.list("name");
         console.log('LoanType.list after bulkCreate =>', after);
         return after;
       }
