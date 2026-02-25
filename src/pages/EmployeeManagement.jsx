@@ -1721,8 +1721,14 @@ export default function EmployeeManagement() {
                             });
                           }}
                           placeholder="Opcional - se actualiza desde contratos"
+                          disabled={!!editingEmployee}
+                          className={editingEmployee ? "bg-slate-100 text-slate-700" : ""}
                         />
-                        <p className="text-xs text-slate-500 mt-1">Se actualiza automáticamente al registrar contratos</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {editingEmployee 
+                            ? "Campo bloqueado - se actualiza automáticamente desde contratos" 
+                            : "Se actualiza automáticamente al registrar contratos"}
+                        </p>
                       </div>
                     </div>
                   </div>
