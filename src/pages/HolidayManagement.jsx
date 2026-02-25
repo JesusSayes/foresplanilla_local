@@ -357,65 +357,45 @@ export default function HolidayManagement() {
           </div>
 
           {/* Stats and Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-indigo-100 rounded-xl">
-                    <CalendarIcon className="w-6 h-6 text-indigo-600" />
-                  </div>
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div className="flex flex-wrap gap-4">
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                <CalendarIcon className="w-5 h-5 text-indigo-600" />
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xl font-bold text-slate-900">{holidays.length}</span>
+                  <span className="text-sm text-slate-600">Feriados en {selectedYear}</span>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {holidays.length}
+              </div>
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                <Sun className="w-5 h-5 text-blue-600" />
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xl font-bold text-slate-900">{holidays.filter(h => h.type === "Nacional").length}</span>
+                  <span className="text-sm text-slate-600">Feriados Nacionales</span>
                 </div>
-                <p className="text-slate-600 text-sm">Feriados en {selectedYear}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <Sun className="w-6 h-6 text-blue-600" />
-                  </div>
-                </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {holidays.filter(h => h.type === "Nacional").length}
-                </div>
-                <p className="text-slate-600 text-sm">Feriados Nacionales</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between h-full">
-                  <div>
-                    <Select
-                      value={selectedYear.toString()}
-                      onValueChange={(val) => setSelectedYear(parseInt(val))}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="2024">2024</SelectItem>
-                        <SelectItem value="2025">2025</SelectItem>
-                        <SelectItem value="2026">2026</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => setShowForm(true)}
-                      className="bg-indigo-600 hover:bg-indigo-700"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Nuevo
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Select
+                value={selectedYear.toString()}
+                onValueChange={(val) => setSelectedYear(parseInt(val))}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2024">2024</SelectItem>
+                  <SelectItem value="2025">2025</SelectItem>
+                  <SelectItem value="2026">2026</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={() => setShowForm(true)}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo
+              </Button>
+            </div>
           </div>
 
           {/* Import/Export Actions */}

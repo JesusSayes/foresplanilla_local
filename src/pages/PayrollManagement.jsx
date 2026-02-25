@@ -577,62 +577,35 @@ export default function PayrollManagement() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-blue-100 rounded-xl">
-                  <FileText className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {stats.quincenal}
-              </div>
-              <p className="text-slate-600 text-sm">Planillas Quincenales</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <Calendar className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {stats.mensual}
-              </div>
-              <p className="text-slate-600 text-sm">Planillas Mensuales</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-purple-100 rounded-xl">
-                  <Plus className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {stats.adicional}
-              </div>
-              <p className="text-slate-600 text-sm">Planillas Adicionales</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-indigo-50 to-blue-50">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-indigo-100 rounded-xl">
-                  <DollarSign className="w-6 h-6 text-indigo-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {canViewAmounts ? `S/ ${stats.total.toFixed(2)}` : '🔒'}
-              </div>
-              <p className="text-slate-600 text-sm">Total Planillas</p>
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <FileText className="w-5 h-5 text-blue-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{stats.quincenal}</span>
+              <span className="text-sm text-slate-600">Planillas Quincenales</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Calendar className="w-5 h-5 text-green-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{stats.mensual}</span>
+              <span className="text-sm text-slate-600">Planillas Mensuales</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Plus className="w-5 h-5 text-purple-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{stats.adicional}</span>
+              <span className="text-sm text-slate-600">Planillas Adicionales</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-lg border border-indigo-200 shadow-sm">
+            <DollarSign className="w-5 h-5 text-indigo-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{canViewAmounts ? `S/ ${stats.total.toFixed(2)}` : '🔒'}</span>
+              <span className="text-sm text-slate-600">Total Planillas</span>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

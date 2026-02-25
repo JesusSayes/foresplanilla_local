@@ -9,10 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, Plus, Edit, Trash2, Users, GitBranch, History,
-  Download, FileSpreadsheet, FileText, DollarSign, Search, Calendar, Grid3x3, List
+  Download, FileSpreadsheet, FileText, DollarSign, Search, Calendar, Grid3x3, List, Check, ChevronsUpDown
 } from "lucide-react";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { format } from "date-fns";
@@ -46,6 +49,7 @@ export default function CostCenterManagement() {
   const [assignmentSearchTerm, setAssignmentSearchTerm] = useState("");
   const [unassignedSearchTerm, setUnassignedSearchTerm] = useState("");
   const [historySearchTerm, setHistorySearchTerm] = useState("");
+  const [openCCCombobox, setOpenCCCombobox] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -407,12 +411,8 @@ export default function CostCenterManagement() {
         (!a.end_date || new Date(a.end_date) >= new Date())
       );
 
-<<<<<<< HEAD
-      const hasDepartmentAssignment = emp.department_name && assignments.some(a =>
-=======
       // const hasDepartmentAssignment = emp.department_name && assignments.some(a =>
       const hasDepartmentAssignment = assignments.some(a =>
->>>>>>> jesus_migra_local
         a.assignment_type === "Departamento" &&
         a.department_name === emp.department_name &&
         a.is_active &&
@@ -480,8 +480,18 @@ export default function CostCenterManagement() {
 
         <Tabs defaultValue="centers" className="space-y-6">
           <TabsList className="grid w-full max-w-3xl grid-cols-4">
-            <TabsTrigger value="centers">Centros de Costo</TabsTrigger>
-            <TabsTrigger value="assignments">Asignaciones</TabsTrigger>
+            <TabsTrigger value="centers">
+              Centros de Costo
+              {costCenters.length > 0 && (
+                <Badge className="ml-2 bg-orange-600 text-white">{costCenters.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="assignments">
+              Asignaciones
+              {assignments.length > 0 && (
+                <Badge className="ml-2 bg-orange-600 text-white">{assignments.length}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="unassigned">
               Sin Asignar
               {employeesWithoutCC.length > 0 && (
@@ -876,30 +886,6 @@ export default function CostCenterManagement() {
                       : null;
 
                     return (
-<<<<<<< HEAD
-                    <div key={assignment.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <Badge className={assignment.assignment_type === "Empleado" ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"}>
-                             {assignment.assignment_type}
-                            </Badge>
-                            <h4 className="font-bold text-slate-900">
-                              {assignment.assignment_type === "Empleado"
-                                ? `${emp?.first_name} ${emp?.last_name}`
-                                : assignment.department_name}
-                            </h4>
-                            {assignment.assignment_type === "Empleado" && emp && (
-                              <Badge className={
-                                emp.status === "Activo" ? "bg-green-100 text-green-700" :
-                                emp.status === "Suspendido" ? "bg-yellow-100 text-yellow-700" :
-                                "bg-gray-100 text-gray-700"
-                              }>
-                                {emp.status}
-                              </Badge>
-                            )}
-                            <span className="text-slate-500">→</span>
-=======
                      <div key={assignment.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
                        <div className="flex items-center justify-between">
                          <div className="flex-1">
@@ -922,7 +908,6 @@ export default function CostCenterManagement() {
                                </Badge>
                              )}
                              <span className="text-slate-500">→</span>
->>>>>>> jesus_migra_local
                               <div className="flex items-center gap-2">
                                 <Building2 className="w-4 h-4 text-indigo-600" />
                                 <span className="font-semibold text-indigo-600">{cc?.code}</span>
@@ -1107,19 +1092,52 @@ export default function CostCenterManagement() {
             <CardContent className="p-6 space-y-4">
               <div>
                 <Label>Centro de Costo *</Label>
-                <Select
-                  value={assignmentFormData.cost_center_id}
-                  onValueChange={(v) => setAssignmentFormData({ ...assignmentFormData, cost_center_id: v })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Seleccionar centro" /></SelectTrigger>
-                  <SelectContent>
-                    {costCenters.filter(c => c.is_active).map(cc => (
-                      <SelectItem key={cc.id} value={cc.id}>
-                        {cc.code} - {cc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={openCCCombobox} onOpenChange={setOpenCCCombobox}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openCCCombobox}
+                      className="w-full justify-between"
+                    >
+                      {assignmentFormData.cost_center_id
+                        ? (() => {
+                            const cc = costCenters.find(c => c.id === assignmentFormData.cost_center_id);
+                            return cc ? `${cc.code} - ${cc.name}` : "Seleccionar centro";
+                          })()
+                        : "Seleccionar centro"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar centro de costo..." />
+                      <CommandList>
+                        <CommandEmpty>No se encontró centro de costo.</CommandEmpty>
+                        <CommandGroup>
+                          {costCenters.filter(c => c.is_active).map((cc) => (
+                            <CommandItem
+                              key={cc.id}
+                              value={`${cc.code} ${cc.name}`}
+                              onSelect={() => {
+                                setAssignmentFormData({ ...assignmentFormData, cost_center_id: cc.id });
+                                setOpenCCCombobox(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  assignmentFormData.cost_center_id === cc.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {cc.code} - {cc.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div>
