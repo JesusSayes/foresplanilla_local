@@ -10,6 +10,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
 import morganBody from 'morgan-body';
+import cron from 'node-cron';
 
 import authRoutes from './routes/auth.js';
 import employeeRoutes from './routes/employees.js';
@@ -31,6 +32,9 @@ import balancesRoutes from './routes/vacations/balances.js';
 import payrollRoutes from './routes/payroll/payslips.js';
 import templatesRoutes from './routes/payroll/templates.js';
 import conceptsRoutes from './routes/payroll/concepts.js';
+import loanTypesRoutes from './routes/payroll/loan-types.js';
+import loansRoutes from './routes/payroll/loans.js';
+import loanInstallmentsRoutes from './routes/payroll/loan-installments.js';
 import certificatesRoutes from './routes/certificates.js';
 import notificationsRoutes from './routes/notifications.js';
 import infoRoutes from './routes/company/info.js';
@@ -40,8 +44,10 @@ import costCenterAssignmentsRoutes from './routes/costCenterAssignments.js';
 import costCenterChangeLogsRoutes from './routes/costCenterChangeLogs.js';
 import connectionsRoutes from './routes/database/connections.js';
 import logsRoutes from './routes/sync/logs.js';
+import biotimeSyncRoutes from './routes/sync/biotime.js';
 import holidaysRoutes from './routes/holidays.js';
 import attendanceIncidentsRoutes from './routes/attendance/incidents.js';
+import { syncBiotimeAttendance } from './controllers/sync/biotimeSyncController.js';
 
 dotenv.config();
 
@@ -111,6 +117,9 @@ app.use('/api/vacations/balances', balancesRoutes);
 app.use('/api/payroll/payslips', payrollRoutes);
 app.use('/api/payroll/templates', templatesRoutes);
 app.use('/api/payroll/concepts', conceptsRoutes);
+app.use('/api/payroll/loan-types', loanTypesRoutes);
+app.use('/api/payroll/loans', loansRoutes);
+app.use('/api/payroll/loan-installments', loanInstallmentsRoutes);
 app.use('/api/certificates', certificatesRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/company/info', infoRoutes);
@@ -120,9 +129,16 @@ app.use('/api/cost-center-assignments', costCenterAssignmentsRoutes);
 app.use('/api/cost-center-changelogs', costCenterChangeLogsRoutes);
 app.use('/api/database/connections', connectionsRoutes);
 app.use('/api/sync/logs', logsRoutes);
+app.use('/api/sync/biotime', biotimeSyncRoutes);
 app.use('/api/holidays', holidaysRoutes);
 app.use('/api/attendance/incidents', attendanceIncidentsRoutes);
 app.use('/api/master-data', masterDataRoutes);
+
+// Cron: sincronización biotime cada hora
+cron.schedule('0 * * * *', () => {
+  console.log('[Cron] Ejecutando sync biotime...');
+  syncBiotimeAttendance().catch(err => console.error('[Cron] Error en sync biotime:', err.message));
+});
 
 // 404 handler
 app.use((req, res) => {
@@ -155,4 +171,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
   console.log(`Logs: ${logsDir}`);
+  console.log('[Cron] Sync biotime programado cada hora (0 * * * *)');
 });

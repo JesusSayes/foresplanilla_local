@@ -43,6 +43,7 @@ import PayslipTemplateConfig from "./pages/PayslipTemplateConfig";
 import NotificationSettings from "./pages/NotificationSettings";
 import DataExport from "./pages/DataExport";
 import SystemRoleInitializer from "./pages/SystemRoleInitializer";
+import LoanManagement from "./pages/LoanManagement";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -197,6 +198,11 @@ const AuthenticatedApp = () => {
       <Route path="/PayrollConcepts" element={
         <ProtectedRoute>
           <Layout currentPageName="PayrollConcepts"><PayrollConcepts /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/LoanManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="LoanManagement"><LoanManagement/></Layout>
         </ProtectedRoute>
       } />
       <Route path="/CostCenterManagement" element={

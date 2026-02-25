@@ -230,54 +230,35 @@ export default function CostCenterValuation() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <DollarSign className="w-8 h-8" />
-              </div>
-              <div className="text-3xl font-bold mb-1">
-                S/ {totalValorizado.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
-              </div>
-              <p className="text-indigo-100 text-sm">Total Valorizado</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <Building2 className="w-8 h-8 text-blue-600" />
-              </div>
-              <div className="text-3xl font-bold text-slate-900 mb-1">
-                {filteredData.length}
-              </div>
-              <p className="text-slate-600 text-sm">Centros de Costo</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <Users className="w-8 h-8 text-purple-600" />
-              </div>
-              <div className="text-3xl font-bold text-slate-900 mb-1">
-                {totalEmployees}
-              </div>
-              <p className="text-slate-600 text-sm">Empleados Asignados</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <TrendingUp className="w-8 h-8 text-green-600" />
-              </div>
-              <div className="text-3xl font-bold text-slate-900 mb-1">
-                S/ {totalEmployees > 0 ? (totalValorizado / totalEmployees).toFixed(2) : '0.00'}
-              </div>
-              <p className="text-slate-600 text-sm">Promedio por Empleado</p>
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-lg shadow-sm">
+            <DollarSign className="w-5 h-5" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold">S/ {totalValorizado.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
+              <span className="text-sm text-indigo-100">Total Valorizado</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Building2 className="w-5 h-5 text-blue-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{filteredData.length}</span>
+              <span className="text-sm text-slate-600">Centros de Costo</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <Users className="w-5 h-5 text-purple-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">{totalEmployees}</span>
+              <span className="text-sm text-slate-600">Empleados Asignados</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <TrendingUp className="w-5 h-5 text-green-600" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-slate-900">S/ {totalEmployees > 0 ? (totalValorizado / totalEmployees).toFixed(2) : '0.00'}</span>
+              <span className="text-sm text-slate-600">Promedio por Empleado</span>
+            </div>
+          </div>
         </div>
 
         {/* Filters */}

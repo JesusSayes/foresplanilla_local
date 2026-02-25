@@ -9,10 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, Plus, Edit, Trash2, Users, GitBranch, History,
-  Download, FileSpreadsheet, FileText, DollarSign, Search, Calendar, Grid3x3, List
+  Download, FileSpreadsheet, FileText, DollarSign, Search, Calendar, Grid3x3, List, Check, ChevronsUpDown
 } from "lucide-react";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { format } from "date-fns";
@@ -44,6 +47,7 @@ export default function CostCenterManagement() {
   const [assignmentSearchTerm, setAssignmentSearchTerm] = useState("");
   const [unassignedSearchTerm, setUnassignedSearchTerm] = useState("");
   const [historySearchTerm, setHistorySearchTerm] = useState("");
+  const [openCCCombobox, setOpenCCCombobox] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -474,8 +478,18 @@ export default function CostCenterManagement() {
 
         <Tabs defaultValue="centers" className="space-y-6">
           <TabsList className="grid w-full max-w-3xl grid-cols-4">
-            <TabsTrigger value="centers">Centros de Costo</TabsTrigger>
-            <TabsTrigger value="assignments">Asignaciones</TabsTrigger>
+            <TabsTrigger value="centers">
+              Centros de Costo
+              {costCenters.length > 0 && (
+                <Badge className="ml-2 bg-orange-600 text-white">{costCenters.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="assignments">
+              Asignaciones
+              {assignments.length > 0 && (
+                <Badge className="ml-2 bg-orange-600 text-white">{assignments.length}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="unassigned">
               Sin Asignar
               {employeesWithoutCC.length > 0 && (
@@ -1089,6 +1103,52 @@ export default function CostCenterManagement() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Popover open={openCCCombobox} onOpenChange={setOpenCCCombobox}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openCCCombobox}
+                      className="w-full justify-between"
+                    >
+                      {assignmentFormData.cost_center_id
+                        ? (() => {
+                            const cc = costCenters.find(c => c.id === assignmentFormData.cost_center_id);
+                            return cc ? `${cc.code} - ${cc.name}` : "Seleccionar centro";
+                          })()
+                        : "Seleccionar centro"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar centro de costo..." />
+                      <CommandList>
+                        <CommandEmpty>No se encontró centro de costo.</CommandEmpty>
+                        <CommandGroup>
+                          {costCenters.filter(c => c.is_active).map((cc) => (
+                            <CommandItem
+                              key={cc.id}
+                              value={`${cc.code} ${cc.name}`}
+                              onSelect={() => {
+                                setAssignmentFormData({ ...assignmentFormData, cost_center_id: cc.id });
+                                setOpenCCCombobox(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  assignmentFormData.cost_center_id === cc.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {cc.code} - {cc.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div>

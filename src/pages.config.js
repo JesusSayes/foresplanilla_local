@@ -66,6 +66,7 @@ import HRDashboard from './pages/HRDashboard';
 import HolidayManagement from './pages/HolidayManagement';
 import Home from './pages/Home';
 import ImportEmployees from './pages/ImportEmployees';
+import LoanManagement from './pages/LoanManagement';
 import ManagerApprovals from './pages/ManagerApprovals';
 import MasterDataManagement from './pages/MasterDataManagement';
 import MyProfile from './pages/MyProfile';
@@ -106,6 +107,7 @@ export const PAGES = {
     "HolidayManagement": HolidayManagement,
     "Home": Home,
     "ImportEmployees": ImportEmployees,
+    "LoanManagement": LoanManagement,
     "ManagerApprovals": ManagerApprovals,
     "MasterDataManagement": MasterDataManagement,
     "MyProfile": MyProfile,
