@@ -1192,11 +1192,23 @@ export default function CostCenterManagement() {
                   >
                     <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
                     <SelectContent>
-                      {departments.map(dept => (
-                        <SelectItem key={dept.id} value={dept.name}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
+                      <div className="p-2 border-b sticky top-0 bg-white z-10">
+                        <Input
+                          placeholder="Buscar departamento..."
+                          value={departmentSearchTerm}
+                          onChange={(e) => setDepartmentSearchTerm(e.target.value)}
+                          className="h-8"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      {departments
+                        .filter(dept => dept.name.toLowerCase().includes(departmentSearchTerm.toLowerCase()))
+                        .map(dept => (
+                          <SelectItem key={dept.id} value={dept.name}>
+                            {dept.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
