@@ -164,6 +164,14 @@ export default function EmployeeManagement() {
     },
   });
 
+  const { data: companyInfo } = useQuery({
+    queryKey: ["companyInfo"],
+    queryFn: async () => {
+      const companies = await base44.entities.CompanyInfo.list("-created_date", 1);
+      return companies[0] || null;
+    },
+  });
+
   const createChangeLogMutation = useMutation({
     mutationFn: async (changeData) => {
       return await base44.entities.EmployeeChangeLog.create(changeData);
