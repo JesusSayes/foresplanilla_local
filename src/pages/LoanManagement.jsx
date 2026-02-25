@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,8 @@ import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  DollarSign, Plus, Edit, Trash2, CheckCircle, XCircle, 
+import {
+  DollarSign, Plus, Edit, Trash2, CheckCircle, XCircle,
   AlertCircle, Search, Calendar, Users, Check, ChevronsUpDown
 } from "lucide-react";
 import { toast } from "sonner";
@@ -20,10 +21,11 @@ import { Toaster } from "@/components/ui/sonner";
 import { format, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import PermissionGuard from "../components/PermissionGuard";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function LoanManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [showLoanForm, setShowLoanForm] = useState(false);
   const [editingLoan, setEditingLoan] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -41,45 +43,38 @@ export default function LoanManagement() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
+      });
+    }
+  }, [currentUser]);
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
   });
 
-  const { data: loanTypes = [] } = useQuery({
+  const { data: loanTypes = [], isLoading, error } = useQuery({
     queryKey: ["loanTypes"],
     queryFn: async () => {
-      const types = await base44.entities.LoanType.list("name");
+      const types = await entitiesAPI.LoanType.list("name");
+      console.log('LoanType.list =>', types);
+
       if (types.length === 0) {
         // Crear tipos por defecto
-        await base44.entities.LoanType.bulkCreate([
+        await entitiesAPI.LoanType.bulkCreate([
           { name: "Personal", description: "Préstamo personal" },
           { name: "Escolar", description: "Préstamo escolar" },
           { name: "Vacaciones", description: "Préstamo vacacional" }
         ]);
-        return await base44.entities.LoanType.list("name");
+        return await entitiesAPI.LoanType.list("name");
+        console.log('LoanType.list after bulkCreate =>', after);
+        return after;
       }
       return types;
     },
@@ -88,14 +83,14 @@ export default function LoanManagement() {
   const { data: loans = [] } = useQuery({
     queryKey: ["loans"],
     queryFn: async () => {
-      return await base44.entities.Loan.list("-created_date");
+      return await entitiesAPI.Loan.list("-created_date");
     },
   });
 
   const { data: installments = [] } = useQuery({
     queryKey: ["loanInstallments"],
     queryFn: async () => {
-      return await base44.entities.LoanInstallment.list("-created_date");
+      return await entitiesAPI.LoanInstallment.list("-created_date");
     },
   });
 
@@ -116,7 +111,7 @@ export default function LoanManagement() {
         status: "Activo",
       };
 
-      const loan = await base44.entities.Loan.create(loanData);
+      const loan = await entitiesAPI.Loan.create(loanData);
 
       // Crear las cuotas mensuales
       const installmentsToCreate = [];
@@ -131,7 +126,7 @@ export default function LoanManagement() {
         });
       }
 
-      await base44.entities.LoanInstallment.bulkCreate(installmentsToCreate);
+      await entitiesAPI.LoanInstallment.bulkCreate(installmentsToCreate);
 
       return loan;
     },
@@ -172,11 +167,11 @@ export default function LoanManagement() {
       };
 
       // Actualizar préstamo
-      const loan = await base44.entities.Loan.update(id, loanData);
+      const loan = await entitiesAPI.Loan.update(id, loanData);
 
       // Eliminar cuotas pendientes antiguas
       const existingInstallments = installments.filter(i => i.loan_id === id && i.status === "Pendiente");
-      await Promise.all(existingInstallments.map(i => base44.entities.LoanInstallment.delete(i.id)));
+      await Promise.all(existingInstallments.map(i => entitiesAPI.LoanInstallment.delete(i.id)));
 
       // Crear nuevas cuotas pendientes
       const installmentsToCreate = [];
@@ -191,7 +186,7 @@ export default function LoanManagement() {
         });
       }
 
-      await base44.entities.LoanInstallment.bulkCreate(installmentsToCreate);
+      await entitiesAPI.LoanInstallment.bulkCreate(installmentsToCreate);
 
       return loan;
     },
@@ -221,9 +216,9 @@ export default function LoanManagement() {
     mutationFn: async (id) => {
       // Eliminar cuotas asociadas
       const loanInstallments = installments.filter(i => i.loan_id === id);
-      await Promise.all(loanInstallments.map(i => base44.entities.LoanInstallment.delete(i.id)));
-      
-      return await base44.entities.Loan.delete(id);
+      await Promise.all(loanInstallments.map(i => entitiesAPI.LoanInstallment.delete(i.id)));
+
+      return await entitiesAPI.Loan.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["loans"]);
@@ -274,9 +269,9 @@ export default function LoanManagement() {
 
     // Validar que no exista un préstamo activo del mismo tipo para el empleado
     if (!editingLoan) {
-      const existingActiveLoan = loans.find(loan => 
-        loan.employee_id === loanFormData.employee_id && 
-        loan.loan_type_id === loanFormData.loan_type_id && 
+      const existingActiveLoan = loans.find(loan =>
+        loan.employee_id === loanFormData.employee_id &&
+        loan.loan_type_id === loanFormData.loan_type_id &&
         loan.status === "Activo"
       );
 
@@ -452,7 +447,7 @@ export default function LoanManagement() {
                     const progress = (paidInstallments / loan.total_installments) * 100;
 
                     return (
-                      <div 
+                      <div
                         key={loan.id}
                         className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all"
                       >
@@ -519,7 +514,7 @@ export default function LoanManagement() {
                             <span>{progress.toFixed(0)}%</span>
                           </div>
                           <div className="w-full bg-slate-200 rounded-full h-2">
-                            <div 
+                            <div
                               className="bg-green-600 h-2 rounded-full transition-all"
                               style={{ width: `${progress}%` }}
                             />
@@ -542,11 +537,11 @@ export default function LoanManagement() {
 
         {/* Loan Form Modal */}
         {showLoanForm && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-40 p-6"
             onClick={resetForm}
           >
-            <Card 
+            <Card
               className="max-w-2xl w-full max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
@@ -555,8 +550,8 @@ export default function LoanManagement() {
                   <CardTitle className="text-xl font-bold">
                     {editingLoan ? "Editar Préstamo" : "Nuevo Préstamo"}
                   </CardTitle>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="icon"
                     onClick={resetForm}
                   >
@@ -578,7 +573,7 @@ export default function LoanManagement() {
                           aria-expanded={openEmployeeCombobox}
                           className="w-full justify-between"
                         >
-                          {loanFormData.employee_id ? 
+                          {loanFormData.employee_id ?
                             (() => {
                               const emp = allEmployees.find(e => e.id === loanFormData.employee_id);
                               return emp ? `${emp.employee_code} - ${emp.first_name} ${emp.last_name}` : "Seleccionar empleado";
@@ -622,7 +617,7 @@ export default function LoanManagement() {
                     <label className="block text-sm font-semibold text-slate-900 mb-2">
                       Tipo de Préstamo *
                     </label>
-                    <Select 
+                    <Select
                       value={loanFormData.loan_type_id}
                       onValueChange={(value) => setLoanFormData({ ...loanFormData, loan_type_id: value })}
                     >
@@ -710,8 +705,8 @@ export default function LoanManagement() {
                       onClick={handleSubmit}
                       disabled={createLoanMutation.isPending || updateLoanMutation.isPending}
                     >
-                      {createLoanMutation.isPending || updateLoanMutation.isPending 
-                        ? "Procesando..." 
+                      {createLoanMutation.isPending || updateLoanMutation.isPending
+                        ? "Procesando..."
                         : editingLoan ? "Actualizar" : "Registrar Préstamo"}
                     </Button>
                   </div>
