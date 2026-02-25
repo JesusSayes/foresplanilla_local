@@ -589,7 +589,7 @@ export default function EmployeeManagement() {
       district: emp?.district || "",
       province: emp?.province || "",
       department: emp?.department || "",
-      company: emp?.company || "",
+      company: emp?.company || (emp && companyInfo?.company_name) || "",
       position: emp?.position || "",
       position_level: emp?.position_level || "",
       profession: emp?.profession || "",
