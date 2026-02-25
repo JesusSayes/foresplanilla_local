@@ -80,7 +80,7 @@ export default function PayrollManagement() {
   const { data: allPayslips = [] } = useQuery({
     queryKey: ["allPayslips"],
     queryFn: async () => {
-      return await base44.entities.Payslip.list("-created_date", 500);
+      return await entitiesAPI.Payslip.list("-created_date", 500);
     },
   });
 
@@ -201,7 +201,7 @@ export default function PayrollManagement() {
     const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
 
     // Filtrar empleados según búsqueda y departamento
-    //let filteredEmployees = allEmployees;
+    // let filteredEmployees = allEmployees;
     let filteredEmployees = getFilteredEmployees();
 
     // Filtrar por tipo de contrato si es SNP
@@ -446,7 +446,7 @@ export default function PayrollManagement() {
     );
 
     try {
-      await Promise.all(toDelete.map(p => base44.entities.Payslip.delete(p.id)));
+      await Promise.all(toDelete.map(p => entitiesAPI.Payslip.delete(p.id)));
       queryClient.invalidateQueries(["payslips"]);
       queryClient.invalidateQueries(["allPayslips"]);
       toast.success(`${toDelete.length} planilla(s) eliminada(s)`);

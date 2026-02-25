@@ -105,7 +105,7 @@ export const AVAILABLE_PERMISSIONS = {
   "roles.delete": "Eliminar roles",
   "roles.manage": "Gestionar roles y permisos",
   "roles.assign": "Asignar roles a usuarios",
-  //
+
   // Administración
   "system.admin": "Acceso administrativo completo",
   "system.settings": "Configurar ajustes del sistema",

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function MasterDataManagement() {
   const { user: currentUser } = useAuth();
@@ -91,7 +92,7 @@ export default function MasterDataManagement() {
 
   const { data: accountingAccounts = [] } = useQuery({
     queryKey: ["accountingaccounts"],
-    queryFn: async () => await base44.entities.AccountingAccount.list("cuenta"),
+    queryFn: async () => await entitiesAPI.AccountingAccount.list("cuenta"),
   });
 
   const createMutation = useMutation({
@@ -1309,7 +1310,7 @@ export default function MasterDataManagement() {
                 {["Activos", "Pasivos", "Patrimonio", "Ingresos", "Gastos"].map(elemento => {
                   const elementoAccounts = filteredAccountingAccounts.filter(a => a.elemento === elemento);
                   if (elementoAccounts.length === 0) return null;
-                  
+
                   return (
                     <div key={elemento} className="mb-6">
                       <h3 className="text-lg font-bold text-slate-900 mb-3 pb-2 border-b border-slate-200">
@@ -1576,7 +1577,7 @@ export default function MasterDataManagement() {
                       <Label>Fecha de Vigencia *</Label>
                       <Input
                         type="date"
-                        value={formData.effective_date || ""}
+                        value={formData.effective_date ? formData.effective_date.toString().slice(0, 10) : ""}
                         onChange={(e) => setFormData({ ...formData, effective_date: e.target.value })}
                       />
                     </div>
@@ -1845,8 +1846,8 @@ export default function MasterDataManagement() {
                   <>
                     <div>
                       <Label>Elemento *</Label>
-                      <Select 
-                        value={formData.elemento || ""} 
+                      <Select
+                        value={formData.elemento || ""}
                         onValueChange={(val) => setFormData({ ...formData, elemento: val })}
                       >
                         <SelectTrigger><SelectValue placeholder="Seleccionar elemento" /></SelectTrigger>

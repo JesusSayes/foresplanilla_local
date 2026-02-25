@@ -59,12 +59,41 @@ export const remove = async (req, res) => {
   }
 };
 
+export const filter = async (req, res) => {
+  try {
+    const {
+      status,    // ?status=Activo
+      code,      // ?code=ABC (contains)
+      sort = '-created_date'  // Hereda patrón company_info
+    } = req.query;
+
+    const desc = sort.startsWith('-');
+    const field = sort.replace('-', '');
+
+    const concepts = await prisma.payroll_concept.findMany({
+      where: {
+        ...(status && { status }),
+        ...(code && { code: { contains: code, mode: 'insensitive' } })  // Búsqueda parcial
+      },
+      orderBy: {
+        [field]: desc ? 'desc' : 'asc'
+      }
+    });
+
+    res.json(concepts);
+  } catch (error) {
+    console.error('Error filtering payroll concepts:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const controller = {
   getAll,
   getById,
   create,
   update,
   delete: remove, // aquí sí usamos la clave "delete"
+  filter,
 }
 
 export default controller

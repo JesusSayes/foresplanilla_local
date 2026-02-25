@@ -215,8 +215,8 @@ model cost_center {
   category      String?
   is_active     Boolean?
   id            String    @id(map: "costcenter_pkey") @db.VarChar(255)
-  created_date  DateTime? @db.Timestamp(6)
-  updated_date  DateTime? @db.Timestamp(6)
+  created_date  DateTime? @db.Timestamp(6) @default(now())
+  updated_date  DateTime? @db.Timestamp(6) @updatedAt
   created_by_id String?
   created_by    String?
   is_sample     Boolean?
@@ -258,6 +258,19 @@ model cost_center_change_log {
   created_by_id  String?
   created_by     String?
   is_sample      Boolean?
+}
+
+model costcentercategory {
+  id            String    @id(map: "costcentercategory_pkey") @db.VarChar(255)
+  code          String?
+  name          String?
+  description   String?
+  is_active     Boolean?
+  created_date  DateTime? @db.Timestamp(6) @default(now())
+  updated_date  DateTime? @db.Timestamp(6) @updatedAt
+  created_by_id String?
+  created_by    String?
+  is_sample     Boolean?
 }
 
 model database_connection {
@@ -397,13 +410,6 @@ model notification {
 
 model notification_preference {
   id           String    @id(map: "notificationpreference_pkey") @db.VarChar(255)
-  created_date DateTime? @db.Timestamp(6)
-  updated_date DateTime? @db.Timestamp(6)
-  created_by   String?
-}
-
-model overtime_alert {
-  id           String    @id(map: "overtimealert_pkey") @db.VarChar(255)
   created_date DateTime? @db.Timestamp(6)
   updated_date DateTime? @db.Timestamp(6)
   created_by   String?
@@ -584,8 +590,8 @@ model user_role {
 }
 
 model users {
-  created_date  DateTime? @db.Timestamp(6)
-  updated_date  DateTime? @db.Timestamp(6)
+  created_date  DateTime? @db.Timestamp(6) @default(now())
+  updated_date  DateTime? @db.Timestamp(6) @updatedAt
   disabled      String?
   is_verified   Boolean?
   app_id        String?
@@ -654,4 +660,49 @@ model vacation_request {
   created_date DateTime? @db.Timestamp(6)
   updated_date DateTime? @db.Timestamp(6)
   created_by   String?
+}
+
+model accountingaccount {
+  cuenta        String?
+  elemento      String?
+  is_active     Boolean?
+  nombre        String?
+  id            String    @id @db.VarChar(255)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id String?
+  created_by    String?
+  is_sample     Boolean?
+}
+
+model overtime_alert {
+  id           String    @id(map: "overtimealert_pkey") @db.VarChar(255)
+  created_date DateTime? @db.Timestamp(6)
+  updated_date DateTime? @db.Timestamp(6)
+  created_by   String?
+}
+
+model segurovidaley {
+  age_range_start Int?
+  age_range_end   Int?
+  commercial_rate Decimal?  @db.Decimal(18, 2)
+  is_active       Boolean?
+  id              String    @id @db.VarChar(255)
+  created_date    DateTime? @db.Timestamp(6)
+  updated_date    DateTime? @db.Timestamp(6)
+  created_by_id   String?
+  created_by      String?
+  is_sample       Boolean?
+}
+
+model uit {
+  year          Int?
+  amount        Int?
+  is_active     Boolean?
+  id            String    @id @db.VarChar(255)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id String?
+  created_by    String?
+  is_sample     Boolean?
 }

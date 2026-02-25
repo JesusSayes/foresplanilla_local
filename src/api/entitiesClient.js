@@ -63,8 +63,16 @@ export const entitiesAPI = {
   Notification: createEntityAPI('/api/notifications'),
   CompanyInfo: createEntityAPI('/api/company/info'),
   CostCenter: createEntityAPI('/api/cost-centers'),
+  CostCenterCategory: createEntityAPI('/api/cost-center-categories'),
+  CostCenterAssignment: createEntityAPI('/api/cost-center-assignments'),
+  CostCenterChangeLog: createEntityAPI('/api/cost-center-changelogs'),
   DatabaseConnection: createEntityAPI('/api/database/connections'),
   SyncLog: createEntityAPI('/api/sync/logs'),
+  SeguroVidaLey: createEntityAPI('/api/master-data/segurovidaley'),
+  UIT: createEntityAPI('/api/master-data/uits'),
+  AccountingAccount: createEntityAPI('/api/master-data/accountingaccounts'),
+  RMV: createEntityAPI('/api/master-data/rmvs'),
+  User: createEntityAPI('/api/users'),
 };
 
 export default entitiesAPI;

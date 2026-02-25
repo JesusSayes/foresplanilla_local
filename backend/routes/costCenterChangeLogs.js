@@ -1,6 +1,6 @@
 import express from 'express';
 const router = express.Router();
-import controller from '../controllers/costCenterController.js';
+import controller from '../controllers/costCenterChangeLogController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 router.use(authenticateToken);
