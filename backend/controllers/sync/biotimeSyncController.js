@@ -16,20 +16,29 @@ function getBiotimePool() {
   return biotimePool;
 }
 
-export async function syncBiotimeAttendance() {
+export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
   const startedAt = new Date();
   let inserted = 0;
   let updated = 0;
   let errors = 0;
   let errorDetails = [];
 
+  const dateFrom = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const dateTo = endDate ? new Date(endDate) : new Date();
+
+  if (isNaN(dateFrom.getTime()) || isNaN(dateTo.getTime())) {
+    return { success: false, error: 'Fechas inválidas. Use formato YYYY-MM-DD.' };
+  }
+
   console.log(`[BiotimeSync] Iniciando sincronización: ${startedAt.toISOString()}`);
+  console.log(`[BiotimeSync] Rango: ${dateFrom.toISOString()} → ${dateTo.toISOString()}`);
 
   const pool = getBiotimePool();
   const client = await pool.connect();
 
   try {
-    const { rows: transactions } = await client.query(`
+    const { rows: transactions } = await client.query(
+      `
       SELECT
         t.id,
         t.emp_code,
@@ -43,9 +52,11 @@ export async function syncBiotimeAttendance() {
         e.last_name
       FROM iclock_transaction t
       LEFT JOIN personnel_employee e ON e.emp_code = t.emp_code
-      WHERE t.punch_time >= NOW() - INTERVAL '7 days'
+      WHERE t.punch_time >= $1 AND t.punch_time <= $2
       ORDER BY t.emp_code, t.punch_time ASC
-    `);
+      `,
+      [dateFrom, dateTo]
+    );
 
     console.log(`[BiotimeSync] ${transactions.length} marcaciones obtenidas de biotime`);
 
@@ -158,7 +169,10 @@ export async function syncBiotimeAttendance() {
 
 export async function triggerSync(req, res) {
   try {
-    const result = await syncBiotimeAttendance();
+    const startDate = req.body?.startDate || req.query?.startDate;
+    const endDate = req.body?.endDate || req.query?.endDate;
+
+    const result = await syncBiotimeAttendance({ startDate, endDate });
     res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
