@@ -216,7 +216,7 @@ model cost_center {
   is_active     Boolean?
   id            String    @id(map: "costcenter_pkey") @db.VarChar(255)
   created_date  DateTime? @db.Timestamp(6) @default(now())
-  updated_date  DateTime? @db.Timestamp(6) @updatedAt
+  updated_date  DateTime? @updatedAt @db.Timestamp(6)
   created_by_id String?
   created_by    String?
   is_sample     Boolean?
@@ -261,13 +261,13 @@ model cost_center_change_log {
 }
 
 model costcentercategory {
-  id            String    @id(map: "costcentercategory_pkey") @db.VarChar(255)
-  code          String?
   name          String?
   description   String?
+  code          String?
   is_active     Boolean?
+  id            String    @id @db.VarChar(255)
   created_date  DateTime? @db.Timestamp(6) @default(now())
-  updated_date  DateTime? @db.Timestamp(6) @updatedAt
+  updated_date  DateTime? @updatedAt @db.Timestamp(6)
   created_by_id String?
   created_by    String?
   is_sample     Boolean?
@@ -591,7 +591,7 @@ model user_role {
 
 model users {
   created_date  DateTime? @db.Timestamp(6) @default(now())
-  updated_date  DateTime? @db.Timestamp(6) @updatedAt
+  updated_date  DateTime? @updatedAt @db.Timestamp(6)
   disabled      String?
   is_verified   Boolean?
   app_id        String?
@@ -705,4 +705,60 @@ model uit {
   created_by_id String?
   created_by    String?
   is_sample     Boolean?
+}
+
+model loan {
+  installments_paid  Int?
+  end_date           DateTime? @db.Date
+  amount             Int?
+  approved_by        String?
+  approval_date      DateTime? @db.Date
+  notes              String?
+  employee_id        String?
+  total_installments Int?
+  monthly_amount     Int?
+  loan_type_id       String?
+  start_date         DateTime? @db.Date
+  status             String?
+  id                 String    @id @db.VarChar(255)
+  created_date       DateTime? @db.Timestamp(6)
+  updated_date       DateTime? @db.Timestamp(6)
+  created_by_id      String?
+  created_by         String?
+  is_sample          Boolean?
+}
+
+model loaninstallment {
+  amount        Int?
+  payslip_id    String?
+  month         Int?
+  year          Int?
+  applied_date  String?
+  loan_id       String?
+  status        String?
+  id            String    @id @db.VarChar(255)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id String?
+  created_by    String?
+  is_sample     Boolean?
+}
+
+model loantype {
+  name          String?
+  description   String?
+  is_active     Boolean?
+  id            String    @id @db.VarChar(255)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id String?
+  created_by    String?
+  is_sample     Boolean?
+}
+
+model reportconfiguration {
+  id           String    @id @db.VarChar(255)
+  created_date DateTime? @db.Timestamp(6)
+  updated_date DateTime? @db.Timestamp(6)
+  created_by   String?
 }

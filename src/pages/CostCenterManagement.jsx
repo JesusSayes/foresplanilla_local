@@ -1093,6 +1093,19 @@ export default function CostCenterManagement() {
             <CardContent className="p-6 space-y-4">
               <div>
                 <Label>Centro de Costo *</Label>
+                <Select
+                  value={assignmentFormData.cost_center_id}
+                  onValueChange={(v) => setAssignmentFormData({ ...assignmentFormData, cost_center_id: v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Seleccionar centro" /></SelectTrigger>
+                  <SelectContent>
+                    {costCenters.filter(c => c.is_active).map(cc => (
+                      <SelectItem key={cc.id} value={cc.id}>
+                        {cc.code} - {cc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Popover open={openCCCombobox} onOpenChange={setOpenCCCombobox}>
                   <PopoverTrigger asChild>
                     <Button
