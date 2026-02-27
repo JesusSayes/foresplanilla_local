@@ -226,6 +226,27 @@ export default function ScheduleManagement() {
     });
     setSelectedTemplateId(assignment.id);
     setTemplateSearch(`${assignment.schedule_name} (${assignment.monday_start} - ${assignment.monday_end})`);
+    setScheduleEditData({
+      schedule_name: assignment.schedule_name || "",
+      monday_start: assignment.monday_start || "",
+      monday_end: assignment.monday_end || "",
+      tuesday_start: assignment.tuesday_start || "",
+      tuesday_end: assignment.tuesday_end || "",
+      wednesday_start: assignment.wednesday_start || "",
+      wednesday_end: assignment.wednesday_end || "",
+      thursday_start: assignment.thursday_start || "",
+      thursday_end: assignment.thursday_end || "",
+      friday_start: assignment.friday_start || "",
+      friday_end: assignment.friday_end || "",
+      saturday_start: assignment.saturday_start || "",
+      saturday_end: assignment.saturday_end || "",
+      sunday_start: assignment.sunday_start || "",
+      sunday_end: assignment.sunday_end || "",
+      break_duration_minutes: assignment.break_duration_minutes ?? 60,
+      tolerance_minutes: assignment.tolerance_minutes ?? 10,
+      exempt_from_clocking: assignment.exempt_from_clocking || false,
+      overtime_authorized: assignment.overtime_authorized || false,
+    });
     
     if (assignment.employee_id) {
       const emp = allEmployees.find(e => e.id === assignment.employee_id);
