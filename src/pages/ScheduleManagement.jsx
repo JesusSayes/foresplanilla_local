@@ -207,8 +207,6 @@ export default function ScheduleManagement() {
       employee_id: assignment.employee_id || null,
       departments: assignment.departments || (assignment.department_name ? [assignment.department_name] : []),
     });
-    setSelectedTemplateId(assignment.id);
-    setTemplateSearch(`${assignment.schedule_name} (${assignment.monday_start} - ${assignment.monday_end})`);
 
     setScheduleEditData({
       schedule_name: assignment.schedule_name || "",
@@ -231,6 +229,16 @@ export default function ScheduleManagement() {
       exempt_from_clocking: assignment.exempt_from_clocking || false,
       overtime_authorized: assignment.overtime_authorized || false,
     });
+
+    // Buscar la plantilla que corresponde a esta asignación por nombre
+    const currentTemplate = templates.find(t => t.schedule_name === assignment.schedule_name);
+    if (currentTemplate) {
+      setSelectedTemplateId(currentTemplate.id);
+      setTemplateSearch(`${currentTemplate.schedule_name} (${currentTemplate.monday_start} - ${currentTemplate.monday_end})`);
+    } else {
+      setSelectedTemplateId("");
+      setTemplateSearch(assignment.schedule_name || "");
+    }
 
     if (assignment.employee_id) {
       const emp = allEmployees.find(e => e.id === assignment.employee_id);
