@@ -1171,9 +1171,8 @@ export default function ScheduleManagement() {
                 </p>
               </div>
 
-              {!editingAssignment && (
-                <div>
-                  <Label>Seleccionar Plantilla de Horario *</Label>
+              <div>
+                <Label>Seleccionar Plantilla de Horario *</Label>
                   <div className="relative">
                     <div className="flex gap-2">
                       <button
