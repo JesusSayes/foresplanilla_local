@@ -301,6 +301,7 @@ export default function ScheduleManagement() {
       const updatedData = {
         employee_id: assignFormData.employee_id,
         departments: assignFormData.departments,
+        ...scheduleEditData,
       };
       updateAssignmentMutation.mutate({ id: editingAssignment.id, data: updatedData });
     } else {
