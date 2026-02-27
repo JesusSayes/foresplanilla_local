@@ -56,6 +56,21 @@ export default function ScheduleManagement() {
     departments: [],
   });
 
+  const [scheduleEditData, setScheduleEditData] = useState({
+    schedule_name: "",
+    monday_start: "", monday_end: "",
+    tuesday_start: "", tuesday_end: "",
+    wednesday_start: "", wednesday_end: "",
+    thursday_start: "", thursday_end: "",
+    friday_start: "", friday_end: "",
+    saturday_start: "", saturday_end: "",
+    sunday_start: "", sunday_end: "",
+    break_duration_minutes: 60,
+    tolerance_minutes: 10,
+    exempt_from_clocking: false,
+    overtime_authorized: false,
+  });
+
   const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
 
