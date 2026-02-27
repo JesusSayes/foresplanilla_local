@@ -1250,7 +1250,6 @@ export default function ScheduleManagement() {
                     )}
                   </div>
                 </div>
-              )}
 
               <div>
                 <Label>Asignar a Empleado Individual</Label>
