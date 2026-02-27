@@ -270,11 +270,30 @@ export default function ScheduleManagement() {
     }
 
     if (editingAssignment) {
-      const updatedData = {
-        employee_id: assignFormData.employee_id,
-        departments: assignFormData.departments,
-      };
-      updateAssignmentMutation.mutate({ id: editingAssignment.id, data: updatedData });
+      // Si se seleccionó una nueva plantilla, copiar sus datos al horario asignado
+      if (selectedTemplateId) {
+        const template = templates.find(t => t.id === selectedTemplateId);
+        if (!template) {
+          toast.error("Plantilla no encontrada");
+          return;
+        }
+        const updatedData = {
+          ...template,
+          employee_id: assignFormData.employee_id,
+          departments: assignFormData.departments,
+        };
+        delete updatedData.id;
+        delete updatedData.created_date;
+        delete updatedData.updated_date;
+        delete updatedData.created_by;
+        updateAssignmentMutation.mutate({ id: editingAssignment.id, data: updatedData });
+      } else {
+        const updatedData = {
+          employee_id: assignFormData.employee_id,
+          departments: assignFormData.departments,
+        };
+        updateAssignmentMutation.mutate({ id: editingAssignment.id, data: updatedData });
+      }
     } else {
       const template = templates.find(t => t.id === selectedTemplateId);
       if (!template) {
