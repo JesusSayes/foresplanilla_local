@@ -65,21 +65,6 @@ export default function ScheduleManagement() {
     departments: [],
   });
 
-  const [scheduleEditData, setScheduleEditData] = useState({
-    schedule_name: "",
-    monday_start: "", monday_end: "",
-    tuesday_start: "", tuesday_end: "",
-    wednesday_start: "", wednesday_end: "",
-    thursday_start: "", thursday_end: "",
-    friday_start: "", friday_end: "",
-    saturday_start: "", saturday_end: "",
-    sunday_start: "", sunday_end: "",
-    break_duration_minutes: 60,
-    tolerance_minutes: 10,
-    exempt_from_clocking: false,
-    overtime_authorized: false,
-  });
-
   const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
 
@@ -300,7 +285,6 @@ export default function ScheduleManagement() {
       const updatedData = {
         employee_id: assignFormData.employee_id,
         departments: assignFormData.departments,
-        ...scheduleEditData,
       };
       updateAssignmentMutation.mutate({ id: editingAssignment.id, data: updatedData });
     } else {
@@ -1375,80 +1359,6 @@ export default function ScheduleManagement() {
                   </p>
                 )}
               </div>
-
-              {editingAssignment && (
-                <div className="space-y-4 pt-4 border-t">
-                  <h3 className="font-semibold text-slate-900">Editar Horario Asignado</h3>
-                  <div className="grid grid-cols-3 gap-3 items-center text-sm font-semibold text-slate-700 px-1">
-                    <span>Día</span><span>Entrada</span><span>Salida</span>
-                  </div>
-                  {[
-                    { key: "monday", label: "Lunes" },
-                    { key: "tuesday", label: "Martes" },
-                    { key: "wednesday", label: "Miércoles" },
-                    { key: "thursday", label: "Jueves" },
-                    { key: "friday", label: "Viernes" },
-                    { key: "saturday", label: "Sábado" },
-                    { key: "sunday", label: "Domingo" },
-                  ].map(({ key, label }) => (
-                    <div key={key} className="grid grid-cols-3 gap-3 items-center">
-                      <span className="text-sm text-slate-700 font-medium">{label}</span>
-                      <Input
-                        type="time"
-                        value={scheduleEditData[`${key}_start`] || ""}
-                        onChange={(e) => setScheduleEditData({ ...scheduleEditData, [`${key}_start`]: e.target.value })}
-                        className="h-8 text-sm"
-                      />
-                      <Input
-                        type="time"
-                        value={scheduleEditData[`${key}_end`] || ""}
-                        onChange={(e) => setScheduleEditData({ ...scheduleEditData, [`${key}_end`]: e.target.value })}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                  ))}
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div>
-                      <Label className="text-xs">Break (min)</Label>
-                      <Input
-                        type="number"
-                        value={scheduleEditData.break_duration_minutes}
-                        onChange={(e) => setScheduleEditData({ ...scheduleEditData, break_duration_minutes: parseInt(e.target.value) || 0 })}
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Tolerancia (min)</Label>
-                      <Input
-                        type="number"
-                        value={scheduleEditData.tolerance_minutes}
-                        onChange={(e) => setScheduleEditData({ ...scheduleEditData, tolerance_minutes: parseInt(e.target.value) || 0 })}
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-center gap-2 cursor-pointer text-sm">
-                      <input
-                        type="checkbox"
-                        checked={scheduleEditData.exempt_from_clocking}
-                        onChange={(e) => setScheduleEditData({ ...scheduleEditData, exempt_from_clocking: e.target.checked })}
-                        className="w-4 h-4 rounded"
-                      />
-                      Exonerado de marcación
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm">
-                      <input
-                        type="checkbox"
-                        checked={scheduleEditData.overtime_authorized}
-                        onChange={(e) => setScheduleEditData({ ...scheduleEditData, overtime_authorized: e.target.checked })}
-                        className="w-4 h-4 rounded"
-                      />
-                      Autorizado a realizar horas extras
-                    </label>
-                  </div>
-                </div>
-              )}
 
               <div className="flex gap-3 pt-4 border-t">
                 <Button variant="outline" className="flex-1" onClick={resetAssignForm}>
