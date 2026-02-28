@@ -207,8 +207,16 @@ export default function ScheduleManagement() {
       employee_id: assignment.employee_id || null,
       departments: assignment.departments || (assignment.department_name ? [assignment.department_name] : []),
     });
-    setSelectedTemplateId(assignment.id);
-    setTemplateSearch(`${assignment.schedule_name} (${assignment.monday_start} - ${assignment.monday_end})`);
+
+    // Buscar la plantilla que corresponde a esta asignación por nombre
+    const currentTemplate = templates.find(t => t.schedule_name === assignment.schedule_name);
+    if (currentTemplate) {
+      setSelectedTemplateId(currentTemplate.id);
+      setTemplateSearch(`${currentTemplate.schedule_name} (${currentTemplate.monday_start} - ${currentTemplate.monday_end})`);
+    } else {
+      setSelectedTemplateId("");
+      setTemplateSearch(assignment.schedule_name || "");
+    }
 
     if (assignment.employee_id) {
       const emp = allEmployees.find(e => e.id === assignment.employee_id);
@@ -260,11 +268,30 @@ export default function ScheduleManagement() {
     }
 
     if (editingAssignment) {
-      const updatedData = {
-        employee_id: assignFormData.employee_id,
-        departments: assignFormData.departments,
-      };
-      updateAssignmentMutation.mutate({ id: editingAssignment.id, data: updatedData });
+      // Si se seleccionó una nueva plantilla, copiar sus datos al horario asignado
+      if (selectedTemplateId) {
+        const template = templates.find(t => t.id === selectedTemplateId);
+        if (!template) {
+          toast.error("Plantilla no encontrada");
+          return;
+        }
+        const updatedData = {
+          ...template,
+          employee_id: assignFormData.employee_id,
+          departments: assignFormData.departments,
+        };
+        delete updatedData.id;
+        delete updatedData.created_date;
+        delete updatedData.updated_date;
+        delete updatedData.created_by;
+        updateAssignmentMutation.mutate({ id: editingAssignment.id, data: updatedData });
+      } else {
+        const updatedData = {
+          employee_id: assignFormData.employee_id,
+          departments: assignFormData.departments,
+        };
+        updateAssignmentMutation.mutate({ id: editingAssignment.id, data: updatedData });
+      }
     } else {
       const template = templates.find(t => t.id === selectedTemplateId);
       if (!template) {
@@ -479,7 +506,7 @@ export default function ScheduleManagement() {
                 <TabsTrigger value="unassigned-departments" className="flex items-center gap-2">
                   <span>Depts Sin Horario</span>
                   <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-orange-500 rounded-full">
-                    {departmentsWithoutSchedule.filter(dept => 
+                    {departmentsWithoutSchedule.filter(dept =>
                       dept.toLowerCase().includes(searchTerm.toLowerCase())
                     ).length}
                   </span>
@@ -1122,9 +1149,8 @@ export default function ScheduleManagement() {
                 </p>
               </div>
 
-              {!editingAssignment && (
-                <div>
-                  <Label>Seleccionar Plantilla de Horario *</Label>
+              <div>
+                <Label>Seleccionar Plantilla de Horario *</Label>
                   <div className="relative">
                     <div className="flex gap-2">
                       <button
@@ -1202,7 +1228,6 @@ export default function ScheduleManagement() {
                     )}
                   </div>
                 </div>
-              )}
 
               <div>
                 <Label>Asignar a Empleado Individual</Label>
