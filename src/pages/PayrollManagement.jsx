@@ -27,7 +27,9 @@ import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUp
 export default function PayrollManagement() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
+
   const { hasPermission, canAccessDepartment, loading: permissionsLoading } = usePermissions();
+
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [payrollType, setPayrollType] = useState("Mensual");

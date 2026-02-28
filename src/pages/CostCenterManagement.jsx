@@ -30,7 +30,9 @@ import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUp
 export default function CostCenterManagement() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
+
   const { hasPermission, loading: permissionsLoading } = usePermissions();
+
   const [showCCForm, setShowCCForm] = useState(false);
   const [showAssignmentForm, setShowAssignmentForm] = useState(false);
   const [editingCC, setEditingCC] = useState(null);
@@ -48,6 +50,7 @@ export default function CostCenterManagement() {
   const [unassignedSearchTerm, setUnassignedSearchTerm] = useState("");
   const [historySearchTerm, setHistorySearchTerm] = useState("");
   const [openCCCombobox, setOpenCCCombobox] = useState(false);
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
 
   const queryClient = useQueryClient();
 
@@ -913,9 +916,9 @@ export default function CostCenterManagement() {
                             </div>
                             <div className="flex items-center gap-4 text-sm text-slate-600">
                               <span>Inicio: {format(new Date(assignment.start_date), "dd/MM/yyyy")}</span>
-                              {assignment.end_date && (
-                                <span>Fin: {format(new Date(assignment.end_date), "dd/MM/yyyy")}</span>
-                              )}
+                                {assignment.end_date && (
+                                  <span>Fin: {format(new Date(assignment.end_date), "dd/MM/yyyy")}</span>
+                                )}
                               <span>Porcentaje: {assignment.percentage}%</span>
                             </div>
                           </div>
@@ -1207,11 +1210,23 @@ export default function CostCenterManagement() {
                   >
                     <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
                     <SelectContent>
-                      {departments.map(dept => (
-                        <SelectItem key={dept.id} value={dept.name}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
+                      <div className="p-2 border-b sticky top-0 bg-white z-10">
+                        <Input
+                          placeholder="Buscar departamento..."
+                          value={departmentSearchTerm}
+                          onChange={(e) => setDepartmentSearchTerm(e.target.value)}
+                          className="h-8"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      {departments
+                        .filter(dept => dept.name.toLowerCase().includes(departmentSearchTerm.toLowerCase()))
+                        .map(dept => (
+                          <SelectItem key={dept.id} value={dept.name}>
+                            {dept.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>

@@ -150,6 +150,14 @@ export default function EmployeeManagement() {
     },
   });
 
+  const { data: companyInfo } = useQuery({
+    queryKey: ["companyInfo"],
+    queryFn: async () => {
+      const companies = await base44.entities.CompanyInfo.list("-created_date", 1);
+      return companies[0] || null;
+    },
+  });
+
   const createChangeLogMutation = useMutation({
     mutationFn: async (changeData) => {
       return await entitiesAPI.EmployeeChangeLog.create(changeData);
@@ -568,7 +576,7 @@ export default function EmployeeManagement() {
       district: emp?.district || "",
       province: emp?.province || "",
       department: emp?.department || "",
-      company: emp?.company || "",
+      company: emp?.company || (emp && companyInfo?.company_name) || "",
       position: emp?.position || "",
       position_level: emp?.position_level || "",
       profession: emp?.profession || "",
@@ -1739,8 +1747,14 @@ export default function EmployeeManagement() {
                             });
                           }}
                           placeholder="Opcional - se actualiza desde contratos"
+                          disabled={!!editingEmployee}
+                          className={editingEmployee ? "bg-slate-100 text-slate-700" : ""}
                         />
-                        <p className="text-xs text-slate-500 mt-1">Se actualiza automáticamente al registrar contratos</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {editingEmployee 
+                            ? "Campo bloqueado - se actualiza automáticamente desde contratos" 
+                            : "Se actualiza automáticamente al registrar contratos"}
+                        </p>
                       </div>
                     </div>
                   </div>
