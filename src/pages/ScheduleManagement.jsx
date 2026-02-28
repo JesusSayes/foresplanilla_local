@@ -926,8 +926,8 @@ export default function ScheduleManagement() {
                         onClick={() => setShowEmployeeDropdown(!showEmployeeDropdown)}
                         className="w-full flex items-center justify-between px-3 py-2 border border-slate-200 rounded-md bg-white hover:bg-slate-50 text-left"
                       >
-                        <span className={formData.employee_id ? "text-slate-900" : "text-slate-500"}>
-                          {formData.employee_id && employeeSearch ? employeeSearch : "Seleccionar empleado"}
+                        <span className={assignFormData.employee_id ? "text-slate-900" : "text-slate-500"}>
+                          {assignFormData.employee_id && employeeSearch ? employeeSearch : "Seleccionar empleado"}
                         </span>
                         <ChevronsUpDown className="w-4 h-4 text-slate-400" />
                       </button>
@@ -948,23 +948,23 @@ export default function ScheduleManagement() {
                               type="button"
                               className="w-full px-3 py-2 text-left hover:bg-slate-50 text-sm text-slate-600 border-b"
                               onClick={() => {
-                                setFormData({ ...formData, employee_id: null });
+                                setAssignFormData({ ...assignFormData, employee_id: null });
                                 setEmployeeSearch("");
                                 setShowEmployeeDropdown(false);
                               }}
                             >
                               Ninguno
                             </button>
-                            {filteredEmployees.length > 0 ? (
-                              filteredEmployees.map(emp => (
+                            {filteredEmployeesWithoutSchedule.length > 0 ? (
+                              filteredEmployeesWithoutSchedule.map(emp => (
                                 <button
                                   key={emp.id}
                                   type="button"
                                   className={`w-full px-3 py-2 text-left hover:bg-slate-50 flex items-center justify-between ${
-                                    formData.employee_id === emp.id ? 'bg-indigo-50' : ''
+                                    assignFormData.employee_id === emp.id ? 'bg-indigo-50' : ''
                                   }`}
                                   onClick={() => {
-                                    setFormData({ ...formData, employee_id: emp.id, departments: [] });
+                                    setAssignFormData({ ...assignFormData, employee_id: emp.id, departments: [] });
                                     setEmployeeSearch(`${emp.first_name} ${emp.last_name} - ${emp.employee_code}`);
                                     setShowEmployeeDropdown(false);
                                   }}
@@ -975,7 +975,7 @@ export default function ScheduleManagement() {
                                     </span>
                                     <span className="text-xs text-slate-500">{emp.employee_code}</span>
                                   </div>
-                                  {formData.employee_id === emp.id && (
+                                  {assignFormData.employee_id === emp.id && (
                                     <Check className="w-4 h-4 text-indigo-600" />
                                   )}
                                 </button>
@@ -998,12 +998,12 @@ export default function ScheduleManagement() {
                         <label key={dept} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
                           <input
                             type="checkbox"
-                            checked={formData.departments?.includes(dept)}
+                            checked={assignFormData.departments?.includes(dept)}
                             onChange={(e) => {
                               const newDepts = e.target.checked
-                                ? [...(formData.departments || []), dept]
-                                : formData.departments.filter(d => d !== dept);
-                              setFormData({ ...formData, departments: newDepts, employee_id: null });
+                                ? [...(assignFormData.departments || []), dept]
+                                : assignFormData.departments.filter(d => d !== dept);
+                              setAssignFormData({ ...assignFormData, departments: newDepts, employee_id: null });
                             }}
                             className="w-4 h-4 rounded"
                           />
@@ -1011,9 +1011,9 @@ export default function ScheduleManagement() {
                         </label>
                       ))}
                     </div>
-                    {formData.departments?.length > 0 && (
+                    {assignFormData.departments?.length > 0 && (
                       <p className="text-xs text-slate-600 mt-2">
-                        {formData.departments.length} departamento(s) seleccionado(s)
+                        {assignFormData.departments.length} departamento(s) seleccionado(s)
                       </p>
                     )}
                   </div>
