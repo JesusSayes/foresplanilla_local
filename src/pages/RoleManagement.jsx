@@ -53,6 +53,11 @@ export default function RoleManagement() {
     },
   });
 
+  const normalizedRoles = roles.map(r => ({
+    ...r,
+    permissions: Array.isArray(r.permissions) ? r.permissions : [],
+  }));
+
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
@@ -358,7 +363,7 @@ export default function RoleManagement() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="space-y-4">
-                    {roles.map(role => (
+                    {normalizedRoles.map(role => (
                       <div key={role.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
