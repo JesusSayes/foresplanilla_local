@@ -266,79 +266,69 @@ export default function HRDashboard() {
           </div>
 
           {/* Métricas principales */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <Users className="w-6 h-6 text-blue-600" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Users className="w-4 h-4 text-blue-600" />
                   </div>
-                  <TrendingUp className="w-5 h-5 text-green-500" />
+                  <TrendingUp className="w-4 h-4 text-green-500" />
                 </div>
-                <div className="text-3xl font-bold text-slate-900 mb-1">
-                  {metrics.activeEmployees}
-                </div>
-                <p className="text-slate-600 text-sm mb-2">Empleados Activos</p>
-                <div className="flex gap-2 text-xs">
-                  <Badge className="bg-yellow-100 text-yellow-700">
-                    {metrics.suspendedEmployees} Suspendidos
+                <div className="text-2xl font-bold text-slate-900">{metrics.activeEmployees}</div>
+                <p className="text-slate-500 text-xs font-medium mb-1">Empleados Activos</p>
+                <div className="flex gap-1 flex-wrap">
+                  <Badge className="bg-yellow-100 text-yellow-700 text-xs px-1.5 py-0">
+                    {metrics.suspendedEmployees} Susp.
                   </Badge>
-                  <Badge className="bg-red-100 text-red-700">
-                    {metrics.terminatedEmployees} Cesados
+                  <Badge className="bg-red-100 text-red-700 text-xs px-1.5 py-0">
+                    {metrics.terminatedEmployees} Ces.
                   </Badge>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-orange-100 rounded-xl">
-                    <TrendingDown className="w-6 h-6 text-orange-600" />
+            <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <TrendingDown className="w-4 h-4 text-orange-600" />
                   </div>
                   {parseFloat(metrics.turnoverRate) > 5 ? (
-                    <AlertCircle className="w-5 h-5 text-red-500" />
+                    <AlertCircle className="w-4 h-4 text-red-500" />
                   ) : (
-                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    <CheckCircle className="w-4 h-4 text-green-500" />
                   )}
                 </div>
-                <div className="text-3xl font-bold text-slate-900 mb-1">
-                  {metrics.turnoverRate}%
-                </div>
-                <p className="text-slate-600 text-sm">Rotación de Personal</p>
-                <p className="text-xs text-slate-500 mt-1">Últimos 3 meses</p>
+                <div className="text-2xl font-bold text-slate-900">{metrics.turnoverRate}%</div>
+                <p className="text-slate-500 text-xs font-medium">Rotación de Personal</p>
+                <p className="text-xs text-slate-400 mt-0.5">Últimos 3 meses</p>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-purple-100 rounded-xl">
-                    <Clock className="w-6 h-6 text-purple-600" />
+            <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Clock className="w-4 h-4 text-purple-600" />
                   </div>
                 </div>
-                <div className="text-3xl font-bold text-slate-900 mb-1">
-                  {metrics.avgHiringTime}
-                </div>
-                <p className="text-slate-600 text-sm">Días Promedio</p>
-                <p className="text-xs text-slate-500 mt-1">Tiempo de contratación</p>
+                <div className="text-2xl font-bold text-slate-900">{metrics.avgHiringTime}</div>
+                <p className="text-slate-500 text-xs font-medium">Días Promedio</p>
+                <p className="text-xs text-slate-400 mt-0.5">Tiempo de contratación</p>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-green-100 rounded-xl">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+            <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
                   </div>
                 </div>
-                <div className="text-3xl font-bold text-slate-900 mb-1">
-                  {metrics.attendanceRate}%
-                </div>
-                <p className="text-slate-600 text-sm">Asistencia del Mes</p>
-                <p className="text-xs text-slate-500 mt-1">
-                  {metrics.lateRecords} tardanzas registradas
-                </p>
+                <div className="text-2xl font-bold text-slate-900">{metrics.attendanceRate}%</div>
+                <p className="text-slate-500 text-xs font-medium">Asistencia del Mes</p>
+                <p className="text-xs text-slate-400 mt-0.5">{metrics.lateRecords} tardanzas registradas</p>
               </CardContent>
             </Card>
           </div>

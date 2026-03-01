@@ -78,12 +78,12 @@ import PayslipTemplateConfig from './pages/PayslipTemplateConfig';
 import Payslips from './pages/Payslips';
 import Reports from './pages/Reports';
 import RoleManagement from './pages/RoleManagement';
+import ScheduleManagement from './pages/ScheduleManagement';
 import SystemRoleInitializer from './pages/SystemRoleInitializer';
 import UserManagement from './pages/UserManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
-import ScheduleManagement from './pages/ScheduleManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -119,12 +119,12 @@ export const PAGES = {
     "Payslips": Payslips,
     "Reports": Reports,
     "RoleManagement": RoleManagement,
+    "ScheduleManagement": ScheduleManagement,
     "SystemRoleInitializer": SystemRoleInitializer,
     "UserManagement": UserManagement,
     "VacationCalendar": VacationCalendar,
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
-    "ScheduleManagement": ScheduleManagement,
 }
 
 export const pagesConfig = {
