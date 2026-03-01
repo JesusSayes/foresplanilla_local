@@ -448,56 +448,48 @@ export default function HRDashboard() {
           </div>
 
           {/* Estadísticas adicionales */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-indigo-100 rounded-xl">
-                    <DollarSign className="w-6 h-6 text-indigo-600" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 bg-indigo-100 rounded-lg">
+                    <DollarSign className="w-4 h-4 text-indigo-600" />
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
+                <div className="text-2xl font-bold text-slate-900">
                   S/ {metrics.totalPayroll.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                 </div>
-                <p className="text-slate-600 text-sm">Planilla del Mes</p>
-                <p className="text-xs text-slate-500 mt-1">
-                  {metrics.currentMonthPayslips} empleados
-                </p>
+                <p className="text-slate-500 text-xs font-medium">Planilla del Mes</p>
+                <p className="text-xs text-slate-400 mt-0.5">{metrics.currentMonthPayslips} empleados</p>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-yellow-100 rounded-xl">
-                    <FileText className="w-6 h-6 text-yellow-600" />
+            <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 bg-yellow-100 rounded-lg">
+                    <FileText className="w-4 h-4 text-yellow-600" />
                   </div>
                   {metrics.expiringContracts > 0 && (
-                    <AlertCircle className="w-5 h-5 text-yellow-500" />
+                    <AlertCircle className="w-4 h-4 text-yellow-500" />
                   )}
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {metrics.expiringContracts}
-                </div>
-                <p className="text-slate-600 text-sm">Contratos por Vencer</p>
-                <p className="text-xs text-slate-500 mt-1">Próximos 30 días</p>
+                <div className="text-2xl font-bold text-slate-900">{metrics.expiringContracts}</div>
+                <p className="text-slate-500 text-xs font-medium">Contratos por Vencer</p>
+                <p className="text-xs text-slate-400 mt-0.5">Próximos 30 días</p>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-pink-100 rounded-xl">
-                    <Briefcase className="w-6 h-6 text-pink-600" />
+            <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 bg-pink-100 rounded-lg">
+                    <Briefcase className="w-4 h-4 text-pink-600" />
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900 mb-1">
-                  {departments.length}
-                </div>
-                <p className="text-slate-600 text-sm">Departamentos Activos</p>
-                <p className="text-xs text-slate-500 mt-1">
-                  {metrics.totalEmployees} empleados totales
-                </p>
+                <div className="text-2xl font-bold text-slate-900">{departments.length}</div>
+                <p className="text-slate-500 text-xs font-medium">Departamentos Activos</p>
+                <p className="text-xs text-slate-400 mt-0.5">{metrics.totalEmployees} empleados totales</p>
               </CardContent>
             </Card>
           </div>
