@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   LayoutDashboard, FileText, Calendar, Clock,
-  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown
+  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown, KeyRound, Eye, EyeOff, AlertCircle
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import NotificationCenter from "./components/notifications/NotificationCenter";
 
 export default function Layout({ children, currentPageName }) {
@@ -19,6 +21,13 @@ export default function Layout({ children, currentPageName }) {
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [passwordData, setPasswordData] = useState({ newPassword: "", confirmPassword: "" });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState([]);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   // Pages that don't need sidebar/layout
   const noLayoutPages = ["Home"];
@@ -59,6 +68,53 @@ export default function Layout({ children, currentPageName }) {
   const handleLogout = async () => {
     await logout();
     navigate('/');
+  };
+
+  const validatePassword = (pwd) => {
+    const errors = [];
+    if (pwd.length < 8) errors.push("Debe tener al menos 8 caracteres.");
+    if (!/[A-Z]/.test(pwd)) errors.push("Debe contener al menos una letra mayúscula.");
+    if (!/[a-z]/.test(pwd)) errors.push("Debe contener al menos una letra minúscula.");
+    if (!/[0-9]/.test(pwd)) errors.push("Debe contener al menos un número.");
+    return errors;
+  };
+
+  const handleChangePassword = async () => {
+    const errors = validatePassword(passwordData.newPassword);
+    if (errors.length > 0) {
+      setPasswordErrors(errors);
+      return;
+    }
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordErrors(["Las contraseñas no coinciden."]);
+      return;
+    }
+    setSavingPassword(true);
+    setPasswordErrors([]);
+    try {
+      const user = await base44.auth.me();
+      await base44.entities.User.update(user.id, { password: passwordData.newPassword });
+      setPasswordSuccess(true);
+      setTimeout(() => {
+        setShowChangePassword(false);
+        setPasswordData({ newPassword: "", confirmPassword: "" });
+        setPasswordSuccess(false);
+      }, 2000);
+    } catch (error) {
+      setPasswordErrors(["Error al cambiar la contraseña. Inténtelo de nuevo."]);
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  const openPasswordModal = () => {
+    setOpenDropdown(null);
+    setPasswordData({ newPassword: "", confirmPassword: "" });
+    setPasswordErrors([]);
+    setPasswordSuccess(false);
+    setShowPassword(false);
+    setShowConfirm(false);
+    setShowChangePassword(true);
   };
 
   const getMenuItems = () => {
@@ -302,6 +358,13 @@ export default function Layout({ children, currentPageName }) {
                         <User className="w-4 h-4" />
                         Mi Perfil
                       </Link>
+                      <button
+                        onClick={openPasswordModal}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <KeyRound className="w-4 h-4" />
+                        Cambiar Contraseña
+                      </button>
                       {employee?.role === "admin" && (
                         <>
                           <Link
@@ -448,6 +511,124 @@ export default function Layout({ children, currentPageName }) {
       <main className="pt-[73px]">
         {children}
       </main>
+
+      {/* Change Password Modal */}
+      {showChangePassword && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-6"
+          onClick={() => setShowChangePassword(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <KeyRound className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Cambiar Contraseña</h2>
+                <p className="text-sm text-slate-500">{currentUser?.email}</p>
+              </div>
+            </div>
+
+            {/* Validation errors - centered, prominent */}
+            {passwordErrors.length > 0 && (
+              <div className="mb-5 bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-red-700 mb-1">La contraseña no cumple los requisitos:</p>
+                    <ul className="space-y-0.5">
+                      {passwordErrors.map((err, i) => (
+                        <li key={i} className="text-sm text-red-600">• {err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {passwordSuccess && (
+              <div className="mb-5 bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                <p className="text-green-700 font-semibold">✓ Contraseña actualizada correctamente</p>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Nueva Contraseña *</Label>
+                <div className="relative mt-1.5">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Ingrese la nueva contraseña"
+                    value={passwordData.newPassword}
+                    onChange={(e) => {
+                      setPasswordData({ ...passwordData, newPassword: e.target.value });
+                      setPasswordErrors([]);
+                    }}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Confirmar Contraseña *</Label>
+                <div className="relative mt-1.5">
+                  <Input
+                    type={showConfirm ? "text" : "password"}
+                    placeholder="Repita la nueva contraseña"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => {
+                      setPasswordData({ ...passwordData, confirmPassword: e.target.value });
+                      setPasswordErrors([]);
+                    }}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500 space-y-1">
+                <p className="font-semibold text-slate-600 mb-1">Requisitos de contraseña:</p>
+                <p className={/[A-Z]/.test(passwordData.newPassword) ? "text-green-600" : ""}>• Al menos una letra mayúscula</p>
+                <p className={/[a-z]/.test(passwordData.newPassword) ? "text-green-600" : ""}>• Al menos una letra minúscula</p>
+                <p className={/[0-9]/.test(passwordData.newPassword) ? "text-green-600" : ""}>• Al menos un número</p>
+                <p className={passwordData.newPassword.length >= 8 ? "text-green-600" : ""}>• Mínimo 8 caracteres</p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowChangePassword(false)}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleChangePassword}
+                  disabled={savingPassword || passwordSuccess}
+                  className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg text-sm font-medium text-white transition-colors"
+                >
+                  {savingPassword ? "Guardando..." : "Cambiar Contraseña"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -200,80 +200,77 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                  <DollarSign className="w-6 h-6" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg shrink-0">
+                  <DollarSign className="w-4 h-4 text-blue-600" />
                 </div>
-                <Badge className="bg-white/20 text-white border-0">
-                  Último pago
-                </Badge>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xl font-bold text-slate-900 truncate">
+                      S/ {latestPayslip?.net_pay?.toFixed(2) || "0.00"}
+                    </span>
+                    <Badge className="bg-blue-100 text-blue-700 text-xs px-1 py-0 border-0 shrink-0">Último</Badge>
+                  </div>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Neto Pagado</p>
+                  <p className="text-xs text-slate-400">{latestPayslip?.period || "Sin datos"}</p>
+                </div>
               </div>
-              <div className="text-3xl font-bold mb-1">
-                S/ {latestPayslip?.net_pay?.toFixed(2) || "0.00"}
-              </div>
-              <p className="text-blue-100 text-sm">
-                {latestPayslip?.period || "Sin datos"}
-              </p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-green-500 to-green-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                  <Calendar className="w-6 h-6" />
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg shrink-0">
+                  <Calendar className="w-4 h-4 text-green-600" />
                 </div>
-                <Badge className="bg-white/20 text-white border-0">
-                  Disponibles
-                </Badge>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xl font-bold text-slate-900">{vacationBalance?.days_pending || 0}</span>
+                    <span className="text-sm text-slate-500">días</span>
+                  </div>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Vacaciones</p>
+                  <p className="text-xs text-slate-400">Disponibles</p>
+                </div>
               </div>
-              <div className="text-3xl font-bold mb-1">
-                {vacationBalance?.days_pending || 0} días
-              </div>
-              <p className="text-green-100 text-sm">
-                Vacaciones pendientes
-              </p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                  <Clock className="w-6 h-6" />
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg shrink-0">
+                  <Clock className="w-4 h-4 text-purple-600" />
                 </div>
-                <Badge className="bg-white/20 text-white border-0">
-                  Antigüedad
-                </Badge>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xl font-bold text-slate-900">{yearsOfService}</span>
+                    <span className="text-sm text-slate-500">{yearsOfService === 1 ? 'año' : 'años'}</span>
+                  </div>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Antigüedad</p>
+                  <p className="text-xs text-slate-400">
+                    Desde {employee.hire_date && format(new Date(employee.hire_date), "MMM yyyy", { locale: es })}
+                  </p>
+                </div>
               </div>
-              <div className="text-3xl font-bold mb-1">
-                {yearsOfService} {yearsOfService === 1 ? 'año' : 'años'}
-              </div>
-              <p className="text-purple-100 text-sm">
-                Desde {employee.hire_date && format(new Date(employee.hire_date), "dd MMM yyyy", { locale: es })}
-              </p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                  <TrendingUp className="w-6 h-6" />
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 rounded-lg shrink-0">
+                  <TrendingUp className="w-4 h-4 text-orange-600" />
                 </div>
-                <Badge className="bg-white/20 text-white border-0">
-                  Solicitudes
-                </Badge>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xl font-bold text-slate-900">{pendingRequests?.length || 0}</span>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Solicitudes</p>
+                  <p className="text-xs text-slate-400">Pendientes de aprobación</p>
+                </div>
               </div>
-              <div className="text-3xl font-bold mb-1">
-                {pendingRequests?.length || 0}
-              </div>
-              <p className="text-orange-100 text-sm">
-                Pendientes de aprobación
-              </p>
             </CardContent>
           </Card>
         </div>
