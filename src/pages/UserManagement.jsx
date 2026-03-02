@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { 
   Users, Mail, UserPlus, Search, Shield, 
-  CheckCircle2, XCircle, AlertCircle, Send, Edit2, Trash2, Ban
+  CheckCircle2, XCircle, AlertCircle, Send, Edit2, Trash2, Ban, KeyRound
 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
