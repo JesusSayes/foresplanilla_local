@@ -292,6 +292,32 @@ Equipo de Recursos Humanos
     }
   };
 
+  const handleOpenPasswordModal = (emp) => {
+    setPasswordEmployee(emp);
+    setNewPassword(emp.document_number || "");
+    setShowPasswordModal(true);
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const user = getUserForEmployee(passwordEmployee.work_email);
+      await base44.entities.User.update(user.id, { password: newPassword });
+      toast.success(`Contraseña actualizada correctamente para ${passwordEmployee.first_name} ${passwordEmployee.last_name}`);
+      setShowPasswordModal(false);
+      setPasswordEmployee(null);
+      setNewPassword("");
+    } catch (error) {
+      toast.error("Error al cambiar la contraseña: " + (error.message || "Inténtelo de nuevo"));
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const resetUserForm = () => {
     setUserFormData({
       email: "",
