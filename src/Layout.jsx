@@ -69,6 +69,53 @@ export default function Layout({ children, currentPageName }) {
     base44.auth.logout(createPageUrl("Home"));
   };
 
+  const validatePassword = (pwd) => {
+    const errors = [];
+    if (pwd.length < 8) errors.push("Debe tener al menos 8 caracteres.");
+    if (!/[A-Z]/.test(pwd)) errors.push("Debe contener al menos una letra mayúscula.");
+    if (!/[a-z]/.test(pwd)) errors.push("Debe contener al menos una letra minúscula.");
+    if (!/[0-9]/.test(pwd)) errors.push("Debe contener al menos un número.");
+    return errors;
+  };
+
+  const handleChangePassword = async () => {
+    const errors = validatePassword(passwordData.newPassword);
+    if (errors.length > 0) {
+      setPasswordErrors(errors);
+      return;
+    }
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordErrors(["Las contraseñas no coinciden."]);
+      return;
+    }
+    setSavingPassword(true);
+    setPasswordErrors([]);
+    try {
+      const user = await base44.auth.me();
+      await base44.entities.User.update(user.id, { password: passwordData.newPassword });
+      setPasswordSuccess(true);
+      setTimeout(() => {
+        setShowChangePassword(false);
+        setPasswordData({ newPassword: "", confirmPassword: "" });
+        setPasswordSuccess(false);
+      }, 2000);
+    } catch (error) {
+      setPasswordErrors(["Error al cambiar la contraseña. Inténtelo de nuevo."]);
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  const openPasswordModal = () => {
+    setOpenDropdown(null);
+    setPasswordData({ newPassword: "", confirmPassword: "" });
+    setPasswordErrors([]);
+    setPasswordSuccess(false);
+    setShowPassword(false);
+    setShowConfirm(false);
+    setShowChangePassword(true);
+  };
+
   const getMenuItems = () => {
     const role = employee?.role || "empleado";
 
