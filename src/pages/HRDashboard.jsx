@@ -268,67 +268,73 @@ export default function HRDashboard() {
           {/* Métricas principales */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="p-2 bg-blue-100 rounded-lg">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg shrink-0">
                     <Users className="w-4 h-4 text-blue-600" />
                   </div>
-                  <TrendingUp className="w-4 h-4 text-green-500" />
-                </div>
-                <div className="text-2xl font-bold text-slate-900">{metrics.activeEmployees}</div>
-                <p className="text-slate-500 text-xs font-medium mb-1">Empleados Activos</p>
-                <div className="flex gap-1 flex-wrap">
-                  <Badge className="bg-yellow-100 text-yellow-700 text-xs px-1.5 py-0">
-                    {metrics.suspendedEmployees} Susp.
-                  </Badge>
-                  <Badge className="bg-red-100 text-red-700 text-xs px-1.5 py-0">
-                    {metrics.terminatedEmployees} Ces.
-                  </Badge>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xl font-bold text-slate-900">{metrics.activeEmployees}</span>
+                      <TrendingUp className="w-3 h-3 text-green-500" />
+                    </div>
+                    <p className="text-slate-500 text-xs font-medium leading-none mb-1">Empleados Activos</p>
+                    <div className="flex gap-1 flex-wrap">
+                      <Badge className="bg-yellow-100 text-yellow-700 text-xs px-1 py-0">{metrics.suspendedEmployees} Susp.</Badge>
+                      <Badge className="bg-red-100 text-red-700 text-xs px-1 py-0">{metrics.terminatedEmployees} Ces.</Badge>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="p-2 bg-orange-100 rounded-lg">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg shrink-0">
                     <TrendingDown className="w-4 h-4 text-orange-600" />
                   </div>
-                  {parseFloat(metrics.turnoverRate) > 5 ? (
-                    <AlertCircle className="w-4 h-4 text-red-500" />
-                  ) : (
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xl font-bold text-slate-900">{metrics.turnoverRate}%</span>
+                      {parseFloat(metrics.turnoverRate) > 5
+                        ? <AlertCircle className="w-3 h-3 text-red-500" />
+                        : <CheckCircle className="w-3 h-3 text-green-500" />}
+                    </div>
+                    <p className="text-slate-500 text-xs font-medium leading-none">Rotación de Personal</p>
+                    <p className="text-xs text-slate-400">Últimos 3 meses</p>
+                  </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900">{metrics.turnoverRate}%</div>
-                <p className="text-slate-500 text-xs font-medium">Rotación de Personal</p>
-                <p className="text-xs text-slate-400 mt-0.5">Últimos 3 meses</p>
               </CardContent>
             </Card>
 
             <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="p-2 bg-purple-100 rounded-lg">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 rounded-lg shrink-0">
                     <Clock className="w-4 h-4 text-purple-600" />
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xl font-bold text-slate-900">{metrics.avgHiringTime}</span>
+                    <p className="text-slate-500 text-xs font-medium leading-none">Días Promedio</p>
+                    <p className="text-xs text-slate-400">Tiempo de contratación</p>
+                  </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900">{metrics.avgHiringTime}</div>
-                <p className="text-slate-500 text-xs font-medium">Días Promedio</p>
-                <p className="text-xs text-slate-400 mt-0.5">Tiempo de contratación</p>
               </CardContent>
             </Card>
 
             <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="p-2 bg-green-100 rounded-lg">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg shrink-0">
                     <CheckCircle className="w-4 h-4 text-green-600" />
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xl font-bold text-slate-900">{metrics.attendanceRate}%</span>
+                    <p className="text-slate-500 text-xs font-medium leading-none">Asistencia del Mes</p>
+                    <p className="text-xs text-slate-400">{metrics.lateRecords} tardanzas</p>
+                  </div>
                 </div>
-                <div className="text-2xl font-bold text-slate-900">{metrics.attendanceRate}%</div>
-                <p className="text-slate-500 text-xs font-medium">Asistencia del Mes</p>
-                <p className="text-xs text-slate-400 mt-0.5">{metrics.lateRecords} tardanzas registradas</p>
               </CardContent>
             </Card>
           </div>
