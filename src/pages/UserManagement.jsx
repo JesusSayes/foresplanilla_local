@@ -616,8 +616,18 @@ Equipo de Recursos Humanos
                                 variant="outline"
                                 onClick={() => handleEditUser(user, emp)}
                                 className="h-8"
+                                title="Editar usuario"
                               >
                                 <Edit2 className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenPasswordModal(emp)}
+                                className="h-8 text-indigo-600 hover:text-indigo-700"
+                                title="Cambiar contraseña"
+                              >
+                                <KeyRound className="w-4 h-4" />
                               </Button>
                               {emp.status === "Activo" && (
                                 <Button
