@@ -414,64 +414,74 @@ Equipo de Recursos Humanos
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-indigo-100 rounded-xl">
-                  <Users className="w-6 h-6 text-indigo-600" />
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-100 rounded-lg shrink-0">
+                  <Users className="w-4 h-4 text-indigo-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xl font-bold text-slate-900">{stats.total}</span>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Total Empleados</p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.total}</div>
-              <p className="text-slate-600 text-sm">Total Empleados</p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <CheckCircle2 className="w-6 h-6 text-green-600" />
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg shrink-0">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xl font-bold text-slate-900">{stats.active}</span>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Activos</p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.active}</div>
-              <p className="text-slate-600 text-sm">Activos</p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-yellow-100 rounded-xl">
-                  <Ban className="w-6 h-6 text-yellow-600" />
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-yellow-100 rounded-lg shrink-0">
+                  <Ban className="w-4 h-4 text-yellow-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xl font-bold text-slate-900">{stats.suspended}</span>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Suspendidos</p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.suspended}</div>
-              <p className="text-slate-600 text-sm">Suspendidos</p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-red-100 rounded-xl">
-                  <XCircle className="w-6 h-6 text-red-600" />
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-100 rounded-lg shrink-0">
+                  <XCircle className="w-4 h-4 text-red-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xl font-bold text-slate-900">{stats.ceased}</span>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Cesados</p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.ceased}</div>
-              <p className="text-slate-600 text-sm">Cesados</p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-orange-100 rounded-xl">
-                  <AlertCircle className="w-6 h-6 text-orange-600" />
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 rounded-lg shrink-0">
+                  <AlertCircle className="w-4 h-4 text-orange-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xl font-bold text-slate-900">{stats.pending}</span>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Pendientes</p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.pending}</div>
-              <p className="text-slate-600 text-sm">Pendientes</p>
             </CardContent>
           </Card>
         </div>
