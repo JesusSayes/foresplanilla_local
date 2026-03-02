@@ -92,7 +92,7 @@ export default function Layout({ children, currentPageName }) {
     setPasswordErrors([]);
     try {
       const user = await base44.auth.me();
-      await base44.entities.User.update(user.id, { password: passwordData.newPassword });
+      await base44.auth.updateMe({ password: passwordData.newPassword });
       setPasswordSuccess(true);
       setTimeout(() => {
         setShowChangePassword(false);
@@ -100,7 +100,11 @@ export default function Layout({ children, currentPageName }) {
         setPasswordSuccess(false);
       }, 2000);
     } catch (error) {
-      setPasswordErrors(["Error al cambiar la contraseña. Inténtelo de nuevo."]);
+      const msg = error?.response?.data?.message
+        || error?.response?.data?.detail
+        || error?.message
+        || "Error desconocido al cambiar la contraseña.";
+      setPasswordErrors([`Error: ${msg}`]);
     } finally {
       setSavingPassword(false);
     }
