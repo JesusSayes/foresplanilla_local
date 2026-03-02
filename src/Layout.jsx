@@ -357,6 +357,13 @@ export default function Layout({ children, currentPageName }) {
                         <User className="w-4 h-4" />
                         Mi Perfil
                       </Link>
+                      <button
+                        onClick={openPasswordModal}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <KeyRound className="w-4 h-4" />
+                        Cambiar Contraseña
+                      </button>
                       {employee?.role === "admin" && (
                         <>
                           <Link
