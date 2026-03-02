@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
   LayoutDashboard, FileText, Calendar, Clock, 
-  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown
+  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown, KeyRound, Eye, EyeOff, AlertCircle
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import NotificationCenter from "./components/notifications/NotificationCenter";
 
 export default function Layout({ children, currentPageName }) {
