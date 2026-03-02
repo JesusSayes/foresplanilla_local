@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Users, Mail, UserPlus, Search, Shield,
-  CheckCircle2, XCircle, AlertCircle, Send, Edit2, Trash2, Ban
+  CheckCircle2, XCircle, AlertCircle, Send, Edit2, Trash2, Ban, KeyRound
 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,6 +31,10 @@ export default function UserManagement() {
     full_name: "",
     role: "user",
   });
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordEmployee, setPasswordEmployee] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -279,6 +283,32 @@ Equipo de Recursos Humanos
     }
   };
 
+  const handleOpenPasswordModal = (emp) => {
+    setPasswordEmployee(emp);
+    setNewPassword(emp.document_number || "");
+    setShowPasswordModal(true);
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const user = getUserForEmployee(passwordEmployee.work_email);
+      await base44.entities.User.update(user.id, { password: newPassword });
+      toast.success(`Contraseña actualizada correctamente para ${passwordEmployee.first_name} ${passwordEmployee.last_name}`);
+      setShowPasswordModal(false);
+      setPasswordEmployee(null);
+      setNewPassword("");
+    } catch (error) {
+      toast.error("Error al cambiar la contraseña: " + (error.message || "Inténtelo de nuevo"));
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const resetUserForm = () => {
     setUserFormData({
       email: "",
@@ -375,64 +405,74 @@ Equipo de Recursos Humanos
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-indigo-100 rounded-xl">
-                  <Users className="w-6 h-6 text-indigo-600" />
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-100 rounded-lg shrink-0">
+                  <Users className="w-4 h-4 text-indigo-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xl font-bold text-slate-900">{stats.total}</span>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Total Empleados</p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.total}</div>
-              <p className="text-slate-600 text-sm">Total Empleados</p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <CheckCircle2 className="w-6 h-6 text-green-600" />
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg shrink-0">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xl font-bold text-slate-900">{stats.active}</span>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Activos</p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.active}</div>
-              <p className="text-slate-600 text-sm">Activos</p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-yellow-100 rounded-xl">
-                  <Ban className="w-6 h-6 text-yellow-600" />
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-yellow-100 rounded-lg shrink-0">
+                  <Ban className="w-4 h-4 text-yellow-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xl font-bold text-slate-900">{stats.suspended}</span>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Suspendidos</p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.suspended}</div>
-              <p className="text-slate-600 text-sm">Suspendidos</p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-red-100 rounded-xl">
-                  <XCircle className="w-6 h-6 text-red-600" />
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-100 rounded-lg shrink-0">
+                  <XCircle className="w-4 h-4 text-red-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xl font-bold text-slate-900">{stats.ceased}</span>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Cesados</p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.ceased}</div>
-              <p className="text-slate-600 text-sm">Cesados</p>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-orange-100 rounded-xl">
-                  <AlertCircle className="w-6 h-6 text-orange-600" />
+          <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 rounded-lg shrink-0">
+                  <AlertCircle className="w-4 h-4 text-orange-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xl font-bold text-slate-900">{stats.pending}</span>
+                  <p className="text-slate-500 text-xs font-medium leading-none">Pendientes</p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">{stats.pending}</div>
-              <p className="text-slate-600 text-sm">Pendientes</p>
             </CardContent>
           </Card>
         </div>
@@ -567,8 +607,18 @@ Equipo de Recursos Humanos
                                 variant="outline"
                                 onClick={() => handleEditUser(user, emp)}
                                 className="h-8"
+                                title="Editar usuario"
                               >
                                 <Edit2 className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenPasswordModal(emp)}
+                                className="h-8 text-indigo-600 hover:text-indigo-700"
+                                title="Cambiar contraseña"
+                              >
+                                <KeyRound className="w-4 h-4" />
                               </Button>
                               {emp.status === "Activo" && (
                                 <Button
@@ -838,6 +888,74 @@ Equipo de Recursos Humanos
                   ) : (
                     editingUser ? "Actualizar Usuario" : "Crear Usuario"
                   )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && passwordEmployee && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+          onClick={() => { setShowPasswordModal(false); setPasswordEmployee(null); }}
+        >
+          <Card
+            className="max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <KeyRound className="w-5 h-5 text-indigo-600" />
+                  Cambiar Contraseña
+                </CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => { setShowPasswordModal(false); setPasswordEmployee(null); }}>✕</Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                <p className="font-semibold text-slate-900">{passwordEmployee.first_name} {passwordEmployee.last_name}</p>
+                <p className="text-sm text-slate-600">{passwordEmployee.work_email}</p>
+              </div>
+
+              <div>
+                <Label>Nueva Contraseña *</Label>
+                <Input
+                  type="text"
+                  placeholder="Nueva contraseña"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="mt-2"
+                  autoFocus
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  La contraseña por defecto es el número de documento de identidad ({passwordEmployee.document_number || "no registrado"})
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setNewPassword(passwordEmployee.document_number || "")}
+                  className="text-xs"
+                >
+                  Usar N° Documento ({passwordEmployee.document_number || "—"})
+                </Button>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => { setShowPasswordModal(false); setPasswordEmployee(null); }}>
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                  onClick={handleChangePassword}
+                  disabled={changingPassword}
+                >
+                  {changingPassword ? "Guardando..." : "Cambiar Contraseña"}
                 </Button>
               </div>
             </CardContent>

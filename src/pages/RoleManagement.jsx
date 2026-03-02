@@ -312,28 +312,46 @@ export default function RoleManagement() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-4 mb-6">
-            <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
-              <Shield className="w-5 h-5 text-indigo-600" />
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold text-slate-900">{roles.length}</span>
-                <span className="text-sm text-slate-600">Roles definidos</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
-              <Users className="w-5 h-5 text-blue-600" />
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold text-slate-900">{allEmployees.length}</span>
-                <span className="text-sm text-slate-600">Empleados activos</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
-              <CheckSquare className="w-5 h-5 text-green-600" />
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold text-slate-900">{Object.keys(AVAILABLE_PERMISSIONS).length}</span>
-                <span className="text-sm text-slate-600">Permisos disponibles</span>
-              </div>
-            </div>
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <Card className="border border-slate-200 shadow-sm">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-100 rounded-lg shrink-0">
+                    <Shield className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  <div>
+                    <span className="text-xl font-bold text-slate-900">{roles.length}</span>
+                    <p className="text-slate-500 text-xs font-medium">Roles definidos</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border border-slate-200 shadow-sm">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg shrink-0">
+                    <Users className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <span className="text-xl font-bold text-slate-900">{allEmployees.length}</span>
+                    <p className="text-slate-500 text-xs font-medium">Empleados activos</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border border-slate-200 shadow-sm">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg shrink-0">
+                    <CheckSquare className="w-4 h-4 text-green-600" />
+                  </div>
+                  <div>
+                    <span className="text-xl font-bold text-slate-900">{Object.keys(AVAILABLE_PERMISSIONS).length}</span>
+                    <p className="text-slate-500 text-xs font-medium">Permisos disponibles</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <Tabs defaultValue="roles" className="space-y-6">
