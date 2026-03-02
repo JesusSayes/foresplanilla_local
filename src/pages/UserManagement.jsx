@@ -29,6 +29,10 @@ export default function UserManagement() {
     full_name: "",
     role: "user",
   });
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordEmployee, setPasswordEmployee] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const queryClient = useQueryClient();
 
