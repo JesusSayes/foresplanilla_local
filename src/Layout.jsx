@@ -12,9 +12,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import NotificationCenter from "./components/notifications/NotificationCenter";
 
+// Permisos básicos fallback por rol legacy
+const getBasicPermissionsByRole = (role) => {
+  const basicPermissions = {
+    super_admin: ["system.admin"],
+    admin: ["system.admin", "employees.view", "attendance.view_all", "vacations.view_all", "payroll.view_all", "contracts.view", "cost_centers.view", "reports.view", "roles.view", "schedules.view", "holidays.view", "certificates.view_all"],
+    hr_readonly: ["employees.view", "attendance.view_all", "vacations.view_all", "payroll.view_all", "reports.view", "schedules.view", "holidays.view", "certificates.view_all"],
+    manager: ["employees.view", "attendance.view_department", "attendance.approve_incidents", "vacations.view_department", "vacations.approve", "payroll.view_own", "certificates.view_own", "schedules.view", "holidays.view", "reports.view"],
+    empleado: ["attendance.view_own", "vacations.view_own", "payroll.view_own", "certificates.view_own", "schedules.view", "holidays.view"],
+  };
+  return basicPermissions[role] || basicPermissions.empleado;
+};
+
 export default function Layout({ children, currentPageName }) {
   const [employee, setEmployee] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [userPermissions, setUserPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -29,12 +42,17 @@ export default function Layout({ children, currentPageName }) {
   // Pages that don't need sidebar/layout
   const noLayoutPages = ["Home"];
 
+  const hasPermission = (perm) => {
+    return userPermissions.includes("system.admin") || userPermissions.includes(perm);
+  };
+
+  const hasAnyPermission = (perms) => perms.some(p => hasPermission(p));
+
   useEffect(() => {
     const loadEmployee = async () => {
       try {
         const isAuth = await base44.auth.isAuthenticated();
         if (!isAuth) {
-          // Si no está autenticado y no está en Home, redirigir a Home
           if (currentPageName !== "Home") {
             window.location.href = createPageUrl("Home");
           }
@@ -49,11 +67,34 @@ export default function Layout({ children, currentPageName }) {
         });
 
         if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+          const emp = employees[0];
+          setEmployee(emp);
+
+          // Super admin siempre tiene acceso total
+          if (emp.role === "super_admin") {
+            setUserPermissions(["system.admin"]);
+            setLoading(false);
+            return;
+          }
+
+          // Cargar roles asignados al empleado
+          const userRoles = await base44.entities.UserRole.filter({ employee_id: emp.id });
+          
+          if (userRoles && userRoles.length > 0) {
+            const allRoles = await base44.entities.Role.list();
+            const assignedRoles = allRoles.filter(r => userRoles.some(ur => ur.role_id === r.id));
+            const allPerms = new Set();
+            assignedRoles.forEach(role => {
+              (role.permissions || []).forEach(p => allPerms.add(p));
+            });
+            setUserPermissions([...allPerms]);
+          } else {
+            // Fallback al rol legacy
+            setUserPermissions(getBasicPermissionsByRole(emp.role));
+          }
         }
       } catch (error) {
         console.error("Error loading employee:", error);
-        // En caso de error de autenticación, redirigir a Home
         if (currentPageName !== "Home") {
           window.location.href = createPageUrl("Home");
         }
