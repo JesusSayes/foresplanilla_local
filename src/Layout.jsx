@@ -415,7 +415,7 @@ export default function Layout({ children, currentPageName }) {
                         <KeyRound className="w-4 h-4" />
                         Cambiar Contraseña
                       </button>
-                      {employee?.role === "admin" && (
+                      {hasPermission("system.settings") && (
                         <>
                           <Link
                             to={createPageUrl("CompanySettings")}
@@ -465,8 +465,8 @@ export default function Layout({ children, currentPageName }) {
                             <Shield className="w-4 h-4" />
                             Exportar Datos
                           </Link>
-                          </>
-                          )}
+                        </>
+                      )}
                           <button
                           onClick={() => {
                             setOpenDropdown(null);
