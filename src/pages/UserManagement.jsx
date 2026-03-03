@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from "@/api/entitiesClient";
+import { authAPI } from "@/api/localClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -296,14 +297,13 @@ Equipo de Recursos Humanos
     }
     setChangingPassword(true);
     try {
-      const user = getUserForEmployee(passwordEmployee.work_email);
-      await base44.entities.User.update(user.id, { password: newPassword });
+      await authAPI.changePassword(passwordEmployee.work_email, newPassword);
       toast.success(`Contraseña actualizada correctamente para ${passwordEmployee.first_name} ${passwordEmployee.last_name}`);
       setShowPasswordModal(false);
       setPasswordEmployee(null);
       setNewPassword("");
     } catch (error) {
-      toast.error("Error al cambiar la contraseña: " + (error.message || "Inténtelo de nuevo"));
+      toast.error("Error al cambiar la contraseña: " + (error.response?.data?.message || error.message || "Inténtelo de nuevo"));
     } finally {
       setChangingPassword(false);
     }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "./utils";
 import { useAuth } from "@/lib/AuthContext";
-import { base44 } from "@/api/base44Client";
+import { authAPI } from "@/api/localClient";
 import { entitiesAPI } from "@/api/entitiesClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -92,8 +92,8 @@ export default function Layout({ children, currentPageName }) {
     setSavingPassword(true);
     setPasswordErrors([]);
     try {
-      const user = await base44.auth.me();
-      await base44.auth.updateMe({ password: passwordData.newPassword });
+      const user = await authAPI.me();
+      await authAPI.changePassword(user.email, passwordData.newPassword);
       setPasswordSuccess(true);
       setTimeout(() => {
         setShowChangePassword(false);
