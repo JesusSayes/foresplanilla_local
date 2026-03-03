@@ -162,98 +162,104 @@ export default function Layout({ children, currentPageName }) {
   };
 
   const getMenuItems = () => {
-    const role = employee?.role || "empleado";
+    const isAdmin = hasPermission("system.admin");
+    const items = [];
 
-    const employeeMenu = [
-      { name: "Dashboard", icon: LayoutDashboard, path: "Dashboard" },
-      { name: "Mis Boletas", icon: FileText, path: "Payslips" },
-      { name: "Mis Vacaciones", icon: Calendar, path: "VacationRequest" },
-      { name: "Mi Asistencia", icon: Clock, path: "Attendance" },
-      { name: "Certificados", icon: Award, path: "Certificates" },
-      { name: "Mi Perfil", icon: User, path: "MyProfile" },
-    ];
-
-    const managerMenu = [
-      ...employeeMenu,
-      { name: "Reportes Asistencia", icon: Clock, path: "AttendanceReports" },
-      { name: "Aprobar Vacaciones", icon: CheckSquare, path: "ManagerApprovals" },
-      { name: "Calendario Equipo", icon: CalendarDays, path: "VacationCalendar" },
-    ];
-
-    const adminMenu = [
-      { 
-        name: "Dashboard", 
-        icon: LayoutDashboard, 
+    // Dashboard - siempre visible
+    if (isAdmin || hasAnyPermission(["employees.view", "attendance.view_all", "payroll.view_all"])) {
+      items.push({
+        name: "Dashboard",
+        icon: LayoutDashboard,
         path: "HRDashboard",
         submenu: [
           { name: "Dashboard RRHH", path: "HRDashboard" },
           { name: "Dashboard Personal", path: "Dashboard" },
         ]
-      },
-      { 
-        name: "Gestión Empleados", 
-        icon: Users, 
-        path: "EmployeeManagement",
-        submenu: [
-          { name: "Ver Empleados", path: "EmployeeManagement" },
-          { name: "Organigrama", path: "OrgChart" },
-          { name: "Importar Empleados", path: "ImportEmployees" },
-          { name: "Gestión Vacaciones", path: "VacationManagement" },
-          { name: "Aprobar Vacaciones", path: "ManagerApprovals" },
-          { name: "Calendario Vacaciones", path: "VacationCalendar" },
-          { name: "Boletas", path: "Payslips" },
-          { name: "Vacaciones", path: "VacationRequest" },
-          { name: "Certificados", path: "Certificates" },
-        ]
-      },
-      { 
-        name: "Gestión Contratos", 
-        icon: FileText, 
+      });
+    } else {
+      items.push({ name: "Dashboard", icon: LayoutDashboard, path: "Dashboard" });
+    }
+
+    // Gestión Empleados
+    if (hasPermission("employees.view")) {
+      const submenu = [{ name: "Ver Empleados", path: "EmployeeManagement" }];
+      if (isAdmin) {
+        submenu.push({ name: "Organigrama", path: "OrgChart" });
+        if (hasPermission("employees.import")) submenu.push({ name: "Importar Empleados", path: "ImportEmployees" });
+      }
+      if (hasPermission("vacations.manage")) submenu.push({ name: "Gestión Vacaciones", path: "VacationManagement" });
+      if (hasPermission("vacations.approve")) submenu.push({ name: "Aprobar Vacaciones", path: "ManagerApprovals" });
+      if (hasPermission("vacations.calendar")) submenu.push({ name: "Calendario Vacaciones", path: "VacationCalendar" });
+      submenu.push({ name: "Boletas", path: "Payslips" });
+      submenu.push({ name: "Vacaciones", path: "VacationRequest" });
+      if (hasPermission("certificates.view_all")) submenu.push({ name: "Certificados", path: "Certificates" });
+      items.push({ name: "Gestión Empleados", icon: Users, path: "EmployeeManagement", submenu });
+    } else {
+      // Empleado normal: sus propias secciones
+      items.push({ name: "Mis Boletas", icon: FileText, path: "Payslips" });
+      if (hasPermission("vacations.view_own")) items.push({ name: "Mis Vacaciones", icon: Calendar, path: "VacationRequest" });
+      if (hasPermission("attendance.view_own")) items.push({ name: "Mi Asistencia", icon: Clock, path: "Attendance" });
+      if (hasPermission("certificates.view_own")) items.push({ name: "Certificados", icon: Award, path: "Certificates" });
+    }
+
+    // Contratos
+    if (hasPermission("contracts.view")) {
+      items.push({
+        name: "Gestión Contratos",
+        icon: FileText,
         path: "ContractManagement",
         submenu: [
           { name: "Ver Contratos", path: "ContractManagement" },
-          { name: "Plantillas Contratos", path: "ContractTemplateConfig" },
-          { name: "Automatización Renovación", path: "ContractRenewalAutomation" },
+          ...(isAdmin ? [
+            { name: "Plantillas Contratos", path: "ContractTemplateConfig" },
+            { name: "Automatización Renovación", path: "ContractRenewalAutomation" },
+          ] : []),
         ]
-      },
-      { 
-        name: "Gestión Asistencia", 
-        icon: CheckSquare, 
-        path: "AttendanceManagement",
-        submenu: [
-          { name: "Ver Asistencia", path: "AttendanceManagement" },
-          { name: "Reportes Asistencia", path: "AttendanceReports" },
-          { name: "Gestión Horarios", path: "ScheduleManagement" },
-          { name: "Base de Datos Externa", path: "DatabaseConfig" },
-          { name: "Control de Acceso Físico", path: "AccessDeviceConfig" },
-          { name: "Mi Asistencia", path: "Attendance" },
-        ]
-      },
-      { 
-        name: "Gestión Planillas", 
-        icon: FileText, 
-        path: "PayrollManagement",
-        submenu: [
-          { name: "Generar Planillas", path: "PayrollManagement" },
-          { name: "Conceptos de Planilla", path: "PayrollConcepts" },
-          { name: "Préstamos", path: "LoanManagement" },
-          { name: "Centros de Costo", path: "CostCenterManagement" },
-          { name: "Consulta Valorizada", path: "CostCenterValuation" },
-        ]
-      },
-      { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
-      { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
-      ];
+      });
+    }
 
-      const superAdminMenu = [
-      ...adminMenu,
-      ];
+    // Asistencia
+    if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.manage"])) {
+      const submenu = [];
+      if (hasAnyPermission(["attendance.view_all", "attendance.view_department"])) submenu.push({ name: "Ver Asistencia", path: "AttendanceManagement" });
+      if (hasAnyPermission(["reports.attendance", "attendance.export"])) submenu.push({ name: "Reportes Asistencia", path: "AttendanceReports" });
+      if (hasPermission("schedules.view")) submenu.push({ name: "Gestión Horarios", path: "ScheduleManagement" });
+      if (isAdmin) {
+        submenu.push({ name: "Base de Datos Externa", path: "DatabaseConfig" });
+        submenu.push({ name: "Control de Acceso Físico", path: "AccessDeviceConfig" });
+      }
+      submenu.push({ name: "Mi Asistencia", path: "Attendance" });
+      items.push({ name: "Gestión Asistencia", icon: CheckSquare, path: "AttendanceManagement", submenu });
+    } else if (hasPermission("attendance.view_own")) {
+      // Ya añadido arriba para empleado normal
+    }
 
-    if (role === "super_admin") return superAdminMenu;
-    if (role === "admin") return adminMenu;
-    if (role === "manager") return managerMenu;
-    if (role === "hr_readonly") return adminMenu; // RRHH Solo lectura ve todo pero sin editar
-    return employeeMenu;
+    // Planillas
+    if (hasAnyPermission(["payroll.view_all", "payroll.create", "payroll.calculate"])) {
+      const submenu = [{ name: "Generar Planillas", path: "PayrollManagement" }];
+      if (isAdmin) submenu.push({ name: "Conceptos de Planilla", path: "PayrollConcepts" });
+      submenu.push({ name: "Préstamos", path: "LoanManagement" });
+      if (hasPermission("cost_centers.view")) {
+        submenu.push({ name: "Centros de Costo", path: "CostCenterManagement" });
+        submenu.push({ name: "Consulta Valorizada", path: "CostCenterValuation" });
+      }
+      items.push({ name: "Gestión Planillas", icon: FileText, path: "PayrollManagement", submenu });
+    }
+
+    // Feriados
+    if (hasPermission("holidays.view")) {
+      items.push({ name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" });
+    }
+
+    // Roles y Permisos
+    if (hasPermission("roles.view")) {
+      items.push({ name: "Roles y Permisos", icon: Shield, path: "RoleManagement" });
+    }
+
+    // Mi Perfil siempre
+    items.push({ name: "Mi Perfil", icon: User, path: "MyProfile" });
+
+    return items;
   };
 
   const getRoleBadge = (role) => {
