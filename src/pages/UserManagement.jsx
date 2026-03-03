@@ -305,14 +305,21 @@ Equipo de Recursos Humanos
     }
     setChangingPassword(true);
     try {
-      const user = getUserForEmployee(passwordEmployee.work_email);
-      await base44.entities.User.update(user.id, { password: newPassword });
-      toast.success(`Contraseña actualizada correctamente para ${passwordEmployee.first_name} ${passwordEmployee.last_name}`);
-      setShowPasswordModal(false);
-      setPasswordEmployee(null);
-      setNewPassword("");
+      const response = await base44.functions.invoke('changeUserPassword', {
+        targetEmail: passwordEmployee.work_email,
+        newPassword: newPassword,
+      });
+      if (response.data?.success) {
+        toast.success(`Contraseña actualizada correctamente para ${passwordEmployee.first_name} ${passwordEmployee.last_name}`);
+        setShowPasswordModal(false);
+        setPasswordEmployee(null);
+        setNewPassword("");
+      } else {
+        toast.error("Error: " + (response.data?.error || "No se pudo cambiar la contraseña"));
+      }
     } catch (error) {
-      toast.error("Error al cambiar la contraseña: " + (error.message || "Inténtelo de nuevo"));
+      const msg = error?.response?.data?.error || error?.message || "Error desconocido";
+      toast.error("Error al cambiar la contraseña: " + msg);
     } finally {
       setChangingPassword(false);
     }
