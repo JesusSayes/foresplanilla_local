@@ -67,6 +67,11 @@ export const authAPI = {
     return response.data;
   },
 
+  changePassword: async (email, newPassword) => {
+    const response = await localClient.put('/api/auth/change-password', { email, newPassword });
+    return response.data;
+  },
+
   isAuthenticated: () => {
     const token = localStorage.getItem('token');
     return !!token;
