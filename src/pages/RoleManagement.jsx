@@ -124,30 +124,39 @@ export default function RoleManagement() {
       await Promise.all(existing.map(ur => base44.entities.UserRole.delete(ur.id)));
 
       // Crear nuevas asignaciones
-      const assignments = roleIds.map(roleId => ({
-        employee_id: employeeId,
-        role_id: roleId,
-        assigned_by: employee.work_email,
-        assigned_date: new Date().toISOString().split('T')[0],
-      }));
-      
-      await Promise.all(assignments.map(a => base44.entities.UserRole.create(a)));
-
-      // Actualizar el campo role en Employee para mantener compatibilidad
-      const emp = allEmployees.find(e => e.id === employeeId);
-      if (emp && roleIds.length > 0) {
-        const primaryRole = roles.find(r => r.id === roleIds[0]);
-        if (primaryRole) {
-          // Mapear el nombre del rol al campo legacy 'role'
-          let legacyRole = "empleado";
-          if (primaryRole.name.toLowerCase().includes("admin") || primaryRole.name.toLowerCase().includes("administrador")) {
-            legacyRole = "admin";
-          } else if (primaryRole.name.toLowerCase().includes("manager") || primaryRole.name.toLowerCase().includes("gerente")) {
-            legacyRole = "manager";
-          }
-          await base44.entities.Employee.update(employeeId, { role: legacyRole });
-        }
+      if (roleIds.length > 0) {
+        const assignments = roleIds.map(roleId => ({
+          employee_id: employeeId,
+          role_id: roleId,
+          assigned_by: currentUser?.email || "",
+          assigned_date: new Date().toISOString().split('T')[0],
+        }));
+        await Promise.all(assignments.map(a => base44.entities.UserRole.create(a)));
       }
+
+      // Actualizar el campo role legacy en Employee para compatibilidad con sistema anterior
+      const assignedRoles = roles.filter(r => roleIds.includes(r.id));
+      let legacyRole = "empleado";
+      
+      // Determinar el rol legacy más alto basado en los permisos del rol asignado
+      const allPerms = new Set();
+      assignedRoles.forEach(r => (r.permissions || []).forEach(p => allPerms.add(p)));
+      
+      if (allPerms.has("system.admin")) {
+        legacyRole = "admin";
+      } else if (assignedRoles.some(r => r.name.toLowerCase().includes("super admin"))) {
+        legacyRole = "super_admin";
+      } else if (assignedRoles.some(r => r.name.toLowerCase().includes("admin") || r.name.toLowerCase().includes("administrador"))) {
+        legacyRole = "admin";
+      } else if (allPerms.has("employees.view") && allPerms.has("attendance.view_all")) {
+        legacyRole = "hr_readonly";
+      } else if (allPerms.has("vacations.approve") || allPerms.has("attendance.approve_incidents") || allPerms.has("attendance.view_department")) {
+        legacyRole = "manager";
+      } else if (roleIds.length === 0) {
+        legacyRole = "empleado";
+      }
+
+      await base44.entities.Employee.update(employeeId, { role: legacyRole });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["userRoles"]);
