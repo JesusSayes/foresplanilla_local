@@ -14,10 +14,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import NotificationCenter from "./components/notifications/NotificationCenter";
 
+// Permisos básicos fallback por rol legacy
+const getBasicPermissionsByRole = (role) => {
+  const basicPermissions = {
+    super_admin: ["system.admin"],
+    admin: ["system.admin", "employees.view", "attendance.view_all", "vacations.view_all", "payroll.view_all", "contracts.view", "cost_centers.view", "reports.view", "roles.view", "schedules.view", "holidays.view", "certificates.view_all"],
+    hr_readonly: ["employees.view", "attendance.view_all", "vacations.view_all", "payroll.view_all", "reports.view", "schedules.view", "holidays.view", "certificates.view_all"],
+    manager: ["employees.view", "attendance.view_department", "attendance.approve_incidents", "vacations.view_department", "vacations.approve", "payroll.view_own", "certificates.view_own", "schedules.view", "holidays.view", "reports.view"],
+    empleado: ["attendance.view_own", "vacations.view_own", "payroll.view_own", "certificates.view_own", "schedules.view", "holidays.view"],
+  };
+  return basicPermissions[role] || basicPermissions.empleado;
+};
+
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
   const { user: currentUser, logout } = useAuth();
   const [employee, setEmployee] = useState(null);
+  const [userPermissions, setUserPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -32,6 +45,12 @@ export default function Layout({ children, currentPageName }) {
   // Pages that don't need sidebar/layout
   const noLayoutPages = ["Home"];
 
+  const hasPermission = (perm) => {
+    return userPermissions.includes("system.admin") || userPermissions.includes(perm);
+  };
+
+  const hasAnyPermission = (perms) => perms.some(p => hasPermission(p));
+
   useEffect(() => {
     const loadEmployee = async () => {
       try {
@@ -42,7 +61,32 @@ export default function Layout({ children, currentPageName }) {
 
         // Use employee data from auth context if available
         if (currentUser.employee) {
-          setEmployee(currentUser.employee);
+          const emp = currentUser.employee;
+          setEmployee(emp);
+
+          if (emp.role === "super_admin") {
+            setUserPermissions(["system.admin"]);
+            setLoading(false);
+            return;
+          }
+
+          try {
+            const userRoles = await entitiesAPI.UserRole.filter({ employee_id: emp.id });
+            if (userRoles && userRoles.length > 0) {
+              const allRoles = await entitiesAPI.Role.list();
+              const assignedRoles = allRoles.filter(r => userRoles.some(ur => ur.role_id === r.id));
+              const allPerms = new Set();
+              assignedRoles.forEach(role => {
+                (role.permissions || []).forEach(p => allPerms.add(p));
+              });
+              setUserPermissions([...allPerms]);
+            } else {
+              setUserPermissions(getBasicPermissionsByRole(emp.role));
+            }
+          } catch {
+            setUserPermissions(getBasicPermissionsByRole(emp.role));
+          }
+
           setLoading(false);
           return;
         }
@@ -53,7 +97,31 @@ export default function Layout({ children, currentPageName }) {
         });
 
         if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
+          const emp = employees[0];
+          setEmployee(emp);
+
+          // Super admin siempre tiene acceso total
+          if (emp.role === "super_admin") {
+            setUserPermissions(["system.admin"]);
+            setLoading(false);
+            return;
+          }
+
+          // Cargar roles asignados al empleado
+          const userRoles = await base44.entities.UserRole.filter({ employee_id: emp.id });
+          
+          if (userRoles && userRoles.length > 0) {
+            const allRoles = await base44.entities.Role.list();
+            const assignedRoles = allRoles.filter(r => userRoles.some(ur => ur.role_id === r.id));
+            const allPerms = new Set();
+            assignedRoles.forEach(role => {
+              (role.permissions || []).forEach(p => allPerms.add(p));
+            });
+            setUserPermissions([...allPerms]);
+          } else {
+            // Fallback al rol legacy
+            setUserPermissions(getBasicPermissionsByRole(emp.role));
+          }
         }
       } catch (error) {
         console.error("Error loading employee:", error);
@@ -122,26 +190,12 @@ export default function Layout({ children, currentPageName }) {
   };
 
   const getMenuItems = () => {
-    const role = employee?.role || "empleado";
+    const isAdmin = hasPermission("system.admin");
+    const items = [];
 
-    const employeeMenu = [
-      { name: "Dashboard", icon: LayoutDashboard, path: "Dashboard" },
-      { name: "Mis Boletas", icon: FileText, path: "Payslips" },
-      { name: "Mis Vacaciones", icon: Calendar, path: "VacationRequest" },
-      { name: "Mi Asistencia", icon: Clock, path: "Attendance" },
-      { name: "Certificados", icon: Award, path: "Certificates" },
-      { name: "Mi Perfil", icon: User, path: "MyProfile" },
-    ];
-
-    const managerMenu = [
-      ...employeeMenu,
-      { name: "Reportes Asistencia", icon: Clock, path: "AttendanceReports" },
-      { name: "Aprobar Vacaciones", icon: CheckSquare, path: "ManagerApprovals" },
-      { name: "Calendario Equipo", icon: CalendarDays, path: "VacationCalendar" },
-    ];
-
-    const adminMenu = [
-      {
+    // Dashboard - siempre visible
+    if (isAdmin || hasAnyPermission(["employees.view", "attendance.view_all", "payroll.view_all"])) {
+      items.push({
         name: "Dashboard",
         icon: LayoutDashboard,
         path: "HRDashboard",
@@ -149,71 +203,89 @@ export default function Layout({ children, currentPageName }) {
           { name: "Dashboard RRHH", path: "HRDashboard" },
           { name: "Dashboard Personal", path: "Dashboard" },
         ]
-      },
-      {
-        name: "Gestión Empleados",
-        icon: Users,
-        path: "EmployeeManagement",
-        submenu: [
-          { name: "Ver Empleados", path: "EmployeeManagement" },
-          { name: "Organigrama", path: "OrgChart" },
-          { name: "Importar Empleados", path: "ImportEmployees" },
-          { name: "Gestión Vacaciones", path: "VacationManagement" },
-          { name: "Aprobar Vacaciones", path: "ManagerApprovals" },
-          { name: "Calendario Vacaciones", path: "VacationCalendar" },
-          { name: "Boletas", path: "Payslips" },
-          { name: "Vacaciones", path: "VacationRequest" },
-          { name: "Certificados", path: "Certificates" },
-        ]
-      },
-      {
+      });
+    } else {
+      items.push({ name: "Dashboard", icon: LayoutDashboard, path: "Dashboard" });
+    }
+
+    // Gestión Empleados
+    if (hasPermission("employees.view")) {
+      const submenu = [{ name: "Ver Empleados", path: "EmployeeManagement" }];
+      if (isAdmin) {
+        submenu.push({ name: "Organigrama", path: "OrgChart" });
+        if (hasPermission("employees.import")) submenu.push({ name: "Importar Empleados", path: "ImportEmployees" });
+      }
+      if (hasPermission("vacations.manage")) submenu.push({ name: "Gestión Vacaciones", path: "VacationManagement" });
+      if (hasPermission("vacations.approve")) submenu.push({ name: "Aprobar Vacaciones", path: "ManagerApprovals" });
+      if (hasPermission("vacations.calendar")) submenu.push({ name: "Calendario Vacaciones", path: "VacationCalendar" });
+      submenu.push({ name: "Boletas", path: "Payslips" });
+      submenu.push({ name: "Vacaciones", path: "VacationRequest" });
+      if (hasPermission("certificates.view_all")) submenu.push({ name: "Certificados", path: "Certificates" });
+      items.push({ name: "Gestión Empleados", icon: Users, path: "EmployeeManagement", submenu });
+    } else {
+      // Empleado normal: sus propias secciones
+      items.push({ name: "Mis Boletas", icon: FileText, path: "Payslips" });
+      if (hasPermission("vacations.view_own")) items.push({ name: "Mis Vacaciones", icon: Calendar, path: "VacationRequest" });
+      if (hasPermission("attendance.view_own")) items.push({ name: "Mi Asistencia", icon: Clock, path: "Attendance" });
+      if (hasPermission("certificates.view_own")) items.push({ name: "Certificados", icon: Award, path: "Certificates" });
+    }
+
+    // Contratos
+    if (hasPermission("contracts.view")) {
+      items.push({
         name: "Gestión Contratos",
         icon: FileText,
         path: "ContractManagement",
         submenu: [
           { name: "Ver Contratos", path: "ContractManagement" },
-          { name: "Plantillas Contratos", path: "ContractTemplateConfig" },
-          { name: "Automatización Renovación", path: "ContractRenewalAutomation" },
+          ...(isAdmin ? [
+            { name: "Plantillas Contratos", path: "ContractTemplateConfig" },
+            { name: "Automatización Renovación", path: "ContractRenewalAutomation" },
+          ] : []),
         ]
-      },
-      {
-        name: "Gestión Asistencia",
-        icon: CheckSquare,
-        path: "AttendanceManagement",
-        submenu: [
-          { name: "Ver Asistencia", path: "AttendanceManagement" },
-          { name: "Reportes Asistencia", path: "AttendanceReports" },
-          { name: "Gestión Horarios", path: "ScheduleManagement" },
-          { name: "Base de Datos Externa", path: "DatabaseConfig" },
-          { name: "Control de Acceso Físico", path: "AccessDeviceConfig" },
-          { name: "Mi Asistencia", path: "Attendance" },
-        ]
-      },
-      {
-        name: "Gestión Planillas",
-        icon: FileText,
-        path: "PayrollManagement",
-        submenu: [
-          { name: "Generar Planillas", path: "PayrollManagement" },
-          { name: "Conceptos de Planilla", path: "PayrollConcepts" },
-          { name: "Préstamos", path: "LoanManagement" },
-          { name: "Centros de Costo", path: "CostCenterManagement" },
-          { name: "Consulta Valorizada", path: "CostCenterValuation" },
-        ]
-      },
-      { name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" },
-      { name: "Roles y Permisos", icon: Shield, path: "RoleManagement" },
-      ];
+      });
+    }
 
-      const superAdminMenu = [
-      ...adminMenu,
-      ];
+    // Asistencia
+    if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.manage"])) {
+      const submenu = [];
+      if (hasAnyPermission(["attendance.view_all", "attendance.view_department"])) submenu.push({ name: "Ver Asistencia", path: "AttendanceManagement" });
+      if (hasAnyPermission(["reports.attendance", "attendance.export"])) submenu.push({ name: "Reportes Asistencia", path: "AttendanceReports" });
+      if (hasPermission("schedules.view")) submenu.push({ name: "Gestión Horarios", path: "ScheduleManagement" });
+      if (isAdmin) {
+        submenu.push({ name: "Base de Datos Externa", path: "DatabaseConfig" });
+        submenu.push({ name: "Control de Acceso Físico", path: "AccessDeviceConfig" });
+      }
+      submenu.push({ name: "Mi Asistencia", path: "Attendance" });
+      items.push({ name: "Gestión Asistencia", icon: CheckSquare, path: "AttendanceManagement", submenu });
+    }
 
-    if (role === "super_admin") return superAdminMenu;
-    if (role === "admin") return adminMenu;
-    if (role === "manager") return managerMenu;
-    if (role === "hr_readonly") return adminMenu; // RRHH Solo lectura ve todo pero sin editar
-    return employeeMenu;
+    // Planillas
+    if (hasAnyPermission(["payroll.view_all", "payroll.create", "payroll.calculate"])) {
+      const submenu = [{ name: "Generar Planillas", path: "PayrollManagement" }];
+      if (isAdmin) submenu.push({ name: "Conceptos de Planilla", path: "PayrollConcepts" });
+      submenu.push({ name: "Préstamos", path: "LoanManagement" });
+      if (hasPermission("cost_centers.view")) {
+        submenu.push({ name: "Centros de Costo", path: "CostCenterManagement" });
+        submenu.push({ name: "Consulta Valorizada", path: "CostCenterValuation" });
+      }
+      items.push({ name: "Gestión Planillas", icon: FileText, path: "PayrollManagement", submenu });
+    }
+
+    // Feriados
+    if (hasPermission("holidays.view")) {
+      items.push({ name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" });
+    }
+
+    // Roles y Permisos
+    if (hasPermission("roles.view")) {
+      items.push({ name: "Roles y Permisos", icon: Shield, path: "RoleManagement" });
+    }
+
+    // Mi Perfil siempre
+    items.push({ name: "Mi Perfil", icon: User, path: "MyProfile" });
+
+    return items;
   };
 
   const getRoleBadge = (role) => {
@@ -369,7 +441,7 @@ export default function Layout({ children, currentPageName }) {
                         <KeyRound className="w-4 h-4" />
                         Cambiar Contraseña
                       </button>
-                      {employee?.role === "admin" && (
+                      {hasPermission("system.settings") && (
                         <>
                           <Link
                             to={createPageUrl("CompanySettings")}
@@ -419,23 +491,23 @@ export default function Layout({ children, currentPageName }) {
                             <Shield className="w-4 h-4" />
                             Exportar Datos
                           </Link>
-                          </>
-                          )}
-                          <button
-                          onClick={() => {
-                            setOpenDropdown(null);
-                            handleLogout();
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                          >
-                          <LogOut className="w-4 h-4" />
-                          Cerrar Sesión
-                          </button>
-                          </div>
-                          </div>
-                          )}
-                          </div>
-                          )}
+                        </>
+                      )}
+                      <button
+                        onClick={() => {
+                          setOpenDropdown(null);
+                          handleLogout();
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Cerrar Sesión
+                      </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Mobile menu button */}
               <Button
