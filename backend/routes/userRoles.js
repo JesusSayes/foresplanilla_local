@@ -71,11 +71,12 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { employee_id, role_id } = req.body;
+    const { employee_id, role_id, assigned_by, assigned_date } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO user_role (employee_id, role_id) VALUES ($1, $2) RETURNING *`,
-      [employee_id, role_id]
+      `INSERT INTO user_role (id, employee_id, role_id, assigned_by, assigned_date)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4) RETURNING *`,
+      [employee_id, role_id, assigned_by || null, assigned_date || null]
     );
 
     res.status(201).json(result.rows[0]);
