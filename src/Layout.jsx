@@ -33,6 +33,7 @@ export default function Layout({ children, currentPageName }) {
   const { user: currentUser, logout } = useAuth();
   const [employee, setEmployee] = useState(null);
   const [userPermissions, setUserPermissions] = useState([]);
+  const [assignedRoleNames, setAssignedRoleNames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -82,11 +83,14 @@ export default function Layout({ children, currentPageName }) {
                 (role.permissions || []).forEach(p => allPerms.add(p));
               });
               setUserPermissions([...allPerms]);
+              setAssignedRoleNames(assignedRoles.map(r => r.name));
             } else {
               setUserPermissions(getBasicPermissionsByRole(emp.role));
+              setAssignedRoleNames([]);
             }
           } catch {
             setUserPermissions(getBasicPermissionsByRole(emp.role));
+            setAssignedRoleNames([]);
           }
 
           setLoading(false);
@@ -105,6 +109,7 @@ export default function Layout({ children, currentPageName }) {
           // Super admin siempre tiene acceso total
           if (emp.role === "super_admin") {
             setUserPermissions(["system.admin"]);
+            setAssignedRoleNames([]);
             setLoading(false);
             return;
           }
@@ -120,9 +125,11 @@ export default function Layout({ children, currentPageName }) {
               (role.permissions || []).forEach(p => allPerms.add(p));
             });
             setUserPermissions([...allPerms]);
+            setAssignedRoleNames(assignedRoles.map(r => r.name));
           } else {
             // Fallback al rol legacy
             setUserPermissions(getBasicPermissionsByRole(emp.role));
+            setAssignedRoleNames([]);
           }
         }
       } catch (error) {
@@ -198,7 +205,7 @@ export default function Layout({ children, currentPageName }) {
     const isAdmin = hasPermission("system.admin");
     const items = [];
 
-    // Dashboard - siempre visible
+    // Dashboard
     if (isAdmin || hasAnyPermission(["employees.view", "attendance.view_all", "payroll.view_all"])) {
       items.push({
         name: "Dashboard",
@@ -213,7 +220,7 @@ export default function Layout({ children, currentPageName }) {
       items.push({ name: "Dashboard", icon: LayoutDashboard, path: "Dashboard" });
     }
 
-    // Gestión Empleados
+    // Gestión Empleados (solo quien puede ver empleados)
     if (hasPermission("employees.view")) {
       const submenu = [{ name: "Ver Empleados", path: "EmployeeManagement" }];
       if (isAdmin) {
@@ -222,17 +229,9 @@ export default function Layout({ children, currentPageName }) {
       }
       if (hasPermission("vacations.manage")) submenu.push({ name: "Gestión Vacaciones", path: "VacationManagement" });
       if (hasPermission("vacations.approve")) submenu.push({ name: "Aprobar Vacaciones", path: "ManagerApprovals" });
-      if (hasPermission("vacations.calendar")) submenu.push({ name: "Calendario Vacaciones", path: "VacationCalendar" });
-      submenu.push({ name: "Boletas", path: "Payslips" });
-      submenu.push({ name: "Vacaciones", path: "VacationRequest" });
+      if (hasAnyPermission(["vacations.view_calendar", "vacations.manage_balances"])) submenu.push({ name: "Calendario Vacaciones", path: "VacationCalendar" });
       if (hasPermission("certificates.view_all")) submenu.push({ name: "Certificados", path: "Certificates" });
       items.push({ name: "Gestión Empleados", icon: Users, path: "EmployeeManagement", submenu });
-    } else {
-      // Empleado normal: sus propias secciones
-      items.push({ name: "Mis Boletas", icon: FileText, path: "Payslips" });
-      if (hasPermission("vacations.view_own")) items.push({ name: "Mis Vacaciones", icon: Calendar, path: "VacationRequest" });
-      if (hasPermission("attendance.view_own")) items.push({ name: "Mi Asistencia", icon: Clock, path: "Attendance" });
-      if (hasPermission("certificates.view_own")) items.push({ name: "Certificados", icon: Award, path: "Certificates" });
     }
 
     // Contratos
@@ -243,32 +242,29 @@ export default function Layout({ children, currentPageName }) {
         path: "ContractManagement",
         submenu: [
           { name: "Ver Contratos", path: "ContractManagement" },
-          ...(isAdmin ? [
-            { name: "Plantillas Contratos", path: "ContractTemplateConfig" },
-            { name: "Automatización Renovación", path: "ContractRenewalAutomation" },
-          ] : []),
+          ...(hasPermission("contracts.manage_templates") ? [{ name: "Plantillas Contratos", path: "ContractTemplateConfig" }] : []),
+          ...(hasPermission("contracts.manage_renewals") ? [{ name: "Automatización Renovación", path: "ContractRenewalAutomation" }] : []),
         ]
       });
     }
 
-    // Asistencia
+    // Asistencia - solo quien puede ver asistencia de todos o del departamento
     if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.manage"])) {
       const submenu = [];
       if (hasAnyPermission(["attendance.view_all", "attendance.view_department"])) submenu.push({ name: "Ver Asistencia", path: "AttendanceManagement" });
-      if (hasAnyPermission(["reports.attendance", "attendance.export"])) submenu.push({ name: "Reportes Asistencia", path: "AttendanceReports" });
-      if (hasPermission("schedules.view")) submenu.push({ name: "Gestión Horarios", path: "ScheduleManagement" });
+      if (hasAnyPermission(["reports.attendance", "attendance.view_reports", "attendance.export"])) submenu.push({ name: "Reportes Asistencia", path: "AttendanceReports" });
+      if (hasAnyPermission(["schedules.view", "attendance.manage_schedules"])) submenu.push({ name: "Gestión Horarios", path: "ScheduleManagement" });
       if (isAdmin) {
         submenu.push({ name: "Base de Datos Externa", path: "DatabaseConfig" });
         submenu.push({ name: "Control de Acceso Físico", path: "AccessDeviceConfig" });
       }
-      submenu.push({ name: "Mi Asistencia", path: "Attendance" });
       items.push({ name: "Gestión Asistencia", icon: CheckSquare, path: "AttendanceManagement", submenu });
     }
 
-    // Planillas
-    if (hasAnyPermission(["payroll.view_all", "payroll.create", "payroll.calculate"])) {
+    // Planillas - solo quien puede ver planillas de todos o del departamento
+    if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department"])) {
       const submenu = [{ name: "Generar Planillas", path: "PayrollManagement" }];
-      if (isAdmin) submenu.push({ name: "Conceptos de Planilla", path: "PayrollConcepts" });
+      if (hasPermission("payroll.manage_concepts")) submenu.push({ name: "Conceptos de Planilla", path: "PayrollConcepts" });
       submenu.push({ name: "Préstamos", path: "LoanManagement" });
       if (hasPermission("cost_centers.view")) {
         submenu.push({ name: "Centros de Costo", path: "CostCenterManagement" });
@@ -277,14 +273,33 @@ export default function Layout({ children, currentPageName }) {
       items.push({ name: "Gestión Planillas", icon: FileText, path: "PayrollManagement", submenu });
     }
 
+    // Reportes
+    if (hasAnyPermission(["reports.view", "reports.advanced", "reports.payroll", "reports.vacations", "reports.employees"])) {
+      items.push({ name: "Reportes", icon: FileText, path: "Reports" });
+    }
+
     // Feriados
-    if (hasPermission("holidays.view")) {
+    if (hasAnyPermission(["holidays.view", "settings.holidays"])) {
       items.push({ name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" });
     }
 
     // Roles y Permisos
-    if (hasPermission("roles.view")) {
+    if (hasAnyPermission(["roles.view", "roles.manage"])) {
       items.push({ name: "Roles y Permisos", icon: Shield, path: "RoleManagement" });
+    }
+
+    // Secciones propias del empleado (solo si NO tiene acceso global)
+    if (hasPermission("payroll.view_own") && !hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.view_department"])) {
+      items.push({ name: "Mis Boletas", icon: FileText, path: "Payslips" });
+    }
+    if (hasPermission("vacations.view_own") && !hasAnyPermission(["vacations.view_all", "vacations.manage", "vacations.approve"])) {
+      items.push({ name: "Mis Vacaciones", icon: Calendar, path: "VacationRequest" });
+    }
+    if (hasPermission("attendance.view_own") && !hasAnyPermission(["attendance.view_all", "attendance.view_department"])) {
+      items.push({ name: "Mi Asistencia", icon: Clock, path: "Attendance" });
+    }
+    if (hasPermission("certificates.view_own") && !hasPermission("certificates.view_all")) {
+      items.push({ name: "Certificados", icon: Award, path: "Certificates" });
     }
 
     // Mi Perfil siempre
@@ -305,7 +320,10 @@ export default function Layout({ children, currentPageName }) {
   };
 
   const menuItems = getMenuItems();
-  const roleBadge = getRoleBadge(employee?.role);
+  const legacyBadge = getRoleBadge(employee?.role);
+  const roleBadge = assignedRoleNames.length > 0
+    ? { text: assignedRoleNames.join(", "), color: legacyBadge.color }
+    : legacyBadge;
 
   if (loading) {
     return (
@@ -535,7 +553,53 @@ export default function Layout({ children, currentPageName }) {
             <ul className="space-y-1">
               {menuItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = currentPageName === item.path;
+                const isActive = currentPageName === item.path ||
+                  (item.submenu && item.submenu.some(sub => sub.path === currentPageName));
+
+                if (item.submenu) {
+                  const isOpen = openDropdown === `mobile_${item.path}`;
+                  return (
+                    <li key={item.path}>
+                      <button
+                        onClick={() => setOpenDropdown(isOpen ? null : `mobile_${item.path}`)}
+                        className={`
+                          w-full flex items-center gap-3 px-4 py-3 rounded-lg
+                          transition-all duration-200
+                          ${isActive
+                            ? 'bg-indigo-50 text-indigo-600 font-semibold'
+                            : 'text-slate-700 hover:bg-slate-50'
+                          }
+                        `}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="flex-1 text-left">{item.name}</span>
+                        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {isOpen && (
+                        <ul className="mt-1 ml-8 space-y-1">
+                          {item.submenu.map((subItem) => (
+                            <li key={subItem.path}>
+                              <Link
+                                to={createPageUrl(subItem.path)}
+                                onClick={() => { setMobileMenuOpen(false); setOpenDropdown(null); }}
+                                className={`
+                                  flex items-center px-4 py-2 rounded-lg text-sm
+                                  transition-colors duration-150
+                                  ${currentPageName === subItem.path
+                                    ? 'bg-indigo-50 text-indigo-600 font-semibold'
+                                    : 'text-slate-600 hover:bg-slate-50'
+                                  }
+                                `}
+                              >
+                                {subItem.name}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                }
 
                 return (
                   <li key={item.path}>
