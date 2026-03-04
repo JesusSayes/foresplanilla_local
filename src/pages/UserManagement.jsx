@@ -851,40 +851,7 @@ Equipo de Recursos Humanos
                 />
               </div>
 
-              <div>
-                <Label>Rol en el Sistema *</Label>
-                <select
-                  value={userFormData.role}
-                  onChange={(e) => setUserFormData({...userFormData, role: e.target.value})}
-                  className="w-full mt-2 h-10 px-3 rounded-md border border-slate-200 bg-white text-slate-900"
-                >
-                  <option value="empleado">Empleado</option>
-                  <option value="manager">Manager</option>
-                  <option value="hr_readonly">RRHH (Solo Lectura)</option>
-                  <option value="admin">Administrador</option>
-                  {employee?.role === "super_admin" && (
-                    <option value="super_admin">Super Administrador</option>
-                  )}
-                </select>
-                <p className="text-xs text-slate-500 mt-1">
-                  Define el nivel de acceso del usuario en el sistema
-                </p>
-              </div>
 
-              {editingUser && (
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-blue-900">
-                      <p className="font-semibold mb-1">Información:</p>
-                      <p>
-                        Los cambios se aplicarán inmediatamente. 
-                        El usuario verá reflejado su nuevo rol en el próximo inicio de sesión.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div className="flex gap-3 pt-4">
                 <Button 
