@@ -25,9 +25,16 @@ export default function PermissionGuard({ employee, requiredRole, requiredPermis
 
   // Fallback al sistema antiguo de roles si no se especifican permisos
   if (requiredRole && !requiredPermission && !requiredAnyPermissions) {
+    // Si tiene system.admin, siempre tiene acceso
+    if (hasPermission("system.admin")) {
+      return <>{children}</>;
+    }
+
     const roleHierarchy = {
+      "super_admin": 4,
       "admin": 3,
       "manager": 2,
+      "hr_readonly": 2,
       "empleado": 1,
     };
 
