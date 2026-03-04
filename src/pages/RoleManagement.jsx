@@ -115,9 +115,15 @@ export default function RoleManagement() {
 
   const assignRolesMutation = useMutation({
     mutationFn: async ({ employeeId, roleIds }) => {
-      // Eliminar asignaciones existentes
-      const existing = userRoles.filter(ur => ur.employee_id === employeeId);
-      await Promise.all(existing.map(ur => entitiesAPI.UserRole.delete(ur.id)));
+      // Obtener asignaciones frescas directamente desde el servidor
+      const freshUserRoles = await entitiesAPI.UserRole.filter({ employee_id: employeeId });
+
+      // Eliminar asignaciones existentes, ignorando errores 404 individuales
+      await Promise.all(
+        freshUserRoles.map(ur =>
+          entitiesAPI.UserRole.delete(ur.id).catch(() => null)
+        )
+      );
 
       // Crear nuevas asignaciones
       if (roleIds.length > 0) {
@@ -129,24 +135,9 @@ export default function RoleManagement() {
         }));
 
         await Promise.all(assignments.map(a => entitiesAPI.UserRole.create(a)));
-
-        // Actualizar el campo role en Employee para mantener compatibilidad
-        const emp = allEmployees.find(e => e.id === employeeId);
-        if (emp && roleIds.length > 0) {
-          const primaryRole = roles.find(r => r.id === roleIds[0]);
-          if (primaryRole) {
-            // Mapear el nombre del rol al campo legacy 'role'
-            let legacyRole = "empleado";
-            if (primaryRole.name.toLowerCase().includes("admin") || primaryRole.name.toLowerCase().includes("administrador")) {
-              legacyRole = "admin";
-            } else if (primaryRole.name.toLowerCase().includes("manager") || primaryRole.name.toLowerCase().includes("gerente")) {
-              legacyRole = "manager";
-            }
-            await entitiesAPI.Employee.update(employeeId, { role: legacyRole });
-          }
-        }
       }
 
+      // Calcular rol legacy a partir de los roles asignados
       const assignedRoles = roles.filter(r => roleIds.includes(r.id));
       let legacyRole = "empleado";
 
@@ -163,8 +154,6 @@ export default function RoleManagement() {
         legacyRole = "hr_readonly";
       } else if (allPerms.has("vacations.approve") || allPerms.has("attendance.approve_incidents") || allPerms.has("attendance.view_department")) {
         legacyRole = "manager";
-      } else if (roleIds.length === 0) {
-        legacyRole = "empleado";
       }
 
       await entitiesAPI.Employee.update(employeeId, { role: legacyRole });
@@ -177,7 +166,8 @@ export default function RoleManagement() {
       setSelectedEmployee(null);
       setSelectedRoles([]);
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Error al asignar roles:", error);
       toast.error("Error al asignar roles");
     },
   });
