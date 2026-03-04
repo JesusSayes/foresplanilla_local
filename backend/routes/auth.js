@@ -270,4 +270,27 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// PUT /api/auth/change-password - Cambiar contraseña del usuario autenticado
+router.put('/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: 'La nueva contraseña es requerida' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await query(
+      'UPDATE users SET password_hash = $1, updated_date = NOW() WHERE id = $2',
+      [passwordHash, req.user.userId]
+    );
+
+    res.json({ success: true, message: 'Contraseña actualizada exitosamente' });
+  } catch (error) {
+    console.error('Error al cambiar contraseña:', error);
+    res.status(500).json({ error: 'Error al cambiar la contraseña' });
+  }
+});
+
 export default router;

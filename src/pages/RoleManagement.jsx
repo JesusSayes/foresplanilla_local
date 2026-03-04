@@ -77,7 +77,7 @@ export default function RoleManagement() {
       return await entitiesAPI.Role.create(data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["roles"]);
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
       toast.success("Rol creado correctamente");
       resetRoleForm();
     },
@@ -91,7 +91,7 @@ export default function RoleManagement() {
       return await entitiesAPI.Role.update(id, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["roles"]);
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
       toast.success("Rol actualizado correctamente");
       resetRoleForm();
     },
@@ -105,7 +105,7 @@ export default function RoleManagement() {
       return await entitiesAPI.Role.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["roles"]);
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
       toast.success("Rol eliminado correctamente");
     },
     onError: () => {
@@ -170,8 +170,8 @@ export default function RoleManagement() {
       await entitiesAPI.Employee.update(employeeId, { role: legacyRole });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["userRoles"]);
-      queryClient.invalidateQueries(["allEmployees"]);
+      queryClient.invalidateQueries({ queryKey: ["userRoles"] });
+      queryClient.invalidateQueries({ queryKey: ["allEmployees"] });
       toast.success("Roles asignados correctamente");
       setShowAssignModal(false);
       setSelectedEmployee(null);

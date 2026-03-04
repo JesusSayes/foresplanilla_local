@@ -1,9 +1,10 @@
+// @ts-nocheck
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "./utils";
 import { useAuth } from "@/lib/AuthContext";
-import { base44 } from "@/api/base44Client";
 import { entitiesAPI } from "@/api/entitiesClient";
+import localClient from "@/api/localClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -108,10 +109,10 @@ export default function Layout({ children, currentPageName }) {
           }
 
           // Cargar roles asignados al empleado
-          const userRoles = await base44.entities.UserRole.filter({ employee_id: emp.id });
-          
+          const userRoles = await entitiesAPI.UserRole.filter({ employee_id: emp.id });
+
           if (userRoles && userRoles.length > 0) {
-            const allRoles = await base44.entities.Role.list();
+            const allRoles = await entitiesAPI.Role.list();
             const assignedRoles = allRoles.filter(r => userRoles.some(ur => ur.role_id === r.id));
             const allPerms = new Set();
             assignedRoles.forEach(role => {
@@ -160,8 +161,7 @@ export default function Layout({ children, currentPageName }) {
     setSavingPassword(true);
     setPasswordErrors([]);
     try {
-      const user = await base44.auth.me();
-      await base44.auth.updateMe({ password: passwordData.newPassword });
+      await localClient.put('/api/auth/change-password', { password: passwordData.newPassword });
       setPasswordSuccess(true);
       setTimeout(() => {
         setShowChangePassword(false);
