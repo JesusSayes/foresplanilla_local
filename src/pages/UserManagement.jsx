@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from "@/api/entitiesClient";
+import { authAPI } from "@/api/localClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -296,21 +297,13 @@ Equipo de Recursos Humanos
     }
     setChangingPassword(true);
     try {
-      const response = await base44.functions.invoke('changeUserPassword', {
-        targetEmail: passwordEmployee.work_email,
-        newPassword: newPassword,
-      });
-      if (response.data?.success) {
-        toast.success(`Contraseña actualizada correctamente para ${passwordEmployee.first_name} ${passwordEmployee.last_name}`);
-        setShowPasswordModal(false);
-        setPasswordEmployee(null);
-        setNewPassword("");
-      } else {
-        toast.error("Error: " + (response.data?.error || "No se pudo cambiar la contraseña"));
-      }
+      await authAPI.changePassword(passwordEmployee.work_email, newPassword);
+      toast.success(`Contraseña actualizada correctamente para ${passwordEmployee.first_name} ${passwordEmployee.last_name}`);
+      setShowPasswordModal(false);
+      setPasswordEmployee(null);
+      setNewPassword("");
     } catch (error) {
-      const msg = error?.response?.data?.error || error?.message || "Error desconocido";
-      toast.error("Error al cambiar la contraseña: " + msg);
+      toast.error("Error al cambiar la contraseña: " + (error.response?.data?.message || error.message || "Inténtelo de nuevo"));
     } finally {
       setChangingPassword(false);
     }

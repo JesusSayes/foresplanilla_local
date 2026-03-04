@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "./utils";
 import { useAuth } from "@/lib/AuthContext";
+import { authAPI } from "@/api/localClient";
 import { entitiesAPI } from "@/api/entitiesClient";
 import localClient from "@/api/localClient";
 import { Button } from "@/components/ui/button";
@@ -160,8 +161,12 @@ export default function Layout({ children, currentPageName }) {
     }
     setSavingPassword(true);
     setPasswordErrors([]);
+      const user = await authAPI.me();
+      await authAPI.changePassword(user.email, passwordData.newPassword);
+      setPasswordSuccess(true);
     try {
-      await localClient.put('/api/auth/change-password', { password: passwordData.newPassword });
+      const user = await authAPI.me();
+      await authAPI.changePassword(user.email, passwordData.newPassword);
       setPasswordSuccess(true);
       setTimeout(() => {
         setShowChangePassword(false);

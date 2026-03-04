@@ -270,26 +270,52 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// PUT /api/auth/change-password - Cambiar contraseña del usuario autenticado
+// PUT /api/auth/change-password - Cambiar contraseña de un usuario
 router.put('/change-password', authenticateToken, async (req, res) => {
   try {
-    const { password } = req.body;
+    const { email, newPassword } = req.body;
 
-    if (!password) {
-      return res.status(400).json({ error: 'La nueva contraseña es requerida' });
+    if (!email || !newPassword) {
+      return res.status(400).json({
+        error: 'Datos incompletos',
+        message: 'Email y nueva contraseña son requeridos'
+      });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        error: 'Contraseña inválida',
+        message: 'La contraseña debe tener al menos 6 caracteres'
+      });
+    }
 
-    await query(
-      'UPDATE users SET password_hash = $1, updated_date = NOW() WHERE id = $2',
-      [passwordHash, req.user.userId]
+    const userResult = await query(
+      'SELECT id FROM users WHERE email = $1',
+      [email.toLowerCase()]
     );
 
-    res.json({ success: true, message: 'Contraseña actualizada exitosamente' });
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Usuario no encontrado',
+        message: 'No existe un usuario con ese email'
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await query(
+      'UPDATE users SET password_hash = $1, updated_date = NOW() WHERE email = $2',
+      [passwordHash, email.toLowerCase()]
+    );
+
+    res.json({ success: true, message: 'Contraseña actualizada correctamente' });
+
   } catch (error) {
-    console.error('Error al cambiar contraseña:', error);
-    res.status(500).json({ error: 'Error al cambiar la contraseña' });
+    console.error('Error en change-password:', error);
+    res.status(500).json({
+      error: 'Error del servidor',
+      message: 'Ocurrió un error al cambiar la contraseña'
+    });
   }
 });
 
