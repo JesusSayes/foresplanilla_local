@@ -65,33 +65,16 @@ export default function UserManagement() {
     enabled: !!employee && ["admin", "super_admin"].includes(employee.role),
   });
 
-  const { data: allInvitations = [] } = useQuery({
-    queryKey: ["allInvitations"],
-    queryFn: async () => {
-      return await entitiesAPI.UserInvitation.list("-invited_at");
-    },
-    enabled: !!employee && ["admin", "super_admin"].includes(employee.role),
-  });
+  const allInvitations = [];
 
   const sendInviteMutation = useMutation({
     mutationFn: async ({ email, name, role, employeeId }) => {
-      // Usar la función oficial para invitar usuarios (incluye envío de email)
       await mailerAPI.inviteUser({ email, name });
-
-      // Registrar la invitación en la base de datos
-      await entitiesAPI.UserInvitation.create({
-        employee_id: employeeId,
-        email: email,
-        invited_by: currentUser?.email || "Sistema",
-        invited_at: new Date().toISOString(),
-        status: "Enviada"
-      });
 
       return { email, name, employeeId };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries(["allUsers"]);
-      queryClient.invalidateQueries(["allInvitations"]);
       toast.success(`✓ Invitación enviada exitosamente a ${data.email}`);
       setSendingInviteFor(null);
       setShowInviteModal(null);
