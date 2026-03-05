@@ -15,7 +15,7 @@ router.post('/invite-user', authenticateToken, async (req, res) => {
     await sendEmail({
       to: email,
       subject: 'Invitación al Sistema de RRHH',
-      body: `Hola ${name || ''},\n\nHas sido invitado a unirte al Sistema de Recursos Humanos de la empresa.\n\nPor favor, revisa tu correo electrónico para encontrar el enlace de invitación oficial y configurar tu cuenta.\n\nTu email de acceso será: ${email}\n\nSaludos,\nEquipo de Recursos Humanos`,
+      body: `Hola ${name || ''},\n\nHas sido invitado a unirte al Sistema de Recursos Humanos de la empresa.\n\nPor favor, comunícate con nosotros para proceder a configurar tu cuenta.\n\nTu email de acceso será: ${email}\n\nSaludos,\nEquipo de Recursos Humanos`,
     });
 
     res.json({ success: true, message: `Invitación enviada a ${email}` });
