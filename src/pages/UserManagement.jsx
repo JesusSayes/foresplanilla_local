@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from "@/api/entitiesClient";
-import { authAPI } from "@/api/localClient";
+import { authAPI, mailerAPI } from "@/api/localClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -75,8 +75,8 @@ export default function UserManagement() {
 
   const sendInviteMutation = useMutation({
     mutationFn: async ({ email, name, role, employeeId }) => {
-      // Usar la función oficial de Base44 para invitar usuarios
-      await base44.users.inviteUser(email, role || "user");
+      // Usar la función oficial para invitar usuarios (incluye envío de email)
+      await mailerAPI.inviteUser({ email, name });
 
       // Registrar la invitación en la base de datos
       await entitiesAPI.UserInvitation.create({
@@ -86,28 +86,6 @@ export default function UserManagement() {
         invited_at: new Date().toISOString(),
         status: "Enviada"
       });
-
-      // Opcionalmente enviar email adicional con información
-      try {
-        await base44.integrations.Core.SendEmail({
-          to: email,
-          subject: "Invitación al Sistema de RRHH",
-          body: `
-Hola ${name},
-
-Has sido invitado a unirte al Sistema de Recursos Humanos de la empresa.
-
-Por favor, revisa tu correo electrónico para encontrar el enlace de invitación oficial y configurar tu cuenta.
-
-Tu email de acceso será: ${email}
-
-Saludos,
-Equipo de Recursos Humanos
-          `,
-        });
-      } catch (emailError) {
-        console.log("Email adicional no enviado:", emailError);
-      }
 
       return { email, name, employeeId };
     },

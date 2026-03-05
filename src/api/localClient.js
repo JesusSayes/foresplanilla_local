@@ -78,4 +78,11 @@ export const authAPI = {
   }
 };
 
+export const mailerAPI = {
+  inviteUser: async ({ email, name }) => {
+    const response = await localClient.post('/api/mailer/invite-user', { email, name });
+    return response.data;
+  },
+};
+
 export default localClient;
