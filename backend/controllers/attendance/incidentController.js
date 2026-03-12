@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { generate24HexId } from '../../utils/idGenerator.js';
 const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
@@ -69,7 +70,7 @@ export const filter = async (req, res) => {
 export const getById =  async (req, res) => {
   try {
     const incident = await prisma.attendance_incident.findUnique({
-      where: { id: parseInt(req.params.id) },
+      where: { id: req.params.id },
       include: { attendance: true }
     });
     if (!incident) return res.status(404).json({ error: 'Incident not found' });
@@ -81,8 +82,13 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
+    const { id, created_date, updated_date, created_by, incident_date,...data } = req.body;
     const incident = await prisma.attendance_incident.create({
-      data: req.body
+      data: {
+        id: generate24HexId(),
+        incident_date: new Date(incident_date),
+        ...data
+      }
     });
     res.status(201).json(incident);
   } catch (error) {
@@ -92,9 +98,14 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
+    const { review_date, ...data } = req.body;
+
     const incident = await prisma.attendance_incident.update({
-      where: { id: parseInt(req.params.id) },
-      data: req.body
+      where: { id: req.params.id },
+      data: {
+        ...data,
+        ...(review_date && { review_date: new Date(review_date) })
+      }
     });
     res.json(incident);
   } catch (error) {
@@ -105,7 +116,7 @@ export const update = async (req, res) => {
 export const remove = async (req, res) => {
   try {
     await prisma.attendance_incident.delete({
-      where: { id: parseInt(req.params.id) }
+      where: { id: req.params.id }
     });
     res.status(204).send();
   } catch (error) {
