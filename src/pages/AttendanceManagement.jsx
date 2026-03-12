@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle, 
-  AlertCircle, Users, Search, FileText, Download, Database, History, Eye, Printer
+  AlertCircle, Users, Search, FileText, Download, Database, History, Printer
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
+import JustifyModal from "../components/attendance/JustifyModal";
 
 export default function AttendanceManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -47,7 +48,6 @@ export default function AttendanceManagement() {
     justified_time_end: "18:00",
     full_day_justification: true,
   });
-  const [uploadingFile, setUploadingFile] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -56,11 +56,7 @@ export default function AttendanceManagement() {
       try {
         const user = await base44.auth.me();
         setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
+        const employees = await base44.entities.Employee.filter({ work_email: user.email });
         if (employees && employees.length > 0) {
           setEmployee(employees[0]);
         }
@@ -68,35 +64,25 @@ export default function AttendanceManagement() {
         console.error("Error loading user:", error);
       }
     };
-
     loadUserData();
   }, []);
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
-    queryFn: async () => {
-      const allEmps = await base44.entities.Employee.list("-created_date");
-      return allEmps;
-    },
+    queryFn: async () => await base44.entities.Employee.list("-created_date"),
   });
 
   const { data: todayRecords = [] } = useQuery({
     queryKey: ["todayAttendance", selectedDate],
     queryFn: async () => {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      const records = await base44.entities.AttendanceRecord.filter(
-        { date: dateStr },
-        "-created_date"
-      );
-      return records;
+      return await base44.entities.AttendanceRecord.filter({ date: dateStr }, "-created_date");
     },
   });
 
   const { data: holidays = [] } = useQuery({
     queryKey: ["holidays"],
-    queryFn: async () => {
-      return await base44.entities.Holiday.list("-date");
-    },
+    queryFn: async () => await base44.entities.Holiday.list("-date"),
   });
 
   const { data: dbConnections = [] } = useQuery({
@@ -115,19 +101,12 @@ export default function AttendanceManagement() {
     },
   });
 
-  const isHoliday = (date) => {
-    const dateStr = format(date, "yyyy-MM-dd");
-    return holidays.some(h => h.date === dateStr && h.is_mandatory);
-  };
-
-  const todayIsHoliday = isHoliday(selectedDate);
+  const todayIsHoliday = holidays.some(h => h.date === format(selectedDate, "yyyy-MM-dd") && h.is_mandatory);
   const holidayInfo = holidays.find(h => h.date === format(selectedDate, "yyyy-MM-dd"));
 
   const { data: allIncidents = [] } = useQuery({
     queryKey: ["allIncidents"],
-    queryFn: async () => {
-      return await base44.entities.AttendanceIncident.list("-created_date", 500);
-    },
+    queryFn: async () => await base44.entities.AttendanceIncident.list("-created_date", 500),
   });
 
   const pendingIncidents = allIncidents.filter(i => i.status === "Pendiente");
@@ -136,33 +115,23 @@ export default function AttendanceManagement() {
 
   const { data: overtimeAlerts = [] } = useQuery({
     queryKey: ["overtimeAlerts"],
-    queryFn: async () => {
-      return await base44.entities.OvertimeAlert.filter(
-        { status: "Pendiente" },
-        "-created_date"
-      );
-    },
+    queryFn: async () => await base44.entities.OvertimeAlert.filter({ status: "Pendiente" }, "-created_date"),
   });
 
   const { data: workSchedules = [] } = useQuery({
     queryKey: ["workSchedules"],
-    queryFn: async () => {
-      return await base44.entities.WorkSchedule.list("-created_date");
-    },
+    queryFn: async () => await base44.entities.WorkSchedule.list("-created_date"),
   });
 
-  // Generar marcaciones automáticas para exonerados
   useEffect(() => {
     const generateExemptClockings = async () => {
       if (!employee || employee.role !== "admin") return;
-      
       const result = await generateAutoClockings(selectedDate);
       if (result.success && result.recordsCreated > 0) {
         queryClient.invalidateQueries(["todayAttendance"]);
         toast.success(`✓ ${result.recordsCreated} marcación(es) automática(s) generada(s)`);
       }
     };
-    
     generateExemptClockings();
   }, [selectedDate, employee]);
 
@@ -170,34 +139,24 @@ export default function AttendanceManagement() {
     queryKey: ["employeeIncidents", historyEmployeeId],
     queryFn: async () => {
       if (!historyEmployeeId) return [];
-      return await base44.entities.AttendanceIncident.filter(
-        { employee_id: historyEmployeeId },
-        "-created_date"
-      );
+      return await base44.entities.AttendanceIncident.filter({ employee_id: historyEmployeeId }, "-created_date");
     },
     enabled: !!historyEmployeeId,
   });
 
   const updateRecordMutation = useMutation({
-    mutationFn: async ({ id, data }) => {
-      return await base44.entities.AttendanceRecord.update(id, data);
-    },
+    mutationFn: async ({ id, data }) => await base44.entities.AttendanceRecord.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(["todayAttendance"]);
       toast.success("Registro actualizado correctamente");
       setShowEditModal(false);
       setEditingRecord(null);
     },
-    onError: (error) => {
-      toast.error("Error al actualizar el registro");
-      console.error(error);
-    },
+    onError: () => toast.error("Error al actualizar el registro"),
   });
 
   const reviewIncidentMutation = useMutation({
-    mutationFn: async ({ id, data }) => {
-      return await base44.entities.AttendanceIncident.update(id, data);
-    },
+    mutationFn: async ({ id, data }) => await base44.entities.AttendanceIncident.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(["allIncidents"]);
       toast.success("Justificación revisada correctamente");
@@ -205,65 +164,40 @@ export default function AttendanceManagement() {
       setReviewingIncident(null);
       setReviewComments("");
     },
-    onError: (error) => {
-      toast.error("Error al revisar la justificación");
-      console.error(error);
-    },
-  });
-
-  const createJustificationMutation = useMutation({
-    mutationFn: async (data) => {
-      return await base44.entities.AttendanceIncident.create(data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(["allIncidents"]);
-      queryClient.invalidateQueries(["todayAttendance"]);
-      toast.success("Justificación creada correctamente");
-      setShowJustifyModal(false);
-      setJustifyingEmployee(null);
-      setJustificationData({
-        incident_type: "Olvido de Marcación",
-        justification: "",
-        supporting_document_url: "",
-        justified_time_start: "09:00",
-        justified_time_end: "18:00",
-        full_day_justification: true,
-      });
-    },
-    onError: (error) => {
-      toast.error("Error al crear la justificación");
-      console.error(error);
-    },
+    onError: () => toast.error("Error al revisar la justificación"),
   });
 
   const importAttendanceMutation = useMutation({
     mutationFn: async (connectionId) => {
       const connection = dbConnections.find(c => c.id === connectionId);
       if (!connection) throw new Error("Conexión no encontrada");
-
-      // Aquí iría la lógica real de importación desde la BD externa
-      // Por ahora simulamos la importación
       toast.info("Iniciando importación desde base de datos externa...");
-      
       return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({ 
-            success: true, 
-            imported: 45, 
-            errors: 2,
-            message: "Importación completada"
-          });
-        }, 2000);
+        setTimeout(() => resolve({ success: true, imported: 45, errors: 2 }), 2000);
       });
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries(["todayAttendance"]);
       toast.success(`✓ ${result.imported} marcaciones importadas. ${result.errors} errores.`);
     },
-    onError: () => {
-      toast.error("Error al importar marcaciones");
-    },
+    onError: () => toast.error("Error al importar marcaciones"),
   });
+
+  const getEmployeeSchedule = (empId) => {
+    let schedule = workSchedules.find(s => s.employee_id === empId && s.is_active);
+    if (!schedule) {
+      const emp = allEmployees.find(e => e.id === empId);
+      if (emp?.department_name) {
+        schedule = workSchedules.find(s =>
+          s.is_active &&
+          (s.departments?.includes(emp.department_name) || s.department_name === emp.department_name)
+        );
+      }
+    }
+    return schedule;
+  };
+
+  const isOvertimeAuthorized = (empId) => getEmployeeSchedule(empId)?.overtime_authorized || false;
 
   const handleEditRecord = (record) => {
     setEditingRecord({
@@ -276,36 +210,11 @@ export default function AttendanceManagement() {
     setShowEditModal(true);
   };
 
-  const getEmployeeSchedule = (empId) => {
-    // Buscar horario individual primero
-    let schedule = workSchedules.find(s => s.employee_id === empId && s.is_active);
-    
-    // Si no hay individual, buscar por departamento
-    if (!schedule) {
-      const emp = allEmployees.find(e => e.id === empId);
-      if (emp?.department_name) {
-        schedule = workSchedules.find(s => 
-          s.is_active && 
-          (s.departments?.includes(emp.department_name) || s.department_name === emp.department_name)
-        );
-      }
-    }
-    
-    return schedule;
-  };
-
-  const isOvertimeAuthorized = (empId) => {
-    const schedule = getEmployeeSchedule(empId);
-    return schedule?.overtime_authorized || false;
-  };
-
   const handleSaveEdit = async () => {
     if (!editingRecord) return;
-
     const clockIn = editingRecord.clock_in;
     const clockOut = editingRecord.clock_out;
     const scheduledStart = editingRecord.scheduled_start || "09:00";
-
     let workedHours = 0;
     let lateMinutes = 0;
     let isLate = false;
@@ -313,69 +222,53 @@ export default function AttendanceManagement() {
     if (clockIn && clockOut) {
       const [inHour, inMin] = clockIn.split(":").map(Number);
       const [outHour, outMin] = clockOut.split(":").map(Number);
-      
-      // Calcular horas trabajadas (descontando 60 minutos de break)
       const totalMinutes = (outHour * 60 + outMin) - (inHour * 60 + inMin) - 60;
       workedHours = Math.max(0, totalMinutes / 60);
-
-      // Calcular tardanza
       const [schedHour, schedMin] = scheduledStart.split(":").map(Number);
-      const scheduledMinutes = schedHour * 60 + schedMin;
-      const actualMinutes = inHour * 60 + inMin;
-      
-      lateMinutes = Math.max(0, actualMinutes - scheduledMinutes);
+      lateMinutes = Math.max(0, (inHour * 60 + inMin) - (schedHour * 60 + schedMin));
       isLate = lateMinutes > 0;
 
-      // Verificar si hay horas extras sin autorización
       if (workedHours > 8 && !isOvertimeAuthorized(editingRecord.employee_id)) {
-        const overtimeHours = workedHours - 8;
-        
-        // Crear alerta de horas extras no autorizadas
         await base44.entities.OvertimeAlert.create({
           employee_id: editingRecord.employee_id,
           attendance_record_id: editingRecord.id,
           alert_date: editingRecord.date,
-          overtime_hours: overtimeHours,
+          overtime_hours: workedHours - 8,
           status: "Pendiente",
         });
-
-        toast.warning(`⚠️ Alerta: ${overtimeHours.toFixed(2)}h extras sin autorización. Se ha generado una alerta para RRHH.`);
+        toast.warning(`⚠️ Alerta: ${(workedHours - 8).toFixed(2)}h extras sin autorización.`);
       }
     }
 
-    const updatedData = {
-      clock_in: clockIn || null,
-      clock_out: clockOut || null,
-      worked_hours: workedHours,
-      is_late: isLate,
-      late_minutes: lateMinutes,
-      notes: editingRecord.notes,
-      status: editingRecord.status,
-      is_absent: editingRecord.status === "Ausente",
-    };
-
-    updateRecordMutation.mutate({ id: editingRecord.id, data: updatedData });
+    updateRecordMutation.mutate({
+      id: editingRecord.id,
+      data: {
+        clock_in: clockIn || null,
+        clock_out: clockOut || null,
+        worked_hours: workedHours,
+        is_late: isLate,
+        late_minutes: lateMinutes,
+        notes: editingRecord.notes,
+        status: editingRecord.status,
+        is_absent: editingRecord.status === "Ausente",
+      }
+    });
   };
 
   const handleApproveIncident = async (incident) => {
-    // Actualizar el registro de asistencia con los ajustes
-    const attendanceRecord = todayRecords.find(r => 
-      r.employee_id === incident.employee_id && 
-      r.date === incident.incident_date
+    const attendanceRecord = todayRecords.find(r =>
+      r.employee_id === incident.employee_id && r.date === incident.incident_date
     );
-
     if (attendanceRecord && incident.hours_to_adjust > 0) {
       const adjustedWorkedHours = (attendanceRecord.worked_hours || 0) + incident.hours_to_adjust;
       const adjustedLateMinutes = Math.max(0, (attendanceRecord.late_minutes || 0) - incident.late_minutes_to_adjust);
-
       await base44.entities.AttendanceRecord.update(attendanceRecord.id, {
-        worked_hours: Math.min(adjustedWorkedHours, 8), // Máximo 8 horas regulares
+        worked_hours: Math.min(adjustedWorkedHours, 8),
         late_minutes: adjustedLateMinutes,
         is_late: adjustedLateMinutes > 0,
         status: adjustedLateMinutes === 0 && adjustedWorkedHours >= 8 ? "Completo" : "Incompleto",
       });
     }
-
     reviewIncidentMutation.mutate({
       id: incident.id,
       data: {
@@ -405,26 +298,19 @@ export default function AttendanceManagement() {
 
   const handleJustifyClick = (emp, record) => {
     setJustifyingEmployee(emp);
-    
-    // Determinar el tipo de incidente basado en el estado del registro
     let incidentType = "Olvido de Marcación";
     let startTime = record?.scheduled_start || "09:00";
     let endTime = record?.scheduled_end || "18:00";
-    
     if (record) {
       if (record.is_absent) {
         incidentType = "Falta";
       } else if (record.is_late) {
         incidentType = "Tardanza";
-        startTime = record.scheduled_start || "09:00";
         endTime = record.clock_in || startTime;
       } else if (record.clock_in && !record.clock_out) {
-        incidentType = "Olvido de Marcación";
         startTime = record.clock_in;
-        endTime = record.scheduled_end || "18:00";
       }
     }
-    
     setJustificationData({
       incident_type: incidentType,
       justification: "",
@@ -436,100 +322,20 @@ export default function AttendanceManagement() {
     setShowJustifyModal(true);
   };
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadingFile(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setJustificationData({ ...justificationData, supporting_document_url: file_url });
-      toast.success("Archivo subido correctamente");
-    } catch (error) {
-      toast.error("Error al subir el archivo");
-      console.error(error);
-    } finally {
-      setUploadingFile(false);
-    }
-  };
-
-  const handleSubmitJustification = () => {
-    if (!justificationData.justification.trim()) {
-      toast.error("Debes ingresar una justificación");
-      return;
-    }
-
-    // Calcular las horas y minutos a ajustar
-    let hoursToAdjust = 0;
-    let lateMinutesToAdjust = 0;
-
-    if (justificationData.full_day_justification) {
-      hoursToAdjust = 8; // Día completo = 8 horas
-      lateMinutesToAdjust = 0;
-    } else if (justificationData.justified_time_start && justificationData.justified_time_end) {
-      const [startHour, startMin] = justificationData.justified_time_start.split(":").map(Number);
-      const [endHour, endMin] = justificationData.justified_time_end.split(":").map(Number);
-      
-      const startMinutes = startHour * 60 + startMin;
-      const endMinutes = endHour * 60 + endMin;
-      const totalMinutes = endMinutes - startMinutes;
-      
-      // Calcular horas (máximo 8 horas regulares, sin extras)
-      hoursToAdjust = Math.min(totalMinutes / 60, 8);
-      
-      // Si es tardanza, calcular minutos de tardanza a ajustar
-      if (justificationData.incident_type === "Tardanza") {
-        const record = todayRecords.find(r => r.employee_id === justifyingEmployee.id);
-        if (record && record.clock_in) {
-          const scheduledStart = record.scheduled_start || "09:00";
-          const [schedHour, schedMin] = scheduledStart.split(":").map(Number);
-          const scheduledMinutes = schedHour * 60 + schedMin;
-          
-          // Si el tiempo justificado cubre la tardanza
-          if (startMinutes <= scheduledMinutes && endMinutes >= startMinutes) {
-            lateMinutesToAdjust = record.late_minutes || 0;
-          }
-        }
-      }
-    }
-
-    createJustificationMutation.mutate({
-      employee_id: justifyingEmployee.id,
-      incident_date: format(selectedDate, "yyyy-MM-dd"),
-      incident_type: justificationData.incident_type,
-      justification: justificationData.justification,
-      supporting_document_url: justificationData.supporting_document_url,
-      justified_time_start: justificationData.justified_time_start,
-      justified_time_end: justificationData.justified_time_end,
-      full_day_justification: justificationData.full_day_justification,
-      hours_to_adjust: hoursToAdjust,
-      late_minutes_to_adjust: lateMinutesToAdjust,
-      status: "Pendiente",
-    });
-  };
-
   const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
 
   const filteredEmployees = allEmployees.filter(emp => {
-    const matchesSearch = emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch =
+      emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDept = selectedDepartment === "all" || emp.department_name === selectedDepartment;
     const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
-    
-    // Para empleados cesados, solo mostrar si tienen asistencias pasadas
     if (emp.status === "Cesado") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const selected = new Date(selectedDate);
-      selected.setHours(0, 0, 0, 0);
-      
-      // Solo mostrar cesados si la fecha seleccionada es anterior a hoy
-      if (selected >= today) {
-        return false;
-      }
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
+      if (selected >= today) return false;
     }
-    
     return matchesSearch && matchesDept && matchesSite;
   });
 
@@ -537,7 +343,6 @@ export default function AttendanceManagement() {
     const record = todayRecords.find(r => r.employee_id === emp.id);
     return { ...emp, record };
   }).filter(emp => {
-    // Aplicar filtros de asistencia
     if (attendanceFilter === "all") return true;
     if (attendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
     if (attendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
@@ -549,9 +354,6 @@ export default function AttendanceManagement() {
     const dataToExport = employeesWithRecords.map(emp => {
       const workedHours = emp.record?.worked_hours || 0;
       const overtimeHours = Math.max(0, workedHours - 8);
-      const he25 = Math.min(overtimeHours, 2);
-      const he35 = Math.max(0, overtimeHours - 2);
-      
       return {
         'Código': emp.employee_code,
         'Nombres': emp.first_name,
@@ -563,160 +365,30 @@ export default function AttendanceManagement() {
         'Salida': emp.record?.clock_out || '--:--',
         'Horas Trabajadas': workedHours.toFixed(2),
         'Tardanza (min)': emp.record?.late_minutes || 0,
-        'HE 25%': he25.toFixed(2),
-        'HE 35%': he35.toFixed(2),
+        'HE 25%': Math.min(overtimeHours, 2).toFixed(2),
+        'HE 35%': Math.max(0, overtimeHours - 2).toFixed(2),
         'Estado': emp.record?.status || 'Sin marcar'
       };
     });
-
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Asistencia');
-    
-    const filterText = attendanceFilter === "all" ? "Todos" :
-                      attendanceFilter === "sin_entrada" ? "Sin_Entrada" :
-                      attendanceFilter === "sin_salida" ? "Sin_Salida" :
-                      attendanceFilter === "con_tardanza" ? "Con_Tardanza" : "Filtrado";
-    
-    const fileName = `Asistencia_${format(selectedDate, "yyyy-MM-dd")}_${filterText}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-    
+    const filterText = attendanceFilter === "all" ? "Todos" : attendanceFilter === "sin_entrada" ? "Sin_Entrada" : attendanceFilter === "sin_salida" ? "Sin_Salida" : "Con_Tardanza";
+    XLSX.writeFile(wb, `Asistencia_${format(selectedDate, "yyyy-MM-dd")}_${filterText}.xlsx`);
     toast.success('✓ Archivo Excel generado correctamente');
   };
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('Por favor, permite las ventanas emergentes para imprimir');
-      return;
-    }
-
-    const filterText = attendanceFilter === "all" ? "Todos los empleados" :
-                      attendanceFilter === "sin_entrada" ? "Sin marcar entrada" :
-                      attendanceFilter === "sin_salida" ? "Sin marcar salida" :
-                      attendanceFilter === "con_tardanza" ? "Con tardanza" : "Filtrado";
-
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Reporte de Asistencia</title>
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            padding: 20px;
-            font-size: 12px;
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 15px;
-          }
-          .header h1 { margin: 5px 0; font-size: 24px; }
-          .header p { margin: 3px 0; color: #666; }
-          table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-top: 20px;
-          }
-          th, td { 
-            border: 1px solid #ddd; 
-            padding: 8px; 
-            text-align: left;
-          }
-          th { 
-            background-color: #4f46e5; 
-            color: white;
-            font-weight: bold;
-          }
-          tr:nth-child(even) { background-color: #f9fafb; }
-          .late { color: #ea580c; font-weight: bold; }
-          .absent { color: #dc2626; font-weight: bold; }
-          .complete { color: #16a34a; font-weight: bold; }
-          .footer {
-            margin-top: 30px;
-            text-align: center;
-            font-size: 11px;
-            color: #666;
-          }
-          @media print {
-            body { margin: 0; }
-            .no-print { display: none; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>Reporte de Asistencia</h1>
-          <p><strong>Fecha:</strong> ${format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}</p>
-          <p><strong>Filtro aplicado:</strong> ${filterText}</p>
-          <p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p>
-        </div>
-        
-        <table>
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Empleado</th>
-              <th>Cargo</th>
-              <th>Departamento</th>
-              <th>Entrada</th>
-              <th>Salida</th>
-              <th>Horas</th>
-              <th>Tardanza</th>
-              <th>HE 25%</th>
-              <th>HE 35%</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${employeesWithRecords.map(emp => {
-              const workedHours = emp.record?.worked_hours || 0;
-              const overtimeHours = Math.max(0, workedHours - 8);
-              const he25 = Math.min(overtimeHours, 2);
-              const he35 = Math.max(0, overtimeHours - 2);
-
-              return `
-              <tr>
-                <td>${emp.employee_code}</td>
-                <td>${emp.first_name} ${emp.last_name}</td>
-                <td>${emp.position}</td>
-                <td>${emp.department_name}</td>
-                <td>${emp.record?.clock_in || '--:--'}</td>
-                <td>${emp.record?.clock_out || '--:--'}</td>
-                <td>${workedHours.toFixed(2)}h</td>
-                <td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td>
-                <td>${he25.toFixed(2)}h</td>
-                <td>${he35.toFixed(2)}h</td>
-                <td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td>
-              </tr>
-            `;
-            }).join('')}
-          </tbody>
-        </table>
-        
-        <div class="footer">
-          <p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p>
-        </div>
-        
-        <script>
-          window.onload = function() {
-            window.print();
-          }
-        </script>
-      </body>
-      </html>
-    `;
-
+    if (!printWindow) { toast.error('Por favor, permite las ventanas emergentes para imprimir'); return; }
+    const filterText = attendanceFilter === "all" ? "Todos los empleados" : attendanceFilter === "sin_entrada" ? "Sin marcar entrada" : attendanceFilter === "sin_salida" ? "Sin marcar salida" : "Con tardanza";
+    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>Código</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; const ot = Math.max(0, wh - 8); return `<tr><td>${emp.employee_code}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${emp.record?.clock_in || '--:--'}</td><td>${emp.record?.clock_out || '--:--'}</td><td>${wh.toFixed(2)}h</td><td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${Math.min(ot,2).toFixed(2)}h</td><td>${Math.max(0,ot-2).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
     printWindow.document.write(printContent);
     printWindow.document.close();
   };
 
   const getStatusConfig = (status, hasClockIn) => {
-    if (!hasClockIn) {
-      return { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle, text: "Sin marcar" };
-    }
+    if (!hasClockIn) return { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle, text: "Sin marcar" };
     const configs = {
       "Completo": { color: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle, text: "Completo" },
       "Incompleto": { color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: Clock, text: "En curso" },
@@ -738,15 +410,10 @@ export default function AttendanceManagement() {
     <PermissionGuard employee={employee} requiredRole="admin">
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          {/* Header */}
           <div className="mb-8 flex justify-between items-start">
             <div>
-              <h1 className="text-4xl font-bold text-slate-900 mb-2">
-                Gestión de Asistencia
-              </h1>
-              <p className="text-slate-600 text-lg">
-                Control y verificación de asistencia del personal
-              </p>
+              <h1 className="text-4xl font-bold text-slate-900 mb-2">Gestión de Asistencia</h1>
+              <p className="text-slate-600 text-lg">Control y verificación de asistencia del personal</p>
             </div>
             {dbConnections.length > 0 && (
               <div className="flex gap-2">
@@ -757,122 +424,59 @@ export default function AttendanceManagement() {
                   <SelectContent>
                     {dbConnections.map(conn => (
                       <SelectItem key={conn.id} value={conn.id}>
-                        <div className="flex items-center gap-2">
-                          <Database className="w-4 h-4" />
-                          {conn.connection_name}
-                        </div>
+                        <div className="flex items-center gap-2"><Database className="w-4 h-4" />{conn.connection_name}</div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button 
-                  variant="outline"
-                  onClick={() => window.location.href = "/DatabaseConfig"}
-                >
-                  <Database className="w-4 h-4 mr-2" />
-                  Configurar
+                <Button variant="outline" onClick={() => window.location.href = "/DatabaseConfig"}>
+                  <Database className="w-4 h-4 mr-2" />Configurar
                 </Button>
               </div>
             )}
           </div>
 
-          {/* Holiday Banner */}
           {todayIsHoliday && (
             <Card className="border-0 shadow-lg bg-gradient-to-r from-orange-500 to-red-500 text-white mb-6">
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-white/20 rounded-xl">
-                    <CalendarIcon className="w-8 h-8" />
-                  </div>
+                  <div className="p-3 bg-white/20 rounded-xl"><CalendarIcon className="w-8 h-8" /></div>
                   <div>
-                    <h3 className="text-xl font-bold mb-1">
-                      🎉 Día Feriado: {holidayInfo?.name}
-                    </h3>
-                    <p className="text-orange-100">
-                      Este es un día no laborable. No se contabiliza como falta para los empleados.
-                    </p>
+                    <h3 className="text-xl font-bold mb-1">🎉 Día Feriado: {holidayInfo?.name}</h3>
+                    <p className="text-orange-100">Este es un día no laborable. No se contabiliza como falta para los empleados.</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {/* Stats */}
           <div className="grid grid-cols-5 gap-3 mb-8">
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-blue-100 rounded-lg shrink-0">
-                    <Users className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xl font-bold text-slate-900 leading-tight">
-                      {allEmployees.length}
+            {[
+              { label: "Total empleados", value: allEmployees.length, icon: Users, color: "blue" },
+              { label: "Han marcado", value: todayRecords.filter(r => r.clock_in).length, icon: CheckCircle, color: "green" },
+              { label: "Tardanzas", value: todayRecords.filter(r => r.is_late).length, icon: Clock, color: "yellow" },
+              { label: "Justificaciones", value: pendingIncidents.length, icon: AlertCircle, color: "orange" },
+            ].map(({ label, value, icon: Icon, color }) => (
+              <Card key={label} className="border-0 shadow-lg">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`p-2 bg-${color}-100 rounded-lg shrink-0`}>
+                      <Icon className={`w-4 h-4 text-${color}-600`} />
                     </div>
-                    <p className="text-slate-600 text-xs truncate">Total empleados</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-green-100 rounded-lg shrink-0">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xl font-bold text-slate-900 leading-tight">
-                      {todayRecords.filter(r => r.clock_in).length}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xl font-bold text-slate-900 leading-tight">{value}</div>
+                      <p className="text-slate-600 text-xs truncate">{label}</p>
                     </div>
-                    <p className="text-slate-600 text-xs truncate">Han marcado</p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-yellow-100 rounded-lg shrink-0">
-                    <Clock className="w-4 h-4 text-yellow-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xl font-bold text-slate-900 leading-tight">
-                      {todayRecords.filter(r => r.is_late).length}
-                    </div>
-                    <p className="text-slate-600 text-xs truncate">Tardanzas</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-orange-100 rounded-lg shrink-0">
-                    <AlertCircle className="w-4 h-4 text-orange-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xl font-bold text-slate-900 leading-tight">
-                      {pendingIncidents.length}
-                    </div>
-                    <p className="text-slate-600 text-xs truncate">Justificaciones</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
+                </CardContent>
+              </Card>
+            ))}
             <Card className="border-0 shadow-lg bg-red-50 border-red-200">
               <CardContent className="p-3">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-red-100 rounded-lg shrink-0">
-                    <Clock className="w-4 h-4 text-red-600" />
-                  </div>
+                  <div className="p-2 bg-red-100 rounded-lg shrink-0"><Clock className="w-4 h-4 text-red-600" /></div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xl font-bold text-red-900 leading-tight">
-                      {overtimeAlerts.length}
-                    </div>
+                    <div className="text-xl font-bold text-red-900 leading-tight">{overtimeAlerts.length}</div>
                     <p className="text-red-700 text-xs truncate">HE sin autorización</p>
                   </div>
                 </div>
@@ -880,26 +484,19 @@ export default function AttendanceManagement() {
             </Card>
           </div>
 
-          {/* Main Content */}
           <Tabs defaultValue="attendance" className="space-y-6">
             <TabsList className="grid w-full max-w-2xl grid-cols-3">
               <TabsTrigger value="attendance">
                 Asistencia del Día
-                {employeesWithRecords.length > 0 && (
-                  <Badge className="ml-2 bg-orange-500 text-white">{employeesWithRecords.length}</Badge>
-                )}
+                {employeesWithRecords.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{employeesWithRecords.length}</Badge>}
               </TabsTrigger>
               <TabsTrigger value="incidents">
                 Justificaciones
-                {allIncidents.length > 0 && (
-                  <Badge className="ml-2 bg-orange-500 text-white">{allIncidents.length}</Badge>
-                )}
+                {allIncidents.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{allIncidents.length}</Badge>}
               </TabsTrigger>
               <TabsTrigger value="overtime-alerts">
                 Alertas HE
-                {overtimeAlerts.length > 0 && (
-                  <Badge className="ml-2 bg-orange-500 text-white">{overtimeAlerts.length}</Badge>
-                )}
+                {overtimeAlerts.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{overtimeAlerts.length}</Badge>}
               </TabsTrigger>
             </TabsList>
 
@@ -911,67 +508,33 @@ export default function AttendanceManagement() {
                     <div className="flex-1 min-w-[200px]">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                        <Input
-                          placeholder="Buscar empleado..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10"
-                        />
+                        <Input placeholder="Buscar empleado..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
                       </div>
                     </div>
-
                     <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Departamento" />
-                      </SelectTrigger>
+                      <SelectTrigger className="w-40"><SelectValue placeholder="Departamento" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
-                        {departments.map(dept => (
-                          <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                        ))}
+                        {departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
                       </SelectContent>
                     </Select>
-
                     <Select value={selectedSite} onValueChange={setSelectedSite}>
-                      <SelectTrigger className="w-36">
-                        <SelectValue placeholder="Sede" />
-                      </SelectTrigger>
+                      <SelectTrigger className="w-36"><SelectValue placeholder="Sede" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todas</SelectItem>
                         <SelectItem value="sin_sede">Sin sede</SelectItem>
-                        {sites.map(site => (
-                          <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>
-                        ))}
+                        {sites.map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
-
                     <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
-                      <SelectTrigger className="w-44">
-                        <SelectValue placeholder="Filtro" />
-                      </SelectTrigger>
+                      <SelectTrigger className="w-44"><SelectValue placeholder="Filtro" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="sin_entrada">
-                          <div className="flex items-center gap-2">
-                            <XCircle className="w-4 h-4 text-red-600" />
-                            Sin entrada
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="sin_salida">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-yellow-600" />
-                            Sin salida
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="con_tardanza">
-                          <div className="flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4 text-orange-600" />
-                            Con tardanza
-                          </div>
-                        </SelectItem>
+                        <SelectItem value="sin_entrada"><div className="flex items-center gap-2"><XCircle className="w-4 h-4 text-red-600" />Sin entrada</div></SelectItem>
+                        <SelectItem value="sin_salida"><div className="flex items-center gap-2"><Clock className="w-4 h-4 text-yellow-600" />Sin salida</div></SelectItem>
+                        <SelectItem value="con_tardanza"><div className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-orange-600" />Con tardanza</div></SelectItem>
                       </SelectContent>
                     </Select>
-
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="bg-green-50 border-green-200 hover:bg-green-100 whitespace-nowrap">
@@ -980,31 +543,14 @@ export default function AttendanceManagement() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={(date) => date && setSelectedDate(date)}
-                          locale={es}
-                        />
+                        <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} locale={es} />
                       </PopoverContent>
                     </Popover>
-
-                    <Button
-                      onClick={handleExportToExcel}
-                      variant="outline"
-                      className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Excel
+                    <Button onClick={handleExportToExcel} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
+                      <Download className="w-4 h-4 mr-2" />Excel
                     </Button>
-
-                    <Button
-                      onClick={handlePrint}
-                      variant="outline"
-                      className="whitespace-nowrap"
-                    >
-                      <Printer className="w-4 h-4 mr-2" />
-                      Imprimir
+                    <Button onClick={handlePrint} variant="outline" className="whitespace-nowrap">
+                      <Printer className="w-4 h-4 mr-2" />Imprimir
                     </Button>
                   </div>
 
@@ -1012,45 +558,33 @@ export default function AttendanceManagement() {
                     {employeesWithRecords.map(emp => {
                       const statusConfig = getStatusConfig(emp.record?.status, emp.record?.clock_in);
                       const StatusIcon = statusConfig.icon;
-
                       return (
-                        <div 
-                          key={emp.id}
-                          className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all"
-                        >
+                        <div key={emp.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4 flex-1">
                               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold">
                                 {emp.first_name[0]}{emp.last_name[0]}
                               </div>
-                              
                               <div className="flex-1">
-                                <h4 className="font-bold text-slate-900">
-                                  {emp.first_name} {emp.last_name}
-                                </h4>
-                                <p className="text-sm text-slate-600">
-                                  {emp.employee_code} • {emp.position} • {emp.department_name}
-                                </p>
+                                <h4 className="font-bold text-slate-900">{emp.first_name} {emp.last_name}</h4>
+                                <p className="text-sm text-slate-600">{emp.employee_code} • {emp.position} • {emp.department_name}</p>
                               </div>
-
                               <div className="grid grid-cols-6 gap-3 text-sm">
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Entrada</p>
-                                  <p className="font-semibold text-slate-900">
+                                  <p className={`font-semibold ${emp.record?.clock_in ? 'text-slate-900' : 'text-slate-400'}`}>
                                     {emp.record?.clock_in || "--:--"}
                                   </p>
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Salida</p>
-                                  <p className="font-semibold text-slate-900">
+                                  <p className={`font-semibold ${emp.record?.clock_out ? 'text-slate-900' : 'text-slate-400'}`}>
                                     {emp.record?.clock_out || "--:--"}
                                   </p>
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Horas</p>
-                                  <p className="font-semibold text-slate-900">
-                                    {emp.record?.worked_hours?.toFixed(2) || "0.00"}h
-                                  </p>
+                                  <p className="font-semibold text-slate-900">{emp.record?.worked_hours?.toFixed(2) || "0.00"}h</p>
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Tardanza</p>
@@ -1063,10 +597,7 @@ export default function AttendanceManagement() {
                                   <p className={`font-semibold ${isOvertimeAuthorized(emp.id) ? 'text-blue-600' : 'text-red-600'}`}>
                                     {(() => {
                                       if (!isOvertimeAuthorized(emp.id)) return "0.00";
-                                      const workedHours = emp.record?.worked_hours || 0;
-                                      const overtimeHours = Math.max(0, workedHours - 8);
-                                      const he25 = Math.min(overtimeHours, 2);
-                                      return he25.toFixed(2);
+                                      return Math.min(Math.max(0, (emp.record?.worked_hours || 0) - 8), 2).toFixed(2);
                                     })()}h
                                   </p>
                                 </div>
@@ -1075,58 +606,32 @@ export default function AttendanceManagement() {
                                   <p className={`font-semibold ${isOvertimeAuthorized(emp.id) ? 'text-purple-600' : 'text-red-600'}`}>
                                     {(() => {
                                       if (!isOvertimeAuthorized(emp.id)) return "0.00";
-                                      const workedHours = emp.record?.worked_hours || 0;
-                                      const overtimeHours = Math.max(0, workedHours - 8);
-                                      const he35 = Math.max(0, overtimeHours - 2);
-                                      return he35.toFixed(2);
+                                      return Math.max(0, (emp.record?.worked_hours || 0) - 10).toFixed(2);
                                     })()}h
                                   </p>
                                 </div>
                               </div>
-
                               <div className="flex items-center gap-3">
                                 <Badge className={statusConfig.color}>
-                                  <StatusIcon className="w-3 h-3 mr-1" />
-                                  {statusConfig.text}
+                                  <StatusIcon className="w-3 h-3 mr-1" />{statusConfig.text}
                                 </Badge>
-
                                 {emp.record?.is_late && (
-                                  <Badge className="bg-orange-100 text-orange-700">
-                                    +{emp.record.late_minutes} min
-                                  </Badge>
+                                  <Badge className="bg-orange-100 text-orange-700">+{emp.record.late_minutes} min</Badge>
                                 )}
-
                                 {emp.record && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleEditRecord(emp.record)}
-                                  >
-                                    <Edit className="w-4 h-4 mr-1" />
-                                    Editar
+                                  <Button size="sm" variant="outline" onClick={() => handleEditRecord(emp.record)}>
+                                    <Edit className="w-4 h-4 mr-1" />Editar
                                   </Button>
                                 )}
-
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="text-orange-600 border-orange-200 hover:bg-orange-50"
                                   onClick={() => handleJustifyClick(emp, emp.record)}
-                                  title="Justificar asistencia"
                                 >
-                                  <FileText className="w-4 h-4 mr-1" />
-                                  Justificar
+                                  <FileText className="w-4 h-4 mr-1" />Justificar
                                 </Button>
-
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setHistoryEmployeeId(emp.id);
-                                    setShowHistory(true);
-                                  }}
-                                  title="Ver historial de incidencias"
-                                >
+                                <Button size="sm" variant="outline" onClick={() => { setHistoryEmployeeId(emp.id); setShowHistory(true); }}>
                                   <History className="w-4 h-4" />
                                 </Button>
                               </div>
@@ -1145,12 +650,9 @@ export default function AttendanceManagement() {
               <Card className="border-0 shadow-lg">
                 <CardHeader className="border-b bg-red-50/50">
                   <CardTitle className="text-xl font-bold flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-red-600" />
-                    Alertas de Horas Extras No Autorizadas
+                    <Clock className="w-5 h-5 text-red-600" />Alertas de Horas Extras No Autorizadas
                   </CardTitle>
-                  <p className="text-sm text-slate-600 mt-2">
-                    Personal que registró horas extras sin autorización previa
-                  </p>
+                  <p className="text-sm text-slate-600 mt-2">Personal que registró horas extras sin autorización previa</p>
                 </CardHeader>
                 <CardContent className="p-6">
                   {overtimeAlerts.length === 0 ? (
@@ -1163,106 +665,46 @@ export default function AttendanceManagement() {
                       {overtimeAlerts.map(alert => {
                         const emp = allEmployees.find(e => e.id === alert.employee_id);
                         const record = todayRecords.find(r => r.id === alert.attendance_record_id);
-                        
                         return (
-                          <div 
-                            key={alert.id}
-                            className="p-4 border-2 border-red-200 bg-red-50 rounded-lg"
-                          >
+                          <div key={alert.id} className="p-4 border-2 border-red-200 bg-red-50 rounded-lg">
                             <div className="flex items-start justify-between mb-4">
                               <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-2">
-                                  <h4 className="font-bold text-slate-900">
-                                    {emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}
-                                  </h4>
-                                  <Badge className="bg-red-600 text-white">
-                                    {alert.overtime_hours.toFixed(2)}h extras
-                                  </Badge>
+                                  <h4 className="font-bold text-slate-900">{emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
+                                  <Badge className="bg-red-600 text-white">{alert.overtime_hours.toFixed(2)}h extras</Badge>
                                 </div>
-                                <p className="text-sm text-slate-600 mb-2">
-                                  {emp?.employee_code} • {emp?.position} • {emp?.department_name}
-                                </p>
-                                <p className="text-sm text-slate-700">
-                                  📅 {format(new Date(alert.alert_date), "dd MMM yyyy", { locale: es })}
-                                </p>
-                                {record && (
-                                  <p className="text-sm text-slate-600 mt-2">
-                                    Marcación: {record.clock_in} - {record.clock_out} ({record.worked_hours?.toFixed(2)}h trabajadas)
-                                  </p>
-                                )}
+                                <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position} • {emp?.department_name}</p>
+                                <p className="text-sm text-slate-700">📅 {format(new Date(alert.alert_date), "dd MMM yyyy", { locale: es })}</p>
+                                {record && <p className="text-sm text-slate-600 mt-2">Marcación: {record.clock_in} - {record.clock_out} ({record.worked_hours?.toFixed(2)}h trabajadas)</p>}
                               </div>
                             </div>
-
                             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
-                              <p className="text-sm text-yellow-900">
-                                ⚠️ Este empleado NO está autorizado para realizar horas extras. 
-                                Por favor, verifica la marcación o autoriza las horas extras desde Gestión de Horarios.
-                              </p>
+                              <p className="text-sm text-yellow-900">⚠️ Este empleado NO está autorizado para realizar horas extras. Por favor, verifica la marcación o autoriza las horas extras desde Gestión de Horarios.</p>
                             </div>
-
                             <div className="flex gap-3">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="flex-1"
-                                onClick={() => {
-                                  if (record) {
-                                    handleEditRecord(record);
-                                  }
-                                }}
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Corregir Marcación
+                              <Button size="sm" variant="outline" className="flex-1" onClick={() => record && handleEditRecord(record)}>
+                                <Edit className="w-4 h-4 mr-2" />Corregir Marcación
                               </Button>
-                              <Button
-                                size="sm"
-                                className="flex-1 bg-blue-600 hover:bg-blue-700"
-                                onClick={async () => {
-                                  if (confirm("¿Autorizar estas horas extras? Esto autorizará al empleado para futuras HE.")) {
-                                    // Actualizar horario del empleado para autorizar HE
-                                    const schedule = getEmployeeSchedule(emp.id);
-                                    if (schedule) {
-                                      await base44.entities.WorkSchedule.update(schedule.id, {
-                                        overtime_authorized: true
-                                      });
-                                    } else {
-                                      toast.error("No se encontró horario asignado");
-                                      return;
-                                    }
-
-                                    // Marcar alerta como autorizada
-                                    await base44.entities.OvertimeAlert.update(alert.id, {
-                                      status: "Autorizado",
-                                      resolved_by: currentUser.email,
-                                      resolution_date: format(new Date(), "yyyy-MM-dd"),
-                                      resolution_notes: "Horas extras autorizadas retroactivamente"
-                                    });
-
-                                    queryClient.invalidateQueries(["overtimeAlerts"]);
-                                    queryClient.invalidateQueries(["workSchedules"]);
-                                    toast.success("Horas extras autorizadas");
-                                  }
-                                }}
-                              >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Autorizar HE
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-slate-600"
-                                onClick={async () => {
-                                  await base44.entities.OvertimeAlert.update(alert.id, {
-                                    status: "Descartado",
-                                    resolved_by: currentUser.email,
-                                    resolution_date: format(new Date(), "yyyy-MM-dd"),
-                                  });
+                              <Button size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={async () => {
+                                if (confirm("¿Autorizar estas horas extras? Esto autorizará al empleado para futuras HE.")) {
+                                  const schedule = getEmployeeSchedule(emp.id);
+                                  if (schedule) {
+                                    await base44.entities.WorkSchedule.update(schedule.id, { overtime_authorized: true });
+                                  } else { toast.error("No se encontró horario asignado"); return; }
+                                  await base44.entities.OvertimeAlert.update(alert.id, { status: "Autorizado", resolved_by: currentUser.email, resolution_date: format(new Date(), "yyyy-MM-dd"), resolution_notes: "Horas extras autorizadas retroactivamente" });
                                   queryClient.invalidateQueries(["overtimeAlerts"]);
-                                  toast.success("Alerta descartada");
-                                }}
-                              >
-                                <XCircle className="w-4 h-4 mr-2" />
-                                Descartar
+                                  queryClient.invalidateQueries(["workSchedules"]);
+                                  toast.success("Horas extras autorizadas");
+                                }
+                              }}>
+                                <CheckCircle className="w-4 h-4 mr-2" />Autorizar HE
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
+                                await base44.entities.OvertimeAlert.update(alert.id, { status: "Descartado", resolved_by: currentUser.email, resolution_date: format(new Date(), "yyyy-MM-dd") });
+                                queryClient.invalidateQueries(["overtimeAlerts"]);
+                                toast.success("Alerta descartada");
+                              }}>
+                                <XCircle className="w-4 h-4 mr-2" />Descartar
                               </Button>
                             </div>
                           </div>
@@ -1278,111 +720,50 @@ export default function AttendanceManagement() {
             <TabsContent value="incidents" className="space-y-6">
               <Tabs defaultValue="pending">
                 <TabsList className="grid w-full max-w-xl grid-cols-3 mb-6">
-                  <TabsTrigger value="pending">
-                    Pendientes
-                    {pendingIncidents.length > 0 && (
-                      <Badge className="ml-2 bg-orange-600 text-white">{pendingIncidents.length}</Badge>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="approved">
-                    Aprobadas
-                    {approvedIncidents.length > 0 && (
-                      <Badge className="ml-2 bg-green-600 text-white">{approvedIncidents.length}</Badge>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="rejected">
-                    Rechazadas
-                    {rejectedIncidents.length > 0 && (
-                      <Badge className="ml-2 bg-red-600 text-white">{rejectedIncidents.length}</Badge>
-                    )}
-                  </TabsTrigger>
+                  <TabsTrigger value="pending">Pendientes {pendingIncidents.length > 0 && <Badge className="ml-2 bg-orange-600 text-white">{pendingIncidents.length}</Badge>}</TabsTrigger>
+                  <TabsTrigger value="approved">Aprobadas {approvedIncidents.length > 0 && <Badge className="ml-2 bg-green-600 text-white">{approvedIncidents.length}</Badge>}</TabsTrigger>
+                  <TabsTrigger value="rejected">Rechazadas {rejectedIncidents.length > 0 && <Badge className="ml-2 bg-red-600 text-white">{rejectedIncidents.length}</Badge>}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="pending">
                   <Card className="border-0 shadow-lg">
-                    <CardHeader className="border-b bg-slate-50/50">
-                      <CardTitle className="text-xl font-bold">
-                        Justificaciones Pendientes de Aprobación
-                      </CardTitle>
-                    </CardHeader>
+                    <CardHeader className="border-b bg-slate-50/50"><CardTitle className="text-xl font-bold">Justificaciones Pendientes de Aprobación</CardTitle></CardHeader>
                     <CardContent className="p-6">
                       {pendingIncidents.length === 0 ? (
-                        <div className="text-center py-12">
-                          <CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" />
-                          <p className="text-slate-600">No hay justificaciones pendientes</p>
-                        </div>
+                        <div className="text-center py-12"><CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones pendientes</p></div>
                       ) : (
                         <div className="space-y-4">
                           {pendingIncidents.map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
-                              <div 
-                                key={incident.id}
-                                className="p-4 border border-slate-200 rounded-lg"
-                              >
+                              <div key={incident.id} className="p-4 border border-slate-200 rounded-lg">
                                 <div className="flex items-start justify-between mb-4">
                                   <div className="flex-1">
-                                    <h4 className="font-bold text-slate-900 mb-1">
-                                      {emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}
-                                    </h4>
-                                    <p className="text-sm text-slate-600 mb-2">
-                                      {emp?.employee_code} • {emp?.position}
-                                    </p>
+                                    <h4 className="font-bold text-slate-900 mb-1">{emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
+                                    <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm">
-                                      <Badge className="bg-orange-100 text-orange-700">
-                                        {incident.incident_type}
-                                      </Badge>
-                                      <span className="text-slate-600">
-                                        📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}
-                                      </span>
+                                      <Badge className="bg-orange-100 text-orange-700">{incident.incident_type}</Badge>
+                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
                                     </div>
                                   </div>
                                 </div>
-
                                 <div className="p-3 bg-slate-50 rounded-lg mb-4">
-                                  <p className="text-sm font-semibold text-slate-900 mb-1">
-                                    Justificación:
-                                  </p>
-                                  <p className="text-sm text-slate-700">
-                                    {incident.justification}
-                                  </p>
+                                  <p className="text-sm font-semibold text-slate-900 mb-1">Justificación:</p>
+                                  <p className="text-sm text-slate-700">{incident.justification}</p>
                                 </div>
-
                                 {incident.supporting_document_url && (
                                   <div className="mb-4">
-                                    <a
-                                      href={incident.supporting_document_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:underline bg-indigo-50 px-3 py-2 rounded-lg"
-                                    >
-                                      <Download className="w-4 h-4" />
-                                      Ver documento adjunto
+                                    <a href={incident.supporting_document_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:underline bg-indigo-50 px-3 py-2 rounded-lg">
+                                      <Download className="w-4 h-4" />Ver documento adjunto
                                     </a>
                                   </div>
                                 )}
-
                                 <div className="flex gap-3">
-                                  <Button
-                                    className="flex-1 bg-green-600 hover:bg-green-700"
-                                    onClick={() => {
-                                      setReviewingIncident(incident);
-                                      setShowIncidentModal(true);
-                                    }}
-                                  >
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Aprobar
+                                  <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => { setReviewingIncident(incident); setShowIncidentModal(true); }}>
+                                    <CheckCircle className="w-4 h-4 mr-2" />Aprobar
                                   </Button>
-                                  <Button
-                                    variant="outline"
-                                    className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
-                                    onClick={() => {
-                                      setReviewingIncident(incident);
-                                      setShowIncidentModal(true);
-                                    }}
-                                  >
-                                    <XCircle className="w-4 h-4 mr-2" />
-                                    Rechazar
+                                  <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setReviewingIncident(incident); setShowIncidentModal(true); }}>
+                                    <XCircle className="w-4 h-4 mr-2" />Rechazar
                                   </Button>
                                 </div>
                               </div>
@@ -1396,70 +777,39 @@ export default function AttendanceManagement() {
 
                 <TabsContent value="approved">
                   <Card className="border-0 shadow-lg">
-                    <CardHeader className="border-b bg-green-50/50">
-                      <CardTitle className="text-xl font-bold flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                        Justificaciones Aprobadas
-                      </CardTitle>
-                    </CardHeader>
+                    <CardHeader className="border-b bg-green-50/50"><CardTitle className="text-xl font-bold flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-600" />Justificaciones Aprobadas</CardTitle></CardHeader>
                     <CardContent className="p-6">
                       {approvedIncidents.length === 0 ? (
-                        <div className="text-center py-12">
-                          <AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                          <p className="text-slate-600">No hay justificaciones aprobadas</p>
-                        </div>
+                        <div className="text-center py-12"><AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones aprobadas</p></div>
                       ) : (
                         <div className="space-y-4">
                           {approvedIncidents.map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
-                              <div 
-                                key={incident.id}
-                                className="p-4 border border-green-200 bg-green-50/30 rounded-lg"
-                              >
+                              <div key={incident.id} className="p-4 border border-green-200 bg-green-50/30 rounded-lg">
                                 <div className="flex items-start justify-between mb-4">
                                   <div className="flex-1">
-                                    <h4 className="font-bold text-slate-900 mb-1">
-                                      {emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}
-                                    </h4>
-                                    <p className="text-sm text-slate-600 mb-2">
-                                      {emp?.employee_code} • {emp?.position}
-                                    </p>
+                                    <h4 className="font-bold text-slate-900 mb-1">{emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
+                                    <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm flex-wrap">
-                                      <Badge className="bg-green-100 text-green-700">
-                                        {incident.incident_type}
-                                      </Badge>
-                                      <span className="text-slate-600">
-                                        📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}
-                                      </span>
+                                      <Badge className="bg-green-100 text-green-700">{incident.incident_type}</Badge>
+                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
                                       <Badge className="bg-green-600 text-white">Aprobada</Badge>
                                     </div>
                                   </div>
                                 </div>
-
                                 <div className="p-3 bg-white rounded-lg mb-3">
-                                  <p className="text-sm font-semibold text-slate-900 mb-1">
-                                    Justificación:
-                                  </p>
-                                  <p className="text-sm text-slate-700">
-                                    {incident.justification}
-                                  </p>
+                                  <p className="text-sm font-semibold text-slate-900 mb-1">Justificación:</p>
+                                  <p className="text-sm text-slate-700">{incident.justification}</p>
                                 </div>
-
                                 {incident.review_comments && (
                                   <div className="p-3 bg-green-100 border border-green-200 rounded-lg mb-3">
-                                    <p className="text-sm font-semibold text-green-900 mb-1">
-                                      Comentarios de aprobación:
-                                    </p>
-                                    <p className="text-sm text-green-800">
-                                      {incident.review_comments}
-                                    </p>
+                                    <p className="text-sm font-semibold text-green-900 mb-1">Comentarios de aprobación:</p>
+                                    <p className="text-sm text-green-800">{incident.review_comments}</p>
                                   </div>
                                 )}
-
                                 <div className="flex items-center gap-4 text-xs text-slate-600">
-                                  <span>Revisado por: {incident.reviewed_by || "N/A"}</span>
-                                  <span>•</span>
+                                  <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
                                   <span>Fecha: {incident.review_date ? format(new Date(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
                                 </div>
                               </div>
@@ -1473,70 +823,39 @@ export default function AttendanceManagement() {
 
                 <TabsContent value="rejected">
                   <Card className="border-0 shadow-lg">
-                    <CardHeader className="border-b bg-red-50/50">
-                      <CardTitle className="text-xl font-bold flex items-center gap-2">
-                        <XCircle className="w-5 h-5 text-red-600" />
-                        Justificaciones Rechazadas
-                      </CardTitle>
-                    </CardHeader>
+                    <CardHeader className="border-b bg-red-50/50"><CardTitle className="text-xl font-bold flex items-center gap-2"><XCircle className="w-5 h-5 text-red-600" />Justificaciones Rechazadas</CardTitle></CardHeader>
                     <CardContent className="p-6">
                       {rejectedIncidents.length === 0 ? (
-                        <div className="text-center py-12">
-                          <AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                          <p className="text-slate-600">No hay justificaciones rechazadas</p>
-                        </div>
+                        <div className="text-center py-12"><AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones rechazadas</p></div>
                       ) : (
                         <div className="space-y-4">
                           {rejectedIncidents.map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
-                              <div 
-                                key={incident.id}
-                                className="p-4 border border-red-200 bg-red-50/30 rounded-lg"
-                              >
+                              <div key={incident.id} className="p-4 border border-red-200 bg-red-50/30 rounded-lg">
                                 <div className="flex items-start justify-between mb-4">
                                   <div className="flex-1">
-                                    <h4 className="font-bold text-slate-900 mb-1">
-                                      {emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}
-                                    </h4>
-                                    <p className="text-sm text-slate-600 mb-2">
-                                      {emp?.employee_code} • {emp?.position}
-                                    </p>
+                                    <h4 className="font-bold text-slate-900 mb-1">{emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
+                                    <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm flex-wrap">
-                                      <Badge className="bg-red-100 text-red-700">
-                                        {incident.incident_type}
-                                      </Badge>
-                                      <span className="text-slate-600">
-                                        📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}
-                                      </span>
+                                      <Badge className="bg-red-100 text-red-700">{incident.incident_type}</Badge>
+                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
                                       <Badge className="bg-red-600 text-white">Rechazada</Badge>
                                     </div>
                                   </div>
                                 </div>
-
                                 <div className="p-3 bg-white rounded-lg mb-3">
-                                  <p className="text-sm font-semibold text-slate-900 mb-1">
-                                    Justificación:
-                                  </p>
-                                  <p className="text-sm text-slate-700">
-                                    {incident.justification}
-                                  </p>
+                                  <p className="text-sm font-semibold text-slate-900 mb-1">Justificación:</p>
+                                  <p className="text-sm text-slate-700">{incident.justification}</p>
                                 </div>
-
                                 {incident.review_comments && (
                                   <div className="p-3 bg-red-100 border border-red-200 rounded-lg mb-3">
-                                    <p className="text-sm font-semibold text-red-900 mb-1">
-                                      Motivo de rechazo:
-                                    </p>
-                                    <p className="text-sm text-red-800">
-                                      {incident.review_comments}
-                                    </p>
+                                    <p className="text-sm font-semibold text-red-900 mb-1">Motivo de rechazo:</p>
+                                    <p className="text-sm text-red-800">{incident.review_comments}</p>
                                   </div>
                                 )}
-
                                 <div className="flex items-center gap-4 text-xs text-slate-600">
-                                  <span>Revisado por: {incident.reviewed_by || "N/A"}</span>
-                                  <span>•</span>
+                                  <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
                                   <span>Fecha: {incident.review_date ? format(new Date(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
                                 </div>
                               </div>
@@ -1554,71 +873,33 @@ export default function AttendanceManagement() {
 
         {/* Edit Record Modal */}
         {showEditModal && editingRecord && (
-          <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
-            onClick={() => setShowEditModal(false)}
-          >
-            <Card 
-              className="max-w-2xl w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" onClick={() => setShowEditModal(false)}>
+            <Card className="max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
               <CardHeader className="border-b">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-xl font-bold">
-                    Editar Registro de Asistencia
-                  </CardTitle>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => setShowEditModal(false)}
-                  >
-                    ✕
-                  </Button>
+                  <CardTitle className="text-xl font-bold">Editar Registro de Asistencia</CardTitle>
+                  <Button variant="ghost" size="icon" onClick={() => setShowEditModal(false)}>✕</Button>
                 </div>
               </CardHeader>
               <CardContent className="p-6">
                 <div className="space-y-6">
                   <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm text-slate-600">
-                      Fecha: <strong>{format(new Date(editingRecord.date), "dd 'de' MMMM, yyyy", { locale: es })}</strong>
-                    </p>
+                    <p className="text-sm text-slate-600">Fecha: <strong>{format(new Date(editingRecord.date), "dd 'de' MMMM, yyyy", { locale: es })}</strong></p>
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-900 mb-2">
-                        Hora de Entrada
-                      </label>
-                      <Input
-                        type="time"
-                        value={editingRecord.clock_in}
-                        onChange={(e) => setEditingRecord({ ...editingRecord, clock_in: e.target.value })}
-                      />
+                      <label className="block text-sm font-semibold text-slate-900 mb-2">Hora de Entrada</label>
+                      <Input type="time" value={editingRecord.clock_in} onChange={(e) => setEditingRecord({ ...editingRecord, clock_in: e.target.value })} />
                     </div>
-
                     <div>
-                      <label className="block text-sm font-semibold text-slate-900 mb-2">
-                        Hora de Salida
-                      </label>
-                      <Input
-                        type="time"
-                        value={editingRecord.clock_out}
-                        onChange={(e) => setEditingRecord({ ...editingRecord, clock_out: e.target.value })}
-                      />
+                      <label className="block text-sm font-semibold text-slate-900 mb-2">Hora de Salida</label>
+                      <Input type="time" value={editingRecord.clock_out} onChange={(e) => setEditingRecord({ ...editingRecord, clock_out: e.target.value })} />
                     </div>
                   </div>
-
                   <div>
-                    <label className="block text-sm font-semibold text-slate-900 mb-2">
-                      Estado
-                    </label>
-                    <Select 
-                      value={editingRecord.status}
-                      onValueChange={(value) => setEditingRecord({ ...editingRecord, status: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">Estado</label>
+                    <Select value={editingRecord.status} onValueChange={(value) => setEditingRecord({ ...editingRecord, status: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Completo">Completo</SelectItem>
                         <SelectItem value="Incompleto">Incompleto</SelectItem>
@@ -1627,32 +908,13 @@ export default function AttendanceManagement() {
                       </SelectContent>
                     </Select>
                   </div>
-
                   <div>
-                    <label className="block text-sm font-semibold text-slate-900 mb-2">
-                      Notas
-                    </label>
-                    <Textarea
-                      value={editingRecord.notes}
-                      onChange={(e) => setEditingRecord({ ...editingRecord, notes: e.target.value })}
-                      placeholder="Observaciones adicionales..."
-                      rows={3}
-                    />
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">Notas</label>
+                    <Textarea value={editingRecord.notes} onChange={(e) => setEditingRecord({ ...editingRecord, notes: e.target.value })} placeholder="Observaciones adicionales..." rows={3} />
                   </div>
-
                   <div className="flex gap-3">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => setShowEditModal(false)}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      className="flex-1 bg-indigo-600 hover:bg-indigo-700"
-                      onClick={handleSaveEdit}
-                      disabled={updateRecordMutation.isPending}
-                    >
+                    <Button variant="outline" className="flex-1" onClick={() => setShowEditModal(false)}>Cancelar</Button>
+                    <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleSaveEdit} disabled={updateRecordMutation.isPending}>
                       {updateRecordMutation.isPending ? "Guardando..." : "Guardar Cambios"}
                     </Button>
                   </div>
@@ -1664,94 +926,38 @@ export default function AttendanceManagement() {
 
         {/* Review Incident Modal */}
         {showIncidentModal && reviewingIncident && (
-          <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
-            onClick={() => {
-              setShowIncidentModal(false);
-              setReviewComments("");
-            }}
-          >
-            <Card 
-              className="max-w-2xl w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" onClick={() => { setShowIncidentModal(false); setReviewComments(""); }}>
+            <Card className="max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
               <CardHeader className="border-b">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-xl font-bold">
-                    Revisar Justificación
-                  </CardTitle>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => {
-                      setShowIncidentModal(false);
-                      setReviewComments("");
-                    }}
-                  >
-                    ✕
-                  </Button>
+                  <CardTitle className="text-xl font-bold">Revisar Justificación</CardTitle>
+                  <Button variant="ghost" size="icon" onClick={() => { setShowIncidentModal(false); setReviewComments(""); }}>✕</Button>
                 </div>
               </CardHeader>
               <CardContent className="p-6">
                 <div className="space-y-6">
                   <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm text-slate-600 mb-2">
-                      <strong>Tipo:</strong> {reviewingIncident.incident_type}
-                    </p>
-                    <p className="text-sm text-slate-600 mb-2">
-                      <strong>Fecha:</strong> {format(new Date(reviewingIncident.incident_date), "dd 'de' MMMM, yyyy", { locale: es })}
-                    </p>
+                    <p className="text-sm text-slate-600 mb-2"><strong>Tipo:</strong> {reviewingIncident.incident_type}</p>
+                    <p className="text-sm text-slate-600 mb-2"><strong>Fecha:</strong> {format(new Date(reviewingIncident.incident_date), "dd 'de' MMMM, yyyy", { locale: es })}</p>
                     {reviewingIncident.full_day_justification ? (
-                      <p className="text-sm text-slate-600 mb-2">
-                        <strong>Período:</strong> <Badge className="bg-blue-100 text-blue-700">Día completo (8 horas)</Badge>
-                      </p>
+                      <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> <Badge className="bg-blue-100 text-blue-700">Día completo (8 horas)</Badge></p>
                     ) : (
-                      <p className="text-sm text-slate-600 mb-2">
-                        <strong>Período:</strong> {reviewingIncident.justified_time_start} - {reviewingIncident.justified_time_end}
-                      </p>
+                      <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> {reviewingIncident.justified_time_start} - {reviewingIncident.justified_time_end}</p>
                     )}
-                    <p className="text-sm text-slate-600 mb-2">
-                      <strong>Ajuste:</strong> +{reviewingIncident.hours_to_adjust?.toFixed(2) || 0}h trabajadas
-                      {reviewingIncident.late_minutes_to_adjust > 0 && `, -{reviewingIncident.late_minutes_to_adjust} min tardanza`}
-                    </p>
-                    <p className="text-sm text-slate-700">
-                      <strong>Justificación:</strong><br />
-                      {reviewingIncident.justification}
-                    </p>
+                    <p className="text-sm text-slate-600 mb-2"><strong>Ajuste:</strong> +{reviewingIncident.hours_to_adjust?.toFixed(2) || 0}h trabajadas{reviewingIncident.late_minutes_to_adjust > 0 && `, -${reviewingIncident.late_minutes_to_adjust} min tardanza`}</p>
+                    <p className="text-sm text-slate-700"><strong>Justificación:</strong><br />{reviewingIncident.justification}</p>
                   </div>
-
                   <div>
-                    <label className="block text-sm font-semibold text-slate-900 mb-2">
-                      Comentarios de Revisión
-                    </label>
-                    <Textarea
-                      value={reviewComments}
-                      onChange={(e) => setReviewComments(e.target.value)}
-                      placeholder="Ingresa comentarios sobre la decisión..."
-                      rows={3}
-                    />
-                    <p className="text-xs text-slate-500 mt-2">
-                      * Requerido para rechazar una justificación
-                    </p>
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">Comentarios de Revisión</label>
+                    <Textarea value={reviewComments} onChange={(e) => setReviewComments(e.target.value)} placeholder="Ingresa comentarios sobre la decisión..." rows={3} />
+                    <p className="text-xs text-slate-500 mt-2">* Requerido para rechazar una justificación</p>
                   </div>
-
                   <div className="flex gap-3">
-                    <Button
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                      onClick={() => handleApproveIncident(reviewingIncident)}
-                      disabled={reviewIncidentMutation.isPending}
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Aprobar
+                    <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => handleApproveIncident(reviewingIncident)} disabled={reviewIncidentMutation.isPending}>
+                      <CheckCircle className="w-4 h-4 mr-2" />Aprobar
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
-                      onClick={() => handleRejectIncident(reviewingIncident)}
-                      disabled={reviewIncidentMutation.isPending}
-                    >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Rechazar
+                    <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleRejectIncident(reviewingIncident)} disabled={reviewIncidentMutation.isPending}>
+                      <XCircle className="w-4 h-4 mr-2" />Rechazar
                     </Button>
                   </div>
                 </div>
@@ -1759,224 +965,41 @@ export default function AttendanceManagement() {
             </Card>
           </div>
         )}
-      </div>
 
-      {/* History Modal */}
-      {showHistory && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
-          onClick={() => {
-            setShowHistory(false);
-            setHistoryEmployeeId(null);
-          }}
-        >
-          <div 
-            className="max-w-4xl w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <IncidentHistory 
-              incidents={employeeIncidents} 
-              isLoading={false}
-              employeeName={historyEmployeeId ? allEmployees.find(e => e.id === historyEmployeeId)?.first_name + ' ' + allEmployees.find(e => e.id === historyEmployeeId)?.last_name : ""}
-            />
-            <Button
-              onClick={() => {
-                setShowHistory(false);
-                setHistoryEmployeeId(null);
-              }}
-              className="w-full mt-4"
-              variant="outline"
-            >
-              Cerrar
-            </Button>
+        {/* History Modal */}
+        {showHistory && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" onClick={() => { setShowHistory(false); setHistoryEmployeeId(null); }}>
+            <div className="max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
+              <IncidentHistory
+                incidents={employeeIncidents}
+                isLoading={false}
+                employeeName={historyEmployeeId ? allEmployees.find(e => e.id === historyEmployeeId)?.first_name + ' ' + allEmployees.find(e => e.id === historyEmployeeId)?.last_name : ""}
+              />
+              <Button onClick={() => { setShowHistory(false); setHistoryEmployeeId(null); }} className="w-full mt-4" variant="outline">Cerrar</Button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Justify Modal */}
-      {showJustifyModal && justifyingEmployee && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
-          onClick={() => {
-            setShowJustifyModal(false);
-            setJustifyingEmployee(null);
-          }}
-        >
-          <Card 
-            className="max-w-2xl w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader className="border-b">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl font-bold">Justificar Asistencia</CardTitle>
-                  <p className="text-sm text-slate-600 mt-1">
-                    {justifyingEmployee.first_name} {justifyingEmployee.last_name} • {format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}
-                  </p>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={() => {
-                    setShowJustifyModal(false);
-                    setJustifyingEmployee(null);
-                  }}
-                >
-                  ✕
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-900 mb-2">
-                    Tipo de Incidente
-                  </label>
-                  <Select 
-                    value={justificationData.incident_type}
-                    onValueChange={(value) => setJustificationData({ ...justificationData, incident_type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Tardanza">Tardanza</SelectItem>
-                      <SelectItem value="Falta">Falta</SelectItem>
-                      <SelectItem value="Salida Temprana">Salida Temprana</SelectItem>
-                      <SelectItem value="Olvido de Marcación">Olvido de Marcación</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-900 mb-2">
-                    Período a Justificar
-                  </label>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                      <input
-                        type="checkbox"
-                        checked={justificationData.full_day_justification}
-                        onChange={(e) => setJustificationData({ 
-                          ...justificationData, 
-                          full_day_justification: e.target.checked,
-                          justified_time_start: e.target.checked ? "09:00" : justificationData.justified_time_start,
-                          justified_time_end: e.target.checked ? "18:00" : justificationData.justified_time_end,
-                        })}
-                        className="w-4 h-4 text-indigo-600"
-                      />
-                      <label className="text-sm font-medium text-slate-900">
-                        Justificar día completo (8 horas)
-                      </label>
-                    </div>
-
-                    {!justificationData.full_day_justification && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-medium text-slate-700 mb-1">
-                            Hora de Inicio
-                          </label>
-                          <Input
-                            type="time"
-                            value={justificationData.justified_time_start}
-                            onChange={(e) => setJustificationData({ ...justificationData, justified_time_start: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-slate-700 mb-1">
-                            Hora de Fin
-                          </label>
-                          <Input
-                            type="time"
-                            value={justificationData.justified_time_end}
-                            onChange={(e) => setJustificationData({ ...justificationData, justified_time_end: e.target.value })}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-xs text-blue-900">
-                        <strong>Nota:</strong> Las horas extras NO se ajustan con justificaciones. 
-                        Solo se ajustan las horas regulares (máximo 8h) y las tardanzas.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-900 mb-2">
-                    Justificación *
-                  </label>
-                  <Textarea
-                    value={justificationData.justification}
-                    onChange={(e) => setJustificationData({ ...justificationData, justification: e.target.value })}
-                    placeholder="Explica el motivo de la incidencia..."
-                    rows={4}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-900 mb-2">
-                    Documento de Sustento (opcional)
-                  </label>
-                  <div className="space-y-2">
-                    <Input
-                      type="file"
-                      onChange={handleFileUpload}
-                      disabled={uploadingFile}
-                      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                    />
-                    {uploadingFile && (
-                      <p className="text-xs text-blue-600">Subiendo archivo...</p>
-                    )}
-                    {justificationData.supporting_document_url && (
-                      <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
-                        <FileText className="w-4 h-4 text-green-600" />
-                        <a 
-                          href={justificationData.supporting_document_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-green-700 hover:underline flex-1"
-                        >
-                          Archivo adjunto
-                        </a>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setJustificationData({ ...justificationData, supporting_document_url: "" })}
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      setShowJustifyModal(false);
-                      setJustifyingEmployee(null);
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700"
-                    onClick={handleSubmitJustification}
-                    disabled={createJustificationMutation.isPending}
-                  >
-                    {createJustificationMutation.isPending ? "Guardando..." : "Crear Justificación"}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-      </PermissionGuard>
-      );
-      }
+        {/* Justify Modal — componente separado */}
+        {showJustifyModal && justifyingEmployee && (
+          <JustifyModal
+            justifyingEmployee={justifyingEmployee}
+            justificationData={justificationData}
+            setJustificationData={setJustificationData}
+            selectedDate={selectedDate}
+            todayRecords={todayRecords}
+            employee={employee}
+            onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); }}
+            onSuccess={() => {
+              setShowJustifyModal(false);
+              setJustifyingEmployee(null);
+              setJustificationData({ incident_type: "Olvido de Marcación", justification: "", supporting_document_url: "", justified_time_start: "09:00", justified_time_end: "18:00", full_day_justification: true });
+              queryClient.invalidateQueries(["allIncidents"]);
+              queryClient.invalidateQueries(["todayAttendance"]);
+            }}
+          />
+        )}
+      </div>
+    </PermissionGuard>
+  );
+}
