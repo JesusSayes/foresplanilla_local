@@ -17,6 +17,7 @@ export default function JustifyModal({
   selectedDate,
   todayRecords,
   employee,
+  existingIncident,
   onClose,
   onSuccess,
 }) {
