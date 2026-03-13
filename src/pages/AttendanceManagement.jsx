@@ -299,27 +299,49 @@ export default function AttendanceManagement() {
 
   const handleJustifyClick = (emp, record) => {
     setJustifyingEmployee(emp);
-    let incidentType = "Olvido de Marcación";
-    let startTime = record?.scheduled_start || "09:00";
-    let endTime = record?.scheduled_end || "18:00";
-    if (record) {
-      if (record.is_absent) {
-        incidentType = "Falta";
-      } else if (record.is_late) {
-        incidentType = "Tardanza";
-        endTime = record.clock_in || startTime;
-      } else if (record.clock_in && !record.clock_out) {
-        startTime = record.clock_in;
+
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    // Buscar justificación previa para este empleado en esta fecha
+    const prevIncident = allIncidents.find(
+      i => i.employee_id === emp.id && i.incident_date === dateStr
+    );
+
+    if (prevIncident) {
+      // Pre-cargar datos de la justificación existente
+      setExistingIncident(prevIncident);
+      setJustificationData({
+        incident_type: prevIncident.incident_type,
+        justification: prevIncident.justification || "",
+        supporting_document_url: prevIncident.supporting_document_url || "",
+        justified_time_start: prevIncident.justified_time_start || "09:00",
+        justified_time_end: prevIncident.justified_time_end || "18:00",
+        full_day_justification: prevIncident.full_day_justification ?? true,
+      });
+    } else {
+      setExistingIncident(null);
+      let incidentType = "Olvido de Marcación";
+      let startTime = record?.scheduled_start || "09:00";
+      let endTime = record?.scheduled_end || "18:00";
+      if (record) {
+        if (record.is_absent) {
+          incidentType = "Falta";
+        } else if (record.is_late) {
+          incidentType = "Tardanza";
+          endTime = record.clock_in || startTime;
+        } else if (record.clock_in && !record.clock_out) {
+          startTime = record.clock_in;
+        }
       }
+      setJustificationData({
+        incident_type: incidentType,
+        justification: "",
+        supporting_document_url: "",
+        justified_time_start: startTime,
+        justified_time_end: endTime,
+        full_day_justification: incidentType === "Falta",
+      });
     }
-    setJustificationData({
-      incident_type: incidentType,
-      justification: "",
-      supporting_document_url: "",
-      justified_time_start: startTime,
-      justified_time_end: endTime,
-      full_day_justification: incidentType === "Falta",
-    });
+
     setShowJustifyModal(true);
   };
 
