@@ -145,21 +145,24 @@ export default function JustifyModal({
       const newWorkedHours = hoursToAdjust; // Usar directamente las horas de la justificación
       const newLateMinutes = justificationData.incident_type === "Tardanza" ? Math.max(0, (existingRecord?.late_minutes || 0) - lateMinutesToAdjust) : 0;
 
+      // Construir datos del registro: solo sobreescribir los campos que tienen valor
+      const recordUpdate = {
+        worked_hours: Math.min(newWorkedHours, 8),
+        late_minutes: newLateMinutes,
+        is_late: newLateMinutes > 0,
+        status: newLateMinutes === 0 && newWorkedHours >= 8 ? "Completo" : "Justificado",
+      };
+      if (timeStart) recordUpdate.clock_in = timeStart;
+      if (timeEnd) recordUpdate.clock_out = timeEnd;
+
       if (existingRecord) {
-        await base44.entities.AttendanceRecord.update(existingRecord.id, {
-          clock_in: timeStart,
-          clock_out: timeEnd,
-          worked_hours: Math.min(newWorkedHours, 8),
-          late_minutes: newLateMinutes,
-          is_late: newLateMinutes > 0,
-          status: newLateMinutes === 0 && newWorkedHours >= 8 ? "Completo" : "Justificado",
-        });
+        await base44.entities.AttendanceRecord.update(existingRecord.id, recordUpdate);
       } else {
         await base44.entities.AttendanceRecord.create({
           employee_id: justifyingEmployee.id,
           date: dateStr,
-          clock_in: timeStart,
-          clock_out: timeEnd,
+          clock_in: timeStart || null,
+          clock_out: timeEnd || null,
           worked_hours: Math.min(newWorkedHours, 8),
           late_minutes: 0,
           is_late: false,
