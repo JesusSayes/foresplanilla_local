@@ -1012,10 +1012,12 @@ export default function AttendanceManagement() {
             selectedDate={selectedDate}
             todayRecords={todayRecords}
             employee={employee}
-            onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); }}
+            existingIncident={existingIncident}
+            onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); setExistingIncident(null); }}
             onSuccess={() => {
               setShowJustifyModal(false);
               setJustifyingEmployee(null);
+              setExistingIncident(null);
               setJustificationData({ incident_type: "Olvido de Marcación", justification: "", supporting_document_url: "", justified_time_start: "09:00", justified_time_end: "18:00", full_day_justification: true });
               queryClient.invalidateQueries(["allIncidents"]);
               queryClient.invalidateQueries(["todayAttendance"]);
