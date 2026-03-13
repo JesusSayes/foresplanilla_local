@@ -42,6 +42,7 @@ export default function AttendanceManagement() {
   const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
   const [showJustifyModal, setShowJustifyModal] = useState(false);
   const [justifyingEmployee, setJustifyingEmployee] = useState(null);
+  const [existingIncident, setExistingIncident] = useState(null);
   const [justificationData, setJustificationData] = useState({
     incident_type: "Olvido de Marcación",
     justification: "",
@@ -311,27 +312,49 @@ export default function AttendanceManagement() {
 
   const handleJustifyClick = (emp, record) => {
     setJustifyingEmployee(emp);
-    let incidentType = "Olvido de Marcación";
-    let startTime = record?.scheduled_start || "09:00";
-    let endTime = record?.scheduled_end || "18:00";
-    if (record) {
-      if (record.is_absent) {
-        incidentType = "Falta";
-      } else if (record.is_late) {
-        incidentType = "Tardanza";
-        endTime = record.clock_in || startTime;
-      } else if (record.clock_in && !record.clock_out) {
-        startTime = record.clock_in;
+
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    // Buscar justificación previa para este empleado en esta fecha
+    const prevIncident = allIncidents.find(
+      i => i.employee_id === emp.id && i.incident_date === dateStr
+    );
+
+    if (prevIncident) {
+      // Pre-cargar datos de la justificación existente
+      setExistingIncident(prevIncident);
+      setJustificationData({
+        incident_type: prevIncident.incident_type,
+        justification: prevIncident.justification || "",
+        supporting_document_url: prevIncident.supporting_document_url || "",
+        justified_time_start: prevIncident.justified_time_start || "09:00",
+        justified_time_end: prevIncident.justified_time_end || "18:00",
+        full_day_justification: prevIncident.full_day_justification ?? true,
+      });
+    } else {
+      setExistingIncident(null);
+      let incidentType = "Olvido de Marcación";
+      let startTime = record?.scheduled_start || "09:00";
+      let endTime = record?.scheduled_end || "18:00";
+      if (record) {
+        if (record.is_absent) {
+          incidentType = "Falta";
+        } else if (record.is_late) {
+          incidentType = "Tardanza";
+          endTime = record.clock_in || startTime;
+        } else if (record.clock_in && !record.clock_out) {
+          startTime = record.clock_in;
+        }
       }
+      setJustificationData({
+        incident_type: incidentType,
+        justification: "",
+        supporting_document_url: "",
+        justified_time_start: startTime,
+        justified_time_end: endTime,
+        full_day_justification: incidentType === "Falta",
+      });
     }
-    setJustificationData({
-      incident_type: incidentType,
-      justification: "",
-      supporting_document_url: "",
-      justified_time_start: startTime,
-      justified_time_end: endTime,
-      full_day_justification: incidentType === "Falta",
-    });
+
     setShowJustifyModal(true);
   };
 
@@ -910,11 +933,21 @@ export default function AttendanceManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-900 mb-2">Hora de Entrada</label>
-                      <Input type="time" value={editingRecord.clock_in} onChange={(e) => setEditingRecord({ ...editingRecord, clock_in: e.target.value })} />
+                      <div className="flex gap-2">
+                        <Input type="time" value={editingRecord.clock_in || ""} onChange={(e) => setEditingRecord({ ...editingRecord, clock_in: e.target.value })} className="flex-1" />
+                        {editingRecord.clock_in && (
+                          <Button type="button" size="sm" variant="ghost" className="text-slate-400 hover:text-red-500 px-2" onClick={() => setEditingRecord({ ...editingRecord, clock_in: "" })}>✕</Button>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-slate-900 mb-2">Hora de Salida</label>
-                      <Input type="time" value={editingRecord.clock_out} onChange={(e) => setEditingRecord({ ...editingRecord, clock_out: e.target.value })} />
+                      <div className="flex gap-2">
+                        <Input type="time" value={editingRecord.clock_out || ""} onChange={(e) => setEditingRecord({ ...editingRecord, clock_out: e.target.value })} className="flex-1" />
+                        {editingRecord.clock_out && (
+                          <Button type="button" size="sm" variant="ghost" className="text-slate-400 hover:text-red-500 px-2" onClick={() => setEditingRecord({ ...editingRecord, clock_out: "" })}>✕</Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div>
@@ -930,7 +963,7 @@ export default function AttendanceManagement() {
                     </Select>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-900 mb-2">Notas</label>
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">Notas <span className="text-xs font-normal text-slate-400">(opcional)</span></label>
                     <Textarea value={editingRecord.notes} onChange={(e) => setEditingRecord({ ...editingRecord, notes: e.target.value })} placeholder="Observaciones adicionales..." rows={3} />
                   </div>
                   <div className="flex gap-3">
@@ -1007,10 +1040,12 @@ export default function AttendanceManagement() {
             selectedDate={selectedDate}
             todayRecords={todayRecords}
             employee={employee}
-            onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); }}
+            existingIncident={existingIncident}
+            onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); setExistingIncident(null); }}
             onSuccess={() => {
               setShowJustifyModal(false);
               setJustifyingEmployee(null);
+              setExistingIncident(null);
               setJustificationData({ incident_type: "Olvido de Marcación", justification: "", supporting_document_url: "", justified_time_start: "09:00", justified_time_end: "18:00", full_day_justification: true });
               queryClient.invalidateQueries(["allIncidents"]);
               queryClient.invalidateQueries(["todayAttendance"]);
