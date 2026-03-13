@@ -345,7 +345,7 @@ export default function JustifyModal({
                 onClick={handleSubmit}
                 disabled={submitting}
               >
-                {submitting ? "Guardando..." : "Crear Justificación"}
+                {submitting ? "Guardando..." : existingIncident ? "Actualizar Justificación" : "Crear Justificación"}
               </Button>
             </div>
           </div>
