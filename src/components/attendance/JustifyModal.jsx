@@ -265,29 +265,47 @@ export default function JustifyModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Hora de Inicio <span className="text-red-500">*</span>
+                        Hora de Inicio{" "}
+                        {justificationData.incident_type === "Olvido de Marcación"
+                          ? <span className="text-slate-400">(opcional)</span>
+                          : <span className="text-red-500">*</span>}
                       </label>
-                      <Input
-                        type="time"
-                        value={justificationData.justified_time_start}
-                        onChange={(e) => {
-                          setJustificationData({ ...justificationData, justified_time_start: e.target.value });
-                          setValidationError("");
-                        }}
-                      />
+                      <div className="flex gap-1">
+                        <Input
+                          type="time"
+                          value={justificationData.justified_time_start || ""}
+                          onChange={(e) => {
+                            setJustificationData({ ...justificationData, justified_time_start: e.target.value });
+                            setValidationError("");
+                          }}
+                          className="flex-1"
+                        />
+                        {justificationData.justified_time_start && justificationData.incident_type === "Olvido de Marcación" && (
+                          <Button type="button" size="sm" variant="ghost" className="px-2 text-slate-400 hover:text-red-500" onClick={() => setJustificationData({ ...justificationData, justified_time_start: "" })}>✕</Button>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Hora de Fin <span className="text-red-500">*</span>
+                        Hora de Fin{" "}
+                        {justificationData.incident_type === "Olvido de Marcación"
+                          ? <span className="text-slate-400">(opcional)</span>
+                          : <span className="text-red-500">*</span>}
                       </label>
-                      <Input
-                        type="time"
-                        value={justificationData.justified_time_end}
-                        onChange={(e) => {
-                          setJustificationData({ ...justificationData, justified_time_end: e.target.value });
-                          setValidationError("");
-                        }}
-                      />
+                      <div className="flex gap-1">
+                        <Input
+                          type="time"
+                          value={justificationData.justified_time_end || ""}
+                          onChange={(e) => {
+                            setJustificationData({ ...justificationData, justified_time_end: e.target.value });
+                            setValidationError("");
+                          }}
+                          className="flex-1"
+                        />
+                        {justificationData.justified_time_end && justificationData.incident_type === "Olvido de Marcación" && (
+                          <Button type="button" size="sm" variant="ghost" className="px-2 text-slate-400 hover:text-red-500" onClick={() => setJustificationData({ ...justificationData, justified_time_end: "" })}>✕</Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
