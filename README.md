@@ -11,3 +11,7 @@ $ mailpit
 Emails are displayed in:
 
 http://localhost:8025
+
+Biotime synchronization:
+
+$ npm run sync:biotime 2026-01-01 2026-02-25

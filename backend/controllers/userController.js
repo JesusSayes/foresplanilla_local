@@ -66,8 +66,8 @@ export const createUser = async (req, res) => {
   try {
     const { email, password, full_name, role, is_active } = req.body;
 
-    const bcrypt = await import('bcrypt');
-    const password_hash = password ? await bcrypt.hash(password, 10) : null;
+    const bcrypt = await import('bcryptjs');
+    const password_hash = password ? await bcrypt.default.hash(password, 10) : null;
 
     const user = await prisma.users.create({
       data: {
@@ -132,8 +132,8 @@ export const updateUser = async (req, res) => {
     };
 
     if (password) {
-      const bcrypt = await import('bcrypt');
-      updateData.password_hash = await bcrypt.hash(password, 10);
+      const bcrypt = await import('bcryptjs');
+      updateData.password_hash = await bcrypt.default.hash(password, 10);
     }
 
     const user = await prisma.users.update({

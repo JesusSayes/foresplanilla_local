@@ -68,10 +68,22 @@ export default function UserManagement() {
   const allInvitations = [];
 
   const sendInviteMutation = useMutation({
-    mutationFn: async ({ email, name, role, employeeId }) => {
+    mutationFn: async ({ email, name, role, employeeId, document_number }) => {
+      const alreadyExists = allUsers.some(u => u.email === email);
+
+      if (!alreadyExists) {
+        await entitiesAPI.User.create({
+          email,
+          full_name: name,
+          role: role || "user",
+          password: document_number || email,
+          is_active: true,
+        });
+      }
+
       await mailerAPI.inviteUser({ email, name });
 
-      return { email, name, employeeId };
+      return { email, name, employeeId, alreadyExists };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries(["allUsers"]);
@@ -161,6 +173,7 @@ export default function UserManagement() {
       name: `${emp.first_name} ${emp.last_name}`,
       role: inviteRole,
       employeeId: emp.id,
+      document_number: emp.document_number,
     });
   };
 
@@ -190,6 +203,7 @@ export default function UserManagement() {
       name: `${emp.first_name} ${emp.last_name}`,
       role: inviteRole,
       employeeId: emp.id,
+      document_number: emp.document_number,
     });
   };
 
