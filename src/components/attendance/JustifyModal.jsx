@@ -53,19 +53,32 @@ export default function JustifyModal({
       return;
     }
     if (!justificationData.full_day_justification) {
-      if (!justificationData.justified_time_start) {
-        setValidationError("El campo 'Hora de Inicio' es obligatorio cuando no se justifica el día completo.");
-        return;
+      const isOlvidoMarcacion = justificationData.incident_type === "Olvido de Marcación";
+      if (!isOlvidoMarcacion) {
+        // Para otros tipos, ambas horas son obligatorias
+        if (!justificationData.justified_time_start) {
+          setValidationError("El campo 'Hora de Inicio' es obligatorio cuando no se justifica el día completo.");
+          return;
+        }
+        if (!justificationData.justified_time_end) {
+          setValidationError("El campo 'Hora de Fin' es obligatorio cuando no se justifica el día completo.");
+          return;
+        }
+      } else {
+        // Para Olvido de Marcación, al menos uno es obligatorio
+        if (!justificationData.justified_time_start && !justificationData.justified_time_end) {
+          setValidationError("Debes ingresar al menos la Hora de Inicio o la Hora de Fin.");
+          return;
+        }
       }
-      if (!justificationData.justified_time_end) {
-        setValidationError("El campo 'Hora de Fin' es obligatorio cuando no se justifica el día completo.");
-        return;
-      }
-      const [startHour, startMin] = justificationData.justified_time_start.split(":").map(Number);
-      const [endHour, endMin] = justificationData.justified_time_end.split(":").map(Number);
-      if ((endHour * 60 + endMin) <= (startHour * 60 + startMin)) {
-        setValidationError("La 'Hora de Fin' debe ser posterior a la 'Hora de Inicio'.");
-        return;
+      // Validar orden solo si ambas están presentes
+      if (justificationData.justified_time_start && justificationData.justified_time_end) {
+        const [startHour, startMin] = justificationData.justified_time_start.split(":").map(Number);
+        const [endHour, endMin] = justificationData.justified_time_end.split(":").map(Number);
+        if ((endHour * 60 + endMin) <= (startHour * 60 + startMin)) {
+          setValidationError("La 'Hora de Fin' debe ser posterior a la 'Hora de Inicio'.");
+          return;
+        }
       }
     }
 
