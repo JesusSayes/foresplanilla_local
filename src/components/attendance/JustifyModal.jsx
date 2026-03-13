@@ -94,7 +94,7 @@ export default function JustifyModal({
 
       if (justificationData.full_day_justification) {
         hoursToAdjust = 8;
-      } else {
+      } else if (timeStart && timeEnd) {
         const [startHour, startMin] = timeStart.split(":").map(Number);
         const [endHour, endMin] = timeEnd.split(":").map(Number);
         const totalMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
@@ -114,6 +114,7 @@ export default function JustifyModal({
           }
         }
       }
+      // Si solo hay una hora (Olvido de Marcación), no se calculan horas a ajustar automáticamente
 
       const incidentPayload = {
         employee_id: justifyingEmployee.id,
