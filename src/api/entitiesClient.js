@@ -53,6 +53,7 @@ export const entitiesAPI = {
   ContractRenewalRule: createEntityAPI('/api/contracts/renewal-rules'),
   AttendanceRecord: createEntityAPI('/api/attendance/records'),
   AttendanceIncident: createEntityAPI('/api/attendance/incidents'),
+  OvertimeAlert: createEntityAPI('/api/attendance/overtime-alerts'),
   WorkSchedule: createEntityAPI('/api/attendance/schedules'),
   VacationRequest: createEntityAPI('/api/vacations/requests'),
   VacationBalance: createEntityAPI('/api/vacations/balances'),

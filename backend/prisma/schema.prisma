@@ -215,7 +215,7 @@ model cost_center {
   category      String?
   is_active     Boolean?
   id            String    @id(map: "costcenter_pkey") @db.VarChar(255)
-  created_date  DateTime? @db.Timestamp(6) @default(now())
+  created_date  DateTime? @db.Timestamp(6)
   updated_date  DateTime? @updatedAt @db.Timestamp(6)
   created_by_id String?
   created_by    String?
@@ -266,7 +266,7 @@ model costcentercategory {
   code          String?
   is_active     Boolean?
   id            String    @id @db.VarChar(255)
-  created_date  DateTime? @db.Timestamp(6) @default(now())
+  created_date  DateTime? @db.Timestamp(6)
   updated_date  DateTime? @updatedAt @db.Timestamp(6)
   created_by_id String?
   created_by    String?
@@ -590,7 +590,7 @@ model user_role {
 }
 
 model users {
-  created_date  DateTime? @db.Timestamp(6) @default(now())
+  created_date  DateTime? @db.Timestamp(6)
   updated_date  DateTime? @updatedAt @db.Timestamp(6)
   disabled      String?
   is_verified   Boolean?
@@ -676,10 +676,15 @@ model accountingaccount {
 }
 
 model overtime_alert {
-  id           String    @id(map: "overtimealert_pkey") @db.VarChar(255)
-  created_date DateTime? @db.Timestamp(6)
-  updated_date DateTime? @db.Timestamp(6)
-  created_by   String?
+  id                   String    @id(map: "overtimealert_pkey") @db.VarChar(255)
+  created_date         DateTime? @db.Timestamp(6)
+  updated_date         DateTime? @db.Timestamp(6)
+  created_by           String?
+  employee_id          String    @db.VarChar(255)
+  attendance_record_id String    @db.VarChar(255)
+  alert_date           DateTime  @db.Date
+  overtime_hours       Decimal   @db.Decimal(5, 2)
+  status               String?   @default("Pendiente") @db.VarChar(50)
 }
 
 model segurovidaley {
