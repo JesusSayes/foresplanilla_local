@@ -40,6 +40,7 @@ export default function AttendanceManagement() {
   const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
   const [showJustifyModal, setShowJustifyModal] = useState(false);
   const [justifyingEmployee, setJustifyingEmployee] = useState(null);
+  const [existingIncident, setExistingIncident] = useState(null);
   const [justificationData, setJustificationData] = useState({
     incident_type: "Olvido de Marcación",
     justification: "",
