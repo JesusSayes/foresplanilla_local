@@ -82,11 +82,12 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const { id, created_date, updated_date, created_by, incident_date,...data } = req.body;
+    const { id, created_date, updated_date, created_by, incident_date, review_date,...data } = req.body;
     const incident = await prisma.attendance_incident.create({
       data: {
         id: generate24HexId(),
         incident_date: new Date(incident_date),
+        review_date: review_date ? new Date(review_date) : null,
         ...data
       }
     });
