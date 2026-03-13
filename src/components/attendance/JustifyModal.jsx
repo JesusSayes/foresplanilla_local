@@ -102,8 +102,7 @@ export default function JustifyModal({
         }
       }
 
-      // Crear incidencia como "Aprobada" directamente
-      await base44.entities.AttendanceIncident.create({
+      const incidentPayload = {
         employee_id: justifyingEmployee.id,
         incident_date: dateStr,
         incident_type: justificationData.incident_type,
@@ -118,21 +117,28 @@ export default function JustifyModal({
         reviewed_by: `${employee.first_name} ${employee.last_name}`,
         review_date: dateStr,
         review_comments: "Aprobada automáticamente al crear la justificación",
-      });
+      };
 
-      // Actualizar o crear el registro de asistencia
+      // Si ya existe justificación previa, actualizarla; si no, crearla
+      if (existingIncident) {
+        await base44.entities.AttendanceIncident.update(existingIncident.id, incidentPayload);
+      } else {
+        await base44.entities.AttendanceIncident.create(incidentPayload);
+      }
+
+      // Siempre usar los tiempos de la justificación para el registro de asistencia (sobreescribir)
       const existingRecord = todayRecords.find(r => r.employee_id === justifyingEmployee.id);
-      const adjustedLateMinutes = Math.max(0, (existingRecord?.late_minutes || 0) - lateMinutesToAdjust);
-      const newWorkedHours = Math.min((existingRecord?.worked_hours || 0) + hoursToAdjust, 8);
+      const newWorkedHours = hoursToAdjust; // Usar directamente las horas de la justificación
+      const newLateMinutes = justificationData.incident_type === "Tardanza" ? Math.max(0, (existingRecord?.late_minutes || 0) - lateMinutesToAdjust) : 0;
 
       if (existingRecord) {
         await base44.entities.AttendanceRecord.update(existingRecord.id, {
-          clock_in: existingRecord.clock_in || timeStart,
-          clock_out: existingRecord.clock_out || timeEnd,
-          worked_hours: newWorkedHours,
-          late_minutes: adjustedLateMinutes,
-          is_late: adjustedLateMinutes > 0,
-          status: adjustedLateMinutes === 0 && newWorkedHours >= 8 ? "Completo" : "Justificado",
+          clock_in: timeStart,
+          clock_out: timeEnd,
+          worked_hours: Math.min(newWorkedHours, 8),
+          late_minutes: newLateMinutes,
+          is_late: newLateMinutes > 0,
+          status: newLateMinutes === 0 && newWorkedHours >= 8 ? "Completo" : "Justificado",
         });
       } else {
         await base44.entities.AttendanceRecord.create({
@@ -140,7 +146,7 @@ export default function JustifyModal({
           date: dateStr,
           clock_in: timeStart,
           clock_out: timeEnd,
-          worked_hours: hoursToAdjust,
+          worked_hours: Math.min(newWorkedHours, 8),
           late_minutes: 0,
           is_late: false,
           is_absent: false,
