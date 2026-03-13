@@ -912,11 +912,21 @@ export default function AttendanceManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-900 mb-2">Hora de Entrada</label>
-                      <Input type="time" value={editingRecord.clock_in} onChange={(e) => setEditingRecord({ ...editingRecord, clock_in: e.target.value })} />
+                      <div className="flex gap-2">
+                        <Input type="time" value={editingRecord.clock_in || ""} onChange={(e) => setEditingRecord({ ...editingRecord, clock_in: e.target.value })} className="flex-1" />
+                        {editingRecord.clock_in && (
+                          <Button type="button" size="sm" variant="ghost" className="text-slate-400 hover:text-red-500 px-2" onClick={() => setEditingRecord({ ...editingRecord, clock_in: "" })}>✕</Button>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-slate-900 mb-2">Hora de Salida</label>
-                      <Input type="time" value={editingRecord.clock_out} onChange={(e) => setEditingRecord({ ...editingRecord, clock_out: e.target.value })} />
+                      <div className="flex gap-2">
+                        <Input type="time" value={editingRecord.clock_out || ""} onChange={(e) => setEditingRecord({ ...editingRecord, clock_out: e.target.value })} className="flex-1" />
+                        {editingRecord.clock_out && (
+                          <Button type="button" size="sm" variant="ghost" className="text-slate-400 hover:text-red-500 px-2" onClick={() => setEditingRecord({ ...editingRecord, clock_out: "" })}>✕</Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div>
@@ -932,7 +942,7 @@ export default function AttendanceManagement() {
                     </Select>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-900 mb-2">Notas</label>
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">Notas <span className="text-xs font-normal text-slate-400">(opcional)</span></label>
                     <Textarea value={editingRecord.notes} onChange={(e) => setEditingRecord({ ...editingRecord, notes: e.target.value })} placeholder="Observaciones adicionales..." rows={3} />
                   </div>
                   <div className="flex gap-3">
