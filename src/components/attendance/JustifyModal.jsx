@@ -18,6 +18,7 @@ export default function JustifyModal({
   selectedDate,
   todayRecords,
   employee,
+  existingIncident,
   onClose,
   onSuccess,
 }) {
@@ -53,19 +54,32 @@ export default function JustifyModal({
       return;
     }
     if (!justificationData.full_day_justification) {
-      if (!justificationData.justified_time_start) {
-        setValidationError("El campo 'Hora de Inicio' es obligatorio cuando no se justifica el día completo.");
-        return;
+      const isOlvidoMarcacion = justificationData.incident_type === "Olvido de Marcación";
+      if (!isOlvidoMarcacion) {
+        // Para otros tipos, ambas horas son obligatorias
+        if (!justificationData.justified_time_start) {
+          setValidationError("El campo 'Hora de Inicio' es obligatorio cuando no se justifica el día completo.");
+          return;
+        }
+        if (!justificationData.justified_time_end) {
+          setValidationError("El campo 'Hora de Fin' es obligatorio cuando no se justifica el día completo.");
+          return;
+        }
+      } else {
+        // Para Olvido de Marcación, al menos uno es obligatorio
+        if (!justificationData.justified_time_start && !justificationData.justified_time_end) {
+          setValidationError("Debes ingresar al menos la Hora de Inicio o la Hora de Fin.");
+          return;
+        }
       }
-      if (!justificationData.justified_time_end) {
-        setValidationError("El campo 'Hora de Fin' es obligatorio cuando no se justifica el día completo.");
-        return;
-      }
-      const [startHour, startMin] = justificationData.justified_time_start.split(":").map(Number);
-      const [endHour, endMin] = justificationData.justified_time_end.split(":").map(Number);
-      if ((endHour * 60 + endMin) <= (startHour * 60 + startMin)) {
-        setValidationError("La 'Hora de Fin' debe ser posterior a la 'Hora de Inicio'.");
-        return;
+      // Validar orden solo si ambas están presentes
+      if (justificationData.justified_time_start && justificationData.justified_time_end) {
+        const [startHour, startMin] = justificationData.justified_time_start.split(":").map(Number);
+        const [endHour, endMin] = justificationData.justified_time_end.split(":").map(Number);
+        if ((endHour * 60 + endMin) <= (startHour * 60 + startMin)) {
+          setValidationError("La 'Hora de Fin' debe ser posterior a la 'Hora de Inicio'.");
+          return;
+        }
       }
     }
 
@@ -81,7 +95,7 @@ export default function JustifyModal({
 
       if (justificationData.full_day_justification) {
         hoursToAdjust = 8;
-      } else {
+      } else if (timeStart && timeEnd) {
         const [startHour, startMin] = timeStart.split(":").map(Number);
         const [endHour, endMin] = timeEnd.split(":").map(Number);
         const totalMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
@@ -101,9 +115,9 @@ export default function JustifyModal({
           }
         }
       }
+      // Si solo hay una hora (Olvido de Marcación), no se calculan horas a ajustar automáticamente
 
-      // Crear incidencia como "Aprobada" directamente
-      await entitiesAPI.AttendanceIncident.create({
+      const incidentPayload = {
         employee_id: justifyingEmployee.id,
         incident_date: dateStr,
         incident_type: justificationData.incident_type,
@@ -118,29 +132,39 @@ export default function JustifyModal({
         reviewed_by: `${employee.first_name} ${employee.last_name}`,
         review_date: dateStr,
         review_comments: "Aprobada automáticamente al crear la justificación",
-      });
+      };
 
-      // Actualizar o crear el registro de asistencia
+      // Si ya existe justificación previa, actualizarla; si no, crearla
+      if (existingIncident) {
+        await entitiesAPI.AttendanceIncident.update(existingIncident.id, incidentPayload);
+      } else {
+        await entitiesAPI.AttendanceIncident.create(incidentPayload);
+      }
+
+      // Siempre usar los tiempos de la justificación para el registro de asistencia (sobreescribir)
       const existingRecord = todayRecords.find(r => r.employee_id === justifyingEmployee.id);
-      const adjustedLateMinutes = Math.max(0, (existingRecord?.late_minutes || 0) - lateMinutesToAdjust);
-      const newWorkedHours = Math.min((existingRecord?.worked_hours || 0) + hoursToAdjust, 8);
+      const newWorkedHours = hoursToAdjust; // Usar directamente las horas de la justificación
+      const newLateMinutes = justificationData.incident_type === "Tardanza" ? Math.max(0, (existingRecord?.late_minutes || 0) - lateMinutesToAdjust) : 0;
+
+      // Construir datos del registro: solo sobreescribir los campos que tienen valor
+      const recordUpdate = {
+        worked_hours: Math.min(newWorkedHours, 8),
+        late_minutes: newLateMinutes,
+        is_late: newLateMinutes > 0,
+        status: newLateMinutes === 0 && newWorkedHours >= 8 ? "Completo" : "Justificado",
+      };
+      if (timeStart) recordUpdate.clock_in = timeStart;
+      if (timeEnd) recordUpdate.clock_out = timeEnd;
 
       if (existingRecord) {
-        await entitiesAPI.AttendanceRecord.update(existingRecord.id, {
-          clock_in: existingRecord.clock_in || timeStart,
-          clock_out: existingRecord.clock_out || timeEnd,
-          worked_hours: newWorkedHours,
-          late_minutes: adjustedLateMinutes,
-          is_late: adjustedLateMinutes > 0,
-          status: adjustedLateMinutes === 0 && newWorkedHours >= 8 ? "Completo" : "Justificado",
-        });
+        await entitiesAPI.AttendanceRecord.update(existingRecord.id, recordUpdate);
       } else {
         await entitiesAPI.AttendanceRecord.create({
           employee_id: justifyingEmployee.id,
           date: dateStr,
-          clock_in: timeStart,
-          clock_out: timeEnd,
-          worked_hours: hoursToAdjust,
+          clock_in: timeStart || null,
+          clock_out: timeEnd || null,
+          worked_hours: Math.min(newWorkedHours, 8),
           late_minutes: 0,
           is_late: false,
           is_absent: false,
@@ -242,29 +266,47 @@ export default function JustifyModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Hora de Inicio <span className="text-red-500">*</span>
+                        Hora de Inicio{" "}
+                        {justificationData.incident_type === "Olvido de Marcación"
+                          ? <span className="text-slate-400">(opcional)</span>
+                          : <span className="text-red-500">*</span>}
                       </label>
-                      <Input
-                        type="time"
-                        value={justificationData.justified_time_start}
-                        onChange={(e) => {
-                          setJustificationData({ ...justificationData, justified_time_start: e.target.value });
-                          setValidationError("");
-                        }}
-                      />
+                      <div className="flex gap-1">
+                        <Input
+                          type="time"
+                          value={justificationData.justified_time_start || ""}
+                          onChange={(e) => {
+                            setJustificationData({ ...justificationData, justified_time_start: e.target.value });
+                            setValidationError("");
+                          }}
+                          className="flex-1"
+                        />
+                        {justificationData.justified_time_start && justificationData.incident_type === "Olvido de Marcación" && (
+                          <Button type="button" size="sm" variant="ghost" className="px-2 text-slate-400 hover:text-red-500" onClick={() => setJustificationData({ ...justificationData, justified_time_start: "" })}>✕</Button>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Hora de Fin <span className="text-red-500">*</span>
+                        Hora de Fin{" "}
+                        {justificationData.incident_type === "Olvido de Marcación"
+                          ? <span className="text-slate-400">(opcional)</span>
+                          : <span className="text-red-500">*</span>}
                       </label>
-                      <Input
-                        type="time"
-                        value={justificationData.justified_time_end}
-                        onChange={(e) => {
-                          setJustificationData({ ...justificationData, justified_time_end: e.target.value });
-                          setValidationError("");
-                        }}
-                      />
+                      <div className="flex gap-1">
+                        <Input
+                          type="time"
+                          value={justificationData.justified_time_end || ""}
+                          onChange={(e) => {
+                            setJustificationData({ ...justificationData, justified_time_end: e.target.value });
+                            setValidationError("");
+                          }}
+                          className="flex-1"
+                        />
+                        {justificationData.justified_time_end && justificationData.incident_type === "Olvido de Marcación" && (
+                          <Button type="button" size="sm" variant="ghost" className="px-2 text-slate-400 hover:text-red-500" onClick={() => setJustificationData({ ...justificationData, justified_time_end: "" })}>✕</Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -339,7 +381,7 @@ export default function JustifyModal({
                 onClick={handleSubmit}
                 disabled={submitting}
               >
-                {submitting ? "Guardando..." : "Crear Justificación"}
+                {submitting ? "Guardando..." : existingIncident ? "Actualizar Justificación" : "Crear Justificación"}
               </Button>
             </div>
           </div>

@@ -22,7 +22,7 @@ export const getAll = async (req, res) => {
 export const getById =  async (req, res) => {
   try {
     const record = await prisma.attendance_record.findUnique({
-      where: { id: parseInt(req.params.id) },
+      where: { id: req.params.id },
       // include: { employee: true, schedule: true, incidents: true }
     });
     if (!record) return res.status(404).json({ error: 'Record not found' });
@@ -73,7 +73,7 @@ export const create = async (req, res) => {
 export const update = async (req, res) => {
   try {
     const record = await prisma.attendance_record.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id: req.params.id },
       data: req.body
     });
     res.json(record);
@@ -85,7 +85,7 @@ export const update = async (req, res) => {
 export const remove = async (req, res) => {
   try {
     await prisma.attendance_record.delete({
-      where: { id: parseInt(req.params.id) }
+      where: { id: req.params.id }
     });
     res.status(204).send();
   } catch (error) {
