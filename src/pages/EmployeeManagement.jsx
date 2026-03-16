@@ -1086,7 +1086,7 @@ export default function EmployeeManagement() {
                   <TabsTrigger value="personal">Personal</TabsTrigger>
                   <TabsTrigger value="contact">Contacto</TabsTrigger>
                   <TabsTrigger value="work">Laboral</TabsTrigger>
-                  <TabsTrigger value="financial">Financiero</TabsTrigger>
+                  <TabsTrigger value="financial" disabled={!hasPermission("employees.view_financials")}>Financiero{!hasPermission("employees.view_financials") ? " 🔒" : ""}</TabsTrigger>
                   <TabsTrigger value="emergency">Emergencia</TabsTrigger>
                   <TabsTrigger value="derechohabientes" disabled={!editingEmployee}>Derechohabientes</TabsTrigger>
                 </TabsList>
