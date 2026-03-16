@@ -12,6 +12,7 @@ export const AVAILABLE_PERMISSIONS = {
   "employees.import": "Importar empleados masivamente",
   "employees.export": "Exportar datos de empleados",
   "employees.change_status": "Cambiar estado de empleados",
+  "employees.view_financials": "Ver información financiera de empleados",
 
   // Asistencia
   "attendance.view_own": "Ver propia asistencia",
@@ -203,6 +204,24 @@ export const usePermissions = () => {
     return permissionList.every(p => hasPermission(p));
   };
 
+  const canAccessSite = (siteName) => {
+    if (employee?.role === "super_admin" || employee?.role === "admin") return true;
+    if (hasPermission("system.admin")) return true;
+    const siteRestrictedRoles = roles.filter(r => r.site_restricted);
+    if (siteRestrictedRoles.length === 0) return true;
+    const allowedSites = siteRestrictedRoles.flatMap(r => r.allowed_sites || []);
+    return allowedSites.length === 0 || allowedSites.includes(siteName);
+  };
+
+  const getAccessibleSites = () => {
+    if (employee?.role === "super_admin" || employee?.role === "admin") return null; // null = todas
+    if (hasPermission("system.admin")) return null;
+    const siteRestrictedRoles = roles.filter(r => r.site_restricted);
+    if (siteRestrictedRoles.length === 0) return null;
+    const allowedSites = siteRestrictedRoles.flatMap(r => r.allowed_sites || []);
+    return allowedSites.length > 0 ? allowedSites : null;
+  };
+
   const canAccessDepartment = (departmentName) => {
     // Super Admin y Admin pueden ver todo
     if (employee?.role === "super_admin" || employee?.role === "admin") return true;
@@ -268,6 +287,8 @@ export const usePermissions = () => {
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
+    canAccessSite,
+    getAccessibleSites,
     canAccessDepartment,
     canAccessEmployee,
     getAccessibleEmployeeIds,
