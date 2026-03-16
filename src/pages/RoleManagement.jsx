@@ -26,6 +26,8 @@ export default function RoleManagement() {
     description: "",
     permissions: [],
     department_restricted: false,
+    site_restricted: false,
+    allowed_sites: [],
   });
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
