@@ -608,6 +608,59 @@ export default function RoleManagement() {
                     </label>
                   </div>
 
+                  {/* Restricción por sede */}
+                  <div className="space-y-3 p-4 border border-slate-200 rounded-lg bg-slate-50">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="site_restricted"
+                        checked={roleFormData.site_restricted}
+                        onChange={(e) => setRoleFormData({ ...roleFormData, site_restricted: e.target.checked, allowed_sites: e.target.checked ? roleFormData.allowed_sites : [] })}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="site_restricted" className="text-sm font-medium text-slate-700">
+                        Restringir visualización por sede
+                      </label>
+                    </div>
+                    {roleFormData.site_restricted && (
+                      <div className="ml-6 space-y-2">
+                        <p className="text-xs text-slate-500">Selecciona las sedes que este rol puede visualizar. Si no seleccionas ninguna, solo verá la sede de su propio empleado.</p>
+                        <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                          {sites.map(site => (
+                            <label key={site.id} className="flex items-center gap-2 p-2 bg-white border border-slate-200 rounded cursor-pointer hover:bg-indigo-50 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={roleFormData.allowed_sites.includes(site.name)}
+                                onChange={(e) => {
+                                  const updated = e.target.checked
+                                    ? [...roleFormData.allowed_sites, site.name]
+                                    : roleFormData.allowed_sites.filter(s => s !== site.name);
+                                  setRoleFormData({ ...roleFormData, allowed_sites: updated });
+                                }}
+                                className="w-4 h-4"
+                              />
+                              <span className="font-medium text-slate-800">{site.name}</span>
+                              {site.code && <span className="text-slate-400 text-xs">({site.code})</span>}
+                            </label>
+                          ))}
+                        </div>
+                        {roleFormData.allowed_sites.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {roleFormData.allowed_sites.map(s => (
+                              <Badge key={s} className="bg-amber-100 text-amber-800 text-xs">
+                                {s}
+                                <button
+                                  className="ml-1 hover:text-red-600"
+                                  onClick={() => setRoleFormData({ ...roleFormData, allowed_sites: roleFormData.allowed_sites.filter(x => x !== s) })}
+                                >×</button>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-sm font-semibold text-slate-900 mb-3">
                       Permisos ({roleFormData.permissions.length} seleccionados)
