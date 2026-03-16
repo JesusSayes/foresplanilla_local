@@ -422,6 +422,11 @@ export default function RoleManagement() {
                               {role.department_restricted && (
                                 <Badge className="bg-blue-100 text-blue-700">Departamental</Badge>
                               )}
+                              {role.site_restricted && (
+                                <Badge className="bg-amber-100 text-amber-700">
+                                  {role.allowed_sites?.length > 0 ? `${role.allowed_sites.length} sede(s)` : "Sede propia"}
+                                </Badge>
+                              )}
                             </div>
                             <p className="text-sm text-slate-600 mb-3">
                               {role.description || "Sin descripción"}
