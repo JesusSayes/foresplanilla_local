@@ -201,6 +201,8 @@ export default function RoleManagement() {
       description: role.description || "",
       permissions: role.permissions || [],
       department_restricted: role.department_restricted || false,
+      site_restricted: role.site_restricted || false,
+      allowed_sites: role.allowed_sites || [],
     });
     setShowRoleForm(true);
   };
