@@ -78,6 +78,14 @@ export default function RoleManagement() {
     },
   });
 
+  const { data: sites = [] } = useQuery({
+    queryKey: ["sites"],
+    queryFn: async () => {
+      const allSites = await base44.entities.Site.list("name");
+      return allSites.filter(s => s.is_active);
+    },
+  });
+
   const createRoleMutation = useMutation({
     mutationFn: async (data) => {
       return await base44.entities.Role.create(data);
