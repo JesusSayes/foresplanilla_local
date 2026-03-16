@@ -11,6 +11,7 @@ export const AVAILABLE_PERMISSIONS = {
   "employees.import": "Importar empleados masivamente",
   "employees.export": "Exportar datos de empleados",
   "employees.change_status": "Cambiar estado de empleados",
+  "employees.view_financials": "Ver información financiera de empleados",
   
   // Asistencia
   "attendance.view_own": "Ver propia asistencia",
