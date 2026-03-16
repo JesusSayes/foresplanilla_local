@@ -282,6 +282,8 @@ export const usePermissions = () => {
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
+    canAccessSite,
+    getAccessibleSites,
     canAccessDepartment,
     canAccessEmployee,
     getAccessibleEmployeeIds,
