@@ -223,6 +223,8 @@ export default function RoleManagement() {
       description: "",
       permissions: [],
       department_restricted: false,
+      site_restricted: false,
+      allowed_sites: [],
     });
     setEditingRole(null);
     setShowRoleForm(false);
