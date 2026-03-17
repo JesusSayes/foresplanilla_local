@@ -77,7 +77,7 @@ export default function RoleManagement() {
   const { data: sites = [] } = useQuery({
     queryKey: ["sites"],
     queryFn: async () => {
-      const allSites = await base44.entities.Site.list("name");
+      const allSites = await entitiesAPI.Site.list("name");
       return allSites.filter(s => s.is_active);
     },
   });
