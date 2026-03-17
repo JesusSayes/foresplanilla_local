@@ -354,10 +354,10 @@ export default function AttendanceManagement() {
       emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDept = selectedDepartment === "all" || emp.department_name === selectedDepartment;
     const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
-    if (emp.status === "Cesado") {
-      const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (emp.termination_date) {
+      const termination = new Date(emp.termination_date + "T00:00:00");
       const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
-      if (selected >= today) return false;
+      if (selected > termination) return false;
     }
     return matchesSearch && matchesDept && matchesSite;
   });
