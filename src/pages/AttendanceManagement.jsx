@@ -907,7 +907,7 @@ export default function AttendanceManagement() {
               <CardContent className="p-6">
                 <div className="space-y-6">
                   <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm text-slate-600">Fecha: <strong>{format(new Date(editingRecord.date), "dd 'de' MMMM, yyyy", { locale: es })}</strong></p>
+                    <p className="text-sm text-slate-600">Fecha: <strong>{format(new Date(editingRecord.date + "T00:00:00"), "dd 'de' MMMM, yyyy", { locale: es })}</strong></p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
