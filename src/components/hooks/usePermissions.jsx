@@ -207,19 +207,46 @@ export const usePermissions = () => {
   const canAccessSite = (siteName) => {
     if (employee?.role === "super_admin" || employee?.role === "admin") return true;
     if (hasPermission("system.admin")) return true;
+
+    // Si ningún rol tiene restricción de sede, puede ver todas
     const siteRestrictedRoles = roles.filter(r => r.site_restricted);
     if (siteRestrictedRoles.length === 0) return true;
+
+    // Roles sin restricción de sede: otorgan acceso a todo
+    const hasUnrestrictedRole = roles.some(r => !r.site_restricted);
+    if (hasUnrestrictedRole) return true;
+
+    // Combinar todas las sedes permitidas de TODOS los roles site_restricted del usuario
     const allowedSites = siteRestrictedRoles.flatMap(r => r.allowed_sites || []);
-    return allowedSites.length === 0 || allowedSites.includes(siteName);
+
+    // Si ningún rol tiene sedes específicas definidas, aplica la restricción a la sede propia
+    if (allowedSites.length === 0) {
+      return employee?.site === siteName;
+    }
+
+    return allowedSites.includes(siteName);
   };
 
   const getAccessibleSites = () => {
     if (employee?.role === "super_admin" || employee?.role === "admin") return null; // null = todas
     if (hasPermission("system.admin")) return null;
+
     const siteRestrictedRoles = roles.filter(r => r.site_restricted);
     if (siteRestrictedRoles.length === 0) return null;
-    const allowedSites = siteRestrictedRoles.flatMap(r => r.allowed_sites || []);
-    return allowedSites.length > 0 ? allowedSites : null;
+
+    // Si el usuario tiene algún rol sin restricción de sede, ve todas
+    const hasUnrestrictedRole = roles.some(r => !r.site_restricted);
+    if (hasUnrestrictedRole) return null;
+
+    // Combinar sedes de TODOS los roles site_restricted
+    const allowedSites = [...new Set(siteRestrictedRoles.flatMap(r => r.allowed_sites || []))];
+
+    // Si ningún rol tiene sedes específicas, restringir a la sede propia del empleado
+    if (allowedSites.length === 0) {
+      return employee?.site ? [employee.site] : [];
+    }
+
+    return allowedSites;
   };
 
   const canAccessDepartment = (departmentName) => {
