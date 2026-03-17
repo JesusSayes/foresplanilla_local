@@ -225,10 +225,23 @@ export const usePermissions = () => {
   const getAccessibleSites = () => {
     if (employee?.role === "super_admin" || employee?.role === "admin") return null; // null = todas
     if (hasPermission("system.admin")) return null;
+
     const siteRestrictedRoles = roles.filter(r => r.site_restricted);
     if (siteRestrictedRoles.length === 0) return null;
-    const allowedSites = siteRestrictedRoles.flatMap(r => r.allowed_sites || []);
-    return allowedSites.length > 0 ? allowedSites : null;
+
+    // Si el usuario tiene algún rol sin restricción de sede, ve todas
+    const hasUnrestrictedRole = roles.some(r => !r.site_restricted);
+    if (hasUnrestrictedRole) return null;
+
+    // Combinar sedes de TODOS los roles site_restricted
+    const allowedSites = [...new Set(siteRestrictedRoles.flatMap(r => r.allowed_sites || []))];
+
+    // Si ningún rol tiene sedes específicas, restringir a la sede propia del empleado
+    if (allowedSites.length === 0) {
+      return employee?.site ? [employee.site] : [];
+    }
+
+    return allowedSites;
   };
 
   const canAccessDepartment = (departmentName) => {
