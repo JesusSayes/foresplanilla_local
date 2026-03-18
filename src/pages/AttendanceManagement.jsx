@@ -367,11 +367,10 @@ export default function AttendanceManagement() {
       emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDept = selectedDepartment === "all" || emp.department_name === selectedDepartment;
     const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
-
-    if (emp.status === "Cesado") {
-      const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (emp.termination_date) {
+      const termination = new Date(emp.termination_date + "T00:00:00");
       const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
-      if (selected >= today) return false;
+      if (selected > termination) return false;
     }
     return matchesSearch && matchesDept && matchesSite;
   });
@@ -927,8 +926,8 @@ export default function AttendanceManagement() {
               </CardHeader>
               <CardContent className="p-6">
                 <div className="space-y-6">
-                  <div className="p-bg-slate-50 rounded-lg">
-                    <p className="text-sm text-slate-600">Fecha: <strong>{format(new Date(editingRecord.date), "dd 'de' MMMM, yyyy", { locale: es })}</strong></p>
+                  <div className="p-4 bg-slate-50 rounded-lg">
+                    <p className="text-sm text-slate-600">Fecha: <strong>{format(new Date(editingRecord.date + "T00:00:00"), "dd 'de' MMMM, yyyy", { locale: es })}</strong></p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
