@@ -653,7 +653,7 @@ export default function RoleManagement() {
                                 {s}
                                 <button
                                   className="ml-1 hover:text-red-600"
-                                  onClick={() => setRoleFormData({ ...roleFormData, allowed_sites: roleFormData.allowed_sites.filter(x => x !== s) })}
+                                  onClick={() => setRoleFormData(prev => ({ ...prev, allowed_sites: prev.allowed_sites.filter(x => x !== s) }))}
                                 >×</button>
                               </Badge>
                             ))}
