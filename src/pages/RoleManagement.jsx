@@ -615,7 +615,7 @@ export default function RoleManagement() {
                         type="checkbox"
                         id="site_restricted"
                         checked={roleFormData.site_restricted}
-                        onChange={(e) => setRoleFormData({ ...roleFormData, site_restricted: e.target.checked, allowed_sites: e.target.checked ? roleFormData.allowed_sites : [] })}
+                        onChange={(e) => setRoleFormData(prev => ({ ...prev, site_restricted: e.target.checked, allowed_sites: e.target.checked ? prev.allowed_sites : [] }))}
                         className="w-4 h-4 rounded"
                       />
                       <label htmlFor="site_restricted" className="text-sm font-medium text-slate-700">
