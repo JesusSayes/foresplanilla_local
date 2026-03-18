@@ -23,6 +23,7 @@ export default function VacationRequest() {
   const [showForm, setShowForm] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [formData, setFormData] = useState({
     request_type: "Vacaciones",
     start_date: null,
