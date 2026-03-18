@@ -632,10 +632,12 @@ export default function RoleManagement() {
                                 type="checkbox"
                                 checked={roleFormData.allowed_sites.includes(site.name)}
                                 onChange={(e) => {
-                                  const updated = e.target.checked
-                                    ? [...roleFormData.allowed_sites, site.name]
-                                    : roleFormData.allowed_sites.filter(s => s !== site.name);
-                                  setRoleFormData({ ...roleFormData, allowed_sites: updated });
+                                  setRoleFormData(prev => ({
+                                    ...prev,
+                                    allowed_sites: e.target.checked
+                                      ? [...prev.allowed_sites, site.name]
+                                      : prev.allowed_sites.filter(s => s !== site.name)
+                                  }));
                                 }}
                                 className="w-4 h-4"
                               />
