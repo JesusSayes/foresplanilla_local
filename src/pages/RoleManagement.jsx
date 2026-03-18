@@ -232,7 +232,7 @@ export default function RoleManagement() {
   };
 
   const handlePermissionsChange = (newPermissions) => {
-    setRoleFormData({ ...roleFormData, permissions: newPermissions });
+    setRoleFormData(prev => ({ ...prev, permissions: newPermissions }));
   };
 
   const handleAssignRoles = (emp) => {
@@ -601,7 +601,7 @@ export default function RoleManagement() {
                       type="checkbox"
                       id="dept_restricted"
                       checked={roleFormData.department_restricted}
-                      onChange={(e) => setRoleFormData({ ...roleFormData, department_restricted: e.target.checked })}
+                      onChange={(e) => setRoleFormData(prev => ({ ...prev, department_restricted: e.target.checked }))}
                       className="w-4 h-4 rounded"
                     />
                     <label htmlFor="dept_restricted" className="text-sm text-slate-700">
@@ -616,7 +616,7 @@ export default function RoleManagement() {
                         type="checkbox"
                         id="site_restricted"
                         checked={roleFormData.site_restricted}
-                        onChange={(e) => setRoleFormData({ ...roleFormData, site_restricted: e.target.checked, allowed_sites: e.target.checked ? roleFormData.allowed_sites : [] })}
+                        onChange={(e) => setRoleFormData(prev => ({ ...prev, site_restricted: e.target.checked, allowed_sites: e.target.checked ? prev.allowed_sites : [] }))}
                         className="w-4 h-4 rounded"
                       />
                       <label htmlFor="site_restricted" className="text-sm font-medium text-slate-700">
@@ -633,10 +633,12 @@ export default function RoleManagement() {
                                 type="checkbox"
                                 checked={roleFormData.allowed_sites.includes(site.name)}
                                 onChange={(e) => {
-                                  const updated = e.target.checked
-                                    ? [...roleFormData.allowed_sites, site.name]
-                                    : roleFormData.allowed_sites.filter(s => s !== site.name);
-                                  setRoleFormData({ ...roleFormData, allowed_sites: updated });
+                                  setRoleFormData(prev => ({
+                                    ...prev,
+                                    allowed_sites: e.target.checked
+                                      ? [...prev.allowed_sites, site.name]
+                                      : prev.allowed_sites.filter(s => s !== site.name)
+                                  }));
                                 }}
                                 className="w-4 h-4"
                               />
@@ -652,7 +654,7 @@ export default function RoleManagement() {
                                 {s}
                                 <button
                                   className="ml-1 hover:text-red-600"
-                                  onClick={() => setRoleFormData({ ...roleFormData, allowed_sites: roleFormData.allowed_sites.filter(x => x !== s) })}
+                                  onClick={() => setRoleFormData(prev => ({ ...prev, allowed_sites: prev.allowed_sites.filter(x => x !== s) }))}
                                 >×</button>
                               </Badge>
                             ))}
