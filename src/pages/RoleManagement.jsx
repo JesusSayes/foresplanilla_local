@@ -600,7 +600,7 @@ export default function RoleManagement() {
                       type="checkbox"
                       id="dept_restricted"
                       checked={roleFormData.department_restricted}
-                      onChange={(e) => setRoleFormData({ ...roleFormData, department_restricted: e.target.checked })}
+                      onChange={(e) => setRoleFormData(prev => ({ ...prev, department_restricted: e.target.checked }))}
                       className="w-4 h-4 rounded"
                     />
                     <label htmlFor="dept_restricted" className="text-sm text-slate-700">
