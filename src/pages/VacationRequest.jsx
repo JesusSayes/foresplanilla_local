@@ -11,7 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   Calendar as CalendarIcon, Plus, Clock, CheckCircle, 
-  XCircle, AlertCircle, Upload, FileText, Trash2
+  XCircle, AlertCircle, Upload, FileText, Trash2, Search, ChevronDown
 } from "lucide-react";
 import { format, differenceInBusinessDays, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
