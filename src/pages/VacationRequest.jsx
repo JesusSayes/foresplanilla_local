@@ -347,36 +347,59 @@ export default function VacationRequest() {
                         <label className="block text-sm font-semibold text-slate-900 mb-2">
                           Empleado *
                         </label>
-                        <Select 
-                          value={selectedEmployeeId || ""}
-                          onValueChange={(value) => setSelectedEmployeeId(value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar empleado" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <div className="p-2 border-b">
-                              <Input
-                                placeholder="Buscar por nombre o código..."
-                                value={employeeSearchTerm}
-                                onChange={(e) => setEmployeeSearchTerm(e.target.value)}
-                                className="h-8"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </div>
-                            {filteredEmployees.length === 0 ? (
-                              <div className="p-2 text-sm text-slate-500 text-center">
-                                No se encontraron empleados
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setShowEmployeeDropdown(!showEmployeeDropdown)}
+                            className="w-full flex items-center justify-between h-9 px-3 py-2 text-sm border border-input bg-transparent rounded-md shadow-sm hover:bg-accent transition-colors"
+                          >
+                            <span className={selectedEmployeeId ? "text-foreground" : "text-muted-foreground"}>
+                              {selectedEmployeeId
+                                ? (() => { const e = allEmployees.find(e => e.id === selectedEmployeeId); return e ? `${e.first_name} ${e.last_name} - ${e.employee_code}` : ""; })()
+                                : "Seleccionar empleado"}
+                            </span>
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                          {showEmployeeDropdown && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg">
+                              <div className="p-2 border-b">
+                                <div className="relative">
+                                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                  <Input
+                                    placeholder="Buscar por nombre o código..."
+                                    value={employeeSearchTerm}
+                                    onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                                    className="h-8 pl-8"
+                                    autoFocus
+                                  />
+                                </div>
                               </div>
-                            ) : (
-                              filteredEmployees.map((emp) => (
-                                <SelectItem key={emp.id} value={emp.id}>
-                                  {emp.first_name} {emp.last_name} - {emp.employee_code}
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
+                              <div className="max-h-52 overflow-y-auto">
+                                {filteredEmployees.length === 0 ? (
+                                  <div className="p-3 text-sm text-slate-500 text-center">No se encontraron empleados</div>
+                                ) : (
+                                  filteredEmployees.map((emp) => (
+                                    <button
+                                      key={emp.id}
+                                      type="button"
+                                      className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors ${selectedEmployeeId === emp.id ? "bg-indigo-50 text-indigo-700 font-medium" : "text-slate-700"}`}
+                                      onClick={() => {
+                                        setSelectedEmployeeId(emp.id);
+                                        setShowEmployeeDropdown(false);
+                                        setEmployeeSearchTerm("");
+                                      }}
+                                    >
+                                      {emp.first_name} {emp.last_name} - {emp.employee_code}
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {showEmployeeDropdown && (
+                          <div className="fixed inset-0 z-40" onClick={() => setShowEmployeeDropdown(false)} />
+                        )}
                       </div>
                     ) : (
                       <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
