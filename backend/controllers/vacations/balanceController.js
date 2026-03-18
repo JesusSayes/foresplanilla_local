@@ -18,7 +18,7 @@ export const getAll = async (req, res) => {
 export const getById = async (req, res) => {
   try {
     const balance = await MODEL.findUnique({
-      where: { id: parseInt(req.params.id) },
+      where: { id: req.params.id },
       // include: { employee: true }
     });
     if (!balance) return res.status(404).json({ error: 'Balance not found' });
@@ -42,7 +42,7 @@ export const create = async (req, res) => {
 export const update = async (req, res) => {
   try {
     const balance = await MODEL.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id: req.params.id },
       data: req.body
     });
     res.json(balance);
@@ -54,7 +54,7 @@ export const update = async (req, res) => {
 export const remove = async (req, res) => {
   try {
     await MODEL.delete({
-      where: { id: parseInt(req.params.id) }
+      where: { id: req.params.id }
     });
     res.status(204).send();
   } catch (error) {

@@ -46,16 +46,16 @@ export default function VacationManagement() {
   });
 
   const { data: vacationRequests = [] } = useQuery({
-    queryKey: ["vacationRequests"],
+    queryKey: ["allVacationRequests"],
     queryFn: async () => {
-      return await entitiesAPI.Vacation_request.list("-created_date");
+      return await entitiesAPI.VacationRequest.list("-created_date");
     },
   });
 
   const { data: vacationBalances = [] } = useQuery({
     queryKey: ["vacationBalances"],
     queryFn: async () => {
-      return await entitiesAPI.vacation_balance.list("-created_date");
+      return await entitiesAPI.VacationBalance.list("-created_date");
     },
   });
 
