@@ -231,7 +231,7 @@ export default function RoleManagement() {
   };
 
   const handlePermissionsChange = (newPermissions) => {
-    setRoleFormData({ ...roleFormData, permissions: newPermissions });
+    setRoleFormData(prev => ({ ...prev, permissions: newPermissions }));
   };
 
   const handleAssignRoles = (emp) => {
