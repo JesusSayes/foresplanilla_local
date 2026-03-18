@@ -48,7 +48,7 @@ export default function VacationRequest() {
     queryKey: ["vacationBalance", targetEmployeeId],
     queryFn: async () => {
       if (!targetEmployeeId) return null;
-      const balances = await entitiesAPI.vacation_balance.filter(
+      const balances = await entitiesAPI.VacationBalance.filter(
         { employee_id: targetEmployeeId, is_active: true },
         "-period_start",
         1
@@ -62,7 +62,7 @@ export default function VacationRequest() {
     queryKey: ["vacationRequests", targetEmployeeId],
     queryFn: async () => {
       if (!targetEmployeeId) return [];
-      return await entitiesAPI.vacation_request.filter(
+      return await entitiesAPI.VacationRequest.filter(
         { employee_id: targetEmployeeId },
         "-created_date"
       );
@@ -75,7 +75,7 @@ export default function VacationRequest() {
       return await entitiesAPI.VacationRequest.create(data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["vacationRequests"]);
+      queryClient.invalidateQueries(["vacationRequests", targetEmployeeId]);
       toast.success("Solicitud enviada exitosamente");
       setShowForm(false);
       resetForm();
@@ -91,7 +91,7 @@ export default function VacationRequest() {
       return await entitiesAPI.VacationRequest.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["vacationRequests"]);
+      queryClient.invalidateQueries(["vacationRequests", targetEmployeeId]);
       toast.success("Solicitud cancelada");
     },
   });

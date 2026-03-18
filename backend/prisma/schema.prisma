@@ -656,10 +656,30 @@ model work_schedule {
 }
 
 model vacation_request {
-  id           String    @id(map: "vacationrequest_pkey") @db.VarChar(255)
-  created_date DateTime? @db.Timestamp(6)
-  updated_date DateTime? @db.Timestamp(6)
-  created_by   String?
+  id                      String    @id(map: "vacationrequest_pkey") @db.VarChar(255)
+  created_date            DateTime? @db.Timestamp(6)
+  updated_date            DateTime? @db.Timestamp(6)
+  created_by              String?
+  employee_id             String    @db.VarChar(255)
+  request_type            String    @db.VarChar(50)
+  start_date              DateTime  @db.Date
+  end_date                DateTime  @db.Date
+  total_days              Int
+  business_days           Int
+  reason                  String?
+  supporting_document_url String?
+  status                  String?   @default("Pendiente") @db.VarChar(50)
+  comments                String?
+  approved_date           DateTime? @db.Timestamp(6)
+  approved_by             String?   @db.VarChar(255)
+  rejection_reason        String?
+  created_by_id           String?   @db.VarChar(255)
+  is_sample               Boolean   @default(false)
+
+  @@index([start_date, end_date], map: "idx_vacation_request_dates")
+  @@index([employee_id], map: "idx_vacation_request_employee")
+  @@index([employee_id, status], map: "idx_vacation_request_employee_status")
+  @@index([status], map: "idx_vacation_request_status")
 }
 
 model accountingaccount {
@@ -682,7 +702,7 @@ model overtime_alert {
   created_by           String?
   employee_id          String    @db.VarChar(255)
   attendance_record_id String    @db.VarChar(255)
-  alert_date           DateTime  @db.Date
+  alert_date           DateTime  @db.Timestamp(6)
   overtime_hours       Decimal   @db.Decimal(5, 2)
   status               String?   @default("Pendiente") @db.VarChar(50)
 }
