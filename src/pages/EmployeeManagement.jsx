@@ -1056,10 +1056,7 @@ export default function EmployeeManagement() {
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
-      {false && (<div><div>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <Label>Código de Empleado <span className="text-red-600">*</span></Label>
+      {false && (<div><div><div className="grid grid-cols-3 gap-4"><div><Label>OLD</Label>
                           <Input
                             value={formData.employee_code}
                             onChange={(e) => setFormData({ ...formData, employee_code: e.target.value })}
