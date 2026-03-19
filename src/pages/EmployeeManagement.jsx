@@ -1056,12 +1056,7 @@ export default function EmployeeManagement() {
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
-      {/* OLD_FORM_REMOVED_PLACEHOLDER - delete from here to matching closing */}
-      {false && (
-        <div>
-                  <div className="flex gap-4">
-                    {/* dummy */}
-                    <div className="flex-1 space-y-4">
+      {false && (<div><div>
                       <div className="grid grid-cols-3 gap-4">
                         <div>
                           <Label>Código de Empleado <span className="text-red-600">*</span></Label>
