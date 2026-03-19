@@ -515,16 +515,18 @@ model role {
   name                  String?
   description           String?
   permissions           Json?     @db.Json
-  is_system_role        Boolean?
-  department_restricted Boolean?
-  team_restricted       Boolean?
+  is_system_role        Boolean?  @default(false)
+  department_restricted Boolean?  @default(false)
+  team_restricted       Boolean?  @default(false)
   priority              Int?
   id                    String    @id @db.VarChar(255)
   created_date          DateTime? @db.Timestamp(6)
   updated_date          DateTime? @db.Timestamp(6)
   created_by_id         String?
   created_by            String?
-  is_sample             Boolean?
+  is_sample             Boolean?  @default(false)
+  allowed_sites         Json?     @db.Json
+  site_restricted       Boolean?  @default(false)
 }
 
 model site {
