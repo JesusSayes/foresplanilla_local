@@ -112,6 +112,7 @@ export default function AttendanceManagement() {
     queryFn: async () => await base44.entities.AttendanceIncident.list("-created_date", 500),
   });
 
+  // Los incidentes se filtrarán después de calcular accessibleEmployeeIds (ver abajo)
   const pendingIncidents = allIncidents.filter(i => i.status === "Pendiente");
   const approvedIncidents = allIncidents.filter(i => i.status === "Aprobada");
   const rejectedIncidents = allIncidents.filter(i => i.status === "Rechazada");
