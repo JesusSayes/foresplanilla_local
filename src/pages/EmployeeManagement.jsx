@@ -727,18 +727,17 @@ export default function EmployeeManagement() {
     setShowForm(false);
   };
 
-  const departmentNames = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
+  // Obtener sedes accesibles según el rol (null = todas)
+  const accessibleSites = getAccessibleSites();
 
-  // Obtener listas únicas de ubigeos
-  const departamentos = [...new Set(ubigeos.map(u => u.departamento))].sort();
-  const provincias = selectedDepartamento 
-    ? [...new Set(ubigeos.filter(u => u.departamento === selectedDepartamento).map(u => u.provincia))].sort()
-    : [];
-  const distritos = selectedProvincia 
-    ? [...new Set(ubigeos.filter(u => u.departamento === selectedDepartamento && u.provincia === selectedProvincia).map(u => u.distrito))].sort()
-    : [];
+  // Empleados filtrados por sedes permitidas según rol
+  const siteAllowedEmployees = accessibleSites === null
+    ? allEmployees
+    : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
-  const filteredEmployees = allEmployees.filter(emp => {
+  const departmentNames = [...new Set(siteAllowedEmployees.map(e => e.department_name))].filter(Boolean);
+
+  const filteredEmployees = siteAllowedEmployees.filter(emp => {
     const matchesSearch = emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
