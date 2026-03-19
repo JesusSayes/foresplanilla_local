@@ -1056,10 +1056,7 @@ export default function EmployeeManagement() {
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
-      {false && (<div><div><Label>x</Label>
-                          <Select value={formData.document_type} onValueChange={(val) => setFormData({ ...formData, document_type: val })}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
+      {false && (<div>
                               <SelectItem value="DNI">DNI</SelectItem>
                               <SelectItem value="CE">CE</SelectItem>
                               <SelectItem value="Pasaporte">Pasaporte</SelectItem>
