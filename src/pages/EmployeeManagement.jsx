@@ -1057,10 +1057,9 @@ export default function EmployeeManagement() {
         />
       )}
 
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Teléfono Fijo</Label>
+      {/* History Modal */}
+      {false && <div>
+                      <Label>placeholder removed</Label>
                       <Input
                         value={formData.phone}
                         onChange={(e) => {
