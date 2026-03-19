@@ -1056,18 +1056,7 @@ export default function EmployeeManagement() {
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
-      {false && (<div>
-                          <Input
-                            value={formData.document_number}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, '');
-                              const maxLength = formData.document_type === 'DNI' ? 8 : 20;
-                              setFormData({ ...formData, document_number: value.slice(0, maxLength) });
-                            }}
-                            placeholder={formData.document_type === 'DNI' ? '8 dígitos' : 'Número de documento'}
-                            maxLength={formData.document_type === 'DNI' ? 8 : 20}
-                            className={!formData.document_number ? "border-red-300 focus:border-red-500" : ""}
-                          />
+      {false && (<div><Input value="dead_code"
                           {!formData.document_number && (
                             <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
                           )}
