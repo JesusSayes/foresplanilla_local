@@ -333,7 +333,7 @@ export default function RoleManagement() {
   }
 
   return (
-    <PermissionGuard employee={employee} requiredRole="admin">
+    <PermissionGuard employee={employee} requiredAnyPermissions={["roles.view", "roles.manage", "system.admin"]}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-8">

@@ -142,15 +142,11 @@ export default function VacationManagement() {
     rejectedRequests: vacationRequests.filter(r => r.status === "Rechazada").length,
   };
 
-  if (!employee || (employee.role !== "admin" && employee.role !== "manager")) {
+  // Mientras carga el empleado, mostrar spinner
+  if (!employee) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <Card className="max-w-md">
-          <CardContent className="p-8 text-center">
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
-            <p className="text-slate-600">Solo administradores y managers pueden gestionar vacaciones</p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
