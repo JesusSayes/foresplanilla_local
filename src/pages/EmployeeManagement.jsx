@@ -1057,71 +1057,8 @@ export default function EmployeeManagement() {
         />
       )}
 
-                    {/* Columna derecha con foto (4cm x 4cm = aprox 150px x 150px) */}
-                    <div className="w-[150px] flex-shrink-0">
-                      <Label className="text-xs">Foto</Label>
-                      <div className="mt-2">
-                        {formData.photo_url ? (
-                          <div className="relative group">
-                            <img 
-                              src={formData.photo_url} 
-                              alt="Foto del empleado" 
-                              className="w-[150px] h-[150px] rounded-lg object-cover border-2 border-indigo-200"
-                            />
-                            <Button
-                              size="icon"
-                              variant="destructive"
-                              className="absolute -top-2 -right-2 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => setFormData({ ...formData, photo_url: "" })}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="w-[150px] h-[150px] border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50">
-                            <Users className="w-12 h-12 text-slate-400" />
-                          </div>
-                        )}
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-
-                            if (!file.type.startsWith('image/')) {
-                              toast.error("Solo se permiten archivos de imagen");
-                              return;
-                            }
-
-                            setUploadingPhoto(true);
-                            try {
-                              const { file_url } = await base44.integrations.Core.UploadFile({ file });
-                              setFormData({ ...formData, photo_url: file_url });
-                              toast.success("Foto subida");
-                            } catch (error) {
-                              toast.error("Error al subir la foto");
-                              console.error(error);
-                            } finally {
-                              setUploadingPhoto(false);
-                            }
-                          }}
-                          disabled={uploadingPhoto}
-                          className="mt-2 text-xs h-8"
-                        />
-                        {uploadingPhoto && (
-                          <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            Subiendo...
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="contact" className="space-y-4">
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+      {/* contact tab orphan removed */}
+      {false && <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
                     <p className="text-sm text-blue-800">
                       <strong>Información de contacto</strong> - Todos los campos son opcionales
                     </p>
