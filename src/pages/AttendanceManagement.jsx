@@ -51,6 +51,7 @@ export default function AttendanceManagement() {
     full_day_justification: true,
   });
 
+  const { getAccessibleSites, hasPermission } = usePermissions();
   const queryClient = useQueryClient();
 
   useEffect(() => {
