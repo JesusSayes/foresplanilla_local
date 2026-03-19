@@ -1056,42 +1056,8 @@ export default function EmployeeManagement() {
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
-      {false && (<div><span></span></div>
-
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <Label>Nombres <span className="text-red-600">*</span></Label>
-                          <Input
-                            value={formData.first_name}
-                            onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                            className={!formData.first_name ? "border-red-300 focus:border-red-500" : ""}
-                          />
-                          {!formData.first_name && (
-                            <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
-                          )}
-                        </div>
-                        <div>
-                          <Label>Apellidos <span className="text-red-600">*</span></Label>
-                          <Input
-                            value={formData.last_name}
-                            onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                            className={!formData.last_name ? "border-red-300 focus:border-red-500" : ""}
-                          />
-                          {!formData.last_name && (
-                            <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
-                          )}
-                        </div>
-                        <div>
-                          <Label>Género</Label>
-                          <Select value={formData.gender} onValueChange={(val) => setFormData({ ...formData, gender: val })}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="M">Masculino</SelectItem>
-                              <SelectItem value="F">Femenino</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
+      {false && (<div><span></span></div>)}
+                      {false && (<div>
 
                       <div className="grid grid-cols-3 gap-4">
                         <div>
