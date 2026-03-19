@@ -880,9 +880,11 @@ export default function EmployeeManagement() {
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
                   <SelectItem value="sin_sede">Sin sede</SelectItem>
-                  {sites.map(site => (
-                    <SelectItem key={site.id} value={site.name}>{site.code}</SelectItem>
-                  ))}
+                  {sites
+                    .filter(site => accessibleSites === null || accessibleSites.includes(site.name))
+                    .map(site => (
+                      <SelectItem key={site.id} value={site.name}>{site.code}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
 
