@@ -558,7 +558,9 @@ export default function AttendanceManagement() {
                       <SelectContent>
                         <SelectItem value="all">Todas</SelectItem>
                         <SelectItem value="sin_sede">Sin sede</SelectItem>
-                        {sites.map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
+                        {sites
+                          .filter(site => accessibleSites === null || accessibleSites.includes(site.name))
+                          .map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
