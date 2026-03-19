@@ -487,7 +487,7 @@ export default function AttendanceManagement() {
 
           <div className="grid grid-cols-5 gap-3 mb-8">
             {[
-              { label: "Total empleados", value: allEmployees.length, icon: Users, color: "blue" },
+              { label: "Total empleados", value: siteAllowedEmployees.length, icon: Users, color: "blue" },
               { label: "Han marcado", value: todayRecords.filter(r => r.clock_in).length, icon: CheckCircle, color: "green" },
               { label: "Tardanzas", value: todayRecords.filter(r => r.is_late).length, icon: Clock, color: "yellow" },
               { label: "Justificaciones", value: pendingIncidents.length, icon: AlertCircle, color: "orange" },
