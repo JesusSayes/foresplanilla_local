@@ -347,9 +347,15 @@ export default function AttendanceManagement() {
     setShowJustifyModal(true);
   };
 
-  const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
+  // Aplicar restricción de sedes según el rol del usuario (null = todas)
+  const accessibleSites = getAccessibleSites();
+  const siteAllowedEmployees = accessibleSites === null
+    ? allEmployees
+    : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
-  const filteredEmployees = allEmployees.filter(emp => {
+  const departments = [...new Set(siteAllowedEmployees.map(e => e.department_name))].filter(Boolean);
+
+  const filteredEmployees = siteAllowedEmployees.filter(emp => {
     const matchesSearch =
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -363,6 +369,9 @@ export default function AttendanceManagement() {
     }
     return matchesSearch && matchesDept && matchesSite;
   });
+
+  // IDs de empleados accesibles para filtrar incidentes y alertas
+  const accessibleEmployeeIds = new Set(siteAllowedEmployees.map(e => e.id));
 
   const employeesWithRecords = filteredEmployees.map(emp => {
     const record = todayRecords.find(r => r.employee_id === emp.id);
