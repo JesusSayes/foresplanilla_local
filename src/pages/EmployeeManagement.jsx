@@ -1056,8 +1056,8 @@ export default function EmployeeManagement() {
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
-      {false && (<div>
-                              <SelectItem value="DNI">DNI</SelectItem>
+      {/* OLD FORM REMOVED */}
+      {false && (<div><p>removed</p>
                               <SelectItem value="CE">CE</SelectItem>
                               <SelectItem value="Pasaporte">Pasaporte</SelectItem>
                               <SelectItem value="CPP">CPP</SelectItem>
