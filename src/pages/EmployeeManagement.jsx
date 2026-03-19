@@ -1057,11 +1057,9 @@ export default function EmployeeManagement() {
         />
       )}
       {false && (<div><span></span></div>)}
+                      {false && (<div><span/></div>)}
                       {false && (<div>
-
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <Label>Fecha de Nacimiento</Label>
+                        <Label>Fecha de Nacimiento placeholder</Label>
                           <Input
                             type="date"
                             value={formData.birth_date}
