@@ -20,6 +20,7 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import EmployeeHistory from "../components/employees/EmployeeHistory";
+import EmployeeForm from "../components/employees/EmployeeForm";
 
 export default function EmployeeManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -28,27 +29,13 @@ export default function EmployeeManagement() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [siteFilter, setSiteFilter] = useState("all");
-  const [positionSearchTerm, setPositionSearchTerm] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [formData, setFormData] = useState({});
-  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
-  const [professionSearchTerm, setProfessionSearchTerm] = useState("");
-  const [bankSearchTerm, setBankSearchTerm] = useState("");
-  const [ctsBankSearchTerm, setCtsBankSearchTerm] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
-  const [selectedDepartamento, setSelectedDepartamento] = useState("");
-  const [selectedProvincia, setSelectedProvincia] = useState("");
-  const [deptoSearchTerm, setDeptoSearchTerm] = useState("");
-  const [provSearchTerm, setProvSearchTerm] = useState("");
-  const [distSearchTerm, setDistSearchTerm] = useState("");
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [showDerechohabienteForm, setShowDerechohabienteForm] = useState(false);
-  const [editingDerechohabiente, setEditingDerechohabiente] = useState(null);
-  const [derechohabienteFormData, setDerechohabienteFormData] = useState({});
 
   const { hasPermission, getAccessibleSites, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
