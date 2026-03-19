@@ -1056,16 +1056,7 @@ export default function EmployeeManagement() {
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
-      {/* OLD FORM REMOVED */}
-      {false && (<div><p>removed</p>
-                              <SelectItem value="CE">CE</SelectItem>
-                              <SelectItem value="Pasaporte">Pasaporte</SelectItem>
-                              <SelectItem value="CPP">CPP</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label>Número de Documento <span className="text-red-600">*</span></Label>
+      {false && (<div>
                           <Input
                             value={formData.document_number}
                             onChange={(e) => {
