@@ -1056,7 +1056,7 @@ export default function EmployeeManagement() {
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
-      {false && (<div><Input value="old_form_removed" />
+      {false && (<div>
                           {!formData.employee_code && (
                             <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
                           )}
