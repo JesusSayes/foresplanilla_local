@@ -1057,31 +1057,6 @@ export default function EmployeeManagement() {
         />
       )}
 
-      {/* contact tab orphan removed */}
-      {false && <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
-                    <p className="text-sm text-blue-800">
-                      <strong>Información de contacto</strong> - Todos los campos son opcionales
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Email Personal</Label>
-                      <Input
-                        type="email"
-                        value={formData.personal_email}
-                        onChange={(e) => setFormData({ ...formData, personal_email: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Email Corporativo</Label>
-                      <Input
-                        type="email"
-                        value={formData.work_email}
-                        onChange={(e) => setFormData({ ...formData, work_email: e.target.value })}
-                      />
-                    </div>
-                  </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
