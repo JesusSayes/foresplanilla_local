@@ -36,6 +36,11 @@ export default function EmployeeManagement() {
   const [formData, setFormData] = useState({});
   const [showHistory, setShowHistory] = useState(false);
   const [historyEmployeeId, setHistoryEmployeeId] = useState(null);
+  const [selectedDepartamento, setSelectedDepartamento] = useState("");
+  const [selectedProvincia, setSelectedProvincia] = useState("");
+  const [showDerechohabienteForm, setShowDerechohabienteForm] = useState(false);
+  const [editingDerechohabiente, setEditingDerechohabiente] = useState(null);
+  const [derechohabienteFormData, setDerechohabienteFormData] = useState({});
 
   const { hasPermission, getAccessibleSites, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
