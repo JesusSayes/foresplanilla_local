@@ -794,7 +794,7 @@ export default function EmployeeManagement() {
           <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
             <Users className="w-5 h-5 text-indigo-600" />
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-slate-900">{allEmployees.length}</span>
+              <span className="text-xl font-bold text-slate-900">{siteAllowedEmployees.length}</span>
               <span className="text-sm text-slate-600">Total empleados</span>
             </div>
           </div>
