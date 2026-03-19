@@ -1056,64 +1056,6 @@ export default function EmployeeManagement() {
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
-      {false && (<div><span></span></div>)}
-                      {false && (<div><span/></div>)}
-                      {false && (<div>
-                        <Label>Fecha de Nacimiento placeholder</Label>
-                          <Input
-                            type="date"
-                            value={formData.birth_date}
-                            onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <Label>Edad</Label>
-                          <Input
-                            value={
-                              formData.birth_date
-                                ? (() => {
-                                    const birthDate = new Date(formData.birth_date);
-                                    const today = new Date();
-                                    let age = today.getFullYear() - birthDate.getFullYear();
-                                    const monthDiff = today.getMonth() - birthDate.getMonth();
-                                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-                                      age--;
-                                    }
-                                    return `${age} años`;
-                                  })()
-                                : ""
-                            }
-                            disabled
-                            className="bg-slate-100 text-slate-700 font-medium"
-                          />
-                        </div>
-                        <div>
-                          <Label>Profesión</Label>
-                          <Select value={formData.profession} onValueChange={(val) => setFormData({ ...formData, profession: val })}>
-                            <SelectTrigger><SelectValue placeholder="Seleccionar profesión" /></SelectTrigger>
-                            <SelectContent>
-                              <div className="p-2 border-b sticky top-0 bg-white z-10">
-                                <Input
-                                  placeholder="Buscar profesión..."
-                                  value={professionSearchTerm}
-                                  onChange={(e) => setProfessionSearchTerm(e.target.value)}
-                                  className="h-8"
-                                  onClick={(e) => e.stopPropagation()}
-                                  onKeyDown={(e) => e.stopPropagation()}
-                                />
-                              </div>
-                              {professions
-                                .filter(prof => prof.name.toLowerCase().includes(professionSearchTerm.toLowerCase()))
-                                .map(prof => (
-                                  <SelectItem key={prof.id} value={prof.name}>
-                                    {prof.name}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
 
                     {/* Columna derecha con foto (4cm x 4cm = aprox 150px x 150px) */}
                     <div className="w-[150px] flex-shrink-0">
