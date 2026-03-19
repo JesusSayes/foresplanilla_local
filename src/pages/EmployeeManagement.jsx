@@ -1056,13 +1056,7 @@ export default function EmployeeManagement() {
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
-      {false && (<div>
-                          {!formData.employee_code && (
-                            <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
-                          )}
-                        </div>
-                        <div>
-                          <Label>Tipo de Documento <span className="text-red-600">*</span></Label>
+      {false && (<div><div><Label>x</Label>
                           <Select value={formData.document_type} onValueChange={(val) => setFormData({ ...formData, document_type: val })}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
