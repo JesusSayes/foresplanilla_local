@@ -1056,18 +1056,11 @@ export default function EmployeeManagement() {
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
-      {/* UNUSED_PLACEHOLDER_START - kept for reference, remove after EmployeeForm is stable
-
-                <TabsContent value="personal" className="space-y-4">
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
-                    <p className="text-sm text-amber-800">
-                      <strong>Los campos marcados con <span className="text-red-600">*</span> son obligatorios</strong>
-                    </p>
-                  </div>
-
-                  {/* Layout con foto en la esquina superior derecha */}
+      {/* OLD_FORM_REMOVED_PLACEHOLDER - delete from here to matching closing */}
+      {false && (
+        <div>
                   <div className="flex gap-4">
-                    {/* Columna izquierda con formulario */}
+                    {/* dummy */}
                     <div className="flex-1 space-y-4">
                       <div className="grid grid-cols-3 gap-4">
                         <div>
