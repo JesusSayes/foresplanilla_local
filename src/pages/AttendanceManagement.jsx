@@ -443,7 +443,7 @@ export default function AttendanceManagement() {
   }
 
   return (
-    <PermissionGuard employee={employee} requiredRole="admin">
+    <PermissionGuard employee={employee} requiredAnyPermissions={["attendance.view_all", "attendance.manage", "attendance.view_department", "system.admin"]}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-8 flex justify-between items-start">
@@ -927,7 +927,7 @@ export default function AttendanceManagement() {
               <CardContent className="p-6">
                 <div className="space-y-6">
                   <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm text-slate-600">Fecha: <strong>{format(new Date(editingRecord.date + "T00:00:00"), "dd 'de' MMMM, yyyy", { locale: es })}</strong></p>
+                    <p className="text-sm text-slate-600">Fecha: <strong>{editingRecord.date ? format(new Date(editingRecord.date + "T00:00:00"), "dd 'de' MMMM, yyyy", { locale: es }) : "Sin fecha"}</strong></p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
