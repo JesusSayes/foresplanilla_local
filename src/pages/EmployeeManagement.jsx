@@ -1056,15 +1056,7 @@ export default function EmployeeManagement() {
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
-      {false && (<div><Input value="dead_code"
-                          {!formData.document_number && (
-                            <p className="text-xs text-red-600 mt-1">Este campo es obligatorio</p>
-                          )}
-                          {formData.document_number && formData.document_type === 'DNI' && formData.document_number.length !== 8 && (
-                            <p className="text-xs text-amber-600 mt-1">DNI debe tener 8 dígitos ({formData.document_number.length}/8)</p>
-                          )}
-                        </div>
-                      </div>
+      {false && (<div><span></span></div>
 
                       <div className="grid grid-cols-3 gap-4">
                         <div>
