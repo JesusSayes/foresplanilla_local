@@ -50,7 +50,7 @@ export default function EmployeeManagement() {
   const [editingDerechohabiente, setEditingDerechohabiente] = useState(null);
   const [derechohabienteFormData, setDerechohabienteFormData] = useState({});
 
-  const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, getAccessibleSites, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
 
   useEffect(() => {
