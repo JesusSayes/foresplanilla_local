@@ -699,7 +699,7 @@ export default function AttendanceManagement() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {overtimeAlerts.map(alert => {
+                      {overtimeAlerts.filter(a => accessibleEmployeeIds.has(a.employee_id)).map(alert => {
                         const emp = allEmployees.find(e => e.id === alert.employee_id);
                         const record = todayRecords.find(r => r.id === alert.attendance_record_id);
                         return (
