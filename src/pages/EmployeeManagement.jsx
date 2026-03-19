@@ -1035,30 +1035,28 @@ export default function EmployeeManagement() {
 
       {/* Form Modal */}
       {showForm && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
-        >
-          <Card 
-            className="max-w-5xl w-full my-8"
-          >
-            <CardHeader className="border-b">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl font-bold">
-                  {editingEmployee ? "Editar Empleado" : "Nuevo Empleado"}
-                </CardTitle>
-                <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 max-h-[70vh] overflow-y-auto">
-              <Tabs defaultValue="personal" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-6">
-                  <TabsTrigger value="personal">Personal</TabsTrigger>
-                  <TabsTrigger value="contact">Contacto</TabsTrigger>
-                  <TabsTrigger value="work">Laboral</TabsTrigger>
-                  <TabsTrigger value="financial" disabled={!hasPermission("employees.view_financials")}>Financiero{!hasPermission("employees.view_financials") ? " 🔒" : ""}</TabsTrigger>
-                  <TabsTrigger value="emergency">Emergencia</TabsTrigger>
-                  <TabsTrigger value="derechohabientes" disabled={!editingEmployee}>Derechohabientes</TabsTrigger>
-                </TabsList>
+        <EmployeeForm
+          editingEmployee={editingEmployee}
+          formData={formData}
+          setFormData={setFormData}
+          onSubmit={handleSubmit}
+          onCancel={resetForm}
+          isSubmitting={createEmployeeMutation.isPending || updateEmployeeMutation.isPending}
+          sites={sites}
+          positions={positions}
+          departments={departments}
+          banks={banks}
+          afps={afps}
+          ubigeos={ubigeos}
+          professions={professions}
+          allContracts={allContracts}
+          derechohabientes={derechohabientes}
+          onDerechohabienteAdd={(data) => createDerechohabienteMutation.mutate(data)}
+          onDerechohabienteEdit={(id, data) => updateDerechohabienteMutation.mutate({ id, data })}
+          onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
+        />
+      )}
+      {/* UNUSED_PLACEHOLDER_START - kept for reference, remove after EmployeeForm is stable
 
                 <TabsContent value="personal" className="space-y-4">
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
