@@ -770,7 +770,7 @@ export default function AttendanceManagement() {
                         <div className="text-center py-12"><CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones pendientes</p></div>
                       ) : (
                         <div className="space-y-4">
-                          {pendingIncidents.map(incident => {
+                          {pendingIncidents.filter(i => accessibleEmployeeIds.has(i.employee_id)).map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
                               <div key={incident.id} className="p-4 border border-slate-200 rounded-lg">
