@@ -432,12 +432,63 @@ export default function VacationRequest() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Vacaciones">Vacaciones</SelectItem>
+                          <SelectItem value="Descanso Médico">Descanso Médico</SelectItem>
+                          <SelectItem value="Descanso Vacacional">Descanso Vacacional</SelectItem>
+                          <SelectItem value="Cita Médica">Cita Médica</SelectItem>
+                          <SelectItem value="Onomástico">Onomástico</SelectItem>
+                          <SelectItem value="Licencia sin Goce de Haber">Licencia sin Goce de Haber</SelectItem>
                           <SelectItem value="Permiso con goce">Permiso con goce</SelectItem>
                           <SelectItem value="Permiso sin goce">Permiso sin goce</SelectItem>
                           <SelectItem value="Licencia médica">Licencia médica</SelectItem>
+                          <SelectItem value="Otro">Otro</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Día completo o por horas */}
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-900 mb-2">
+                        Duración
+                      </label>
+                      <div className="flex rounded-lg border border-input overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, is_full_day: true })}
+                          className={`flex-1 py-2 text-sm font-medium transition-colors ${formData.is_full_day ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+                        >
+                          Día(s) completo(s)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, is_full_day: false })}
+                          className={`flex-1 py-2 text-sm font-medium transition-colors ${!formData.is_full_day ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+                        >
+                          Por horas
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Rango de horas (solo si es por horas) */}
+                    {!formData.is_full_day && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">Hora de inicio</label>
+                          <Input
+                            type="time"
+                            value={formData.start_time}
+                            onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">Hora de fin</label>
+                          <Input
+                            type="time"
+                            value={formData.end_time}
+                            onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
