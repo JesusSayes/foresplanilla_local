@@ -535,7 +535,7 @@ export default function AttendanceManagement() {
                 </CardContent>
               </Card>
             ))}
-            <Card className="border-0 shadow-lg bg-red-50 border-red-200">
+            <Card className="border-0 shadow-lg bg-red-50">
               <CardContent className="p-3">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-red-100 rounded-lg shrink-0"><Clock className="w-4 h-4 text-red-600" /></div>
