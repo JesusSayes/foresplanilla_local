@@ -302,7 +302,7 @@ export default function Attendance() {
           <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
             <TrendingUp className="w-5 h-5 text-indigo-600" />
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-slate-900">{stats.avgHours.toFixed(1)}h</span>
+              <span className="text-xl font-bold text-slate-900">{Number(stats.avgHours || 0).toFixed(1)}h</span>
               <span className="text-sm text-slate-600">Promedio diario</span>
             </div>
           </div>
@@ -473,13 +473,15 @@ export default function Attendance() {
                             <div>
                               <span className="text-slate-600 text-xs">Horas trabajadas</span>
                               <p className="font-semibold text-slate-900">
-                                {record.worked_hours ? `${record.worked_hours.toFixed(2)}h` : "0h"}
+                                {record.worked_hours != null
+                                  ? `${Number(record.worked_hours).toFixed(2)}h`
+                                  : "0h"}
                               </p>
                             </div>
                             <div>
                               <span className="text-slate-600 text-xs">Horas esperadas</span>
                               <p className="font-semibold text-slate-700">
-                                {expectedHours.toFixed(2)}h
+                                {Number(expectedHours || 0).toFixed(2)}h
                               </p>
                             </div>
                             {record.is_late && (
