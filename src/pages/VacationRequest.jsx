@@ -490,62 +490,53 @@ export default function VacationRequest() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4">
+                    {formData.is_full_day ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">Fecha de inicio</label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-start text-left">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {formData.start_date ? format(formData.start_date, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar mode="single" selected={formData.start_date} onSelect={(date) => setFormData({ ...formData, start_date: date })} locale={es} />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">Fecha de fin</label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-start text-left">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {formData.end_date ? format(formData.end_date, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar mode="single" selected={formData.end_date} onSelect={(date) => setFormData({ ...formData, end_date: date })} disabled={(date) => formData.start_date ? date < formData.start_date : false} locale={es} />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    ) : (
                       <div>
-                        <label className="block text-sm font-semibold text-slate-900 mb-2">
-                          Fecha de inicio
-                        </label>
+                        <label className="block text-sm font-semibold text-slate-900 mb-2">Fecha</label>
                         <Popover>
                           <PopoverTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              className="w-full justify-start text-left"
-                            >
+                            <Button variant="outline" className="w-full justify-start text-left">
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {formData.start_date 
-                                ? format(formData.start_date, "dd MMM yyyy", { locale: es })
-                                : "Seleccionar"}
+                              {formData.start_date ? format(formData.start_date, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={formData.start_date}
-                              onSelect={(date) => setFormData({ ...formData, start_date: date })}
-                              locale={es}
-                            />
+                            <Calendar mode="single" selected={formData.start_date} onSelect={(date) => setFormData({ ...formData, start_date: date, end_date: date })} locale={es} />
                           </PopoverContent>
                         </Popover>
                       </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-900 mb-2">
-                          Fecha de fin
-                        </label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              className="w-full justify-start text-left"
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {formData.end_date 
-                                ? format(formData.end_date, "dd MMM yyyy", { locale: es })
-                                : "Seleccionar"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={formData.end_date}
-                              onSelect={(date) => setFormData({ ...formData, end_date: date })}
-                              disabled={(date) => formData.start_date ? date < formData.start_date : false}
-                              locale={es}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
+                    )}
 
                     {selectedDays && (
                       <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
