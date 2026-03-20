@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle, 
-  AlertCircle, Users, Search, FileText, Download, Database, History, Printer
+  AlertCircle, Users, Search, FileText, Download, Database, History, Printer, Palmtree
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
