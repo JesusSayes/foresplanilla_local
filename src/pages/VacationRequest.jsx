@@ -161,6 +161,9 @@ export default function VacationRequest() {
   const resetForm = () => {
     setFormData({
       request_type: "Vacaciones",
+      is_full_day: true,
+      start_time: "09:00",
+      end_time: "18:00",
       start_date: null,
       end_date: null,
       reason: "",
