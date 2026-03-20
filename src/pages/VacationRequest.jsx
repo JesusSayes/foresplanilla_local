@@ -26,6 +26,9 @@ export default function VacationRequest() {
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [formData, setFormData] = useState({
     request_type: "Vacaciones",
+    is_full_day: true,
+    start_time: "09:00",
+    end_time: "18:00",
     start_date: null,
     end_date: null,
     reason: "",
