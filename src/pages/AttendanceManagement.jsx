@@ -127,6 +127,16 @@ export default function AttendanceManagement() {
     queryFn: async () => await base44.entities.WorkSchedule.list("-created_date"),
   });
 
+  // Vacaciones aprobadas que cubren la fecha seleccionada
+  const { data: approvedVacations = [] } = useQuery({
+    queryKey: ["approvedVacations", format(selectedDate, "yyyy-MM-dd")],
+    queryFn: async () => {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const all = await base44.entities.VacationRequest.filter({ status: "Aprobada" }, "-start_date", 500);
+      return all.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
+    },
+  });
+
   useEffect(() => {
     const generateExemptClockings = async () => {
       if (!employee || employee.role !== "admin") return;
