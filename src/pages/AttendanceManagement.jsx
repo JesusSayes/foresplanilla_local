@@ -432,6 +432,24 @@ export default function AttendanceManagement() {
     printWindow.document.close();
   };
 
+  // Detectar si el empleado tiene vacación aprobada en la fecha seleccionada
+  const getVacationForEmployee = (empId) => {
+    return approvedVacations.find(v => v.employee_id === empId) || null;
+  };
+
+  // Obtener horario programado de entrada/salida para mostrar en vacaciones
+  const getScheduledTimes = (empId) => {
+    const schedule = getEmployeeSchedule(empId);
+    if (!schedule) return { start: "09:00", end: "18:00" };
+    const dayMap = ["sunday_start", "monday_start", "tuesday_start", "wednesday_start", "thursday_start", "friday_start", "saturday_start"];
+    const dayEndMap = ["sunday_end", "monday_end", "tuesday_end", "wednesday_end", "thursday_end", "friday_end", "saturday_end"];
+    const dow = selectedDate.getDay();
+    return {
+      start: schedule[dayMap[dow]] || "09:00",
+      end: schedule[dayEndMap[dow]] || "18:00",
+    };
+  };
+
   const getStatusConfig = (status, hasClockIn) => {
     if (!hasClockIn) return { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle, text: "Sin marcar" };
     const configs = {
