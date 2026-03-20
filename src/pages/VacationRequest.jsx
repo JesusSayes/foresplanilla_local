@@ -538,16 +538,21 @@ export default function VacationRequest() {
                       </div>
                     )}
 
-                    {selectedDays && (
+                    {formData.start_date && (
                       <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-indigo-900">
-                            <strong>Total días:</strong> {selectedDays.total} días calendario
-                          </span>
-                          <span className="text-sm text-indigo-900">
-                            <strong>Días hábiles:</strong> {selectedDays.business}
-                          </span>
-                        </div>
+                        {formData.is_full_day && selectedDays ? (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-indigo-900"><strong>Total días:</strong> {selectedDays.total} días calendario</span>
+                            <span className="text-sm text-indigo-900"><strong>Días hábiles:</strong> {selectedDays.business}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-indigo-600" />
+                            <span className="text-sm text-indigo-900">
+                              <strong>Permiso por horas:</strong> {format(formData.start_date, "dd MMM yyyy", { locale: es })} de {formData.start_time} a {formData.end_time}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
 
