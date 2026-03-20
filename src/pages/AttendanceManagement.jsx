@@ -513,12 +513,13 @@ export default function AttendanceManagement() {
             </Card>
           )}
 
-          <div className="grid grid-cols-5 gap-3 mb-8">
+          <div className="grid grid-cols-6 gap-3 mb-8">
             {[
               { label: "Total empleados", value: siteAllowedEmployees.length, icon: Users, color: "blue" },
               { label: "Han marcado", value: todayRecords.filter(r => r.clock_in).length, icon: CheckCircle, color: "green" },
               { label: "Tardanzas", value: todayRecords.filter(r => r.is_late).length, icon: Clock, color: "yellow" },
               { label: "Justificaciones", value: pendingIncidents.length, icon: AlertCircle, color: "orange" },
+              { label: "De vacaciones", value: approvedVacations.filter(v => accessibleEmployeeIds.has(v.employee_id)).length, icon: Palmtree, color: "amber" },
             ].map(({ label, value, icon: Icon, color }) => (
               <Card key={label} className="border-0 shadow-lg">
                 <CardContent className="p-3">
