@@ -212,10 +212,10 @@ export default function ManagerApprovals() {
     rejected: allRequests.filter(r => r.status === "Rechazada").length,
   };
 
-  if (!employee) {
+  if (!employee || isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Card><CardContent className="p-8"><p>Cargando...</p></CardContent></Card>
+        <Card><CardContent className="p-8 flex items-center gap-3"><div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" /><p>Cargando...</p></CardContent></Card>
       </div>
     );
   }
