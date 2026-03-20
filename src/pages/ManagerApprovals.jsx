@@ -50,32 +50,50 @@ export default function ManagerApprovals() {
     loadUserData();
   }, []);
 
+  const isAdmin = employee?.role === "admin" || employee?.role === "super_admin";
+
   const { data: allRequests = [], isLoading } = useQuery({
-    queryKey: ["allVacationRequests", employee?.department_name],
+    queryKey: ["allVacationRequests", employee?.id, isAdmin],
     queryFn: async () => {
-      if (!employee?.department_name) return [];
-      
-      const allEmployees = await base44.entities.Employee.filter({
-        department_name: employee.department_name,
-      });
-      
-      const employeeIds = allEmployees.map(e => e.id);
-      const requests = await base44.entities.VacationRequest.list("-created_date");
-      
-      return requests.filter(r => employeeIds.includes(r.employee_id));
+      if (!employee) return [];
+
+      // Admin/super_admin: cargar todas las solicitudes
+      if (isAdmin) {
+        return await base44.entities.VacationRequest.list("-created_date", 500);
+      }
+
+      // Manager: cargar solicitudes de su departamento
+      // Si tiene managed_team_ids, usar esos; si no, usar su departamento
+      if (employee.managed_team_ids && employee.managed_team_ids.length > 0) {
+        const requests = await base44.entities.VacationRequest.list("-created_date", 500);
+        return requests.filter(r => employee.managed_team_ids.includes(r.employee_id));
+      }
+
+      if (employee.department_name) {
+        const deptEmployees = await base44.entities.Employee.filter({
+          department_name: employee.department_name,
+        });
+        const employeeIds = deptEmployees.map(e => e.id);
+        const requests = await base44.entities.VacationRequest.list("-created_date", 500);
+        return requests.filter(r => employeeIds.includes(r.employee_id));
+      }
+
+      return [];
     },
-    enabled: !!employee?.department_name,
+    enabled: !!employee,
   });
 
   const { data: employees = [] } = useQuery({
-    queryKey: ["departmentEmployees", employee?.department_name],
+    queryKey: ["departmentEmployees", employee?.id, isAdmin],
     queryFn: async () => {
-      if (!employee?.department_name) return [];
-      return await base44.entities.Employee.filter({
-        department_name: employee.department_name,
-      });
+      if (!employee) return [];
+      if (isAdmin) return await base44.entities.Employee.list("-created_date");
+      if (employee.department_name) {
+        return await base44.entities.Employee.filter({ department_name: employee.department_name });
+      }
+      return [];
     },
-    enabled: !!employee?.department_name,
+    enabled: !!employee,
   });
 
   const updateRequestMutation = useMutation({
