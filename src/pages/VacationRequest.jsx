@@ -148,11 +148,12 @@ export default function VacationRequest() {
       request_type: formData.request_type,
       start_date: format(formData.start_date, "yyyy-MM-dd"),
       end_date: format(formData.end_date, "yyyy-MM-dd"),
-      total_days: totalDays,
-      business_days: businessDays,
+      total_days: formData.is_full_day ? totalDays : 1,
+      business_days: formData.is_full_day ? businessDays : 1,
       reason: formData.reason,
       supporting_document_url: formData.supporting_document_url,
       status: "Pendiente",
+      comments: formData.is_full_day ? null : `Por horas: ${formData.start_time} - ${formData.end_time}`,
     };
 
     createRequestMutation.mutate(requestData);
