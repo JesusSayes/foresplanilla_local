@@ -80,13 +80,13 @@ export const filter = async (req, res) => {
       };
     }
 
-    if (filters.is_active !== undefined) {
-      where.is_active = filters.is_active;
-    }
+    // if (filters.is_active !== undefined) {
+      // where.is_active = filters.is_active;
+    // }
 
-    if (filters.exempt_from_clocking !== undefined) {
-      where.exempt_from_clocking = filters.exempt_from_clocking;
-    }
+    // if (filters.exempt_from_clocking !== undefined) {
+      // where.exempt_from_clocking = filters.exempt_from_clocking;
+    // }
 
     if (filters.employee_id) {
       where.employee_id = filters.employee_id;

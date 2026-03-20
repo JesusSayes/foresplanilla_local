@@ -20,6 +20,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
+import { usePermissions } from "../components/hooks/usePermissions";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
@@ -52,6 +53,7 @@ export default function AttendanceManagement() {
     full_day_justification: true,
   });
 
+  const { getAccessibleSites, hasPermission } = usePermissions();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -112,6 +114,7 @@ export default function AttendanceManagement() {
     },
   });
 
+  // Los incidentes se filtrarán después de calcular accessibleEmployeeIds (ver abajo)
   const pendingIncidents = allIncidents.filter(i => i.status === "Pendiente");
   const approvedIncidents = allIncidents.filter(i => i.status === "Aprobada");
   const rejectedIncidents = allIncidents.filter(i => i.status === "Rechazada");
@@ -358,9 +361,15 @@ export default function AttendanceManagement() {
     setShowJustifyModal(true);
   };
 
-  const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
+  // Aplicar restricción de sedes según el rol del usuario (null = todas)
+  const accessibleSites = getAccessibleSites();
+  const siteAllowedEmployees = accessibleSites === null
+    ? allEmployees
+    : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
-  const filteredEmployees = allEmployees.filter(emp => {
+  const departments = [...new Set(siteAllowedEmployees.map(e => e.department_name))].filter(Boolean);
+
+  const filteredEmployees = siteAllowedEmployees.filter(emp => {
     const matchesSearch =
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -374,6 +383,9 @@ export default function AttendanceManagement() {
     }
     return matchesSearch && matchesDept && matchesSite;
   });
+
+  // IDs de empleados accesibles para filtrar incidentes y alertas
+  const accessibleEmployeeIds = new Set(siteAllowedEmployees.map(e => e.id));
 
   const employeesWithRecords = filteredEmployees.map(emp => {
     const record = todayRecords.find(r => r.employee_id === emp.id);
@@ -488,7 +500,7 @@ export default function AttendanceManagement() {
 
           <div className="grid grid-cols-5 gap-3 mb-8">
             {[
-              { label: "Total empleados", value: allEmployees.length, icon: Users, color: "blue" },
+              { label: "Total empleados", value: siteAllowedEmployees.length, icon: Users, color: "blue" },
               { label: "Han marcado", value: todayRecords.filter(r => r.clock_in).length, icon: CheckCircle, color: "green" },
               { label: "Tardanzas", value: todayRecords.filter(r => r.is_late).length, icon: Clock, color: "yellow" },
               { label: "Justificaciones", value: pendingIncidents.length, icon: AlertCircle, color: "orange" },
@@ -558,7 +570,9 @@ export default function AttendanceManagement() {
                       <SelectContent>
                         <SelectItem value="all">Todas</SelectItem>
                         <SelectItem value="sin_sede">Sin sede</SelectItem>
-                        {sites.map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
+                        {sites
+                          .filter(site => accessibleSites === null || accessibleSites.includes(site.name))
+                          .map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
@@ -700,7 +714,7 @@ export default function AttendanceManagement() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {overtimeAlerts.map(alert => {
+                      {overtimeAlerts.filter(a => accessibleEmployeeIds.has(a.employee_id)).map(alert => {
                         const emp = allEmployees.find(e => e.id === alert.employee_id);
                         const record = todayRecords.find(r => r.id === alert.attendance_record_id);
                         return (
@@ -775,7 +789,7 @@ export default function AttendanceManagement() {
                         <div className="text-center py-12"><CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones pendientes</p></div>
                       ) : (
                         <div className="space-y-4">
-                          {pendingIncidents.map(incident => {
+                          {pendingIncidents.filter(i => accessibleEmployeeIds.has(i.employee_id)).map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
                               <div key={incident.id} className="p-4 border border-slate-200 rounded-lg">
@@ -827,7 +841,7 @@ export default function AttendanceManagement() {
                         <div className="text-center py-12"><AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones aprobadas</p></div>
                       ) : (
                         <div className="space-y-4">
-                          {approvedIncidents.map(incident => {
+                          {approvedIncidents.filter(i => accessibleEmployeeIds.has(i.employee_id)).map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
                               <div key={incident.id} className="p-4 border border-green-200 bg-green-50/30 rounded-lg">
@@ -873,7 +887,7 @@ export default function AttendanceManagement() {
                         <div className="text-center py-12"><AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones rechazadas</p></div>
                       ) : (
                         <div className="space-y-4">
-                          {rejectedIncidents.map(incident => {
+                          {rejectedIncidents.filter(i => accessibleEmployeeIds.has(i.employee_id)).map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
                               <div key={incident.id} className="p-4 border border-red-200 bg-red-50/30 rounded-lg">
