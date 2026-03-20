@@ -695,7 +695,7 @@ export default function RoleManagement() {
         {/* Assign Roles Modal */}
         {showAssignModal && selectedEmployee && (
           <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={() => {
               setShowAssignModal(false);
               setSelectedEmployee(null);
@@ -703,20 +703,22 @@ export default function RoleManagement() {
             }}
           >
             <Card
-              className="max-w-2xl w-full"
+              className="w-full max-w-md flex flex-col"
+              style={{ maxHeight: "min(90vh, 600px)" }}
               onClick={(e) => e.stopPropagation()}
             >
-              <CardHeader className="border-b">
+              <CardHeader className="border-b shrink-0 py-4 px-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-xl font-bold">Asignar Roles</CardTitle>
-                    <p className="text-sm text-slate-600 mt-1">
+                    <CardTitle className="text-lg font-bold">Asignar Roles</CardTitle>
+                    <p className="text-xs text-slate-500 mt-0.5 uppercase tracking-wide font-medium">
                       {selectedEmployee.first_name} {selectedEmployee.last_name}
                     </p>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="h-7 w-7"
                     onClick={() => {
                       setShowAssignModal(false);
                       setSelectedEmployee(null);
@@ -727,57 +729,56 @@ export default function RoleManagement() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <p className="text-sm text-slate-600">
-                    Selecciona uno o más roles para asignar al empleado:
-                  </p>
+              <CardContent className="p-5 flex flex-col gap-4 overflow-hidden">
+                <p className="text-sm text-slate-600 shrink-0">
+                  Selecciona uno o más roles para asignar al empleado:
+                </p>
+                <div className="overflow-y-auto flex-1 space-y-2 pr-1">
                   {roles.map(role => (
                     <label
                       key={role.id}
-                      className="flex items-start gap-3 p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-all"
+                      className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-all"
                     >
                       <input
                         type="checkbox"
                         checked={selectedRoles.includes(role.id)}
                         onChange={() => toggleRoleSelection(role.id)}
-                        className="w-5 h-5 rounded mt-1"
+                        className="w-4 h-4 rounded mt-0.5 shrink-0"
                       />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold text-slate-900">{role.name}</h4>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <h4 className="font-semibold text-slate-900 text-sm">{role.name}</h4>
                           {role.is_system_role && (
-                            <Badge className="bg-purple-100 text-purple-700 text-xs">Sistema</Badge>
+                            <Badge className="bg-purple-100 text-purple-700 text-xs px-1.5 py-0">Sistema</Badge>
                           )}
                         </div>
-                        <p className="text-sm text-slate-600">{role.description}</p>
+                        <p className="text-xs text-slate-500 leading-snug">{role.description}</p>
                       </div>
                     </label>
                   ))}
-
-                  <div className="flex gap-3 pt-4">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => {
-                        setShowAssignModal(false);
-                        setSelectedEmployee(null);
-                        setSelectedRoles([]);
-                      }}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      className="flex-1 bg-indigo-600 hover:bg-indigo-700"
-                      onClick={() => assignRolesMutation.mutate({
-                        employeeId: selectedEmployee.id,
-                        roleIds: selectedRoles,
-                      })}
-                      disabled={assignRolesMutation.isPending}
-                    >
-                      {assignRolesMutation.isPending ? "Guardando..." : "Guardar Asignación"}
-                    </Button>
-                  </div>
+                </div>
+                <div className="flex gap-3 shrink-0 pt-2 border-t border-slate-100">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setShowAssignModal(false);
+                      setSelectedEmployee(null);
+                      setSelectedRoles([]);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                    onClick={() => assignRolesMutation.mutate({
+                      employeeId: selectedEmployee.id,
+                      roleIds: selectedRoles,
+                    })}
+                    disabled={assignRolesMutation.isPending}
+                  >
+                    {assignRolesMutation.isPending ? "Guardando..." : "Guardar Asignación"}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
