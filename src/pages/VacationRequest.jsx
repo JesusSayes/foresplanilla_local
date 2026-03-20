@@ -666,7 +666,11 @@ export default function VacationRequest() {
                           </div>
                           
                           <div className="text-sm text-slate-600 mb-3">
-                            <strong>{request.total_days}</strong> días ({request.business_days} hábiles)
+                            {request.comments?.startsWith("Por horas:") ? (
+                              <span><Clock className="w-3 h-3 inline mr-1" />{request.comments}</span>
+                            ) : (
+                              <span><strong>{request.total_days}</strong> días ({request.business_days} hábiles)</span>
+                            )}
                           </div>
 
                           {request.reason && (
