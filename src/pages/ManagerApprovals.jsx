@@ -30,32 +30,47 @@ export default function ManagerApprovals() {
 
   const queryClient = useQueryClient();
 
+  const isAdmin = employee?.role === "admin" || employee?.role === "super_admin";
+
   const { data: allRequests = [], isLoading } = useQuery({
-    queryKey: ["allVacationRequests", employee?.department_name],
+    queryKey: ["allVacationRequests", employee?.id, isAdmin],
     queryFn: async () => {
-      if (!employee?.department_name) return [];
+      if (!employee) return [];
 
-      const allEmployees = await entitiesAPI.Employee.filter({
-        department_name: employee.department_name,
-      });
+      if (isAdmin) {
+        return await entitiesAPI.VacationRequest.list("-created_date", 500);
+      }
 
-      const employeeIds = allEmployees.map(e => e.id);
-      const requests = await entitiesAPI.VacationRequest.list("-created_date");
+      if (employee.managed_team_ids && employee.managed_team_ids.length > 0) {
+        const requests = await entitiesAPI.VacationRequest.list("-created_date", 500);
+        return requests.filter(r => employee.managed_team_ids.includes(r.employee_id));
+      }
 
-      return requests.filter(r => employeeIds.includes(r.employee_id));
+      if (employee.department_name) {
+        const deptEmployees = await entitiesAPI.Employee.filter({
+          department_name: employee.department_name,
+        });
+        const employeeIds = deptEmployees.map(e => e.id);
+        const requests = await entitiesAPI.VacationRequest.list("-created_date", 500);
+        return requests.filter(r => employeeIds.includes(r.employee_id));
+      }
+
+      return [];
     },
-    enabled: !!employee?.department_name,
+    enabled: !!employee,
   });
 
   const { data: employees = [] } = useQuery({
-    queryKey: ["departmentEmployees", employee?.department_name],
+    queryKey: ["departmentEmployees", employee?.id, isAdmin],
     queryFn: async () => {
-      if (!employee?.department_name) return [];
-      return await entitiesAPI.Employee.filter({
-        department_name: employee.department_name,
-      });
+      if (!employee) return [];
+      if (isAdmin) return await entitiesAPI.Employee.list("-created_date");
+      if (employee.department_name) {
+        return await entitiesAPI.Employee.filter({ department_name: employee.department_name });
+      }
+      return [];
     },
-    enabled: !!employee?.department_name,
+    enabled: !!employee,
   });
 
   const updateRequestMutation = useMutation({
@@ -125,7 +140,6 @@ export default function ManagerApprovals() {
   const handleReview = (action) => {
     if (!selectedRequest) return;
 
-    // Validar comentario solo para rechazo
     if (action === "reject" && !reviewForm.comments.trim()) {
       toast.error("El motivo del rechazo es obligatorio");
       return;
@@ -174,19 +188,18 @@ export default function ManagerApprovals() {
     rejected: allRequests.filter(r => r.status === "Rechazada").length,
   };
 
-  if (!employee) {
+  if (!employee || isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Card><CardContent className="p-8"><p>Cargando...</p></CardContent></Card>
+        <Card><CardContent className="p-8 flex items-center gap-3"><div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" /><p>Cargando...</p></CardContent></Card>
       </div>
     );
   }
 
   return (
-    <PermissionGuard employee={employee} requiredRole="manager">
+    <PermissionGuard employee={employee} requiredAnyPermissions={["vacations.approve", "vacations.manage", "system.admin"]}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-slate-900 mb-2">
             Aprobación de Vacaciones
@@ -196,7 +209,6 @@ export default function ManagerApprovals() {
           </p>
         </div>
 
-        {/* Stats Cards */}
         <div className="flex flex-wrap gap-4 mb-6">
           <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
             <Clock className="w-5 h-5 text-yellow-600" />
@@ -221,7 +233,6 @@ export default function ManagerApprovals() {
           </div>
         </div>
 
-        {/* Filters */}
         <Card className="border-0 shadow-lg mb-8">
           <CardContent className="p-6">
             <div className="flex flex-wrap gap-4">
@@ -251,7 +262,6 @@ export default function ManagerApprovals() {
           </CardContent>
         </Card>
 
-        {/* Requests List */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -385,7 +395,6 @@ export default function ManagerApprovals() {
           </div>
         )}
 
-        {/* Review Modal */}
         {selectedRequest && (
           <div 
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"

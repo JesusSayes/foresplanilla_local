@@ -27,6 +27,9 @@ export default function VacationRequest() {
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [formData, setFormData] = useState({
     request_type: "Vacaciones",
+    is_full_day: true,
+    start_time: "09:00",
+    end_time: "18:00",
     start_date: null,
     end_date: null,
     reason: "",
@@ -125,11 +128,12 @@ export default function VacationRequest() {
       request_type: formData.request_type,
       start_date: format(formData.start_date, "yyyy-MM-dd"),
       end_date: format(formData.end_date, "yyyy-MM-dd"),
-      total_days: totalDays,
-      business_days: businessDays,
+      total_days: formData.is_full_day ? totalDays : 1,
+      business_days: formData.is_full_day ? businessDays : 1,
       reason: formData.reason,
       supporting_document_url: formData.supporting_document_url,
       status: "Pendiente",
+      comments: formData.is_full_day ? null : `Por horas: ${formData.start_time} - ${formData.end_time}`,
     };
 
     createRequestMutation.mutate(requestData);
@@ -138,6 +142,9 @@ export default function VacationRequest() {
   const resetForm = () => {
     setFormData({
       request_type: "Vacaciones",
+      is_full_day: true,
+      start_time: "09:00",
+      end_time: "18:00",
       start_date: null,
       end_date: null,
       reason: "",
@@ -405,80 +412,127 @@ export default function VacationRequest() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Vacaciones">Vacaciones</SelectItem>
+                          <SelectItem value="Descanso Médico">Descanso Médico</SelectItem>
+                          <SelectItem value="Descanso Vacacional">Descanso Vacacional</SelectItem>
+                          <SelectItem value="Cita Médica">Cita Médica</SelectItem>
+                          <SelectItem value="Onomástico">Onomástico</SelectItem>
+                          <SelectItem value="Licencia sin Goce de Haber">Licencia sin Goce de Haber</SelectItem>
                           <SelectItem value="Permiso con goce">Permiso con goce</SelectItem>
                           <SelectItem value="Permiso sin goce">Permiso sin goce</SelectItem>
                           <SelectItem value="Licencia médica">Licencia médica</SelectItem>
+                          <SelectItem value="Otro">Otro</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-900 mb-2">
-                          Fecha de inicio
-                        </label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start text-left"
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {formData.start_date
-                                ? format(formData.start_date, "dd MMM yyyy", { locale: es })
-                                : "Seleccionar"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={formData.start_date}
-                              onSelect={(date) => setFormData({ ...formData, start_date: date })}
-                              locale={es}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-900 mb-2">
-                          Fecha de fin
-                        </label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start text-left"
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {formData.end_date
-                                ? format(formData.end_date, "dd MMM yyyy", { locale: es })
-                                : "Seleccionar"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={formData.end_date}
-                              onSelect={(date) => setFormData({ ...formData, end_date: date })}
-                              disabled={(date) => formData.start_date ? date < formData.start_date : false}
-                              locale={es}
-                            />
-                          </PopoverContent>
-                        </Popover>
+                    {/* Día completo o por horas */}
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-900 mb-2">
+                        Duración
+                      </label>
+                      <div className="flex rounded-lg border border-input overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, is_full_day: true })}
+                          className={`flex-1 py-2 text-sm font-medium transition-colors ${formData.is_full_day ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+                        >
+                          Día(s) completo(s)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, is_full_day: false })}
+                          className={`flex-1 py-2 text-sm font-medium transition-colors ${!formData.is_full_day ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+                        >
+                          Por horas
+                        </button>
                       </div>
                     </div>
 
-                    {selectedDays && (
-                      <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-indigo-900">
-                            <strong>Total días:</strong> {selectedDays.total} días calendario
-                          </span>
-                          <span className="text-sm text-indigo-900">
-                            <strong>Días hábiles:</strong> {selectedDays.business}
-                          </span>
+                    {/* Rango de horas (solo si es por horas) */}
+                    {!formData.is_full_day && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">Hora de inicio</label>
+                          <Input
+                            type="time"
+                            value={formData.start_time}
+                            onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                          />
                         </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">Hora de fin</label>
+                          <Input
+                            type="time"
+                            value={formData.end_time}
+                            onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.is_full_day ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">Fecha de inicio</label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-start text-left">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {formData.start_date ? format(formData.start_date, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar mode="single" selected={formData.start_date} onSelect={(date) => setFormData({ ...formData, start_date: date })} locale={es} />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-900 mb-2">Fecha de fin</label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-start text-left">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {formData.end_date ? format(formData.end_date, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar mode="single" selected={formData.end_date} onSelect={(date) => setFormData({ ...formData, end_date: date })} disabled={(date) => formData.start_date ? date < formData.start_date : false} locale={es} />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-900 mb-2">Fecha</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start text-left">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {formData.start_date ? format(formData.start_date, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={formData.start_date} onSelect={(date) => setFormData({ ...formData, start_date: date, end_date: date })} locale={es} />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    )}
+
+                    {formData.start_date && (
+                      <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                        {formData.is_full_day && selectedDays ? (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-indigo-900"><strong>Total días:</strong> {selectedDays.total} días calendario</span>
+                            <span className="text-sm text-indigo-900"><strong>Días hábiles:</strong> {selectedDays.business}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-indigo-600" />
+                            <span className="text-sm text-indigo-900">
+                              <strong>Permiso por horas:</strong> {format(formData.start_date, "dd MMM yyyy", { locale: es })} de {formData.start_time} a {formData.end_time}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -592,7 +646,11 @@ export default function VacationRequest() {
                           </div>
 
                           <div className="text-sm text-slate-600 mb-3">
-                            <strong>{request.total_days}</strong> días ({request.business_days} hábiles)
+                            {request.comments?.startsWith("Por horas:") ? (
+                              <span><Clock className="w-3 h-3 inline mr-1" />{request.comments}</span>
+                            ) : (
+                              <span><strong>{request.total_days}</strong> días ({request.business_days} hábiles)</span>
+                            )}
                           </div>
 
                           {request.reason && (
