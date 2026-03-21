@@ -16,7 +16,7 @@ import {
   AlertCircle, Users, Search, FileText, Download, Database, History, Printer, Palmtree
 } from "lucide-react";
 import * as XLSX from 'xlsx';
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
@@ -687,7 +687,14 @@ export default function AttendanceManagement() {
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Horas</p>
-                                  <p className="font-semibold text-slate-900">{vacation ? "8.00" : (emp.record?.worked_hours?.toFixed(2) || "0.00")}h</p>
+                                  <p className="font-semibold text-slate-900">
+                                    {vacation
+                                      ? "8.00"
+                                      : isNaN(Number(emp.record?.worked_hours))
+                                        ? "0.00"
+                                        : Number(emp.record?.worked_hours).toFixed(2)
+                                    }h
+                                  </p>
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Tardanza</p>
@@ -996,14 +1003,17 @@ export default function AttendanceManagement() {
                     <p className="text-sm text-slate-600">
                       Fecha:{" "}
                       <strong>
-                        {(() => {
-                          if (!editingRecord?.date) return "Sin fecha"
+                      {(() => {
+                        if (!editingRecord?.date) return "Sin fecha";
 
-                          const date = new Date(editingRecord.date)
-                          return isNaN(date.getTime())
-                            ? "Fecha inválida"
-                            : format(date, "dd 'de' MMMM, yyyy", { locale: es })
-                        })()}
+                        const rawDate = editingRecord.date.toString().substring(0, 10);
+
+                        const date = parse(rawDate, "yyyy-MM-dd", new Date());
+
+                        if (isNaN(date.getTime())) return "Fecha inválida";
+
+                        return format(date, "dd 'de' MMMM, yyyy", { locale: es });
+                      })()}
                       </strong>
                     </p>
                   </div>
