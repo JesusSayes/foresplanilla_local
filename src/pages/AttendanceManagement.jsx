@@ -138,7 +138,7 @@ export default function AttendanceManagement() {
     queryKey: ["approvedVacations", format(selectedDate, "yyyy-MM-dd")],
     queryFn: async () => {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      const all = await base44.entities.VacationRequest.filter({ status: "Aprobada" }, "-start_date", 500);
+      const all = await entitiesAPI.VacationRequest.filter({ status: "Aprobada" }, "-start_date", 500);
       return all.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
     },
   });
@@ -148,7 +148,7 @@ export default function AttendanceManagement() {
       if (!employee || employee.role !== "admin") return;
       const result = await generateAutoClockings(selectedDate);
       if (result.success && result.recordsCreated > 0) {
-        queryClient.invalidateQueries(["todayAttendance"]);
+        queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
         toast.success(`✓ ${result.recordsCreated} marcación(es) automática(s) generada(s)`);
       }
     };
@@ -169,7 +169,7 @@ export default function AttendanceManagement() {
       return await entitiesAPI.AttendanceRecord.update(id, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
       toast.success("Registro actualizado correctamente");
       setShowEditModal(false);
       setEditingRecord(null);
@@ -182,7 +182,7 @@ export default function AttendanceManagement() {
       return await entitiesAPI.AttendanceIncident.update(id, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["allIncidents"]);
+      queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
       toast.success("Justificación revisada correctamente");
       setShowIncidentModal(false);
       setReviewingIncident(null);
@@ -204,7 +204,7 @@ export default function AttendanceManagement() {
       });
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
       toast.success(`✓ ${result.imported} marcaciones importadas. ${result.errors} errores.`);
     },
     onError: () => toast.error("Error al importar marcaciones"),
@@ -483,7 +483,7 @@ export default function AttendanceManagement() {
   }
 
   return (
-    <PermissionGuard employee={employee} requiredAnyPermissions={["attendance.view_all", "attendance.manage", "attendance.view_department", "system.admin"]}>
+    <PermissionGuard employee={employee} requiredRole={null} requiredPermission={null} requiredAnyPermissions={["attendance.view_all", "attendance.manage", "attendance.view_department", "system.admin"]}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-8 flex justify-between items-start">
@@ -787,7 +787,7 @@ export default function AttendanceManagement() {
                                 <Edit className="w-4 h-4 mr-2" />Corregir Marcación
                               </Button>
                               <Button size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={async () => {
-                                if (cofirm("¿Autorizar estas horas extras? Esto autorizará al empleado para futuras HE.")) {
+                                if (confirm("¿Autorizar estas horas extras? Esto autorizará al empleado para futuras HE.")) {
                                   const schedule = getEmployeeSchedule(emp.id);
                                   if (schedule) {
                                     await entitiesAPI.WorkSchedule.update(schedule.id, { overtime_authorized: true });
@@ -798,8 +798,8 @@ export default function AttendanceManagement() {
                                     resolution_date: format(new Date(), "yyyy-MM-dd"),
                                     resolution_notes: "Horas extras autorizadas retroactivamente"
                                   });
-                                  queryClient.invalidateQueries(["overtimeAlerts"]);
-                                  queryClient.invalidateQueries(["workSchedules"]);
+                                  queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
+                                  queryClient.invalidateQueries({ queryKey: ["workSchedules"] });
                                   toast.success("Horas extras autorizadas");
                                 }
                               }}>
@@ -807,7 +807,7 @@ export default function AttendanceManagement() {
                               </Button>
                               <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
                                 await entitiesAPI.OvertimeAlert.update(alert.id, { status: "Descartado", resolved_by: currentUser.email, resolution_date: format(new Date(), "yyyy-MM-dd") });
-                                queryClient.invalidateQueries(["overtimeAlerts"]);
+                                queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
                                 toast.success("Alerta descartada");
                               }}>
                                 <XCircle className="w-4 h-4 mr-2" />Descartar
@@ -1069,7 +1069,7 @@ export default function AttendanceManagement() {
                     {reviewingIncident.full_day_justification ? (
                       <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> <Badge className="bg-blue-100 text-blue-700">Día completo (8 horas)</Badge></p>
                     ) : (
-                      <p assName="text-sm text-slate-600 mb-2"><strong>Período:</strong> {reviewingIncident.justified_time_start} - {reviewingIncident.justified_time_end}</p>
+                      <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> {reviewingIncident.justified_time_start} - {reviewingIncident.justified_time_end}</p>
                     )}
                     <p className="text-sm text-slate-600 mb-2"><strong>Ajuste:</strong> +{reviewingIncident.hours_to_adjust?.toFixed(2) || 0}h trabajadas{reviewingIncident.late_minutes_to_adjust > 0 && `, -${reviewingIncident.late_minutes_to_adjust} min tardanza`}</p>
                     <p className="text-sm text-slate-700"><strong>Jusificación:</strong><br />{reviewingIncident.justification}</p>
@@ -1121,8 +1121,8 @@ export default function AttendanceManagement() {
               setJustifyingEmployee(null);
               setExistingIncident(null);
               setJustificationData({ incident_type: "Olvido de Marcación", justification: "", supporting_document_url: "", justified_time_start: "09:00", justified_time_end: "18:00", full_day_justification: true });
-              queryClient.invalidateQueries(["allIncidents"]);
-              queryClient.invalidateQueries(["todayAttendance"]);
+              queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
+              queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
             }}
           />
         )}
