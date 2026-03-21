@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, AlertCircle } from "lucide-react";
-import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { FileText, AlertCircle, CalendarIcon, Plus, X } from "lucide-react";
+import { format, eachDayOfInterval, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 
@@ -25,6 +27,31 @@ export default function JustifyModal({
   const [uploadingFile, setUploadingFile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState("");
+
+  // Multi-date mode
+  const [multiDateMode, setMultiDateMode] = useState(false);
+  const [dateRangeStart, setDateRangeStart] = useState(null);
+  const [dateRangeEnd, setDateRangeEnd] = useState(null);
+  const [extraDates, setExtraDates] = useState([]); // additional individual dates
+
+  // Compute all dates to justify
+  const getTargetDates = () => {
+    if (!multiDateMode) {
+      return [format(selectedDate, "yyyy-MM-dd")];
+    }
+    const dates = new Set();
+    // Range
+    if (dateRangeStart && dateRangeEnd) {
+      eachDayOfInterval({ start: dateRangeStart, end: dateRangeEnd }).forEach(d => {
+        dates.add(format(d, "yyyy-MM-dd"));
+      });
+    } else if (dateRangeStart) {
+      dates.add(format(dateRangeStart, "yyyy-MM-dd"));
+    }
+    // Extra individual dates
+    extraDates.forEach(d => dates.add(d));
+    return [...dates].sort();
+  };
 
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -44,19 +71,24 @@ export default function JustifyModal({
   const handleSubmit = async () => {
     setValidationError("");
 
-    // Validaciones con mensajes específicos
     if (!justificationData.incident_type) {
       setValidationError("El campo 'Tipo de Incidente' es obligatorio.");
       return;
     }
     if (!justificationData.justification.trim()) {
-      setValidationError("El campo 'Justificación' es obligatorio. Debes explicar el motivo de la incidencia.");
+      setValidationError("El campo 'Justificación' es obligatorio.");
       return;
     }
+
+    const targetDates = getTargetDates();
+    if (targetDates.length === 0) {
+      setValidationError("Debes seleccionar al menos una fecha.");
+      return;
+    }
+
     if (!justificationData.full_day_justification) {
       const isOlvidoMarcacion = justificationData.incident_type === "Olvido de Marcación";
       if (!isOlvidoMarcacion) {
-        // Para otros tipos, ambas horas son obligatorias
         if (!justificationData.justified_time_start) {
           setValidationError("El campo 'Hora de Inicio' es obligatorio cuando no se justifica el día completo.");
           return;
@@ -66,17 +98,15 @@ export default function JustifyModal({
           return;
         }
       } else {
-        // Para Olvido de Marcación, al menos uno es obligatorio
         if (!justificationData.justified_time_start && !justificationData.justified_time_end) {
           setValidationError("Debes ingresar al menos la Hora de Inicio o la Hora de Fin.");
           return;
         }
       }
-      // Validar orden solo si ambas están presentes
       if (justificationData.justified_time_start && justificationData.justified_time_end) {
-        const [startHour, startMin] = justificationData.justified_time_start.split(":").map(Number);
-        const [endHour, endMin] = justificationData.justified_time_end.split(":").map(Number);
-        if ((endHour * 60 + endMin) <= (startHour * 60 + startMin)) {
+        const [sh, sm] = justificationData.justified_time_start.split(":").map(Number);
+        const [eh, em] = justificationData.justified_time_end.split(":").map(Number);
+        if ((eh * 60 + em) <= (sh * 60 + sm)) {
           setValidationError("La 'Hora de Fin' debe ser posterior a la 'Hora de Inicio'.");
           return;
         }
@@ -85,94 +115,85 @@ export default function JustifyModal({
 
     setSubmitting(true);
     try {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
       const timeStart = justificationData.full_day_justification ? "09:00" : justificationData.justified_time_start;
       const timeEnd = justificationData.full_day_justification ? "18:00" : justificationData.justified_time_end;
 
-      // Calcular horas a ajustar
       let hoursToAdjust = 0;
       let lateMinutesToAdjust = 0;
 
       if (justificationData.full_day_justification) {
         hoursToAdjust = 8;
       } else if (timeStart && timeEnd) {
-        const [startHour, startMin] = timeStart.split(":").map(Number);
-        const [endHour, endMin] = timeEnd.split(":").map(Number);
-        const totalMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
-        hoursToAdjust = Math.min(totalMinutes / 60, 8);
+        const [sh, sm] = timeStart.split(":").map(Number);
+        const [eh, em] = timeEnd.split(":").map(Number);
+        hoursToAdjust = Math.min(((eh * 60 + em) - (sh * 60 + sm)) / 60, 8);
+      }
 
-        if (justificationData.incident_type === "Tardanza") {
-          const record = todayRecords.find(r => r.employee_id === justifyingEmployee.id);
-          if (record && record.clock_in) {
-            const scheduledStart = record.scheduled_start || "09:00";
-            const [schedHour, schedMin] = scheduledStart.split(":").map(Number);
-            const scheduledMinutes = schedHour * 60 + schedMin;
-            const startMinutes = startHour * 60 + startMin;
-            const endMinutes = endHour * 60 + endMin;
-            if (startMinutes <= scheduledMinutes && endMinutes >= startMinutes) {
-              lateMinutesToAdjust = record.late_minutes || 0;
-            }
-          }
+      for (const dateStr of targetDates) {
+        const incidentPayload = {
+          employee_id: justifyingEmployee.id,
+          incident_date: dateStr,
+          incident_type: justificationData.incident_type,
+          justification: justificationData.justification,
+          supporting_document_url: justificationData.supporting_document_url,
+          justified_time_start: timeStart,
+          justified_time_end: timeEnd,
+          full_day_justification: justificationData.full_day_justification,
+          hours_to_adjust: hoursToAdjust,
+          late_minutes_to_adjust: lateMinutesToAdjust,
+          status: "Aprobada",
+          reviewed_by: `${employee.first_name} ${employee.last_name}`,
+          review_date: format(new Date(), "yyyy-MM-dd"),
+          review_comments: "Aprobada automáticamente al crear la justificación",
+        };
+
+        // Only use existingIncident for the primary selectedDate when single-date mode
+        const isSingleMode = !multiDateMode;
+        const isPrimaryDate = dateStr === format(selectedDate, "yyyy-MM-dd");
+
+        if (isSingleMode && existingIncident) {
+          await entitiesAPI.AttendanceIncident.update(existingIncident.id, incidentPayload);
+        } else {
+          await entitiesAPI.AttendanceIncident.create(incidentPayload);
+        }
+
+        const existingRecord = todayRecords.find(r => r.employee_id === justifyingEmployee.id && r.date === dateStr);
+        const newWorkedHours = hoursToAdjust;
+        const newLateMinutes = justificationData.incident_type === "Tardanza"
+          ? Math.max(0, (existingRecord?.late_minutes || 0) - lateMinutesToAdjust)
+          : 0;
+
+        const recordUpdate = {
+          worked_hours: Math.min(newWorkedHours, 8),
+          late_minutes: newLateMinutes,
+          is_late: newLateMinutes > 0,
+          status: newLateMinutes === 0 && newWorkedHours >= 8 ? "Completo" : "Justificado",
+        };
+        if (timeStart) recordUpdate.clock_in = timeStart;
+        if (timeEnd) recordUpdate.clock_out = timeEnd;
+
+        if (existingRecord) {
+          await entitiesAPI.AttendanceRecord.update(existingRecord.id, recordUpdate);
+        } else {
+          await entitiesAPI.AttendanceRecord.create({
+            employee_id: justifyingEmployee.id,
+            date: dateStr,
+            clock_in: timeStart || null,
+            clock_out: timeEnd || null,
+            worked_hours: Math.min(newWorkedHours, 8),
+            late_minutes: 0,
+            is_late: false,
+            is_absent: false,
+            status: "Justificado",
+          });
         }
       }
-      // Si solo hay una hora (Olvido de Marcación), no se calculan horas a ajustar automáticamente
 
-      const incidentPayload = {
-        employee_id: justifyingEmployee.id,
-        incident_date: dateStr,
-        incident_type: justificationData.incident_type,
-        justification: justificationData.justification,
-        supporting_document_url: justificationData.supporting_document_url,
-        justified_time_start: timeStart,
-        justified_time_end: timeEnd,
-        full_day_justification: justificationData.full_day_justification,
-        hours_to_adjust: hoursToAdjust,
-        late_minutes_to_adjust: lateMinutesToAdjust,
-        status: "Aprobada",
-        reviewed_by: `${employee.first_name} ${employee.last_name}`,
-        review_date: dateStr,
-        review_comments: "Aprobada automáticamente al crear la justificación",
-      };
-
-      // Si ya existe justificación previa, actualizarla; si no, crearla
-      if (existingIncident) {
-        await entitiesAPI.AttendanceIncident.update(existingIncident.id, incidentPayload);
-      } else {
-        await entitiesAPI.AttendanceIncident.create(incidentPayload);
-      }
-
-      // Siempre usar los tiempos de la justificación para el registro de asistencia (sobreescribir)
-      const existingRecord = todayRecords.find(r => r.employee_id === justifyingEmployee.id);
-      const newWorkedHours = hoursToAdjust; // Usar directamente las horas de la justificación
-      const newLateMinutes = justificationData.incident_type === "Tardanza" ? Math.max(0, (existingRecord?.late_minutes || 0) - lateMinutesToAdjust) : 0;
-
-      // Construir datos del registro: solo sobreescribir los campos que tienen valor
-      const recordUpdate = {
-        worked_hours: Math.min(newWorkedHours, 8),
-        late_minutes: newLateMinutes,
-        is_late: newLateMinutes > 0,
-        status: newLateMinutes === 0 && newWorkedHours >= 8 ? "Completo" : "Justificado",
-      };
-      if (timeStart) recordUpdate.clock_in = timeStart;
-      if (timeEnd) recordUpdate.clock_out = timeEnd;
-
-      if (existingRecord) {
-        await entitiesAPI.AttendanceRecord.update(existingRecord.id, recordUpdate);
-      } else {
-        await entitiesAPI.AttendanceRecord.create({
-          employee_id: justifyingEmployee.id,
-          date: dateStr,
-          clock_in: timeStart || null,
-          clock_out: timeEnd || null,
-          worked_hours: Math.min(newWorkedHours, 8),
-          late_minutes: 0,
-          is_late: false,
-          is_absent: false,
-          status: "Justificado",
-        });
-      }
-
-      toast.success("Justificación creada y aprobada correctamente");
+      toast.success(
+        targetDates.length === 1
+          ? "Justificación creada y aprobada correctamente"
+          : `${targetDates.length} justificaciones creadas y aprobadas correctamente`
+      );
       onSuccess();
     } catch (error) {
       toast.error("Error al crear la justificación");
@@ -181,6 +202,8 @@ export default function JustifyModal({
       setSubmitting(false);
     }
   };
+
+  const targetDates = getTargetDates();
 
   return (
     <div
@@ -196,17 +219,18 @@ export default function JustifyModal({
             <div>
               <CardTitle className="text-xl font-bold">Justificar Asistencia</CardTitle>
               <p className="text-sm text-slate-600 mt-1">
-                {justifyingEmployee.first_name} {justifyingEmployee.last_name} •{" "}
-                {format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}
+                {justifyingEmployee.first_name} {justifyingEmployee.last_name}
+                {!multiDateMode && <> • {format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}</>}
               </p>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose}>✕</Button>
           </div>
         </CardHeader>
+
         <CardContent className="p-6">
           <div className="space-y-6">
 
-            {/* Error de validación */}
+            {/* Validation error */}
             {validationError && (
               <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
@@ -214,6 +238,94 @@ export default function JustifyModal({
               </div>
             )}
 
+            {/* Multi-date toggle */}
+            <div className="flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="multi_date_mode"
+                checked={multiDateMode}
+                onChange={(e) => {
+                  setMultiDateMode(e.target.checked);
+                  setDateRangeStart(null);
+                  setDateRangeEnd(null);
+                  setExtraDates([]);
+                  setValidationError("");
+                }}
+                className="w-4 h-4 text-indigo-600"
+              />
+              <label htmlFor="multi_date_mode" className="text-sm font-medium text-indigo-900 cursor-pointer">
+                Justificar múltiples días (rango de fechas)
+              </label>
+            </div>
+
+            {/* Date range selector */}
+            {multiDateMode && (
+              <div className="space-y-4 p-4 border border-slate-200 rounded-lg bg-slate-50">
+                <p className="text-sm font-semibold text-slate-900">Selecciona el rango de fechas a justificar</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Fecha de inicio <span className="text-red-500">*</span></label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left text-sm">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dateRangeStart ? format(dateRangeStart, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={dateRangeStart}
+                          onSelect={(d) => {
+                            setDateRangeStart(d);
+                            if (dateRangeEnd && d && d > dateRangeEnd) setDateRangeEnd(null);
+                          }}
+                          locale={es}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Fecha de fin</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left text-sm">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dateRangeEnd ? format(dateRangeEnd, "dd MMM yyyy", { locale: es }) : "Seleccionar"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={dateRangeEnd}
+                          onSelect={setDateRangeEnd}
+                          disabled={(d) => dateRangeStart ? d < dateRangeStart : false}
+                          locale={es}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                {/* Dates summary */}
+                {targetDates.length > 0 && (
+                  <div className="p-3 bg-white border border-indigo-200 rounded-lg">
+                    <p className="text-xs font-semibold text-indigo-900 mb-1">
+                      {targetDates.length} día(s) seleccionado(s):
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {targetDates.map(d => (
+                        <span key={d} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-800 text-xs rounded-full">
+                          {format(parseISO(d), "dd MMM", { locale: es })}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Incident type */}
             <div>
               <label className="block text-sm font-semibold text-slate-900 mb-2">
                 Tipo de Incidente <span className="text-red-500">*</span>
@@ -237,6 +349,7 @@ export default function JustifyModal({
               </Select>
             </div>
 
+            {/* Period */}
             <div>
               <label className="block text-sm font-semibold text-slate-900 mb-2">
                 Período a Justificar <span className="text-red-500">*</span>
@@ -258,7 +371,7 @@ export default function JustifyModal({
                     className="w-4 h-4 text-indigo-600"
                   />
                   <label className="text-sm font-medium text-slate-900">
-                    Justificar día completo (8 horas)
+                    {multiDateMode ? "Día completo (8 horas) — aplica a todos los días" : "Justificar día completo (8 horas)"}
                   </label>
                 </div>
 
@@ -282,7 +395,8 @@ export default function JustifyModal({
                           className="flex-1"
                         />
                         {justificationData.justified_time_start && justificationData.incident_type === "Olvido de Marcación" && (
-                          <Button type="button" size="sm" variant="ghost" className="px-2 text-slate-400 hover:text-red-500" onClick={() => setJustificationData({ ...justificationData, justified_time_start: "" })}>✕</Button>
+                          <Button type="button" size="sm" variant="ghost" className="px-2 text-slate-400 hover:text-red-500"
+                            onClick={() => setJustificationData({ ...justificationData, justified_time_start: "" })}>✕</Button>
                         )}
                       </div>
                     </div>
@@ -304,7 +418,8 @@ export default function JustifyModal({
                           className="flex-1"
                         />
                         {justificationData.justified_time_end && justificationData.incident_type === "Olvido de Marcación" && (
-                          <Button type="button" size="sm" variant="ghost" className="px-2 text-slate-400 hover:text-red-500" onClick={() => setJustificationData({ ...justificationData, justified_time_end: "" })}>✕</Button>
+                          <Button type="button" size="sm" variant="ghost" className="px-2 text-slate-400 hover:text-red-500"
+                            onClick={() => setJustificationData({ ...justificationData, justified_time_end: "" })}>✕</Button>
                         )}
                       </div>
                     </div>
@@ -315,11 +430,13 @@ export default function JustifyModal({
                   <p className="text-xs text-blue-900">
                     <strong>Nota:</strong> Las horas extras NO se ajustan con justificaciones.
                     Solo se ajustan las horas regulares (máximo 8h) y las tardanzas.
+                    {multiDateMode && " El mismo horario se aplicará a todos los días seleccionados."}
                   </p>
                 </div>
               </div>
             </div>
 
+            {/* Justification text */}
             <div>
               <label className="block text-sm font-semibold text-slate-900 mb-2">
                 Justificación <span className="text-red-500">*</span>
@@ -335,6 +452,7 @@ export default function JustifyModal({
               />
             </div>
 
+            {/* Document upload */}
             <div>
               <label className="block text-sm font-semibold text-slate-900 mb-2">
                 Documento de Sustento (opcional)
@@ -346,9 +464,7 @@ export default function JustifyModal({
                   disabled={uploadingFile}
                   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                 />
-                {uploadingFile && (
-                  <p className="text-xs text-blue-600">Subiendo archivo...</p>
-                )}
+                {uploadingFile && <p className="text-xs text-blue-600">Subiendo archivo...</p>}
                 {justificationData.supporting_document_url && (
                   <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
                     <FileText className="w-4 h-4 text-green-600" />
@@ -360,11 +476,8 @@ export default function JustifyModal({
                     >
                       Archivo adjunto
                     </a>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setJustificationData({ ...justificationData, supporting_document_url: "" })}
-                    >
+                    <Button size="sm" variant="ghost"
+                      onClick={() => setJustificationData({ ...justificationData, supporting_document_url: "" })}>
                       ✕
                     </Button>
                   </div>
@@ -372,6 +485,7 @@ export default function JustifyModal({
               </div>
             </div>
 
+            {/* Actions */}
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={onClose}>
                 Cancelar
@@ -381,7 +495,13 @@ export default function JustifyModal({
                 onClick={handleSubmit}
                 disabled={submitting}
               >
-                {submitting ? "Guardando..." : existingIncident ? "Actualizar Justificación" : "Crear Justificación"}
+                {submitting
+                  ? "Guardando..."
+                  : multiDateMode && targetDates.length > 1
+                    ? `Justificar ${targetDates.length} días`
+                    : existingIncident
+                      ? "Actualizar Justificación"
+                      : "Crear Justificación"}
               </Button>
             </div>
           </div>

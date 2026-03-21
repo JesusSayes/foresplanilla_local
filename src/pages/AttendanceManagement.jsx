@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle,
-  AlertCircle, Users, Search, FileText, Download, Database, History, Printer
+  AlertCircle, Users, Search, FileText, Download, Database, History, Printer, Palmtree
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
@@ -133,12 +133,22 @@ export default function AttendanceManagement() {
     },
   });
 
+  // Vacaciones aprobadas que cubren la fecha seleccionada
+  const { data: approvedVacations = [] } = useQuery({
+    queryKey: ["approvedVacations", format(selectedDate, "yyyy-MM-dd")],
+    queryFn: async () => {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const all = await entitiesAPI.VacationRequest.filter({ status: "Aprobada" }, "-start_date", 500);
+      return all.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
+    },
+  });
+
   useEffect(() => {
     const generateExemptClockings = async () => {
       if (!employee || employee.role !== "admin") return;
       const result = await generateAutoClockings(selectedDate);
       if (result.success && result.recordsCreated > 0) {
-        queryClient.invalidateQueries(["todayAttendance"]);
+        queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
         toast.success(`✓ ${result.recordsCreated} marcación(es) automática(s) generada(s)`);
       }
     };
@@ -159,7 +169,7 @@ export default function AttendanceManagement() {
       return await entitiesAPI.AttendanceRecord.update(id, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
       toast.success("Registro actualizado correctamente");
       setShowEditModal(false);
       setEditingRecord(null);
@@ -172,7 +182,7 @@ export default function AttendanceManagement() {
       return await entitiesAPI.AttendanceIncident.update(id, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["allIncidents"]);
+      queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
       toast.success("Justificación revisada correctamente");
       setShowIncidentModal(false);
       setReviewingIncident(null);
@@ -194,7 +204,7 @@ export default function AttendanceManagement() {
       });
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
       toast.success(`✓ ${result.imported} marcaciones importadas. ${result.errors} errores.`);
     },
     onError: () => toast.error("Error al importar marcaciones"),
@@ -435,6 +445,24 @@ export default function AttendanceManagement() {
     printWindow.document.close();
   };
 
+  // Detectar si el empleado tiene vacación aprobada en la fecha seleccionada
+  const getVacationForEmployee = (empId) => {
+    return approvedVacations.find(v => v.employee_id === empId) || null;
+  };
+
+  // Obtener horario programado de entrada/salida para mostrar en vacaciones
+  const getScheduledTimes = (empId) => {
+    const schedule = getEmployeeSchedule(empId);
+    if (!schedule) return { start: "09:00", end: "18:00" };
+    const dayMap = ["sunday_start", "monday_start", "tuesday_start", "wednesday_start", "thursday_start", "friday_start", "saturday_start"];
+    const dayEndMap = ["sunday_end", "monday_end", "tuesday_end", "wednesday_end", "thursday_end", "friday_end", "saturday_end"];
+    const dow = selectedDate.getDay();
+    return {
+      start: schedule[dayMap[dow]] || "09:00",
+      end: schedule[dayEndMap[dow]] || "18:00",
+    };
+  };
+
   const getStatusConfig = (status, hasClockIn) => {
     if (!hasClockIn) return { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle, text: "Sin marcar" };
     const configs = {
@@ -455,7 +483,7 @@ export default function AttendanceManagement() {
   }
 
   return (
-    <PermissionGuard employee={employee} requiredAnyPermissions={["attendance.view_all", "attendance.manage", "attendance.view_department", "system.admin"]}>
+    <PermissionGuard employee={employee} requiredRole={null} requiredPermission={null} requiredAnyPermissions={["attendance.view_all", "attendance.manage", "attendance.view_department", "system.admin"]}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-8 flex justify-between items-start">
@@ -498,12 +526,13 @@ export default function AttendanceManagement() {
             </Card>
           )}
 
-          <div className="grid grid-cols-5 gap-3 mb-8">
+          <div className="grid grid-cols-6 gap-3 mb-8">
             {[
               { label: "Total empleados", value: siteAllowedEmployees.length, icon: Users, color: "blue" },
               { label: "Han marcado", value: todayRecords.filter(r => r.clock_in).length, icon: CheckCircle, color: "green" },
               { label: "Tardanzas", value: todayRecords.filter(r => r.is_late).length, icon: Clock, color: "yellow" },
               { label: "Justificaciones", value: pendingIncidents.length, icon: AlertCircle, color: "orange" },
+              { label: "De vacaciones", value: approvedVacations.filter(v => accessibleEmployeeIds.has(v.employee_id)).length, icon: Palmtree, color: "amber" },
             ].map(({ label, value, icon: Icon, color }) => (
               <Card key={label} className="border-0 shadow-lg">
                 <CardContent className="p-3">
@@ -519,7 +548,7 @@ export default function AttendanceManagement() {
                 </CardContent>
               </Card>
             ))}
-            <Card className="border-0 shadow-lg bg-red-50 border-red-200">
+            <Card className="border-0 shadow-lg bg-red-50">
               <CardContent className="p-3">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-red-100 rounded-lg shrink-0"><Clock className="w-4 h-4 text-red-600" /></div>
@@ -605,50 +634,68 @@ export default function AttendanceManagement() {
 
                   <div className="space-y-3">
                     {employeesWithRecords.map(emp => {
-                      const statusConfig = getStatusConfig(emp.record?.status, emp.record?.clock_in);
+                      const vacation = getVacationForEmployee(emp.id);
+                      const scheduledTimes = vacation ? getScheduledTimes(emp.id) : null;
+                      const statusConfig = vacation
+                        ? { color: "bg-amber-100 text-amber-800 border-amber-300", icon: Palmtree, text: "Vacaciones" }
+                        : getStatusConfig(emp.record?.status, emp.record?.clock_in);
                       const StatusIcon = statusConfig.icon;
+
                       return (
-                        <div key={emp.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                        <div key={emp.id} className={`p-4 border rounded-lg hover:shadow-md transition-all ${vacation ? "border-amber-300 bg-amber-50/40" : "border-slate-200"}`}>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4 flex-1">
-                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${vacation ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-purple-600"}`}>
                                 {emp.first_name[0]}{emp.last_name[0]}
                               </div>
                               <div className="flex-1">
                                 <h4 className="font-bold text-slate-900">{emp.first_name} {emp.last_name}</h4>
                                 <p className="text-sm text-slate-600">{emp.employee_code} • {emp.position} • {emp.department_name}</p>
+                                {vacation && (
+                                  <p className="text-xs text-amber-700 font-medium mt-0.5">
+                                    🌴 {vacation.request_type} — hasta {format(new Date(vacation.end_date + "T00:00:00"), "dd MMM yyyy", { locale: es })}
+                                  </p>
+                                )}
                               </div>
                               <div className="grid grid-cols-6 gap-3 text-sm">
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Entrada</p>
-                                  <p className={`font-semibold ${emp.record?.clock_in ? 'text-slate-900' : 'text-slate-400'}`}>
-                                    {emp.record?.clock_in || "--:--"}
-                                  </p>
+                                  {vacation ? (
+                                    <p className="font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded text-xs">
+                                      {scheduledTimes?.start}
+                                    </p>
+                                  ) : (
+                                    <p className={`font-semibold ${emp.record?.clock_in ? 'text-slate-900' : 'text-slate-400'}`}>
+                                      {emp.record?.clock_in || "--:--"}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Salida</p>
-                                  <p className={`font-semibold ${emp.record?.clock_out ? 'text-slate-900' : 'text-slate-400'}`}>
-                                    {emp.record?.clock_out || "--:--"}
-                                  </p>
+                                  {vacation ? (
+                                    <p className="font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded text-xs">
+                                      {scheduledTimes?.end}
+                                    </p>
+                                  ) : (
+                                    <p className={`font-semibold ${emp.record?.clock_out ? 'text-slate-900' : 'text-slate-400'}`}>
+                                      {emp.record?.clock_out || "--:--"}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Horas</p>
-                                  <p className="font-semibold text-slate-900">
-                                    {emp.record?.worked_hours
-                                      ? Number(emp.record.worked_hours).toFixed(2)
-                                      : "0.00"}h
-                                  </p>
+                                  <p className="font-semibold text-slate-900">{vacation ? "8.00" : (emp.record?.worked_hours?.toFixed(2) || "0.00")}h</p>
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Tardanza</p>
-                                  <p className={`font-semibold ${emp.record?.late_minutes > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                                    {emp.record?.late_minutes || 0} min
+                                  <p className={`font-semibold ${!vacation && emp.record?.late_minutes > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                                    {vacation ? "0" : (emp.record?.late_minutes || 0)} min
                                   </p>
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">HE 25%</p>
-                                  <p className={`font-semibold ${isOvertimeAuthorized(emp.id) ? 'text-blue-600' : 'text-red-600'}`}>
-                                    {(() => {
+                                  <p className={`font-semibold ${!vacation && isOvertimeAuthorized(emp.id) ? 'text-blue-600' : 'text-red-600'}`}>
+                                    {vacation ? "0.00" : (() => {
                                       if (!isOvertimeAuthorized(emp.id)) return "0.00";
                                       return Math.min(Math.max(0, (emp.record?.worked_hours || 0) - 8), 2).toFixed(2);
                                     })()}h
@@ -656,8 +703,8 @@ export default function AttendanceManagement() {
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">HE 35%</p>
-                                  <p className={`font-semibold ${isOvertimeAuthorized(emp.id) ? 'text-purple-600' : 'text-red-600'}`}>
-                                    {(() => {
+                                  <p className={`font-semibold ${!vacation && isOvertimeAuthorized(emp.id) ? 'text-purple-600' : 'text-red-600'}`}>
+                                    {vacation ? "0.00" : (() => {
                                       if (!isOvertimeAuthorized(emp.id)) return "0.00";
                                       return Math.max(0, (emp.record?.worked_hours || 0) - 10).toFixed(2);
                                     })()}h
@@ -668,22 +715,24 @@ export default function AttendanceManagement() {
                                 <Badge className={statusConfig.color}>
                                   <StatusIcon className="w-3 h-3 mr-1" />{statusConfig.text}
                                 </Badge>
-                                {emp.record?.is_late && (
+                                {!vacation && emp.record?.is_late && (
                                   <Badge className="bg-orange-100 text-orange-700">+{emp.record.late_minutes} min</Badge>
                                 )}
-                                {emp.record && (
+                                {!vacation && emp.record && (
                                   <Button size="sm" variant="outline" onClick={() => handleEditRecord(emp.record)}>
                                     <Edit className="w-4 h-4 mr-1" />Editar
                                   </Button>
                                 )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-orange-600 border-orange-200 hover:bg-orange-50"
-                                  onClick={() => handleJustifyClick(emp, emp.record)}
-                                >
-                                  <FileText className="w-4 h-4 mr-1" />Justificar
-                                </Button>
+                                {!vacation && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                                    onClick={() => handleJustifyClick(emp, emp.record)}
+                                  >
+                                    <FileText className="w-4 h-4 mr-1" />Justificar
+                                  </Button>
+                                )}
                                 <Button size="sm" variant="outline" onClick={() => { setHistoryEmployeeId(emp.id); setShowHistory(true); }}>
                                   <History className="w-4 h-4" />
                                 </Button>
@@ -738,7 +787,7 @@ export default function AttendanceManagement() {
                                 <Edit className="w-4 h-4 mr-2" />Corregir Marcación
                               </Button>
                               <Button size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={async () => {
-                                if (cofirm("¿Autorizar estas horas extras? Esto autorizará al empleado para futuras HE.")) {
+                                if (confirm("¿Autorizar estas horas extras? Esto autorizará al empleado para futuras HE.")) {
                                   const schedule = getEmployeeSchedule(emp.id);
                                   if (schedule) {
                                     await entitiesAPI.WorkSchedule.update(schedule.id, { overtime_authorized: true });
@@ -749,8 +798,8 @@ export default function AttendanceManagement() {
                                     resolution_date: format(new Date(), "yyyy-MM-dd"),
                                     resolution_notes: "Horas extras autorizadas retroactivamente"
                                   });
-                                  queryClient.invalidateQueries(["overtimeAlerts"]);
-                                  queryClient.invalidateQueries(["workSchedules"]);
+                                  queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
+                                  queryClient.invalidateQueries({ queryKey: ["workSchedules"] });
                                   toast.success("Horas extras autorizadas");
                                 }
                               }}>
@@ -758,7 +807,7 @@ export default function AttendanceManagement() {
                               </Button>
                               <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
                                 await entitiesAPI.OvertimeAlert.update(alert.id, { status: "Descartado", resolved_by: currentUser.email, resolution_date: format(new Date(), "yyyy-MM-dd") });
-                                queryClient.invalidateQueries(["overtimeAlerts"]);
+                                queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
                                 toast.success("Alerta descartada");
                               }}>
                                 <XCircle className="w-4 h-4 mr-2" />Descartar
@@ -1020,7 +1069,7 @@ export default function AttendanceManagement() {
                     {reviewingIncident.full_day_justification ? (
                       <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> <Badge className="bg-blue-100 text-blue-700">Día completo (8 horas)</Badge></p>
                     ) : (
-                      <p assName="text-sm text-slate-600 mb-2"><strong>Período:</strong> {reviewingIncident.justified_time_start} - {reviewingIncident.justified_time_end}</p>
+                      <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> {reviewingIncident.justified_time_start} - {reviewingIncident.justified_time_end}</p>
                     )}
                     <p className="text-sm text-slate-600 mb-2"><strong>Ajuste:</strong> +{reviewingIncident.hours_to_adjust?.toFixed(2) || 0}h trabajadas{reviewingIncident.late_minutes_to_adjust > 0 && `, -${reviewingIncident.late_minutes_to_adjust} min tardanza`}</p>
                     <p className="text-sm text-slate-700"><strong>Jusificación:</strong><br />{reviewingIncident.justification}</p>
@@ -1072,8 +1121,8 @@ export default function AttendanceManagement() {
               setJustifyingEmployee(null);
               setExistingIncident(null);
               setJustificationData({ incident_type: "Olvido de Marcación", justification: "", supporting_document_url: "", justified_time_start: "09:00", justified_time_end: "18:00", full_day_justification: true });
-              queryClient.invalidateQueries(["allIncidents"]);
-              queryClient.invalidateQueries(["todayAttendance"]);
+              queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
+              queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
             }}
           />
         )}
