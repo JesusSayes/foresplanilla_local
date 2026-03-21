@@ -653,7 +653,10 @@ export default function AttendanceManagement() {
                                 <p className="text-sm text-slate-600">{emp.employee_code} • {emp.position} • {emp.department_name}</p>
                                 {vacation && (
                                   <p className="text-xs text-amber-700 font-medium mt-0.5">
-                                    🌴 {vacation.request_type} — hasta {format(new Date(vacation.end_date + "T00:00:00"), "dd MMM yyyy", { locale: es })}
+                                    🌴 {vacation.request_type} — hasta{" "}
+                                      {vacation.end_date
+                                        ? format(new Date(vacation.end_date), "dd MMM yyyy", { locale: es })
+                                        : "Sin fecha"}
                                   </p>
                                 )}
                               </div>
