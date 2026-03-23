@@ -397,7 +397,7 @@ export default function AttendanceManagement() {
   let employeesWithRecords = [];
 
   if (isRangeMode && dateFrom && dateTo) {
-    // Obtener todas las fechas del rango
+    // Generar todas las fechas del rango
     const dateList = [];
     const cur = new Date(dateFrom);
     cur.setHours(0, 0, 0, 0);
@@ -408,12 +408,25 @@ export default function AttendanceManagement() {
       cur.setDate(cur.getDate() + 1);
     }
 
-    // Para cada registro encontrado en el rango, combinar con empleado
+    // Para cada empleado filtrado × cada fecha → una fila (tenga o no registro)
     const rows = [];
-    for (const rec of todayRecords) {
-      const emp = filteredEmployees.find(e => e.id === rec.employee_id);
-      if (!emp) continue;
-      rows.push({ ...emp, record: rec, displayDate: rec.date });
+    for (const emp of filteredEmployees) {
+      // Excluir empleados cesados antes del rango
+      if (emp.termination_date) {
+        const termination = new Date(emp.termination_date + "T00:00:00");
+        const rangeStart = new Date(dateFrom); rangeStart.setHours(0, 0, 0, 0);
+        if (rangeStart > termination) continue;
+      }
+      for (const dateStr of dateList) {
+        // Si el empleado estaba cesado en esta fecha específica, omitir
+        if (emp.termination_date) {
+          const termination = new Date(emp.termination_date + "T00:00:00");
+          const rowDay = new Date(dateStr + "T00:00:00");
+          if (rowDay > termination) continue;
+        }
+        const record = todayRecords.find(r => r.employee_id === emp.id && r.date === dateStr);
+        rows.push({ ...emp, record, displayDate: dateStr });
+      }
     }
     // Ordenar: fecha más reciente primero, luego por nombre
     rows.sort((a, b) => {
