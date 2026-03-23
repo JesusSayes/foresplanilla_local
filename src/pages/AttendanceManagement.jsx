@@ -812,7 +812,7 @@ export default function AttendanceManagement() {
                                     size="sm"
                                     variant="outline"
                                     className="text-orange-600 border-orange-200 hover:bg-orange-50"
-                                    onClick={() => handleJustifyClick(emp, emp.record)}
+                                    onClick={() => handleJustifyClick(emp, emp.record, rowDate)}
                                   >
                                     <FileText className="w-4 h-4 mr-1" />Justificar
                                   </Button>
