@@ -832,6 +832,86 @@ export default function ContractTemplateConfig() {
 
                 {/* Introducción */}
                 <TabsContent value="intro" className="space-y-4">
+
+                  {/* Título y encabezado */}
+                  <Card className="border-slate-200">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold text-slate-700">🏷️ Título del Contrato</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <Label>Título Principal <span className="text-xs text-slate-400">(ej: CONTRATO DE TRABAJO)</span></Label>
+                        <Input
+                          value={templateData.contract_title || "CONTRATO DE TRABAJO"}
+                          onChange={(e) => setTemplateData({ ...templateData, contract_title: e.target.value })}
+                          className="font-mono text-sm"
+                          placeholder="CONTRATO DE TRABAJO"
+                        />
+                      </div>
+                      <div>
+                        <Label>Subtítulo <span className="text-xs text-slate-400">(puede usar variables)</span></Label>
+                        <Input
+                          value={templateData.contract_subtitle || "{contract_type}"}
+                          onChange={(e) => setTemplateData({ ...templateData, contract_subtitle: e.target.value })}
+                          className="font-mono text-sm"
+                          placeholder="{contract_type}"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Sección Empleador */}
+                  <Card className="border-slate-200">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold text-slate-700">🏢 Sección del Empleador</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <Label>Título de la sección</Label>
+                        <Input
+                          value={templateData.employer_section_title || "I. DATOS DEL EMPLEADOR:"}
+                          onChange={(e) => setTemplateData({ ...templateData, employer_section_title: e.target.value })}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label>Contenido <span className="text-xs text-slate-400">(usa variables, una línea por campo)</span></Label>
+                        <Textarea
+                          value={templateData.employer_section_text || "Empresa: {company_name}\nRUC: {company_ruc}\nDomicilio: {company_address}\nRepresentante Legal: {company_representative}\nDocumento: {company_representative_doc}"}
+                          onChange={(e) => setTemplateData({ ...templateData, employer_section_text: e.target.value })}
+                          rows={5}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Sección Trabajador */}
+                  <Card className="border-slate-200">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold text-slate-700">👤 Sección del Trabajador</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <Label>Título de la sección</Label>
+                        <Input
+                          value={templateData.worker_section_title || "II. DATOS DEL TRABAJADOR:"}
+                          onChange={(e) => setTemplateData({ ...templateData, worker_section_title: e.target.value })}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label>Contenido <span className="text-xs text-slate-400">(usa variables, una línea por campo)</span></Label>
+                        <Textarea
+                          value={templateData.worker_section_text || "Nombres y Apellidos: {employee_name}\n{employee_doc_type}: {employee_doc_number}\nDomicilio: {employee_address}"}
+                          onChange={(e) => setTemplateData({ ...templateData, worker_section_text: e.target.value })}
+                          rows={4}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
                   <div>
                     <Label>Texto Introductorio</Label>
                     <Textarea
