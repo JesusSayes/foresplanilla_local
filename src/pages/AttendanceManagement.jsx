@@ -619,20 +619,13 @@ export default function AttendanceManagement() {
             <TabsContent value="attendance" className="space-y-6">
               <Card className="border-0 shadow-lg">
                 <CardContent className="p-6">
-                  <div className="flex items-center gap-3 mb-6 flex-nowrap overflow-x-auto">
-                    <div className="flex-1 min-w-[200px]">
+                  <div className="flex flex-wrap items-center gap-3 mb-6">
+                    <div className="flex-1 min-w-[180px]">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
                         <Input placeholder="Buscar empleado..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
                       </div>
                     </div>
-                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                      <SelectTrigger className="w-40"><SelectValue placeholder="Departamento" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
                     <Select value={selectedSite} onValueChange={setSelectedSite}>
                       <SelectTrigger className="w-36"><SelectValue placeholder="Sede" /></SelectTrigger>
                       <SelectContent>
@@ -652,17 +645,60 @@ export default function AttendanceManagement() {
                         <SelectItem value="con_tardanza"><div className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-orange-600" />Con tardanza</div></SelectItem>
                       </SelectContent>
                     </Select>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="bg-green-50 border-green-200 hover:bg-green-100 whitespace-nowrap">
-                          <CalendarIcon className="mr-2 h-4 w-4 text-green-700" />
-                          <span className="text-green-700">{format(selectedDate, "dd MMM yyyy", { locale: es })}</span>
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} locale={es} />
-                      </PopoverContent>
-                    </Popover>
+
+                    {/* Selector de fecha única */}
+                    {!isRangeMode && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="bg-green-50 border-green-200 hover:bg-green-100 whitespace-nowrap">
+                            <CalendarIcon className="mr-2 h-4 w-4 text-green-700" />
+                            <span className="text-green-700">{format(selectedDate, "dd MMM yyyy", { locale: es })}</span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} locale={es} />
+                        </PopoverContent>
+                      </Popover>
+                    )}
+
+                    {/* Selector rango de fechas */}
+                    {isRangeMode && (
+                      <div className="flex items-center gap-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="bg-blue-50 border-blue-200 hover:bg-blue-100 whitespace-nowrap">
+                              <CalendarIcon className="mr-2 h-4 w-4 text-blue-700" />
+                              <span className="text-blue-700">{dateFrom ? format(dateFrom, "dd MMM yyyy", { locale: es }) : "Desde"}</span>
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={dateFrom} onSelect={(d) => d && setDateFrom(d)} locale={es} />
+                          </PopoverContent>
+                        </Popover>
+                        <span className="text-slate-400 text-sm">—</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="bg-blue-50 border-blue-200 hover:bg-blue-100 whitespace-nowrap">
+                              <CalendarIcon className="mr-2 h-4 w-4 text-blue-700" />
+                              <span className="text-blue-700">{dateTo ? format(dateTo, "dd MMM yyyy", { locale: es }) : "Hasta"}</span>
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={dateTo} onSelect={(d) => d && setDateTo(d)} locale={es} />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setIsRangeMode(!isRangeMode); setDateFrom(null); setDateTo(null); }}
+                      className={isRangeMode ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700" : ""}
+                    >
+                      {isRangeMode ? "Rango activo" : "Por rango"}
+                    </Button>
+
                     <Button onClick={handleExportToExcel} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
                       <Download className="w-4 h-4 mr-2" />Excel
                     </Button>
