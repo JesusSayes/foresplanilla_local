@@ -880,31 +880,17 @@ export default function AttendanceManagement() {
                               <p className="text-sm text-yellow-900">⚠️ Este empleado NO está autorizado para realizar horas extras. Por favor, verifica la marcación o autoriza las horas extras desde Gestión de Horarios.</p>
                             </div>
                             <div className="flex gap-3">
-                              <Button size="sm" variant="outline" className="flex-1" onClick={() => record && handleEditRecord(record)}>
-                                <Edit className="w-4 h-4 mr-2" />Corregir Marcación
-                              </Button>
-                              <Button size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={async () => {
-                                if (confirm("¿Autorizar estas horas extras? Esto autorizará al empleado para futuras HE.")) {
-                                  const schedule = getEmployeeSchedule(emp.id);
-                                  if (schedule) {
-                                    await base44.entities.WorkSchedule.update(schedule.id, { overtime_authorized: true });
-                                  } else { toast.error("No se encontró horario asignado"); return; }
-                                  await base44.entities.OvertimeAlert.update(alert.id, { status: "Autorizado", resolved_by: currentUser.email, resolution_date: format(new Date(), "yyyy-MM-dd"), resolution_notes: "Horas extras autorizadas retroactivamente" });
-                                  queryClient.invalidateQueries(["overtimeAlerts"]);
-                                  queryClient.invalidateQueries(["workSchedules"]);
-                                  toast.success("Horas extras autorizadas");
-                                }
-                              }}>
-                                <CheckCircle className="w-4 h-4 mr-2" />Autorizar HE
-                              </Button>
-                              <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
-                                await base44.entities.OvertimeAlert.update(alert.id, { status: "Descartado", resolved_by: currentUser.email, resolution_date: format(new Date(), "yyyy-MM-dd") });
-                                queryClient.invalidateQueries(["overtimeAlerts"]);
-                                toast.success("Alerta descartada");
-                              }}>
-                                <XCircle className="w-4 h-4 mr-2" />Descartar
-                              </Button>
-                            </div>
+                               <Button size="sm" variant="outline" className="flex-1" onClick={() => record && handleEditRecord(record)}>
+                                 <Edit className="w-4 h-4 mr-2" />Corregir Marcación
+                               </Button>
+                               <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
+                                 await base44.entities.OvertimeAlert.update(alert.id, { status: "Descartado" });
+                                 queryClient.invalidateQueries(["overtimeAlerts"]);
+                                 toast.success("Alerta descartada");
+                               }}>
+                                 <XCircle className="w-4 h-4 mr-2" />Descartar
+                               </Button>
+                             </div>
                           </div>
                         );
                       })}
