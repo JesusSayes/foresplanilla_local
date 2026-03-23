@@ -136,12 +136,17 @@ export default function AttendanceManagement() {
     queryFn: async () => await base44.entities.WorkSchedule.list("-created_date"),
   });
 
-  // Vacaciones aprobadas que cubren la fecha seleccionada
+  // Vacaciones aprobadas que cubren la(s) fecha(s) seleccionada(s)
   const { data: approvedVacations = [] } = useQuery({
-    queryKey: ["approvedVacations", format(selectedDate, "yyyy-MM-dd")],
+    queryKey: ["approvedVacations", format(selectedDate, "yyyy-MM-dd"), isRangeMode, dateFrom, dateTo],
     queryFn: async () => {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
       const all = await base44.entities.VacationRequest.filter({ status: "Aprobada" }, "-start_date", 500);
+      if (isRangeMode && dateFrom && dateTo) {
+        const fromStr = format(dateFrom, "yyyy-MM-dd");
+        const toStr = format(dateTo, "yyyy-MM-dd");
+        return all.filter(v => v.start_date <= toStr && v.end_date >= fromStr);
+      }
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
       return all.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
     },
   });
