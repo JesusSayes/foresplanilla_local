@@ -26,6 +26,15 @@ const DEFAULT_TEMPLATE = {
   company_address: "",
   company_representative: "",
   company_representative_doc: "",
+  // Título y encabezado
+  contract_title: "CONTRATO DE TRABAJO",
+  contract_subtitle: "{contract_type}",
+  // Sección Empleador
+  employer_section_title: "I. DATOS DEL EMPLEADOR:",
+  employer_section_text: "Empresa: {company_name}\nRUC: {company_ruc}\nDomicilio: {company_address}\nRepresentante Legal: {company_representative}\nDocumento: {company_representative_doc}",
+  // Sección Trabajador
+  worker_section_title: "II. DATOS DEL TRABAJADOR:",
+  worker_section_text: "Nombres y Apellidos: {employee_name}\n{employee_doc_type}: {employee_doc_number}\nDomicilio: {employee_address}",
   introduction_text: "Conste por el presente documento el Contrato de Trabajo {contract_type}, que celebran al amparo del Texto Único Ordenado del Decreto Legislativo N° 728, Ley de Productividad y Competitividad Laboral, aprobado por Decreto Supremo N° 003-97-TR, y normas complementarias:",
   contract_object_text: "Por el presente contrato, EL TRABAJADOR se obliga a prestar sus servicios personales a EL EMPLEADOR, desempeñando el cargo de {position} en el área de {department}, bajo subordinación y dependencia de EL EMPLEADOR.",
   functions_intro_text: "El trabajador desempeñará las siguientes funciones y responsabilidades:",
