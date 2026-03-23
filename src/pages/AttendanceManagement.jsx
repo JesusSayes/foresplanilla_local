@@ -324,10 +324,10 @@ export default function AttendanceManagement() {
     });
   };
 
-  const handleJustifyClick = (emp, record) => {
+  const handleJustifyClick = (emp, record, overrideDate) => {
     setJustifyingEmployee(emp);
 
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    const dateStr = overrideDate || format(selectedDate, "yyyy-MM-dd");
     // Buscar justificación previa para este empleado en esta fecha
     const prevIncident = allIncidents.find(
       i => i.employee_id === emp.id && i.incident_date === dateStr
