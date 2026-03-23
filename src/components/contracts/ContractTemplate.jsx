@@ -107,8 +107,15 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     "{trial_period_days}": (contract.trial_period_days || 90).toString(),
     "{functions}": contract.functions || "",
     "{benefits}": contract.benefits || "",
+    "{benefits_additional}": contract.benefits || "",
+    "{notes}": contract.notes || "",
+    "{activity_cost}": (contract.activity_cost || 0).toFixed(2),
+    "{food_cost}": (contract.food_cost || 0).toFixed(2),
+    "{transport_cost}": (contract.transport_cost || 0).toFixed(2),
     "{renewable_clause}": contract.renewable ? ", siendo renovable según las necesidades de la empresa" : "",
     "{signed_date}": format(new Date(contract.signed_date || contract.start_date), "dd 'de' MMMM 'de' yyyy", { locale: es }),
+    "{company_representative}": company.representative || "",
+    "{company_representative_doc}": company.representativeDoc || "",
   };
 
   // Función para reemplazar variables en texto
