@@ -268,6 +268,7 @@ export default function ContractManagement() {
       toast.success(`${signed} contrato(s) firmado(s) digitalmente`);
     }
     setConfirmSign(null);
+    setSignatureImageUrl("");
   };
 
   const toggleBulkSelect = (contractId) => {
