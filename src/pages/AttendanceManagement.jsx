@@ -78,8 +78,15 @@ export default function AttendanceManagement() {
   });
 
   const { data: todayRecords = [] } = useQuery({
-    queryKey: ["todayAttendance", selectedDate],
+    queryKey: ["todayAttendance", selectedDate, dateFrom, dateTo, isRangeMode],
     queryFn: async () => {
+      if (isRangeMode && dateFrom && dateTo) {
+        // Cargar todos los registros en el rango
+        const allRecs = await base44.entities.AttendanceRecord.list("-date", 2000);
+        const fromStr = format(dateFrom, "yyyy-MM-dd");
+        const toStr = format(dateTo, "yyyy-MM-dd");
+        return allRecs.filter(r => r.date >= fromStr && r.date <= toStr);
+      }
       const dateStr = format(selectedDate, "yyyy-MM-dd");
       return await base44.entities.AttendanceRecord.filter({ date: dateStr }, "-created_date");
     },
