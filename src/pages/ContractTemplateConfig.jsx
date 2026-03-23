@@ -430,6 +430,14 @@ export default function ContractTemplateConfig() {
     { key: "{work_location}", desc: "Lugar de trabajo" },
     { key: "{trial_period_days}", desc: "Días de período de prueba" },
     { key: "{renewable_clause}", desc: "Cláusula de renovación" },
+    { key: "{activity_cost}", desc: "Costo de actividad (S/)" },
+    { key: "{food_cost}", desc: "Costo de alimento (S/)" },
+    { key: "{transport_cost}", desc: "Costo de movilidad (S/)" },
+    { key: "{functions}", desc: "Funciones y responsabilidades" },
+    { key: "{benefits_additional}", desc: "Beneficios adicionales del contrato" },
+    { key: "{notes}", desc: "Notas del contrato" },
+    { key: "{company_representative}", desc: "Nombre del representante legal" },
+    { key: "{company_representative_doc}", desc: "Documento del representante legal" },
   ];
 
   if (!employee || employee.role !== "admin") {
