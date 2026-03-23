@@ -246,6 +246,7 @@ export default function ContractManagement() {
 
     const dataToSave = {
       ...formData,
+      salary: parseFloat(formData.salary) || 0,
       activity_cost: parseFloat(formData.activity_cost) || 0,
       food_cost: parseFloat(formData.food_cost) || 0,
       transport_cost: parseFloat(formData.transport_cost) || 0,
