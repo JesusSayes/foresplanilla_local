@@ -483,11 +483,6 @@ export default function AttendanceManagement() {
     printWindow.document.close();
   };
 
-  // Detectar si el empleado tiene vacación aprobada en la fecha seleccionada
-  const getVacationForEmployee = (empId) => {
-    return approvedVacations.find(v => v.employee_id === empId) || null;
-  };
-
   // Obtener horario programado de entrada/salida para mostrar en vacaciones
   const getScheduledTimes = (empId) => {
     const schedule = getEmployeeSchedule(empId);
