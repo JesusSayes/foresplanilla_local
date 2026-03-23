@@ -1148,96 +1148,179 @@ export default function ContractTemplateConfig() {
                 <Button variant="ghost" size="icon" onClick={() => setShowPreview(false)}>✕</Button>
               </div>
             </CardHeader>
-            <CardContent className="p-8 space-y-6">
-              <div className="space-y-8">
-                {/* Encabezado */}
-                <div className="text-center border-b pb-6">
-                  <h1 className="text-2xl font-bold text-slate-900 mb-2">CONTRATO DE TRABAJO</h1>
-                  <p className="text-slate-600">{templateData.company_name || "[Nombre de la Empresa]"}</p>
-                  <p className="text-sm text-slate-500">RUC: {templateData.company_ruc || "[RUC]"}</p>
-                </div>
+            <CardContent className="p-8 space-y-6 text-sm text-slate-700">
+              {(() => {
+                // Variables de muestra para la vista previa
+                const sampleVars = {
+                  "{contract_type}": "PLAZO FIJO",
+                  "{contract_number}": "001-2026",
+                  "{employee_name}": "Juan Carlos Pérez García",
+                  "{employee_doc_type}": "DNI",
+                  "{employee_doc_number}": "12345678",
+                  "{employee_address}": "Av. Los Jardines 123, Miraflores, Lima",
+                  "{position}": "Analista de Sistemas",
+                  "{department}": "Tecnología",
+                  "{start_date}": "01 de enero de 2026",
+                  "{end_date}": "31 de diciembre de 2026",
+                  "{salary}": "3,500.00",
+                  "{salary_words}": "TRES MIL QUINIENTOS",
+                  "{weekly_hours}": "48",
+                  "{work_schedule}": "Lunes a Viernes 9:00 AM - 6:00 PM",
+                  "{work_location}": "Sede Principal",
+                  "{trial_period_days}": "90",
+                  "{functions}": "[Funciones del trabajador]",
+                  "{benefits}": "[Beneficios adicionales]",
+                  "{benefits_additional}": "[Beneficios adicionales]",
+                  "{notes}": "[Notas del contrato]",
+                  "{activity_cost}": "0.00",
+                  "{food_cost}": "0.00",
+                  "{transport_cost}": "0.00",
+                  "{renewable_clause}": "",
+                  "{signed_date}": "01 de enero de 2026",
+                  "{company_name}": templateData.company_name || "[Razón Social]",
+                  "{company_ruc}": templateData.company_ruc || "[RUC]",
+                  "{company_address}": templateData.company_address || "[Dirección]",
+                  "{company_representative}": templateData.company_representative || "[Representante Legal]",
+                  "{company_representative_doc}": templateData.company_representative_doc || "[Documento]",
+                };
+                const rv = (text) => {
+                  if (!text) return "";
+                  let r = text;
+                  Object.keys(sampleVars).forEach(k => {
+                    r = r.replace(new RegExp(k.replace(/[{}]/g, '\\$&'), 'g'), sampleVars[k]);
+                  });
+                  return r;
+                };
+                return (
+                  <div className="space-y-6 font-serif">
+                    {/* Título */}
+                    <div className="text-center border-b pb-6">
+                      <h1 className="text-xl font-bold text-slate-900 mb-1">
+                        {rv(templateData.contract_title || "CONTRATO DE TRABAJO")}
+                      </h1>
+                      <p className="text-base font-semibold text-slate-700">
+                        {rv(templateData.contract_subtitle || "{contract_type}")}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">Contrato N° 001-2026 | Fecha de Firma: 01/01/2026</p>
+                    </div>
 
-                {/* Texto Introductorio */}
-                <div>
-                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                    {templateData.introduction_text?.replace(/{contract_type}/g, "INDETERMINADO")}
-                  </p>
-                </div>
-
-                {/* Partes */}
-                <div className="space-y-4">
-                  <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="font-semibold text-slate-900 mb-2">EL EMPLEADOR:</p>
-                    <p className="text-sm text-slate-700">{templateData.company_name || "[Nombre de la Empresa]"}</p>
-                    <p className="text-sm text-slate-700">RUC: {templateData.company_ruc || "[RUC]"}</p>
-                    <p className="text-sm text-slate-700">Dirección: {templateData.company_address || "[Dirección]"}</p>
-                  </div>
-
-                  <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="font-semibold text-slate-900 mb-2">EL TRABAJADOR:</p>
-                    <p className="text-sm text-slate-700">Juan Carlos Pérez García</p>
-                    <p className="text-sm text-slate-700">DNI: 12345678</p>
-                  </div>
-                </div>
-
-                {/* Cláusulas */}
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="font-bold text-slate-900 mb-2">PRIMERA: OBJETO DEL CONTRATO</h3>
-                    <p className="text-sm text-slate-700 leading-relaxed">
-                      {templateData.contract_object_text
-                        ?.replace(/{position}/g, "Analista de Sistemas")
-                        ?.replace(/{department}/g, "Tecnología")
-                      }
+                    {/* Introducción */}
+                    <p className="leading-relaxed whitespace-pre-wrap">
+                      {rv(templateData.introduction_text)}
                     </p>
-                  </div>
 
-                  <div>
-                    <h3 className="font-bold text-slate-900 mb-2">SEGUNDA: VIGENCIA</h3>
-                    <p className="text-sm text-slate-700 leading-relaxed">
-                      {templateData.duration_indeterminate_text?.replace(/{start_date}/g, "01 de enero de 2026")}
-                    </p>
-                  </div>
+                    {/* Empleador */}
+                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                      <p className="font-bold text-slate-900 mb-2">
+                        {rv(templateData.employer_section_title || "I. DATOS DEL EMPLEADOR:")}
+                      </p>
+                      <p className="whitespace-pre-wrap leading-relaxed">
+                        {rv(templateData.employer_section_text || "Empresa: {company_name}\nRUC: {company_ruc}\nDomicilio: {company_address}\nRepresentante Legal: {company_representative}\nDocumento: {company_representative_doc}")}
+                      </p>
+                    </div>
 
-                  <div>
-                    <h3 className="font-bold text-slate-900 mb-2">TERCERA: REMUNERACIÓN</h3>
-                    <p className="text-sm text-slate-700 leading-relaxed">
-                      {templateData.salary_text
-                        ?.replace(/{salary}/g, "3,500.00")
-                        ?.replace(/{salary_words}/g, "TRES MIL QUINIENTOS")
-                      }
-                    </p>
-                  </div>
+                    {/* Trabajador */}
+                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                      <p className="font-bold text-slate-900 mb-2">
+                        {rv(templateData.worker_section_title || "II. DATOS DEL TRABAJADOR:")}
+                      </p>
+                      <p className="whitespace-pre-wrap leading-relaxed">
+                        {rv(templateData.worker_section_text || "Nombres y Apellidos: {employee_name}\n{employee_doc_type}: {employee_doc_number}\nDomicilio: {employee_address}")}
+                      </p>
+                    </div>
 
-                  <div>
-                    <h3 className="font-bold text-slate-900 mb-2">CUARTA: OBLIGACIONES</h3>
-                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                      {templateData.obligations_text}
-                    </p>
-                  </div>
+                    {/* Objeto */}
+                    <div>
+                      <p className="font-bold text-slate-900 mb-1">III. OBJETO DEL CONTRATO:</p>
+                      <p className="leading-relaxed">{rv(templateData.contract_object_text)}</p>
+                    </div>
 
-                  <div>
-                    <h3 className="font-bold text-slate-900 mb-2">QUINTA: BENEFICIOS</h3>
-                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                      {templateData.benefits_text}
-                    </p>
-                  </div>
-                </div>
+                    {/* Funciones */}
+                    <div>
+                      <p className="font-bold text-slate-900 mb-1">IV. FUNCIONES Y RESPONSABILIDADES:</p>
+                      <p className="leading-relaxed">{rv(templateData.functions_intro_text)}</p>
+                      <p className="text-slate-400 italic text-xs mt-1">[Se completará con las funciones del contrato]</p>
+                    </div>
 
-                {/* Firmas */}
-                <div className="grid grid-cols-2 gap-8 pt-12 mt-8 border-t">
-                  <div className="text-center">
-                    <div className="border-t border-slate-400 pt-2 mt-16">
-                      <p className="font-semibold text-slate-900">EL EMPLEADOR</p>
+                    {/* Vigencia */}
+                    <div>
+                      <p className="font-bold text-slate-900 mb-1">V. VIGENCIA DEL CONTRATO:</p>
+                      <p className="leading-relaxed">{rv(templateData.duration_fixed_text)}</p>
+                      <p className="leading-relaxed mt-1">{rv(templateData.trial_period_text)}</p>
+                    </div>
+
+                    {/* Remuneración */}
+                    <div>
+                      <p className="font-bold text-slate-900 mb-1">VI. REMUNERACIÓN:</p>
+                      <p className="leading-relaxed">{rv(templateData.salary_text)}</p>
+                    </div>
+
+                    {/* Jornada */}
+                    <div>
+                      <p className="font-bold text-slate-900 mb-1">VII. JORNADA Y HORARIO DE TRABAJO:</p>
+                      <p className="leading-relaxed">{rv(templateData.schedule_text)}</p>
+                      <p className="leading-relaxed">{rv(templateData.work_location_text)}</p>
+                    </div>
+
+                    {/* Obligaciones */}
+                    <div>
+                      <p className="font-bold text-slate-900 mb-1">VIII. OBLIGACIONES DEL TRABAJADOR:</p>
+                      <p className="whitespace-pre-wrap leading-relaxed">{rv(templateData.obligations_text)}</p>
+                    </div>
+
+                    {/* Beneficios Sociales */}
+                    <div>
+                      <p className="font-bold text-slate-900 mb-1">IX. BENEFICIOS SOCIALES:</p>
+                      <p className="whitespace-pre-wrap leading-relaxed">{rv(templateData.benefits_text)}</p>
+                    </div>
+
+                    {/* Término */}
+                    <div>
+                      <p className="font-bold text-slate-900 mb-1">X. TÉRMINO DEL CONTRATO:</p>
+                      <p className="leading-relaxed">{rv(templateData.termination_text)}</p>
+                    </div>
+
+                    {/* Domicilio */}
+                    <div>
+                      <p className="font-bold text-slate-900 mb-1">XI. DOMICILIO:</p>
+                      <p className="leading-relaxed">{rv(templateData.domicile_text)}</p>
+                    </div>
+
+                    {/* Cláusulas personalizadas */}
+                    {clauses.filter(c => c.is_active).length > 0 && (
+                      <div className="space-y-4">
+                        <p className="font-bold text-slate-900">CLÁUSULAS ADICIONALES:</p>
+                        {clauses.filter(c => c.is_active).map((clause, idx) => (
+                          <div key={clause.id}>
+                            <p className="font-semibold text-slate-800 mb-1">
+                              {String.fromCharCode(65 + idx)}. {clause.title.toUpperCase()}:
+                            </p>
+                            <p className="whitespace-pre-wrap leading-relaxed text-slate-600">{rv(clause.content)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Firmas */}
+                    <div className="grid grid-cols-2 gap-8 pt-12 mt-8 border-t border-slate-300">
+                      <div className="text-center">
+                        <div className="border-t border-slate-400 pt-2 mt-16">
+                          <p className="font-bold text-slate-900">EL EMPLEADOR</p>
+                          <p className="text-xs text-slate-500">{templateData.company_representative || "[Representante Legal]"}</p>
+                          <p className="text-xs text-slate-500">{templateData.company_representative_doc || "[Documento]"}</p>
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="border-t border-slate-400 pt-2 mt-16">
+                          <p className="font-bold text-slate-900">EL TRABAJADOR</p>
+                          <p className="text-xs text-slate-500">Juan Carlos Pérez García</p>
+                          <p className="text-xs text-slate-500">DNI: 12345678</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-center">
-                    <div className="border-t border-slate-400 pt-2 mt-16">
-                      <p className="font-semibold text-slate-900">EL TRABAJADOR</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>
