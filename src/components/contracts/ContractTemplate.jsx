@@ -288,6 +288,31 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   );
 
   const sigY = y + 30;
+
+  // Si hay imagen de firma digital, intentar renderizarla sobre la línea del empleador
+  if (contract.digital_signature_image_url && contract.is_digitally_signed) {
+    try {
+      await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          // Calcular dimensiones proporcionales (max 40x20mm)
+          const maxW = 40;
+          const maxH = 20;
+          const ratio = Math.min(maxW / img.width, maxH / img.height);
+          const w = img.width * ratio;
+          const h = img.height * ratio;
+          const sigImgX = (pageWidth - 80) + (80 - 30) / 2 - w / 2; // centrado sobre línea del trabajador
+          const sigImgY = sigY - h - 2;
+          doc.addImage(img, 'PNG', sigImgX, sigImgY, w, h);
+          resolve();
+        };
+        img.onerror = () => resolve(); // si falla, continuar sin imagen
+        img.src = contract.digital_signature_image_url;
+      });
+    } catch (_) { /* continuar sin imagen */ }
+  }
+
   doc.line(30, sigY, 80, sigY);
   doc.line(pageWidth - 80, sigY, pageWidth - 30, sigY);
 
@@ -300,6 +325,15 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
 
   doc.text(`${employee.first_name} ${employee.last_name}`, pageWidth - 55, sigY + 10, { align: "center" });
   doc.text(`${employee.document_type} ${employee.document_number}`, pageWidth - 55, sigY + 14, { align: "center" });
+
+  // Si hay firma digital, agregar nota de validación
+  if (contract.is_digitally_signed && contract.digital_signature_name) {
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 200);
+    const sigNote = `Firmado digitalmente por: ${contract.digital_signature_name} | ${contract.digital_signature_date ? new Date(contract.digital_signature_date).toLocaleString('es-PE') : ''}`;
+    doc.text(sigNote, pageWidth / 2, sigY + 22, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+  }
 
   doc.save(`Contrato_${employee.last_name}_${employee.first_name}_${contract.contract_number || contract.id}.pdf`);
 
