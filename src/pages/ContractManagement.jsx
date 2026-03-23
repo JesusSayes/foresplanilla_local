@@ -36,6 +36,8 @@ export default function ContractManagement() {
   const [selectedForBulkSign, setSelectedForBulkSign] = useState(new Set());
   const [confirmSign, setConfirmSign] = useState(null); // { mode: 'single'|'bulk', contract?: contract }
   const [isBulkSigning, setIsBulkSigning] = useState(false);
+  const [signatureImageUrl, setSignatureImageUrl] = useState("");
+  const [uploadingSignature, setUploadingSignature] = useState(false);
 
   const queryClient = useQueryClient();
   const { hasPermission, employee, loading: loadingPerms } = usePermissions();
