@@ -289,25 +289,25 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
 
   const sigY = y + 30;
 
-  // Si hay imagen de firma digital, intentar renderizarla sobre la línea del empleador
+  // La firma digital del representante legal va al lado del EMPLEADOR (izquierda)
   if (contract.digital_signature_image_url && contract.is_digitally_signed) {
     try {
-      await new Promise((resolve, reject) => {
+      await new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.onload = () => {
-          // Calcular dimensiones proporcionales (max 40x20mm)
           const maxW = 40;
           const maxH = 20;
           const ratio = Math.min(maxW / img.width, maxH / img.height);
           const w = img.width * ratio;
           const h = img.height * ratio;
-          const sigImgX = (pageWidth - 80) + (80 - 30) / 2 - w / 2; // centrado sobre línea del trabajador
+          // Centrado sobre la línea del EMPLEADOR (izquierda: x entre 30 y 80, centro = 55)
+          const sigImgX = 55 - w / 2;
           const sigImgY = sigY - h - 2;
           doc.addImage(img, 'PNG', sigImgX, sigImgY, w, h);
           resolve();
         };
-        img.onerror = () => resolve(); // si falla, continuar sin imagen
+        img.onerror = () => resolve();
         img.src = contract.digital_signature_image_url;
       });
     } catch (_) { /* continuar sin imagen */ }
@@ -326,7 +326,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   doc.text(`${employee.first_name} ${employee.last_name}`, pageWidth - 55, sigY + 10, { align: "center" });
   doc.text(`${employee.document_type} ${employee.document_number}`, pageWidth - 55, sigY + 14, { align: "center" });
 
-  // Si hay firma digital, agregar nota de validación
+  // Nota de validación de firma digital
   if (contract.is_digitally_signed && contract.digital_signature_name) {
     doc.setFontSize(7);
     doc.setTextColor(100, 100, 200);
