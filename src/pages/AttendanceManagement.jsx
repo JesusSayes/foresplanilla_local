@@ -838,6 +838,15 @@ export default function AttendanceManagement() {
                   <p className="text-sm text-slate-600 mt-2">Personal que registró horas extras sin autorización previa</p>
                 </CardHeader>
                 <CardContent className="p-6">
+                  <div className="relative max-w-sm mb-6">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <Input
+                      placeholder="Buscar por nombre..."
+                      value={overtimeSearchTerm}
+                      onChange={(e) => setOvertimeSearchTerm(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
                   {overtimeAlerts.length === 0 ? (
                     <div className="text-center py-12">
                       <CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" />
@@ -845,7 +854,13 @@ export default function AttendanceManagement() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {overtimeAlerts.filter(a => accessibleEmployeeIds.has(a.employee_id)).map(alert => {
+                      {overtimeAlerts.filter(a => {
+                        if (!accessibleEmployeeIds.has(a.employee_id)) return false;
+                        if (!overtimeSearchTerm) return true;
+                        const emp = allEmployees.find(e => e.id === a.employee_id);
+                        const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
+                        return name.includes(overtimeSearchTerm.toLowerCase());
+                      }).map(alert => {
                         const emp = allEmployees.find(e => e.id === alert.employee_id);
                         const record = todayRecords.find(r => r.id === alert.attendance_record_id);
                         return (
