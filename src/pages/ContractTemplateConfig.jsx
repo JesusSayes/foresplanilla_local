@@ -1272,58 +1272,58 @@ export default function ContractTemplateConfig() {
 
                     {/* Objeto */}
                     <div>
-                      <p className="font-bold text-slate-900 mb-1">III. OBJETO DEL CONTRATO:</p>
+                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_object_title || "III. OBJETO DEL CONTRATO:")}</p>
                       <p className="leading-relaxed">{rv(templateData.contract_object_text)}</p>
                     </div>
 
                     {/* Funciones */}
                     <div>
-                      <p className="font-bold text-slate-900 mb-1">IV. FUNCIONES Y RESPONSABILIDADES:</p>
+                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_functions_title || "IV. FUNCIONES Y RESPONSABILIDADES:")}</p>
                       <p className="leading-relaxed">{rv(templateData.functions_intro_text)}</p>
                       <p className="text-slate-400 italic text-xs mt-1">[Se completará con las funciones del contrato]</p>
                     </div>
 
                     {/* Vigencia */}
                     <div>
-                      <p className="font-bold text-slate-900 mb-1">V. VIGENCIA DEL CONTRATO:</p>
+                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_duration_title || "V. VIGENCIA DEL CONTRATO:")}</p>
                       <p className="leading-relaxed">{rv(templateData.duration_fixed_text)}</p>
                       <p className="leading-relaxed mt-1">{rv(templateData.trial_period_text)}</p>
                     </div>
 
                     {/* Remuneración */}
                     <div>
-                      <p className="font-bold text-slate-900 mb-1">VI. REMUNERACIÓN:</p>
+                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_salary_title || "VI. REMUNERACIÓN:")}</p>
                       <p className="leading-relaxed">{rv(templateData.salary_text)}</p>
                     </div>
 
                     {/* Jornada */}
                     <div>
-                      <p className="font-bold text-slate-900 mb-1">VII. JORNADA Y HORARIO DE TRABAJO:</p>
+                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_schedule_title || "VII. JORNADA Y HORARIO DE TRABAJO:")}</p>
                       <p className="leading-relaxed">{rv(templateData.schedule_text)}</p>
                       <p className="leading-relaxed">{rv(templateData.work_location_text)}</p>
                     </div>
 
                     {/* Obligaciones */}
                     <div>
-                      <p className="font-bold text-slate-900 mb-1">VIII. OBLIGACIONES DEL TRABAJADOR:</p>
+                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_obligations_title || "VIII. OBLIGACIONES DEL TRABAJADOR:")}</p>
                       <p className="whitespace-pre-wrap leading-relaxed">{rv(templateData.obligations_text)}</p>
                     </div>
 
                     {/* Beneficios Sociales */}
                     <div>
-                      <p className="font-bold text-slate-900 mb-1">IX. BENEFICIOS SOCIALES:</p>
+                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_benefits_title || "IX. BENEFICIOS SOCIALES:")}</p>
                       <p className="whitespace-pre-wrap leading-relaxed">{rv(templateData.benefits_text)}</p>
                     </div>
 
                     {/* Término */}
                     <div>
-                      <p className="font-bold text-slate-900 mb-1">X. TÉRMINO DEL CONTRATO:</p>
+                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_termination_title || "X. TÉRMINO DEL CONTRATO:")}</p>
                       <p className="leading-relaxed">{rv(templateData.termination_text)}</p>
                     </div>
 
                     {/* Domicilio */}
                     <div>
-                      <p className="font-bold text-slate-900 mb-1">XI. DOMICILIO:</p>
+                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_domicile_title || "XI. DOMICILIO:")}</p>
                       <p className="leading-relaxed">{rv(templateData.domicile_text)}</p>
                     </div>
 
