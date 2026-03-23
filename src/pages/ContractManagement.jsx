@@ -334,9 +334,9 @@ export default function ContractManagement() {
             { label: "Vigentes", value: stats.vigentes, icon: CheckCircle, color: "green" },
             { label: "Firmados", value: stats.firmados, icon: PenLine, color: "blue" },
             { label: "Pendiente Firma", value: stats.pendienteFirma, icon: AlertCircle, color: "amber" },
-          ].map(({ label, value, icon: Icon, color }) => (
+          ].map(({ label, value, icon: StatIcon, color }) => (
             <div key={label} className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
-              <Icon className={`w-5 h-5 text-${color}-600`} />
+              <StatIcon className={`w-5 h-5 text-${color}-600`} />
               <div className="flex items-baseline gap-2">
                 <span className="text-xl font-bold text-slate-900">{value}</span>
                 <span className="text-sm text-slate-600">{label}</span>
