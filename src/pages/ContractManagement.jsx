@@ -746,7 +746,7 @@ export default function ContractManagement() {
 
       {/* Confirm Sign Modal */}
       {confirmSign && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-6" onClick={() => setConfirmSign(null)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-6" onClick={() => { setConfirmSign(null); setSignatureImageUrl(""); }}>
           <Card className="max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <CardHeader className="border-b bg-blue-50">
               <div className="flex items-start gap-3">
@@ -761,20 +761,52 @@ export default function ContractManagement() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-5">
+            <CardContent className="p-6 space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-900 font-medium mb-1">Firmante:</p>
                 <p className="text-sm text-blue-800">{employee ? `${employee.first_name} ${employee.last_name}` : ""}</p>
                 <p className="text-xs text-blue-700">{currentUser?.email}</p>
                 <p className="text-xs text-blue-600 mt-1">Fecha y hora: {format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
               </div>
-              <p className="text-sm text-slate-700 mb-5">
+
+              {/* Firma / Rúbrica */}
+              <div>
+                <Label className="text-sm font-medium text-slate-700 mb-2 block">
+                  Imagen de firma / rúbrica <span className="text-slate-400 font-normal">(opcional)</span>
+                </Label>
+                {signatureImageUrl ? (
+                  <div className="border border-slate-200 rounded-lg p-3 bg-white flex items-center gap-3">
+                    <img src={signatureImageUrl} alt="Firma" className="h-16 object-contain" />
+                    <Button size="sm" variant="outline" className="text-red-600 ml-auto" onClick={() => setSignatureImageUrl("")}>
+                      Quitar
+                    </Button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-lg p-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                    {uploadingSignature ? (
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        Subiendo...
+                      </div>
+                    ) : (
+                      <>
+                        <PenLine className="w-6 h-6 text-slate-400 mb-1" />
+                        <span className="text-sm text-slate-600 font-medium">Subir imagen de firma</span>
+                        <span className="text-xs text-slate-400 mt-0.5">PNG, JPG — fondo blanco recomendado</span>
+                      </>
+                    )}
+                    <input type="file" accept="image/*" className="hidden" onChange={handleSignatureImageUpload} disabled={uploadingSignature} />
+                  </label>
+                )}
+              </div>
+
+              <p className="text-sm text-slate-700">
                 Al confirmar, se registrará la firma digital de forma permanente en {confirmSign.mode === 'single' ? 'este contrato' : 'todos los contratos seleccionados'}.
                 Esta acción no puede deshacerse.
               </p>
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={() => setConfirmSign(null)}>Cancelar</Button>
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleConfirmSign} disabled={isBulkSigning || signContractMutation.isPending}>
+                <Button variant="outline" className="flex-1" onClick={() => { setConfirmSign(null); setSignatureImageUrl(""); }}>Cancelar</Button>
+                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleConfirmSign} disabled={isBulkSigning || signContractMutation.isPending || uploadingSignature}>
                   {isBulkSigning ? "Firmando..." : <><PenLine className="w-4 h-4 mr-2" /> Confirmar Firma</>}
                 </Button>
               </div>
