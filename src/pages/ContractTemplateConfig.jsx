@@ -1237,9 +1237,11 @@ export default function ContractTemplateConfig() {
                   <div className="space-y-6 font-serif">
                     {/* Título */}
                     <div className="text-center border-b pb-6">
-                      <h1 className="text-xl font-bold text-slate-900 mb-1">
-                        {rv(templateData.contract_title || "CONTRATO DE TRABAJO")}
-                      </h1>
+                      <div className="text-xl font-bold text-slate-900 mb-1">
+                        {(rv(templateData.contract_title || "CONTRATO DE TRABAJO")).split("\n").map((line, i) => (
+                          <div key={i}>{line.toUpperCase()}</div>
+                        ))}
+                      </div>
                       <p className="text-base font-semibold text-slate-700">
                         {rv(templateData.contract_subtitle || "{contract_type}")}
                       </p>
