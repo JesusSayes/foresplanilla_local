@@ -708,29 +708,38 @@ export default function AttendanceManagement() {
                   </div>
 
                   <div className="space-y-3">
-                    {employeesWithRecords.map(emp => {
-                      const vacation = getVacationForEmployee(emp.id);
+                    {employeesWithRecords.map((emp, idx) => {
+                      const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
+                      const vacation = approvedVacations.find(v => v.employee_id === emp.id && v.start_date <= rowDate && v.end_date >= rowDate) || null;
                       const scheduledTimes = vacation ? getScheduledTimes(emp.id) : null;
                       const statusConfig = vacation
                         ? { color: "bg-amber-100 text-amber-800 border-amber-300", icon: Palmtree, text: "Vacaciones" }
                         : getStatusConfig(emp.record?.status, emp.record?.clock_in);
                       const StatusIcon = statusConfig.icon;
+                      const rowKey = `${emp.id}-${rowDate}-${idx}`;
 
                       return (
-                        <div key={emp.id} className={`p-4 border rounded-lg hover:shadow-md transition-all ${vacation ? "border-amber-300 bg-amber-50/40" : "border-slate-200"}`}>
+                        <div key={rowKey} className={`p-4 border rounded-lg hover:shadow-md transition-all ${vacation ? "border-amber-300 bg-amber-50/40" : "border-slate-200"}`}>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4 flex-1">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${vacation ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-purple-600"}`}>
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold shrink-0 ${vacation ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-purple-600"}`}>
                                 {emp.first_name[0]}{emp.last_name[0]}
                               </div>
-                              <div className="flex-1">
-                                <h4 className="font-bold text-slate-900">{emp.first_name} {emp.last_name}</h4>
-                                <p className="text-sm text-slate-600">{emp.employee_code} • {emp.position} • {emp.department_name}</p>
+                              <div className="w-48 shrink-0">
+                                <h4 className="font-bold text-slate-900 text-sm">{emp.first_name} {emp.last_name}</h4>
+                                <p className="text-xs text-slate-600">{emp.employee_code} • {emp.department_name}</p>
                                 {vacation && (
                                   <p className="text-xs text-amber-700 font-medium mt-0.5">
-                                    🌴 {vacation.request_type} — hasta {format(new Date(vacation.end_date + "T00:00:00"), "dd MMM yyyy", { locale: es })}
+                                    🌴 {vacation.request_type}
                                   </p>
                                 )}
+                              </div>
+                              {/* Columna fecha */}
+                              <div className="w-24 shrink-0 text-center">
+                                <p className="text-xs text-slate-500 mb-0.5">Fecha</p>
+                                <p className="text-xs font-semibold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">
+                                  {format(new Date(rowDate + "T00:00:00"), "dd MMM yyyy", { locale: es })}
+                                </p>
                               </div>
                               <div className="grid grid-cols-6 gap-3 text-sm">
                                 <div className="text-center">
