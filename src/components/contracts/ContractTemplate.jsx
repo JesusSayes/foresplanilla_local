@@ -137,13 +137,13 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   };
 
   // ── TÍTULO ──
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   doc.setFont(undefined, 'bold');
   const contractTitle = replaceVariables(template?.contract_title || "CONTRATO DE TRABAJO");
-  const titleLines = contractTitle.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+  const titleLines = contractTitle.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
   titleLines.forEach(line => {
     doc.text(line.toUpperCase(), pageWidth / 2, y, { align: "center" });
-    y += 8;
+    y += 7;
   });
 
   doc.setFontSize(12);
