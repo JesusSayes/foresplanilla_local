@@ -29,7 +29,7 @@ export default function DataExport() {
     // Vacaciones
     "VacationRequest", "VacationBalance",
     // Planillas y Remuneración
-    "Payslip", "PayrollConcept",
+    "Payslip", "PayrollConcept", "PayslipTemplate",
     "LoanType", "Loan", "LoanInstallment",
     // Centros de Costo
     "CostCenter", "CostCenterAssignment", "CostCenterChangeLog", "CostCenterCategory",
