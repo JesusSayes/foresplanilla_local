@@ -244,8 +244,15 @@ export default function ContractManagement() {
       return;
     }
 
+    const dataToSave = {
+      ...formData,
+      activity_cost: parseFloat(formData.activity_cost) || 0,
+      food_cost: parseFloat(formData.food_cost) || 0,
+      transport_cost: parseFloat(formData.transport_cost) || 0,
+    };
+
     if (editingContract) {
-      updateContractMutation.mutate({ id: editingContract.id, data: formData });
+      updateContractMutation.mutate({ id: editingContract.id, data: dataToSave });
     } else {
       // Verificar si hay contratos vigentes para este empleado
       const existingActiveContract = contracts.find(
