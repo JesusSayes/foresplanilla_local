@@ -855,12 +855,13 @@ export default function ContractTemplateConfig() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div>
-                        <Label>Título Principal <span className="text-xs text-slate-400">(ej: CONTRATO DE TRABAJO)</span></Label>
-                        <Input
+                        <Label>Título Principal <span className="text-xs text-slate-400">(puede ser 2 o 3 líneas, una por renglón)</span></Label>
+                        <Textarea
                           value={templateData.contract_title || "CONTRATO DE TRABAJO"}
                           onChange={(e) => setTemplateData({ ...templateData, contract_title: e.target.value })}
                           className="font-mono text-sm"
-                          placeholder="CONTRATO DE TRABAJO"
+                          placeholder={"CONTRATO DE TRABAJO\nMODALIDAD ESPECIAL"}
+                          rows={3}
                         />
                       </div>
                       <div>
