@@ -132,9 +132,19 @@ export default function ContractManagement() {
       digital_signature_date: new Date().toISOString(),
       digital_signature_by: currentUser?.email || "",
       digital_signature_name: employee ? `${employee.first_name} ${employee.last_name}` : "",
+      digital_signature_image_url: signatureImageUrl || "",
     }),
     onSuccess: () => queryClient.invalidateQueries(["contracts"]),
   });
+
+  const handleSignatureImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingSignature(true);
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    setSignatureImageUrl(file_url);
+    setUploadingSignature(false);
+  };
 
   const initializeForm = (contract = null, emp = null) => {
     const normalizeDate = (d) => {
