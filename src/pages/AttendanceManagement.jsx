@@ -378,36 +378,73 @@ export default function AttendanceManagement() {
     ? allEmployees
     : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
-  const departments = [...new Set(siteAllowedEmployees.map(e => e.department_name))].filter(Boolean);
-
   const filteredEmployees = siteAllowedEmployees.filter(emp => {
     const matchesSearch =
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = selectedDepartment === "all" || emp.department_name === selectedDepartment;
     const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
-    if (emp.termination_date) {
-      const termination = new Date(emp.termination_date + "T00:00:00");
-      const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
-      if (selected > termination) return false;
-    }
-    return matchesSearch && matchesDept && matchesSite;
+    return matchesSearch && matchesSite;
   });
 
   // IDs de empleados accesibles para filtrar incidentes y alertas
   const accessibleEmployeeIds = new Set(siteAllowedEmployees.map(e => e.id));
 
-  const employeesWithRecords = filteredEmployees.map(emp => {
-    const record = todayRecords.find(r => r.employee_id === emp.id);
-    return { ...emp, record };
-  }).filter(emp => {
-    if (attendanceFilter === "all") return true;
-    if (attendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
-    if (attendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
-    if (attendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
-    return true;
-  });
+  // En modo rango: generar una fila por cada combinación empleado × fecha con registro
+  // En modo fecha única: comportamiento original (todos los empleados para esa fecha)
+  let employeesWithRecords = [];
+
+  if (isRangeMode && dateFrom && dateTo) {
+    // Obtener todas las fechas del rango
+    const dateList = [];
+    const cur = new Date(dateFrom);
+    cur.setHours(0, 0, 0, 0);
+    const end = new Date(dateTo);
+    end.setHours(0, 0, 0, 0);
+    while (cur <= end) {
+      dateList.push(format(cur, "yyyy-MM-dd"));
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    // Para cada registro encontrado en el rango, combinar con empleado
+    const rows = [];
+    for (const rec of todayRecords) {
+      const emp = filteredEmployees.find(e => e.id === rec.employee_id);
+      if (!emp) continue;
+      rows.push({ ...emp, record: rec, displayDate: rec.date });
+    }
+    // Ordenar: fecha más reciente primero, luego por nombre
+    rows.sort((a, b) => {
+      if (b.displayDate !== a.displayDate) return b.displayDate.localeCompare(a.displayDate);
+      return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+    });
+
+    employeesWithRecords = rows.filter(emp => {
+      if (attendanceFilter === "all") return true;
+      if (attendanceFilter === "sin_entrada") return !emp.record?.clock_in;
+      if (attendanceFilter === "sin_salida") return emp.record?.clock_in && !emp.record?.clock_out;
+      if (attendanceFilter === "con_tardanza") return emp.record?.is_late;
+      return true;
+    });
+  } else {
+    employeesWithRecords = filteredEmployees.filter(emp => {
+      if (emp.termination_date) {
+        const termination = new Date(emp.termination_date + "T00:00:00");
+        const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
+        if (selected > termination) return false;
+      }
+      return true;
+    }).map(emp => {
+      const record = todayRecords.find(r => r.employee_id === emp.id);
+      return { ...emp, record, displayDate: format(selectedDate, "yyyy-MM-dd") };
+    }).filter(emp => {
+      if (attendanceFilter === "all") return true;
+      if (attendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
+      if (attendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
+      if (attendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
+      return true;
+    });
+  }
 
   const handleExportToExcel = () => {
     const dataToExport = employeesWithRecords.map(emp => {
