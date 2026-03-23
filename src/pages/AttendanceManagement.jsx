@@ -901,6 +901,15 @@ export default function AttendanceManagement() {
 
             {/* Incidents Tab */}
             <TabsContent value="incidents" className="space-y-6">
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Buscar por nombre..."
+                  value={incidentSearchTerm}
+                  onChange={(e) => setIncidentSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
               <Tabs defaultValue="pending">
                 <TabsList className="grid w-full max-w-xl grid-cols-3 mb-6">
                   <TabsTrigger value="pending">Pendientes {pendingIncidents.length > 0 && <Badge className="ml-2 bg-orange-600 text-white">{pendingIncidents.length}</Badge>}</TabsTrigger>
