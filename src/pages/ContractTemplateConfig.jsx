@@ -36,14 +36,23 @@ const DEFAULT_TEMPLATE = {
   worker_section_title: "II. DATOS DEL TRABAJADOR:",
   worker_section_text: "Nombres y Apellidos: {employee_name}\n{employee_doc_type}: {employee_doc_number}\nDomicilio: {employee_address}",
   introduction_text: "Conste por el presente documento el Contrato de Trabajo {contract_type}, que celebran al amparo del Texto Único Ordenado del Decreto Legislativo N° 728, Ley de Productividad y Competitividad Laboral, aprobado por Decreto Supremo N° 003-97-TR, y normas complementarias:",
+  section_object_title: "III. OBJETO DEL CONTRATO:",
   contract_object_text: "Por el presente contrato, EL TRABAJADOR se obliga a prestar sus servicios personales a EL EMPLEADOR, desempeñando el cargo de {position} en el área de {department}, bajo subordinación y dependencia de EL EMPLEADOR.",
+  section_functions_title: "IV. FUNCIONES Y RESPONSABILIDADES:",
   functions_intro_text: "El trabajador desempeñará las siguientes funciones y responsabilidades:",
+  section_duration_title: "V. VIGENCIA DEL CONTRATO:",
   duration_indeterminate_text: "El presente contrato tiene carácter de INDETERMINADO, iniciando su vigencia el {start_date}.",
   duration_fixed_text: "El presente contrato tendrá una duración determinada, iniciando el {start_date} y finalizando el {end_date}{renewable_clause}.",
   trial_period_text: "El contrato está sujeto a un período de prueba de {trial_period_days} días calendario, durante el cual cualquiera de las partes puede darlo por terminado sin expresión de causa.",
+  section_salary_title: "VI. REMUNERACIÓN:",
   salary_text: "EL EMPLEADOR pagará a EL TRABAJADOR una remuneración mensual de S/ {salary} ({salary_words} SOLES), pagadera mensualmente, sujeta a los descuentos de ley.",
+  section_schedule_title: "VII. JORNADA Y HORARIO DE TRABAJO:",
   schedule_text: "La jornada laboral será de {weekly_hours} horas semanales, distribuidas de la siguiente manera: {work_schedule}.",
   work_location_text: "EL TRABAJADOR prestará sus servicios en: {work_location}.",
+  section_obligations_title: "VIII. OBLIGACIONES DEL TRABAJADOR:",
+  section_benefits_title: "IX. BENEFICIOS SOCIALES:",
+  section_termination_title: "X. TÉRMINO DEL CONTRATO:",
+  section_domicile_title: "XI. DOMICILIO:",
   obligations_text: `1. Cumplir con el horario de trabajo establecido y registrar su asistencia.
 2. Desempeñar sus funciones con diligencia, eficiencia y lealtad.
 3. Cumplir con el Reglamento Interno de Trabajo y las políticas de la empresa.
