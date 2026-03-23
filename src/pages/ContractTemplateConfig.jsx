@@ -959,6 +959,38 @@ export default function ContractTemplateConfig() {
 
                 {/* Cláusulas */}
                 <TabsContent value="clauses" className="space-y-4">
+
+                  {/* Títulos de sección editables */}
+                  <Card className="border-amber-200 bg-amber-50/40">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold text-amber-800">🏷️ Títulos de Sección (labels del PDF)</CardTitle>
+                      <p className="text-xs text-amber-700">Edita el texto que aparece como encabezado de cada sección en el PDF</p>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {[
+                        { field: "section_object_title", label: "Objeto del Contrato", def: "III. OBJETO DEL CONTRATO:" },
+                        { field: "section_functions_title", label: "Funciones y Responsabilidades", def: "IV. FUNCIONES Y RESPONSABILIDADES:" },
+                        { field: "section_duration_title", label: "Vigencia del Contrato", def: "V. VIGENCIA DEL CONTRATO:" },
+                        { field: "section_salary_title", label: "Remuneración", def: "VI. REMUNERACIÓN:" },
+                        { field: "section_schedule_title", label: "Jornada y Horario", def: "VII. JORNADA Y HORARIO DE TRABAJO:" },
+                        { field: "section_obligations_title", label: "Obligaciones del Trabajador", def: "VIII. OBLIGACIONES DEL TRABAJADOR:" },
+                        { field: "section_benefits_title", label: "Beneficios Sociales", def: "IX. BENEFICIOS SOCIALES:" },
+                        { field: "section_termination_title", label: "Término del Contrato", def: "X. TÉRMINO DEL CONTRATO:" },
+                        { field: "section_domicile_title", label: "Domicilio", def: "XI. DOMICILIO:" },
+                      ].map(({ field, label, def }) => (
+                        <div key={field}>
+                          <Label className="text-xs text-slate-600">{label}</Label>
+                          <Input
+                            value={templateData[field] || def}
+                            onChange={(e) => setTemplateData({ ...templateData, [field]: e.target.value })}
+                            className="font-mono text-sm mt-1"
+                            placeholder={def}
+                          />
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+
                   <div>
                     <Label>Vigencia - Contrato Indeterminado</Label>
                     <Textarea
