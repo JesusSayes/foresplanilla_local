@@ -264,7 +264,7 @@ export default function ContractManagement() {
         return;
       }
 
-      createContractMutation.mutate(formData);
+      createContractMutation.mutate(dataToSave);
     }
   };
 
