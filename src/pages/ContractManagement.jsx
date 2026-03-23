@@ -864,36 +864,42 @@ export default function ContractManagement() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <Label>Costo de Actividad (S/)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={formData.activity_cost}
-                        onChange={(e) => setFormData({...formData, activity_cost: parseFloat(e.target.value) || 0})}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <Label>Costo de Alimento (S/)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={formData.food_cost}
-                        onChange={(e) => setFormData({...formData, food_cost: parseFloat(e.target.value) || 0})}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <Label>Costo de Movilidad (S/)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={formData.transport_cost}
-                        onChange={(e) => setFormData({...formData, transport_cost: parseFloat(e.target.value) || 0})}
-                        placeholder="0.00"
-                      />
-                    </div>
+                   <div>
+                     <Label>Costo de Actividad (S/)</Label>
+                     <Input
+                       type="number"
+                       step="0.01"
+                       min="0"
+                       value={formData.activity_cost}
+                       onChange={(e) => setFormData({...formData, activity_cost: e.target.value})}
+                       onKeyDown={(e) => { if (!/[\d.\-Backspace\t\ArrowLeft\ArrowRight\Delete]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault(); }}
+                       placeholder="0.00"
+                     />
+                   </div>
+                   <div>
+                     <Label>Costo de Alimento (S/)</Label>
+                     <Input
+                       type="number"
+                       step="0.01"
+                       min="0"
+                       value={formData.food_cost}
+                       onChange={(e) => setFormData({...formData, food_cost: e.target.value})}
+                       onKeyDown={(e) => { if (!/[\d.\-Backspace\t\ArrowLeft\ArrowRight\Delete]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault(); }}
+                       placeholder="0.00"
+                     />
+                   </div>
+                   <div>
+                     <Label>Costo de Movilidad (S/)</Label>
+                     <Input
+                       type="number"
+                       step="0.01"
+                       min="0"
+                       value={formData.transport_cost}
+                       onChange={(e) => setFormData({...formData, transport_cost: e.target.value})}
+                       onKeyDown={(e) => { if (!/[\d.\-Backspace\t\ArrowLeft\ArrowRight\Delete]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault(); }}
+                       placeholder="0.00"
+                     />
+                   </div>
                   </div>
 
                   <div>
