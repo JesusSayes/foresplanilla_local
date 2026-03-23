@@ -28,9 +28,11 @@ export default function AttendanceManagement() {
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [dateFrom, setDateFrom] = useState(null);
+  const [dateTo, setDateTo] = useState(null);
+  const [isRangeMode, setIsRangeMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSite, setSelectedSite] = useState("all");
-  const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [attendanceFilter, setAttendanceFilter] = useState("all");
   const [editingRecord, setEditingRecord] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
