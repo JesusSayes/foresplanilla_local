@@ -849,7 +849,7 @@ export default function ContractManagement() {
                         type="number"
                         step="0.01"
                         value={formData.salary}
-                        onChange={(e) => setFormData({...formData, salary: parseFloat(e.target.value)})}
+                        onChange={(e) => setFormData({...formData, salary: e.target.value})}
                       />
                     </div>
                     <div>
