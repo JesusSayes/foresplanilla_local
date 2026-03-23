@@ -447,6 +447,12 @@ export default function ContractTemplateConfig() {
     { key: "{notes}", desc: "Notas del contrato" },
     { key: "{company_representative}", desc: "Nombre del representante legal" },
     { key: "{company_representative_doc}", desc: "Documento del representante legal" },
+    { key: "{company_name}", desc: "Razón social de la empresa" },
+    { key: "{company_ruc}", desc: "RUC de la empresa" },
+    { key: "{company_address}", desc: "Dirección de la empresa" },
+    { key: "{employee_address}", desc: "Domicilio del trabajador" },
+    { key: "{contract_number}", desc: "Número de contrato" },
+    { key: "{signed_date}", desc: "Fecha de firma del contrato" },
   ];
 
   if (!employee || employee.role !== "admin") {
