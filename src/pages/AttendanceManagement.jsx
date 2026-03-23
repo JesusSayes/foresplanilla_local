@@ -463,9 +463,30 @@ export default function AttendanceManagement() {
 
   const handleExportToExcel = () => {
     const dataToExport = employeesWithRecords.map(emp => {
+      const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
       const workedHours = emp.record?.worked_hours || 0;
       const overtimeHours = Math.max(0, workedHours - 8);
+
+      // Buscar papeleta (justificación/incidencia) vinculada a este empleado y fecha
+      const incident = allIncidents.find(
+        i => i.employee_id === emp.id && i.incident_date === rowDate
+      );
+
+      // Calcular tiempo de la papeleta
+      let tiempoPapeleta = '';
+      if (incident) {
+        if (incident.full_day_justification) {
+          tiempoPapeleta = '8.00 h';
+        } else if (incident.justified_time_start && incident.justified_time_end) {
+          const [sh, sm] = incident.justified_time_start.split(':').map(Number);
+          const [eh, em] = incident.justified_time_end.split(':').map(Number);
+          const mins = (eh * 60 + em) - (sh * 60 + sm);
+          tiempoPapeleta = `${(Math.max(0, mins) / 60).toFixed(2)} h`;
+        }
+      }
+
       return {
+        'Fecha': rowDate,
         'Código': emp.employee_code,
         'Nombres': emp.first_name,
         'Apellidos': emp.last_name,
@@ -478,14 +499,23 @@ export default function AttendanceManagement() {
         'Tardanza (min)': emp.record?.late_minutes || 0,
         'HE 25%': Math.min(overtimeHours, 2).toFixed(2),
         'HE 35%': Math.max(0, overtimeHours - 2).toFixed(2),
-        'Estado': emp.record?.status || 'Sin marcar'
+        'Estado': emp.record?.status || 'Sin marcar',
+        'Papeleta': incident ? incident.justification : '',
+        'Tipo Papeleta': incident ? incident.incident_type : '',
+        'Hora Papeleta': incident
+          ? (incident.full_day_justification ? 'Día completo' : `${incident.justified_time_start || ''} - ${incident.justified_time_end || ''}`)
+          : '',
+        'Tiempo Papeleta': tiempoPapeleta,
       };
     });
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Asistencia');
     const filterText = attendanceFilter === "all" ? "Todos" : attendanceFilter === "sin_entrada" ? "Sin_Entrada" : attendanceFilter === "sin_salida" ? "Sin_Salida" : "Con_Tardanza";
-    XLSX.writeFile(wb, `Asistencia_${format(selectedDate, "yyyy-MM-dd")}_${filterText}.xlsx`);
+    const dateLabel = isRangeMode && dateFrom && dateTo
+      ? `${format(dateFrom, "yyyy-MM-dd")}_${format(dateTo, "yyyy-MM-dd")}`
+      : format(selectedDate, "yyyy-MM-dd");
+    XLSX.writeFile(wb, `Asistencia_${dateLabel}_${filterText}.xlsx`);
     toast.success('✓ Archivo Excel generado correctamente');
   };
 
