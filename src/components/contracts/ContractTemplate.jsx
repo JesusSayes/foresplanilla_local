@@ -178,20 +178,20 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   y += 3;
 
   // ── OBJETO DEL CONTRATO ──
-  addText("III. OBJETO DEL CONTRATO:", 11, true);
+  addText(replaceVariables(template?.section_object_title || "III. OBJETO DEL CONTRATO:"), 11, true);
   addText(replaceVariables(template?.contract_object_text ||
     "Por el presente contrato, EL TRABAJADOR se obliga a prestar sus servicios personales a EL EMPLEADOR, desempeñando el cargo de {position} en el área de {department}, bajo subordinación y dependencia de EL EMPLEADOR."));
   y += 3;
 
   // ── FUNCIONES Y RESPONSABILIDADES ──
-  addText("IV. FUNCIONES Y RESPONSABILIDADES:", 11, true);
+  addText(replaceVariables(template?.section_functions_title || "IV. FUNCIONES Y RESPONSABILIDADES:"), 11, true);
   const functionsIntro = template?.functions_intro_text || "El trabajador desempeñará las siguientes funciones y responsabilidades:";
   if (functionsIntro) addText(replaceVariables(functionsIntro));
   if (contract.functions) addText(replaceVariables(contract.functions));
   y += 3;
 
   // ── VIGENCIA ──
-  addText("V. VIGENCIA DEL CONTRATO:", 11, true);
+  addText(replaceVariables(template?.section_duration_title || "V. VIGENCIA DEL CONTRATO:"), 11, true);
   if (contract.contract_type === "Indeterminado") {
     addText(replaceVariables(template?.duration_indeterminate_text ||
       "El presente contrato tiene carácter de INDETERMINADO, iniciando su vigencia el {start_date}."));
@@ -206,7 +206,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   y += 3;
 
   // ── REMUNERACIÓN ──
-  addText("VI. REMUNERACIÓN:", 11, true);
+  addText(replaceVariables(template?.section_salary_title || "VI. REMUNERACIÓN:"), 11, true);
   addText(replaceVariables(template?.salary_text ||
     "EL EMPLEADOR pagará a EL TRABAJADOR una remuneración mensual de S/ {salary} ({salary_words} SOLES), pagadera mensualmente, sujeta a los descuentos de ley."));
   if (contract.activity_cost > 0) addText(`Costo de Actividad: S/ ${(contract.activity_cost || 0).toFixed(2)}`);
@@ -216,7 +216,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   y += 3;
 
   // ── JORNADA Y HORARIO ──
-  addText("VII. JORNADA Y HORARIO DE TRABAJO:", 11, true);
+  addText(replaceVariables(template?.section_schedule_title || "VII. JORNADA Y HORARIO DE TRABAJO:"), 11, true);
   addText(replaceVariables(template?.schedule_text ||
     "La jornada laboral será de {weekly_hours} horas semanales, distribuidas de la siguiente manera: {work_schedule}."));
   addText(replaceVariables(template?.work_location_text ||
@@ -224,25 +224,25 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   y += 3;
 
   // ── OBLIGACIONES ──
-  addText("VIII. OBLIGACIONES DEL TRABAJADOR:", 11, true);
+  addText(replaceVariables(template?.section_obligations_title || "VIII. OBLIGACIONES DEL TRABAJADOR:"), 11, true);
   addText(replaceVariables(template?.obligations_text ||
     `1. Cumplir con el horario de trabajo establecido y registrar su asistencia.\n2. Desempeñar sus funciones con diligencia, eficiencia y lealtad.\n3. Cumplir con el Reglamento Interno de Trabajo y las políticas de la empresa.\n4. Guardar confidencialidad sobre la información de la empresa.\n5. Cuidar los bienes y recursos de la empresa.`));
   y += 3;
 
   // ── BENEFICIOS SOCIALES ──
-  addText("IX. BENEFICIOS SOCIALES:", 11, true);
+  addText(replaceVariables(template?.section_benefits_title || "IX. BENEFICIOS SOCIALES:"), 11, true);
   addText(replaceVariables(template?.benefits_text ||
     `EL TRABAJADOR tiene derecho a los siguientes beneficios de acuerdo a la legislación laboral peruana:\n- Gratificaciones legales (Fiestas Patrias y Navidad)\n- Compensación por Tiempo de Servicios (CTS)\n- Vacaciones (30 días calendario por año de servicios)\n- Asignación familiar (si corresponde)\n- Seguro social de salud (EsSalud)`));
   y += 3;
 
   // ── TÉRMINO DEL CONTRATO ──
-  addText("X. TÉRMINO DEL CONTRATO:", 11, true);
+  addText(replaceVariables(template?.section_termination_title || "X. TÉRMINO DEL CONTRATO:"), 11, true);
   addText(replaceVariables(template?.termination_text ||
     "El presente contrato podrá darse por terminado por las causas previstas en la legislación laboral vigente, especialmente las establecidas en el Decreto Supremo N° 003-97-TR."));
   y += 3;
 
   // ── DOMICILIO ──
-  addText("XI. DOMICILIO:", 11, true);
+  addText(replaceVariables(template?.section_domicile_title || "XI. DOMICILIO:"), 11, true);
   addText(replaceVariables(template?.domicile_text ||
     "Para efectos del presente contrato, las partes señalan como sus domicilios los indicados en la introducción del presente documento."));
   y += 3;
