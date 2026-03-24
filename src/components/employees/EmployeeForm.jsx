@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Trash2, Plus, Edit, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { base44 } from "@/api/base44Client";
+// import { base44 } from "@/api/base44Client";
 import { usePermissions } from "../hooks/usePermissions";
+import { uploadFile } from "@/services/uploadService";
 
 export default function EmployeeForm({
   editingEmployee,
@@ -206,7 +207,8 @@ export default function EmployeeForm({
                         if (!file) return;
                         setUploadingPhoto(true);
                         try {
-                          const { file_url } = await base44.integrations.Core.UploadFile({ file });
+                          // const { file_url } = await base44.integrations.Core.UploadFile({ file });
+                          const { file_url } = await uploadFile(file);
                           setFormData({ ...formData, photo_url: file_url });
                           toast.success("Foto subida");
                         } catch { toast.error("Error al subir la foto"); } finally { setUploadingPhoto(false); }

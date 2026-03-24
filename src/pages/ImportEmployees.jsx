@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
+import { uploadFile } from "@/services/uploadService";
 
 export default function ImportEmployees() {
   const [file, setFile] = useState(null);
@@ -125,7 +126,8 @@ export default function ImportEmployees() {
       toast.loading("Subiendo archivo al servidor...", { id: "upload" });
 
       const uploadResult = await Promise.race([
-        base44.integrations.Core.UploadFile({ file: selectedFile }),
+        // base44.integrations.Core.UploadFile({ file: selectedFile }),
+        uploadFile(selectedFile);
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Timeout: La subida tardó más de 2 minutos")), 120000)
         )

@@ -17,6 +17,7 @@ import {
 import { format, differenceInBusinessDays, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { uploadFile } from "@/services/uploadService";
 
 export default function VacationRequest() {
   const { user: currentUser } = useAuth();
@@ -160,7 +161,8 @@ export default function VacationRequest() {
     if (!file) return;
 
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      // const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await uploadFile(file);
       setFormData({ ...formData, supporting_document_url: file_url });
       toast.success("Archivo cargado exitosamente");
     } catch (error) {

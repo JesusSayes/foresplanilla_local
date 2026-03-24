@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import ClockInOutWidget from "../components/attendance/ClockInOutWidget";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
+import { uploadFile } from "@/services/uploadService";
 
 export default function Attendance() {
   const { user: currentUser } = useAuth();
@@ -148,7 +149,8 @@ export default function Attendance() {
 
     setUploadingFile(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      // const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await uploadFile(file);
       setJustificationForm({ ...justificationForm, supporting_document_url: file_url });
       toast.success("Archivo cargado exitosamente");
     } catch (error) {

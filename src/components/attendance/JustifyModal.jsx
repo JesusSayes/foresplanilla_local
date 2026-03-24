@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+// import { base44 } from "@/api/base44Client";
 import { entitiesAPI } from '@/api/entitiesClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { FileText, AlertCircle, CalendarIcon, Plus, X } from "lucide-react";
 import { format, eachDayOfInterval, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { uploadFile } from "@/services/uploadService";
 
 export default function JustifyModal({
   justifyingEmployee,
@@ -58,7 +59,8 @@ export default function JustifyModal({
     if (!file) return;
     setUploadingFile(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      // const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await uploadFile(file);
       setJustificationData({ ...justificationData, supporting_document_url: file_url });
       toast.success("Archivo subido correctamente");
     } catch (error) {
