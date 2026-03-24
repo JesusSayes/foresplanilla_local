@@ -59,7 +59,7 @@ import ContractTemplateConfig from './pages/ContractTemplateConfig';
 import CostCenterManagement from './pages/CostCenterManagement';
 import CostCenterValuation from './pages/CostCenterValuation';
 import Dashboard from './pages/Dashboard';
-import DataExport from './pages/DataExport';
+import DataExport from './pages/DataExport.jsx';
 import DatabaseConfig from './pages/DatabaseConfig';
 import EmployeeManagement from './pages/EmployeeManagement';
 import HRDashboard from './pages/HRDashboard';
