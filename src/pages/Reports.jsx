@@ -28,8 +28,8 @@ const REPORT_TYPES = [
 
 export default function Reports() {
   const { user: currentUser } = useAuth();
-  const employee = currentUser?.employee || null;
-  // const { employee, hasPermission } = usePermissions();
+  // const employee = currentUser?.employee || null;
+  const { employee, hasPermission } = usePermissions();
   const [reportType, setReportType] = useState("employees");
   const [reportConfig, setReportConfig] = useState({
     filters: {},
