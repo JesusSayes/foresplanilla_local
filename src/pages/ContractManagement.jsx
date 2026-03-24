@@ -20,6 +20,7 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { generateContractPDF } from "../components/contracts/ContractTemplate";
 import { usePermissions } from "../components/hooks/usePermissions";
+import { uploadFile } from "@/services/uploadService";
 
 export default function ContractManagement() {
   const { user: currentUser } = useAuth();
@@ -177,9 +178,17 @@ export default function ContractManagement() {
     const file = e.target.files[0];
     if (!file) return;
     setUploadingSignature(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    setSignatureImageUrl(file_url);
-    setUploadingSignature(false);
+    // const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    try{
+      const { file_url } = await uploadFile(file);
+      setSignatureImageUrl(file_url);
+      toast.success("Firma subida correctamente");
+      } catch (error) {
+        console.error(error);
+        toast.error("Error al subir la firma");
+      } finally {
+        setUploadingSignature(false);
+      }
   };
 
   const initializeForm = (contract = null, emp = null) => {

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
+import { uploadFile } from "@/services/uploadService";
 
 export default function CompanySettings() {
   const { user: currentUser } = useAuth();
@@ -99,7 +100,8 @@ export default function CompanySettings() {
     setLogoFile(file);
 
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      // const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await uploadFile(file);
       setFormData({ ...formData, logo_url: file_url });
       toast.success("Logo subido correctamente");
     } catch (error) {
