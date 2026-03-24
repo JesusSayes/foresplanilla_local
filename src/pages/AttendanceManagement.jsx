@@ -820,7 +820,7 @@ export default function AttendanceManagement() {
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Horas</p>
-                                  <p className="font-semibold text-slate-900">{vacation ? "8.00" : (emp.record?.worked_hours?.toFixed(2) || "0.00")}h</p>
+                                  <p className="font-semibold text-slate-900">{vacation ? "8.00" : (Number(emp.record?.worked_hours || 0).toFixed(2) || "0.00")}h</p>
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">Tardanza</p>
