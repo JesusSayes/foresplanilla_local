@@ -115,32 +115,40 @@ model company_info {
 }
 
 model contract {
-  employee_id       String?
-  contract_number   String?
-  contract_type     String?
-  template_id       String?
-  start_date        DateTime? @db.Date
-  end_date          DateTime? @db.Date
-  position          String?
-  department        String?
-  work_location     String?
-  salary            Int?
-  work_schedule     String?
-  weekly_hours      Int?
-  functions         String?
-  benefits          String?
-  trial_period_days Int?
-  renewable         Boolean?
-  status            String?
-  signed_date       DateTime? @db.Date
-  pdf_url           String?
-  notes             String?
-  id                String    @id @db.VarChar(255)
-  created_date      DateTime? @db.Timestamp(6)
-  updated_date      DateTime? @db.Timestamp(6)
-  created_by_id     String?
-  created_by        String?
-  is_sample         Boolean?
+  employee_id                 String?
+  contract_number             String?
+  contract_type               String?
+  template_id                 String?
+  start_date                  DateTime? @db.Date
+  end_date                    DateTime? @db.Date
+  position                    String?
+  department                  String?
+  work_location               String?
+  salary                      Int?
+  work_schedule               String?
+  weekly_hours                Int?
+  functions                   String?
+  benefits                    String?
+  trial_period_days           Int?
+  renewable                   Boolean?  @default(false)
+  status                      String?
+  signed_date                 DateTime? @db.Date
+  pdf_url                     String?
+  notes                       String?
+  id                          String    @id @db.VarChar(255)
+  created_date                DateTime? @db.Timestamp(6)
+  updated_date                DateTime? @db.Timestamp(6)
+  created_by_id               String?
+  created_by                  String?
+  is_sample                   Boolean?  @default(false)
+  activity_cost               Decimal?  @default(0) @db.Decimal
+  food_cost                   Decimal?  @default(0) @db.Decimal
+  transport_cost              Decimal?  @default(0) @db.Decimal
+  is_digitally_signed         Boolean?  @default(false)
+  digital_signature_date      DateTime? @db.Timestamp(6)
+  digital_signature_image_url String?
+  digital_signature_name      String?
+  digital_signature_by        String?
 }
 
 model contract_clause {
@@ -623,6 +631,9 @@ model vacation_balance {
   created_by_id       String?
   created_by          String?
   is_sample           Boolean?
+  year                Int
+
+  @@index([year], map: "idx_vacation_balance_year")
 }
 
 model work_schedule {

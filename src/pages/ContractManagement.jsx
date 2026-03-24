@@ -252,7 +252,14 @@ export default function ContractManagement() {
       activity_cost: parseFloat(formData.activity_cost) || 0,
       food_cost: parseFloat(formData.food_cost) || 0,
       transport_cost: parseFloat(formData.transport_cost) || 0,
+      start_date: formData.start_date || null,
+      end_date: formData.end_date || null,
+      signed_date: formData.signed_date || null,
     };
+    // Regla de negocio
+    if (formData.contract_type === "Indeterminado") {
+      dataToSave.end_date = null;
+    }
     if (editingContract) {
       updateContractMutation.mutate({ id: editingContract.id, data: dataToSave });
     } else {
@@ -690,7 +697,7 @@ export default function ContractManagement() {
                     {contractTemplates.length > 0 && (
                       <div>
                         <Label className="flex items-center gap-1">
-                          <FileText className="w-4 h-4" />Plantilla</Label>
+                          <FileText className="w-4 h-4" />Plantilla
                         </Label>
                         <Select
                           value={formData.template_id}
