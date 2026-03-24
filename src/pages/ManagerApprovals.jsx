@@ -245,7 +245,7 @@ export default function ManagerApprovals() {
                   className="pl-10"
                 />
               </div>
-              
+
               <div className="flex gap-2">
                 {["all", "Pendiente", "Aprobada", "Rechazada"].map((status) => (
                   <Button
@@ -278,9 +278,9 @@ export default function ManagerApprovals() {
             {filteredRequests.map((request) => {
               const StatusIcon = getStatusConfig(request.status).icon;
               const empName = getEmployeeName(request.employee_id);
-              
+
               return (
-                <Card 
+                <Card
                   key={request.id}
                   className="border-0 shadow-lg hover:shadow-xl transition-all"
                 >
@@ -338,8 +338,8 @@ export default function ManagerApprovals() {
                       )}
 
                       {request.supporting_document_url && (
-                        <a 
-                          href={request.supporting_document_url}
+                        <a
+                          href={`${import.meta.env.VITE_API_URL}${request.supporting_document_url}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm text-indigo-600 hover:underline"
@@ -396,7 +396,7 @@ export default function ManagerApprovals() {
         )}
 
         {selectedRequest && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             onClick={() => {
               setSelectedRequest(null);
@@ -404,7 +404,7 @@ export default function ManagerApprovals() {
               setReviewForm({ action: "", comments: "" });
             }}
           >
-            <Card 
+            <Card
               className="max-w-lg w-full"
               onClick={(e) => e.stopPropagation()}
             >
@@ -413,8 +413,8 @@ export default function ManagerApprovals() {
                   <CardTitle className="text-xl font-bold">
                     {reviewAction === "approve" ? "Aprobar Solicitud" : "Rechazar Solicitud"}
                   </CardTitle>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="icon"
                     onClick={() => {
                       setSelectedRequest(null);
@@ -451,8 +451,8 @@ export default function ManagerApprovals() {
                       value={reviewForm.comments}
                       onChange={(e) => setReviewForm({ ...reviewForm, comments: e.target.value })}
                       placeholder={
-                        reviewAction === "approve" 
-                          ? "Ej: Aprobado. Que disfrute sus vacaciones..." 
+                        reviewAction === "approve"
+                          ? "Ej: Aprobado. Que disfrute sus vacaciones..."
                           : "Explica por qué se rechaza esta solicitud..."
                       }
                       rows={4}
@@ -476,8 +476,8 @@ export default function ManagerApprovals() {
                       onClick={() => handleReview(reviewAction)}
                       disabled={updateRequestMutation.isPending || (reviewAction === "reject" && !reviewForm.comments.trim())}
                     >
-                      {updateRequestMutation.isPending 
-                        ? (reviewAction === "approve" ? "Aprobando..." : "Rechazando...") 
+                      {updateRequestMutation.isPending
+                        ? (reviewAction === "approve" ? "Aprobando..." : "Rechazando...")
                         : (reviewAction === "approve" ? "Confirmar Aprobación" : "Confirmar Rechazo")}
                     </Button>
                   </div>

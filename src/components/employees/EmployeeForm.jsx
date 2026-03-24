@@ -191,7 +191,7 @@ export default function EmployeeForm({
                   <div className="mt-2">
                     {formData.photo_url ? (
                       <div className="relative group">
-                        <img src={formData.photo_url} alt="Foto" className="w-[150px] h-[150px] rounded-lg object-cover border-2 border-indigo-200" />
+                        <img src={`${import.meta.env.VITE_API_URL}${formData.photo_url}`} alt="Foto" className="w-[150px] h-[150px] rounded-lg object-cover border-2 border-indigo-200" />
                         <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100" onClick={() => setFormData({ ...formData, photo_url: "" })}>
                           <Trash2 className="w-3 h-3" />
                         </Button>
