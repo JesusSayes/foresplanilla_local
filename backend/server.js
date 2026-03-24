@@ -50,6 +50,7 @@ import holidaysRoutes from './routes/holidays.js';
 import attendanceIncidentsRoutes from './routes/attendance/incidents.js';
 import mailerRoutes from './routes/mailer.js';
 import { syncBiotimeAttendance } from './controllers/sync/biotimeSyncController.js';
+import uploadRoutes from "./routes/uploadRoutes.js";
 
 dotenv.config();
 
@@ -137,6 +138,8 @@ app.use('/api/holidays', holidaysRoutes);
 app.use('/api/attendance/incidents', attendanceIncidentsRoutes);
 app.use('/api/master-data', masterDataRoutes);
 app.use('/api/mailer', mailerRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/uploads", express.static("backend/uploads"));
 
 // Cron: sincronización biotime cada hora
 cron.schedule('0 * * * *', () => {
