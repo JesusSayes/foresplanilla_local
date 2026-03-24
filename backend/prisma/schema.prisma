@@ -302,10 +302,23 @@ model department {
 }
 
 model derechohabiente {
-  id           String    @id @db.VarChar(255)
-  created_date DateTime? @db.Timestamp(6)
-  updated_date DateTime? @db.Timestamp(6)
-  created_by   String?
+  id                String    @id @db.VarChar(255)
+  created_date      DateTime? @default(now()) @db.Timestamp(6)
+  updated_date      DateTime? @default(now()) @db.Timestamp(6)
+  created_by        String?   @default("system")
+  employee_id       String?   @db.VarChar(255)
+  first_name        String?
+  last_name         String?
+  relationship      String?
+  document_type     String?
+  document_number   String?
+  birth_date        DateTime? @db.Date
+  gender            String?
+  phone             String?
+  email             String?
+  address           String?
+  is_active         Boolean?  @default(true)
+  registration_date DateTime? @db.Date
 }
 
 model device_event {
