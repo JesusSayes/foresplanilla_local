@@ -127,7 +127,7 @@ export default function ImportEmployees() {
 
       const uploadResult = await Promise.race([
         // base44.integrations.Core.UploadFile({ file: selectedFile }),
-        uploadFile(selectedFile);
+        uploadFile(selectedFile),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Timeout: La subida tardó más de 2 minutos")), 120000)
         )
