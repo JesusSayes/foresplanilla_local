@@ -188,7 +188,8 @@ export default function DataExport() {
           } else {
             // Si NO hay datos, intentar obtener esquema o generar estructura básica
             try {
-              const schema = await base44.entities[entityName].schema();
+              // const schema = await base44.entities[entityName].schema();
+              const schema = await entitiesAPI[entityName].schema();
               const schemaProps = schema.properties || {};
 
               sqlScript += `CREATE TABLE IF NOT EXISTS ${entityName} (\n`;
@@ -290,7 +291,8 @@ export default function DataExport() {
 
         try {
           // Obtener un registro de muestra para inferir el esquema
-          const sampleData = await base44.entities[entityName].list("", 1);
+          // const sampleData = await base44.entities[entityName].list("", 1);
+          const sampleData = await entitiesAPI[entityName].list("", 1);
 
           if (sampleData && sampleData.length > 0) {
             // Construir esquema basado en el primer registro
@@ -347,7 +349,8 @@ export default function DataExport() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `base44_schemas_all_${new Date().toISOString().split('T')[0]}.json`;
+      // a.download = `base44_schemas_all_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `LocalApi_export_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -377,7 +380,8 @@ export default function DataExport() {
 
         try {
           // Obtener un registro de muestra para inferir el esquema
-          const sampleData = await base44.entities[entityName].list("", 1);
+          // const sampleData = await base44.entities[entityName].list("", 1);
+          const sampleData = await entitiesAPI[entityName].list("", 1);
 
           if (sampleData && sampleData.length > 0) {
             // Construir esquema basado en el primer registro
@@ -434,7 +438,8 @@ export default function DataExport() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `base44_schemas_selected_${new Date().toISOString().split('T')[0]}.json`;
+      // a.download = `base44_schemas_selected_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `LocalApi_schemas_selected_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
