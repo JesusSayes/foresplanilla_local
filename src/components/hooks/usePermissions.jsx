@@ -85,21 +85,9 @@ export const AVAILABLE_PERMISSIONS = {
   "contracts.create": "Crear contratos",
   "contracts.edit": "Editar contratos",
   "contracts.delete": "Eliminar contratos",
+  "contracts.sign": "Firmar contratos digitalmente",
 
-  // Configuración
-  "settings.company": "Configurar información de empresa",
-  "settings.master_data": "Gestionar datos maestros",
-  "settings.cost_centers": "Gestionar centros de costo",
-  "settings.holidays": "Gestionar feriados",
-  "settings.notifications": "Configurar notificaciones",
-  "settings.integrations": "Configurar integraciones",
-
-  // Usuarios y Roles
-  "users.view": "Ver usuarios",
-  "users.create": "Crear usuarios",
-  "users.edit": "Editar usuarios",
-  "users.delete": "Eliminar usuarios",
-  "users.manage_access": "Gestionar accesos de usuarios",
+  // Administración
   "roles.view": "Ver roles",
   "roles.create": "Crear roles",
   "roles.edit": "Editar roles",
@@ -338,7 +326,7 @@ const getBasicPermissionsByRole = (role) => {
       "reports.view", "reports.export", "reports.attendance", "reports.payroll", "reports.vacations", "reports.employees",
       "roles.view", "roles.manage", "roles.assign",
       "cost_centers.view", "cost_centers.create", "cost_centers.edit", "cost_centers.assign", "cost_centers.view_amounts", "cost_centers.delete",
-      "contracts.view", "contracts.view_amounts", "contracts.create", "contracts.edit", "contracts.delete",
+      "contracts.view", "contracts.view_amounts", "contracts.create", "contracts.edit", "contracts.delete", "contracts.sign",
       "sites.view", "sites.create", "sites.edit", "sites.delete", "sites.manage",
       "departments.view", "departments.create", "departments.edit", "departments.delete", "departments.manage",
       "positions.view", "positions.create", "positions.edit", "positions.delete", "positions.manage",

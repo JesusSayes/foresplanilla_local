@@ -20,21 +20,34 @@ export default function DataExport() {
 
   // Lista de todas las entidades
   const entities = [
-    "User",
-    "Employee", "Contract", "ContractTemplate", "ContractClause", "ContractRenewalRule", "Derechohabiente",
+    // Usuarios y Empleados
+    "User", "UserInvitation", "UserRole",
+    "Employee", "EmployeeChangeLog", "Derechohabiente",
+    // Contratos
+    "Contract", "ContractTemplate", "ContractClause", "ContractRenewalRule",
+    // Asistencia
     "AttendanceRecord", "AttendanceIncident", "OvertimeAlert", "WorkSchedule",
+    "AccessDevice", "EmployeeAccessMapping", "DeviceEvent",
+    "DatabaseConnection", "SyncLog",
+    // Vacaciones
     "VacationRequest", "VacationBalance",
+    // Planillas y Remuneración
     "Payslip", "PayrollConcept",
+    "LoanType", "Loan", "LoanInstallment",
+    // Centros de Costo
     "CostCenter", "CostCenterAssignment", "CostCenterChangeLog", "CostCenterCategory",
+    "AccountingAccount",
+    // Datos Maestros
     "Holiday", "Position", "Department", "Bank", "Site", "AFP", "Profession", "Ubigeo",
-    "Role", "UserRole",
+    "RMV", "UIT", "SeguroVidaLey",
+    // Roles y Permisos
+    "Role",
+    // Certificados
     "Certificate",
-    "EmployeeChangeLog",
-    "CompanyInfo", "PayslipTemplate", "RMV", "UIT", "SeguroVidaLey",
-    "DatabaseConnection", "SyncLog", "AccessDevice", "EmployeeAccessMapping", "DeviceEvent",
+    // Configuración de Empresa
+    "CompanyInfo", "PayslipTemplate", "ReportConfiguration",
+    // Notificaciones
     "Notification", "NotificationPreference",
-    "UserInvitation", "AccountingAccount", "ReportConfiguration",
-    "LoanType", "Loan", "LoanInstallment"
   ];
 
   useEffect(() => {

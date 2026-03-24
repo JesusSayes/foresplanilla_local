@@ -30,9 +30,11 @@ export default function AttendanceManagement() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [dateFrom, setDateFrom] = useState(null);
+  const [dateTo, setDateTo] = useState(null);
+  const [isRangeMode, setIsRangeMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSite, setSelectedSite] = useState("all");
-  const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [attendanceFilter, setAttendanceFilter] = useState("all");
   const [editingRecord, setEditingRecord] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -44,6 +46,8 @@ export default function AttendanceManagement() {
   const [showJustifyModal, setShowJustifyModal] = useState(false);
   const [justifyingEmployee, setJustifyingEmployee] = useState(null);
   const [existingIncident, setExistingIncident] = useState(null);
+  const [incidentSearchTerm, setIncidentSearchTerm] = useState("");
+  const [overtimeSearchTerm, setOvertimeSearchTerm] = useState("");
   const [justificationData, setJustificationData] = useState({
     incident_type: "Olvido de Marcación",
     justification: "",
@@ -74,8 +78,15 @@ export default function AttendanceManagement() {
   });
 
   const { data: todayRecords = [] } = useQuery({
-    queryKey: ["todayAttendance", selectedDate],
+    queryKey: ["todayAttendance", selectedDate, dateFrom, dateTo, isRangeMode],
     queryFn: async () => {
+      if (isRangeMode && dateFrom && dateTo) {
+        // Cargar todos los registros en el rango
+        const allRecs = await base44.entities.AttendanceRecord.list("-date", 2000);
+        const fromStr = format(dateFrom, "yyyy-MM-dd");
+        const toStr = format(dateTo, "yyyy-MM-dd");
+        return allRecs.filter(r => r.date >= fromStr && r.date <= toStr);
+      }
       const dateStr = format(selectedDate, "yyyy-MM-dd");
       return await entitiesAPI.AttendanceRecord.filter({ date: dateStr }, "-created_date");
     },
@@ -133,12 +144,17 @@ export default function AttendanceManagement() {
     },
   });
 
-  // Vacaciones aprobadas que cubren la fecha seleccionada
+  // Vacaciones aprobadas que cubren la(s) fecha(s) seleccionada(s)
   const { data: approvedVacations = [] } = useQuery({
-    queryKey: ["approvedVacations", format(selectedDate, "yyyy-MM-dd")],
+    queryKey: ["approvedVacations", format(selectedDate, "yyyy-MM-dd"), isRangeMode, dateFrom, dateTo],
     queryFn: async () => {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
       const all = await entitiesAPI.VacationRequest.filter({ status: "Aprobada" }, "-start_date", 500);
+      if (isRangeMode && dateFrom && dateTo) {
+        const fromStr = format(dateFrom, "yyyy-MM-dd");
+        const toStr = format(dateTo, "yyyy-MM-dd");
+        return all.filter(v => v.start_date <= toStr && v.end_date >= fromStr);
+      }
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
       return all.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
     },
   });
@@ -323,10 +339,10 @@ export default function AttendanceManagement() {
     });
   };
 
-  const handleJustifyClick = (emp, record) => {
+  const handleJustifyClick = (emp, record, overrideDate) => {
     setJustifyingEmployee(emp);
 
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    const dateStr = overrideDate || format(selectedDate, "yyyy-MM-dd");
     // Buscar justificación previa para este empleado en esta fecha
     const prevIncident = allIncidents.find(
       i => i.employee_id === emp.id && i.incident_date === dateStr
@@ -377,42 +393,113 @@ export default function AttendanceManagement() {
     ? allEmployees
     : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
-  const departments = [...new Set(siteAllowedEmployees.map(e => e.department_name))].filter(Boolean);
-
   const filteredEmployees = siteAllowedEmployees.filter(emp => {
     const matchesSearch =
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = selectedDepartment === "all" || emp.department_name === selectedDepartment;
     const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
-    if (emp.termination_date) {
-      const termination = new Date(emp.termination_date + "T00:00:00");
-      const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
-      if (selected > termination) return false;
-    }
-    return matchesSearch && matchesDept && matchesSite;
+    return matchesSearch && matchesSite;
   });
 
   // IDs de empleados accesibles para filtrar incidentes y alertas
   const accessibleEmployeeIds = new Set(siteAllowedEmployees.map(e => e.id));
 
-  const employeesWithRecords = filteredEmployees.map(emp => {
-    const record = todayRecords.find(r => r.employee_id === emp.id);
-    return { ...emp, record };
-  }).filter(emp => {
-    if (attendanceFilter === "all") return true;
-    if (attendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
-    if (attendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
-    if (attendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
-    return true;
-  });
+  // En modo rango: generar una fila por cada combinación empleado × fecha con registro
+  // En modo fecha única: comportamiento original (todos los empleados para esa fecha)
+  let employeesWithRecords = [];
+
+  if (isRangeMode && dateFrom && dateTo) {
+    // Generar todas las fechas del rango
+    const dateList = [];
+    const cur = new Date(dateFrom);
+    cur.setHours(0, 0, 0, 0);
+    const end = new Date(dateTo);
+    end.setHours(0, 0, 0, 0);
+    while (cur <= end) {
+      dateList.push(format(cur, "yyyy-MM-dd"));
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    // Para cada empleado filtrado × cada fecha → una fila (tenga o no registro)
+    const rows = [];
+    for (const emp of filteredEmployees) {
+      // Excluir empleados cesados antes del rango
+      if (emp.termination_date) {
+        const termination = new Date(emp.termination_date + "T00:00:00");
+        const rangeStart = new Date(dateFrom); rangeStart.setHours(0, 0, 0, 0);
+        if (rangeStart > termination) continue;
+      }
+      for (const dateStr of dateList) {
+        // Si el empleado estaba cesado en esta fecha específica, omitir
+        if (emp.termination_date) {
+          const termination = new Date(emp.termination_date + "T00:00:00");
+          const rowDay = new Date(dateStr + "T00:00:00");
+          if (rowDay > termination) continue;
+        }
+        const record = todayRecords.find(r => r.employee_id === emp.id && r.date === dateStr);
+        rows.push({ ...emp, record, displayDate: dateStr });
+      }
+    }
+    // Ordenar: fecha más reciente primero, luego por nombre
+    rows.sort((a, b) => {
+      if (b.displayDate !== a.displayDate) return b.displayDate.localeCompare(a.displayDate);
+      return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+    });
+
+    employeesWithRecords = rows.filter(emp => {
+      if (attendanceFilter === "all") return true;
+      if (attendanceFilter === "sin_entrada") return !emp.record?.clock_in;
+      if (attendanceFilter === "sin_salida") return emp.record?.clock_in && !emp.record?.clock_out;
+      if (attendanceFilter === "con_tardanza") return emp.record?.is_late;
+      return true;
+    });
+  } else {
+    employeesWithRecords = filteredEmployees.filter(emp => {
+      if (emp.termination_date) {
+        const termination = new Date(emp.termination_date + "T00:00:00");
+        const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
+        if (selected > termination) return false;
+      }
+      return true;
+    }).map(emp => {
+      const record = todayRecords.find(r => r.employee_id === emp.id);
+      return { ...emp, record, displayDate: format(selectedDate, "yyyy-MM-dd") };
+    }).filter(emp => {
+      if (attendanceFilter === "all") return true;
+      if (attendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
+      if (attendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
+      if (attendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
+      return true;
+    });
+  }
 
   const handleExportToExcel = () => {
     const dataToExport = employeesWithRecords.map(emp => {
+      const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
       const workedHours = emp.record?.worked_hours || 0;
       const overtimeHours = Math.max(0, workedHours - 8);
+
+      // Buscar papeleta (justificación/incidencia) vinculada a este empleado y fecha
+      const incident = allIncidents.find(
+        i => i.employee_id === emp.id && i.incident_date === rowDate
+      );
+
+      // Calcular tiempo de la papeleta
+      let tiempoPapeleta = '';
+      if (incident) {
+        if (incident.full_day_justification) {
+          tiempoPapeleta = '8.00 h';
+        } else if (incident.justified_time_start && incident.justified_time_end) {
+          const [sh, sm] = incident.justified_time_start.split(':').map(Number);
+          const [eh, em] = incident.justified_time_end.split(':').map(Number);
+          const mins = (eh * 60 + em) - (sh * 60 + sm);
+          tiempoPapeleta = `${(Math.max(0, mins) / 60).toFixed(2)} h`;
+        }
+      }
+
       return {
+        'Fecha': rowDate,
         'Código': emp.employee_code,
         'Nombres': emp.first_name,
         'Apellidos': emp.last_name,
@@ -425,14 +512,23 @@ export default function AttendanceManagement() {
         'Tardanza (min)': emp.record?.late_minutes || 0,
         'HE 25%': Math.min(overtimeHours, 2).toFixed(2),
         'HE 35%': Math.max(0, overtimeHours - 2).toFixed(2),
-        'Estado': emp.record?.status || 'Sin marcar'
+        'Estado': emp.record?.status || 'Sin marcar',
+        'Papeleta': incident ? incident.justification : '',
+        'Tipo Papeleta': incident ? incident.incident_type : '',
+        'Hora Papeleta': incident
+          ? (incident.full_day_justification ? 'Día completo' : `${incident.justified_time_start || ''} - ${incident.justified_time_end || ''}`)
+          : '',
+        'Tiempo Papeleta': tiempoPapeleta,
       };
     });
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Asistencia');
     const filterText = attendanceFilter === "all" ? "Todos" : attendanceFilter === "sin_entrada" ? "Sin_Entrada" : attendanceFilter === "sin_salida" ? "Sin_Salida" : "Con_Tardanza";
-    XLSX.writeFile(wb, `Asistencia_${format(selectedDate, "yyyy-MM-dd")}_${filterText}.xlsx`);
+    const dateLabel = isRangeMode && dateFrom && dateTo
+      ? `${format(dateFrom, "yyyy-MM-dd")}_${format(dateTo, "yyyy-MM-dd")}`
+      : format(selectedDate, "yyyy-MM-dd");
+    XLSX.writeFile(wb, `Asistencia_${dateLabel}_${filterText}.xlsx`);
     toast.success('✓ Archivo Excel generado correctamente');
   };
 
@@ -443,11 +539,6 @@ export default function AttendanceManagement() {
     const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>Código</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; const ot = Math.max(0, wh - 8); return `<tr><td>${emp.employee_code}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${emp.record?.clock_in || '--:--'}</td><td>${emp.record?.clock_out || '--:--'}</td><td>${wh.toFixed(2)}h</td><td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${Math.min(ot,2).toFixed(2)}h</td><td>${Math.max(0,ot-2).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
     printWindow.document.write(printContent);
     printWindow.document.close();
-  };
-
-  // Detectar si el empleado tiene vacación aprobada en la fecha seleccionada
-  const getVacationForEmployee = (empId) => {
-    return approvedVacations.find(v => v.employee_id === empId) || null;
   };
 
   // Obtener horario programado de entrada/salida para mostrar en vacaciones
@@ -580,20 +671,13 @@ export default function AttendanceManagement() {
             <TabsContent value="attendance" className="space-y-6">
               <Card className="border-0 shadow-lg">
                 <CardContent className="p-6">
-                  <div className="flex items-center gap-3 mb-6 flex-nowrap overflow-x-auto">
-                    <div className="flex-1 min-w-[200px]">
+                  <div className="flex flex-wrap items-center gap-3 mb-6">
+                    <div className="flex-1 min-w-[180px]">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
                         <Input placeholder="Buscar empleado..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
                       </div>
                     </div>
-                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                      <SelectTrigger className="w-40"><SelectValue placeholder="Departamento" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
                     <Select value={selectedSite} onValueChange={setSelectedSite}>
                       <SelectTrigger className="w-36"><SelectValue placeholder="Sede" /></SelectTrigger>
                       <SelectContent>
@@ -613,17 +697,60 @@ export default function AttendanceManagement() {
                         <SelectItem value="con_tardanza"><div className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-orange-600" />Con tardanza</div></SelectItem>
                       </SelectContent>
                     </Select>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="bg-green-50 border-green-200 hover:bg-green-100 whitespace-nowrap">
-                          <CalendarIcon className="mr-2 h-4 w-4 text-green-700" />
-                          <span className="text-green-700">{format(selectedDate, "dd MMM yyyy", { locale: es })}</span>
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} locale={es} />
-                      </PopoverContent>
-                    </Popover>
+
+                    {/* Selector de fecha única */}
+                    {!isRangeMode && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="bg-green-50 border-green-200 hover:bg-green-100 whitespace-nowrap">
+                            <CalendarIcon className="mr-2 h-4 w-4 text-green-700" />
+                            <span className="text-green-700">{format(selectedDate, "dd MMM yyyy", { locale: es })}</span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} locale={es} />
+                        </PopoverContent>
+                      </Popover>
+                    )}
+
+                    {/* Selector rango de fechas */}
+                    {isRangeMode && (
+                      <div className="flex items-center gap-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="bg-blue-50 border-blue-200 hover:bg-blue-100 whitespace-nowrap">
+                              <CalendarIcon className="mr-2 h-4 w-4 text-blue-700" />
+                              <span className="text-blue-700">{dateFrom ? format(dateFrom, "dd MMM yyyy", { locale: es }) : "Desde"}</span>
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={dateFrom} onSelect={(d) => d && setDateFrom(d)} locale={es} />
+                          </PopoverContent>
+                        </Popover>
+                        <span className="text-slate-400 text-sm">—</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="bg-blue-50 border-blue-200 hover:bg-blue-100 whitespace-nowrap">
+                              <CalendarIcon className="mr-2 h-4 w-4 text-blue-700" />
+                              <span className="text-blue-700">{dateTo ? format(dateTo, "dd MMM yyyy", { locale: es }) : "Hasta"}</span>
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={dateTo} onSelect={(d) => d && setDateTo(d)} locale={es} />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setIsRangeMode(!isRangeMode); setDateFrom(null); setDateTo(null); }}
+                      className={isRangeMode ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700" : ""}
+                    >
+                      {isRangeMode ? "Rango activo" : "Por rango"}
+                    </Button>
+
                     <Button onClick={handleExportToExcel} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
                       <Download className="w-4 h-4 mr-2" />Excel
                     </Button>
@@ -633,29 +760,38 @@ export default function AttendanceManagement() {
                   </div>
 
                   <div className="space-y-3">
-                    {employeesWithRecords.map(emp => {
-                      const vacation = getVacationForEmployee(emp.id);
+                    {employeesWithRecords.map((emp, idx) => {
+                      const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
+                      const vacation = approvedVacations.find(v => v.employee_id === emp.id && v.start_date <= rowDate && v.end_date >= rowDate) || null;
                       const scheduledTimes = vacation ? getScheduledTimes(emp.id) : null;
                       const statusConfig = vacation
                         ? { color: "bg-amber-100 text-amber-800 border-amber-300", icon: Palmtree, text: "Vacaciones" }
                         : getStatusConfig(emp.record?.status, emp.record?.clock_in);
                       const StatusIcon = statusConfig.icon;
+                      const rowKey = `${emp.id}-${rowDate}-${idx}`;
 
                       return (
-                        <div key={emp.id} className={`p-4 border rounded-lg hover:shadow-md transition-all ${vacation ? "border-amber-300 bg-amber-50/40" : "border-slate-200"}`}>
+                        <div key={rowKey} className={`p-4 border rounded-lg hover:shadow-md transition-all ${vacation ? "border-amber-300 bg-amber-50/40" : "border-slate-200"}`}>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4 flex-1">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${vacation ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-purple-600"}`}>
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold shrink-0 ${vacation ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-purple-600"}`}>
                                 {emp.first_name[0]}{emp.last_name[0]}
                               </div>
-                              <div className="flex-1">
-                                <h4 className="font-bold text-slate-900">{emp.first_name} {emp.last_name}</h4>
-                                <p className="text-sm text-slate-600">{emp.employee_code} • {emp.position} • {emp.department_name}</p>
+                              <div className="w-48 shrink-0">
+                                <h4 className="font-bold text-slate-900 text-sm">{emp.first_name} {emp.last_name}</h4>
+                                <p className="text-xs text-slate-600">{emp.employee_code} • {emp.department_name}</p>
                                 {vacation && (
                                   <p className="text-xs text-amber-700 font-medium mt-0.5">
-                                    🌴 {vacation.request_type} — hasta {format(new Date(vacation.end_date + "T00:00:00"), "dd MMM yyyy", { locale: es })}
+                                    🌴 {vacation.request_type}
                                   </p>
                                 )}
+                              </div>
+                              {/* Columna fecha */}
+                              <div className="w-24 shrink-0 text-center">
+                                <p className="text-xs text-slate-500 mb-0.5">Fecha</p>
+                                <p className="text-xs font-semibold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">
+                                  {format(new Date(rowDate + "T00:00:00"), "dd MMM yyyy", { locale: es })}
+                                </p>
                               </div>
                               <div className="grid grid-cols-6 gap-3 text-sm">
                                 <div className="text-center">
@@ -728,7 +864,7 @@ export default function AttendanceManagement() {
                                     size="sm"
                                     variant="outline"
                                     className="text-orange-600 border-orange-200 hover:bg-orange-50"
-                                    onClick={() => handleJustifyClick(emp, emp.record)}
+                                    onClick={() => handleJustifyClick(emp, emp.record, rowDate)}
                                   >
                                     <FileText className="w-4 h-4 mr-1" />Justificar
                                   </Button>
@@ -756,6 +892,15 @@ export default function AttendanceManagement() {
                   <p className="text-sm text-slate-600 mt-2">Personal que registró horas extras sin autorización previa</p>
                 </CardHeader>
                 <CardContent className="p-6">
+                  <div className="relative max-w-sm mb-6">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <Input
+                      placeholder="Buscar por nombre..."
+                      value={overtimeSearchTerm}
+                      onChange={(e) => setOvertimeSearchTerm(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
                   {overtimeAlerts.length === 0 ? (
                     <div className="text-center py-12">
                     <CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" />
@@ -763,7 +908,13 @@ export default function AttendanceManagement() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {overtimeAlerts.filter(a => accessibleEmployeeIds.has(a.employee_id)).map(alert => {
+                      {overtimeAlerts.filter(a => {
+                        if (!accessibleEmployeeIds.has(a.employee_id)) return false;
+                        if (!overtimeSearchTerm) return true;
+                        const emp = allEmployees.find(e => e.id === a.employee_id);
+                        const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
+                        return name.includes(overtimeSearchTerm.toLowerCase());
+                      }).map(alert => {
                         const emp = allEmployees.find(e => e.id === alert.employee_id);
                         const record = todayRecords.find(r => r.id === alert.attendance_record_id);
                         return (
@@ -783,36 +934,17 @@ export default function AttendanceManagement() {
                               <p className="text-sm text-yellow-900">⚠️ Este empleado NO está autorizado para realizar horas extras. Por favor, verifica la marcación o autoriza las horas extras desde Gestión de Horarios.</p>
                             </div>
                             <div className="flex gap-3">
-                              <Button size="sm" variant="outline" className="flex-1" onClick={() => record && handleEditRecord(record)}>
-                                <Edit className="w-4 h-4 mr-2" />Corregir Marcación
-                              </Button>
-                              <Button size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={async () => {
-                                if (confirm("¿Autorizar estas horas extras? Esto autorizará al empleado para futuras HE.")) {
-                                  const schedule = getEmployeeSchedule(emp.id);
-                                  if (schedule) {
-                                    await entitiesAPI.WorkSchedule.update(schedule.id, { overtime_authorized: true });
-                                  } else { toast.error("No se encontró horario asignado"); return; }
-                                  await entitiesAPI.OvertimeAlert.update(alert.id, {
-                                    status: "Autorizado",
-                                    resolved_by: currentUser.email,
-                                    resolution_date: format(new Date(), "yyyy-MM-dd"),
-                                    resolution_notes: "Horas extras autorizadas retroactivamente"
-                                  });
-                                  queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
-                                  queryClient.invalidateQueries({ queryKey: ["workSchedules"] });
-                                  toast.success("Horas extras autorizadas");
-                                }
-                              }}>
-                                <CheckCircle className="w-4 h-4 mr-2" />Autorizar HE
-                              </Button>
-                              <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
-                                await entitiesAPI.OvertimeAlert.update(alert.id, { status: "Descartado", resolved_by: currentUser.email, resolution_date: format(new Date(), "yyyy-MM-dd") });
-                                queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
-                                toast.success("Alerta descartada");
-                              }}>
-                                <XCircle className="w-4 h-4 mr-2" />Descartar
-                              </Button>
-                            </div>
+                               <Button size="sm" variant="outline" className="flex-1" onClick={() => record && handleEditRecord(record)}>
+                                 <Edit className="w-4 h-4 mr-2" />Corregir Marcación
+                               </Button>
+                               <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
+                                 await entitiesAPI.OvertimeAlert.update(alert.id, { status: "Descartado" });
+                                 queryClient.invalidateQueries(["overtimeAlerts"]);
+                                 toast.success("Alerta descartada");
+                               }}>
+                                 <XCircle className="w-4 h-4 mr-2" />Descartar
+                               </Button>
+                             </div>
                           </div>
                         );
                       })}
@@ -823,6 +955,15 @@ export default function AttendanceManagement() {
             </TabsContent>
 
             <TabsContent value="incidents" className="space-y-6">
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Buscar por nombre..."
+                  value={incidentSearchTerm}
+                  onChange={(e) => setIncidentSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
               <Tabs defaultValue="pending">
                 <TabsList className="grid w-full max-w-xl grid-cols-3 mb-6">
                   <TabsTrigger value="pending">Pendientes {pendingIncidents.length > 0 && <Badge className="ml-2 bg-orange-600 text-white">{pendingIncidents.length}</Badge>}</TabsTrigger>
@@ -838,7 +979,13 @@ export default function AttendanceManagement() {
                         <div className="text-center py-12"><CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones pendientes</p></div>
                       ) : (
                         <div className="space-y-4">
-                          {pendingIncidents.filter(i => accessibleEmployeeIds.has(i.employee_id)).map(incident => {
+                          {pendingIncidents.filter(i => {
+                            if (!accessibleEmployeeIds.has(i.employee_id)) return false;
+                            if (!incidentSearchTerm) return true;
+                            const emp = allEmployees.find(e => e.id === i.employee_id);
+                            const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
+                            return name.includes(incidentSearchTerm.toLowerCase());
+                          }).map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
                               <div key={incident.id} className="p-4 border border-slate-200 rounded-lg">
@@ -890,7 +1037,13 @@ export default function AttendanceManagement() {
                         <div className="text-center py-12"><AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones aprobadas</p></div>
                       ) : (
                         <div className="space-y-4">
-                          {approvedIncidents.filter(i => accessibleEmployeeIds.has(i.employee_id)).map(incident => {
+                          {approvedIncidents.filter(i => {
+                            if (!accessibleEmployeeIds.has(i.employee_id)) return false;
+                            if (!incidentSearchTerm) return true;
+                            const emp = allEmployees.find(e => e.id === i.employee_id);
+                            const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
+                            return name.includes(incidentSearchTerm.toLowerCase());
+                          }).map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
                               <div key={incident.id} className="p-4 border border-green-200 bg-green-50/30 rounded-lg">
@@ -936,7 +1089,13 @@ export default function AttendanceManagement() {
                         <div className="text-center py-12"><AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones rechazadas</p></div>
                       ) : (
                         <div className="space-y-4">
-                          {rejectedIncidents.filter(i => accessibleEmployeeIds.has(i.employee_id)).map(incident => {
+                          {rejectedIncidents.filter(i => {
+                            if (!accessibleEmployeeIds.has(i.employee_id)) return false;
+                            if (!incidentSearchTerm) return true;
+                            const emp = allEmployees.find(e => e.id === i.employee_id);
+                            const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
+                            return name.includes(incidentSearchTerm.toLowerCase());
+                          }).map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
                               <div key={incident.id} className="p-4 border border-red-200 bg-red-50/30 rounded-lg">

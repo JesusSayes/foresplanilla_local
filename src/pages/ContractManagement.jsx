@@ -10,30 +10,41 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   FileText, Plus, Edit, Download, Search, Calendar,
-  CheckCircle, AlertCircle, XCircle, Users, Star
+  CheckCircle, AlertCircle, XCircle, Star, PenLine, Shield, Users
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { generateContractPDF } from "../components/contracts/ContractTemplate";
+import { usePermissions } from "../components/hooks/usePermissions";
 
 export default function ContractManagement() {
   const { user: currentUser } = useAuth();
-  const employee = currentUser?.employee || null;
+  // const employee = currentUser?.employee || null;
   const [showForm, setShowForm] = useState(false);
   const [editingContract, setEditingContract] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [signatureFilter, setSignatureFilter] = useState("all"); // all | signed | pending
   const [formData, setFormData] = useState({});
   const [positionSearchTerm, setPositionSearchTerm] = useState("");
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
   const [siteSearchTerm, setSiteSearchTerm] = useState("");
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [conflictingContract, setConflictingContract] = useState(null);
+  const [selectedForBulkSign, setSelectedForBulkSign] = useState(new Set());
+  const [confirmSign, setConfirmSign] = useState(null); // { mode: 'single'|'bulk', contract?: contract }
+  const [isBulkSigning, setIsBulkSigning] = useState(false);
+  const [signatureImageUrl, setSignatureImageUrl] = useState("");
+  const [uploadingSignature, setUploadingSignature] = useState(false);
 
   const queryClient = useQueryClient();
+  const { hasPermission, employee, loading: loadingPerms } = usePermissions();
+
+  const canSign = hasPermission("contracts.sign") || hasPermission("system.admin");
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
@@ -82,9 +93,6 @@ export default function ContractManagement() {
     enabled: !!employee,
   });
 
-  // Obtener la plantilla por defecto
-  const defaultTemplate = contractTemplates.find(t => t.is_default) || contractTemplates[0] || null;
-
   const { data: companyInfo } = useQuery({
     queryKey: ["companyInfo"],
     queryFn: async () => {
@@ -94,9 +102,10 @@ export default function ContractManagement() {
     enabled: !!employee,
   });
 
+  const defaultTemplate = contractTemplates.find(t => t.is_default) || contractTemplates[0] || null;
+
   const createContractMutation = useMutation({
     mutationFn: async (data) => {
-      // Generar número de contrato automáticamente si no existe
       if (!data.contract_number) {
         const year = new Date().getFullYear();
         const existingContracts = await entitiesAPI.Contract.list("-created_date");
@@ -105,6 +114,10 @@ export default function ContractManagement() {
         );
         const nextNumber = contractsThisYear.length + 1;
         data.contract_number = `CTR-${year}-${String(nextNumber).padStart(3, '0')}`;
+
+        // const existing = await base44.entities.Contract.list("-created_date");
+        // const thisYear = existing.filter(c => c.contract_number?.startsWith(`CTR-${year}`));
+        // data.contract_number = `CTR-${year}-${String(thisYear.length + 1).padStart(3, '0')}`;
       }
 
       return await entitiesAPI.Contract.create(data);
@@ -114,9 +127,7 @@ export default function ContractManagement() {
       toast.success(`Contrato ${newContract.contract_number} creado correctamente`);
       resetForm();
     },
-    onError: () => {
-      toast.error("Error al crear el contrato");
-    },
+    onError: () => toast.error("Error al crear el contrato"),
   });
 
   const updateContractMutation = useMutation({
@@ -128,9 +139,7 @@ export default function ContractManagement() {
       toast.success("Contrato actualizado correctamente");
       resetForm();
     },
-    onError: () => {
-      toast.error("Error al actualizar el contrato");
-    },
+    onError: () => toast.error("Error al actualizar el contrato"),
   });
 
   const updateStatusMutation = useMutation({
@@ -139,26 +148,47 @@ export default function ContractManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contracts"]);
-      toast.success("Estado actualizado correctamente");
-    },
-    onError: () => {
-      toast.error("Error al actualizar el estado");
+      toast.success("Estado actualizado");
     },
   });
 
-  const initializeForm = (contract = null, emp = null) => {
-    // Normalizar fechas para asegurar formato consistente (YYYY-MM-DD)
-    const normalizeDate = (dateStr) => {
-      if (!dateStr) return "";
-      const date = new Date(dateStr);
-      // Obtener la fecha local sin conversión de zona horaria
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
+  const signContractMutation = useMutation({
+    // mutationFn: ({ id }) => base44.entities.Contract.update(id, {
+      // is_digitally_signed: true,
+      // digital_signature_date: new Date().toISOString(),
+      // digital_signature_by: currentUser?.email || "",
+      // digital_signature_name: employee ? `${employee.first_name} ${employee.last_name}` : "",
+      // digital_signature_image_url: signatureImageUrl || "",
+    // }),
+    mutationFn: async ({ id }) =>
+      await entitiesAPI.Contract.update(id, {
+        is_digitally_signed: true,
+        digital_signature_date: new Date().toISOString(),
+        digital_signature_by: currentUser?.email || "",
+        digital_signature_name: employee
+          ? `${employee.first_name} ${employee.last_name}`
+          : "",
+        digital_signature_image_url: signatureImageUrl || "",
+    }),
+    onSuccess: () => queryClient.invalidateQueries(["contracts"]),
+  });
 
-    // Determinar la plantilla a usar
+  const handleSignatureImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingSignature(true);
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    setSignatureImageUrl(file_url);
+    setUploadingSignature(false);
+  };
+
+  const initializeForm = (contract = null, emp = null) => {
+    const normalizeDate = (d) => {
+      if (!d) return "";
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return "";
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    };
     const contractType = contract?.contract_type || "Indeterminado";
     let selectedTemplateId = contract?.template_id || "";
 
@@ -171,7 +201,6 @@ export default function ContractManagement() {
       // Si no hay específica, usar la default
       selectedTemplateId = typeSpecificTemplate?.id || defaultTemplate?.id || "";
     }
-
     setFormData({
       employee_id: contract?.employee_id || emp?.id || "",
       contract_number: contract?.contract_number || "",
@@ -183,9 +212,9 @@ export default function ContractManagement() {
       department: contract?.department || emp?.department_name || "",
       work_location: contract?.work_location || emp?.site || "",
       salary: contract?.salary || emp?.base_salary || "",
-      activity_cost: contract?.activity_cost || 0,
-      food_cost: contract?.food_cost || 0,
-      transport_cost: contract?.transport_cost || 0,
+      activity_cost: contract?.activity_cost || "",
+      food_cost: contract?.food_cost || "",
+      transport_cost: contract?.transport_cost || "",
       work_schedule: contract?.work_schedule || "Lunes a Viernes de 9:00 AM a 6:00 PM",
       weekly_hours: contract?.weekly_hours || 48,
       functions: contract?.functions || "",
@@ -199,20 +228,14 @@ export default function ContractManagement() {
   };
 
   const handleCreate = () => {
-    setEmployeeSearchTerm("");
-    setPositionSearchTerm("");
-    setDepartmentSearchTerm("");
-    setSiteSearchTerm("");
+    setEmployeeSearchTerm(""); setPositionSearchTerm(""); setDepartmentSearchTerm(""); setSiteSearchTerm("");
     initializeForm();
     setEditingContract(null);
     setShowForm(true);
   };
 
   const handleEdit = (contract) => {
-    setEmployeeSearchTerm("");
-    setPositionSearchTerm("");
-    setDepartmentSearchTerm("");
-    setSiteSearchTerm("");
+    setEmployeeSearchTerm(""); setPositionSearchTerm(""); setDepartmentSearchTerm(""); setSiteSearchTerm("");
     initializeForm(contract);
     setEditingContract(contract);
     setShowForm(true);
@@ -223,219 +246,239 @@ export default function ContractManagement() {
       toast.error("Completa los campos obligatorios");
       return;
     }
-
+    const dataToSave = {
+      ...formData,
+      salary: parseFloat(formData.salary) || 0,
+      activity_cost: parseFloat(formData.activity_cost) || 0,
+      food_cost: parseFloat(formData.food_cost) || 0,
+      transport_cost: parseFloat(formData.transport_cost) || 0,
+    };
     if (editingContract) {
-      updateContractMutation.mutate({ id: editingContract.id, data: formData });
+      updateContractMutation.mutate({ id: editingContract.id, data: dataToSave });
     } else {
-      // Verificar si hay contratos vigentes para este empleado
-      const existingActiveContract = contracts.find(
-        c => c.employee_id === formData.employee_id && c.status === "Vigente"
-      );
-
-      if (existingActiveContract && formData.status === "Vigente") {
-        setConflictingContract(existingActiveContract);
+      const existingActive = contracts.find(c => c.employee_id === formData.employee_id && c.status === "Vigente");
+      if (existingActive && formData.status === "Vigente") {
+        setConflictingContract(existingActive);
         return;
       }
-
-      createContractMutation.mutate(formData);
+      createContractMutation.mutate(dataToSave);
     }
   };
 
   const handleResolveConflict = (newStatus) => {
-    updateStatusMutation.mutate(
-      { id: conflictingContract.id, status: newStatus },
-      {
-        onSuccess: () => {
-          setConflictingContract(null);
-          createContractMutation.mutate(formData);
-        }
+    updateStatusMutation.mutate({ id: conflictingContract.id, status: newStatus }, {
+      onSuccess: () => {
+        setConflictingContract(null);
+        createContractMutation.mutate(formData);
       }
-    );
+    });
   };
 
   const handleGeneratePDF = async (contract) => {
     const emp = allEmployees.find(e => e.id === contract.employee_id);
-    if (!emp) {
-      toast.error("Empleado no encontrado");
-      return;
-    }
-
+    if (!emp) { toast.error("Empleado no encontrado"); return; }
     try {
       // Recargar plantillas y datos de empresa antes de generar PDF
       const templates = await entitiesAPI.ContractTemplate.list("-created_date");
 
       // Buscar la plantilla específica del contrato o usar la default
-      let template = null;
-      if (contract.template_id) {
-        template = templates.find(t => t.id === contract.template_id);
-      }
-      if (!template) {
-        // Buscar plantilla específica para el tipo de contrato
-        template = templates.find(t => t.contract_types?.includes(contract.contract_type) && t.is_active);
-      }
-      if (!template) {
-        // Usar la plantilla por defecto
-        template = templates.find(t => t.is_default && t.is_active);
-      }
-      if (!template && templates.length > 0) {
-        template = templates[0];
-      }
+      let template = contract.template_id ? templates.find(t => t.id === contract.template_id) : null;
+      // Buscar plantilla específica para el tipo de contrato
+      if (!template) template = templates.find(t => t.contract_types?.includes(contract.contract_type) && t.is_active);
+      // Usar la plantilla por defecto
+      if (!template) template = templates.find(t => t.is_default && t.is_active);
+      if (!template && templates.length > 0) template = templates[0];
 
       const companyData = companyInfo || {};
 
       await generateContractPDF(emp, contract, companyData, template);
       toast.success("PDF generado exitosamente");
     } catch (error) {
-      console.error("Error generando PDF:", error);
-      toast.error("Error al generar el PDF");
+      toast.error("Error al generar el PDF: " + error.message);
     }
   };
 
-  const resetForm = () => {
-    setFormData({});
-    setEditingContract(null);
-    setShowForm(false);
-    setConflictingContract(null);
-    setEmployeeSearchTerm("");
-    setPositionSearchTerm("");
-    setDepartmentSearchTerm("");
-    setSiteSearchTerm("");
+  const handleSignSingle = (contract) => {
+    setConfirmSign({ mode: 'single', contract });
   };
+
+  const handleConfirmSign = async () => {
+    if (!confirmSign) return;
+    if (confirmSign.mode === 'single') {
+      await signContractMutation.mutateAsync({ id: confirmSign.contract.id });
+      toast.success(`Contrato ${confirmSign.contract.contract_number} firmado digitalmente`);
+    } else {
+      setIsBulkSigning(true);
+      let signed = 0;
+      for (const id of selectedForBulkSign) {
+        await signContractMutation.mutateAsync({ id });
+        signed++;
+      }
+      setIsBulkSigning(false);
+      setSelectedForBulkSign(new Set());
+      toast.success(`${signed} contrato(s) firmado(s) digitalmente`);
+    }
+    setConfirmSign(null);
+    setSignatureImageUrl("");
+  };
+
+  const toggleBulkSelect = (contractId) => {
+    setSelectedForBulkSign(prev => {
+      const next = new Set(prev);
+      next.has(contractId) ? next.delete(contractId) : next.add(contractId);
+      return next;
+    });
+  };
+
+  const resetForm = () => {
+    setFormData({}); setEditingContract(null); setShowForm(false); setConflictingContract(null);
+    setEmployeeSearchTerm(""); setPositionSearchTerm(""); setDepartmentSearchTerm(""); setSiteSearchTerm("");
+  };
+
+  const pendingSignContracts = contracts.filter(c => !c.is_digitally_signed && c.status === "Vigente");
 
   const filteredContracts = contracts.filter(c => {
     const emp = allEmployees.find(e => e.id === c.employee_id);
     if (!emp) return false;
-
-    const matchesSearch = searchTerm ? (
+    const matchesSearch = !searchTerm || (
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.contract_number?.toLowerCase().includes(searchTerm.toLowerCase())
-    ) : true;
-
+    );
     const matchesStatus = statusFilter === "all" || c.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
+    const matchesSign = signatureFilter === "all" || (signatureFilter === "signed" && c.is_digitally_signed) || (signatureFilter === "pending" && !c.is_digitally_signed);
+    return matchesSearch && matchesStatus && matchesSign;
   });
 
   const stats = {
     total: contracts.length,
     vigentes: contracts.filter(c => c.status === "Vigente").length,
-    vencidos: contracts.filter(c => c.status === "Vencido").length,
-    indeterminados: contracts.filter(c => c.contract_type === "Indeterminado").length,
+    firmados: contracts.filter(c => c.is_digitally_signed).length,
+    pendienteFirma: contracts.filter(c => !c.is_digitally_signed && c.status === "Vigente").length,
   };
 
-  const getStatusConfig = (status) => {
-    const configs = {
-      "Vigente": { color: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle },
-      "Vencido": { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle },
-      "Rescindido": { color: "bg-gray-100 text-gray-700 border-gray-200", icon: XCircle },
-      "Renovado": { color: "bg-blue-100 text-blue-700 border-blue-200", icon: CheckCircle },
-    };
-    return configs[status] || configs["Vigente"];
-  };
+  const getStatusConfig = (status) => ({
+    "Vigente": { color: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle },
+    "Vencido": { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle },
+    "Rescindido": { color: "bg-gray-100 text-gray-700 border-gray-200", icon: XCircle },
+    "Renovado": { color: "bg-blue-100 text-blue-700 border-blue-200", icon: CheckCircle },
+  }[status] || { color: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle });
 
-  if (!employee || employee.role !== "admin") {
+  if (loadingPerms) {
+    return <div className="min-h-screen flex items-center justify-center"><div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
+  }
+
+  if (!employee || (!hasPermission("contracts.view") && !hasPermission("system.admin") && employee.role !== "admin")) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <Card className="max-w-md">
-          <CardContent className="p-8 text-center">
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
-            <p className="text-slate-600">Solo administradores pueden gestionar contratos</p>
-          </CardContent>
-        </Card>
+        <Card className="max-w-md"><CardContent className="p-8 text-center">
+          <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
+          <p className="text-slate-600">No tienes permisos para gestionar contratos</p>
+        </CardContent></Card>
       </div>
     );
   }
 
+  const canManage = hasPermission("contracts.create") || hasPermission("system.admin") || employee.role === "admin";
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-2">
-            Gestión de Contratos
-          </h1>
-          <p className="text-slate-600 text-sm sm:text-base lg:text-lg">
-            Registra y administra los contratos laborales de los empleados
-          </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl sm:text-4xl font-bold text-slate-900 mb-1">Gestión de Contratos</h1>
+          <p className="text-slate-600">Registra, administra y firma digitalmente los contratos laborales</p>
         </div>
 
         {/* Stats */}
-        <div className="flex flex-wrap gap-4 mb-6">
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
-            <FileText className="w-5 h-5 text-indigo-600" />
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-slate-900">{stats.total}</span>
-              <span className="text-sm text-slate-600">Total Contratos</span>
+        <div className="flex flex-wrap gap-3 mb-6">
+          {[
+            { label: "Total", value: stats.total, icon: FileText, color: "indigo" },
+            { label: "Vigentes", value: stats.vigentes, icon: CheckCircle, color: "green" },
+            { label: "Firmados", value: stats.firmados, icon: PenLine, color: "blue" },
+            { label: "Pendiente Firma", value: stats.pendienteFirma, icon: AlertCircle, color: "amber" },
+          ].map(({ label, value, icon: StatIcon, color }) => (
+            <div key={label} className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+              <StatIcon className={`w-5 h-5 text-${color}-600`} />
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold text-slate-900">{value}</span>
+                <span className="text-sm text-slate-600">{label}</span>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-slate-900">{stats.vigentes}</span>
-              <span className="text-sm text-slate-600">Vigentes</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
-            <AlertCircle className="w-5 h-5 text-red-600" />
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-slate-900">{stats.vencidos}</span>
-              <span className="text-sm text-slate-600">Vencidos</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
-            <Calendar className="w-5 h-5 text-blue-600" />
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-slate-900">{stats.indeterminados}</span>
-              <span className="text-sm text-slate-600">Indeterminados</span>
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Actions */}
-        <Card className="border-0 shadow-lg mb-8">
-          <CardHeader className="border-b bg-slate-50/50">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <CardTitle className="text-xl font-bold">Contratos Registrados</CardTitle>
-              <Button
-                onClick={handleCreate}
-                className="bg-indigo-600 hover:bg-indigo-700"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Contrato
+        {/* Firma masiva - solo si tiene permiso y hay pendientes seleccionados */}
+        {canSign && selectedForBulkSign.size > 0 && (
+          <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <PenLine className="w-4 h-4 text-indigo-600" />
+              <span className="text-sm font-medium text-indigo-800">{selectedForBulkSign.size} contrato(s) seleccionado(s) para firma masiva</span>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setSelectedForBulkSign(new Set())}>Deseleccionar</Button>
+              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => setConfirmSign({ mode: 'bulk' })}>
+                <PenLine className="w-4 h-4 mr-1" /> Firmar {selectedForBulkSign.size} seleccionados
               </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Main Card */}
+        <Card className="border-0 shadow-lg">
+          <CardHeader className="border-b bg-slate-50/50">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle className="text-xl font-bold">Contratos Registrados</CardTitle>
+              {canManage && (
+                <Button onClick={handleCreate} className="bg-indigo-600 hover:bg-indigo-700">
+                  <Plus className="w-4 h-4 mr-2" /> Nuevo Contrato
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="flex flex-wrap items-center gap-4 mb-6">
-              <div className="flex-1 min-w-64 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <Input
-                  placeholder="Buscar por empleado o número de contrato..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-3 mb-6">
+              <div className="flex-1 min-w-56 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input placeholder="Buscar por empleado o N° contrato..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
               </div>
-
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
+                <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="all">Todos los estados</SelectItem>
                   <SelectItem value="Vigente">Vigente</SelectItem>
                   <SelectItem value="Vencido">Vencido</SelectItem>
                   <SelectItem value="Rescindido">Rescindido</SelectItem>
                   <SelectItem value="Renovado">Renovado</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={signatureFilter} onValueChange={setSignatureFilter}>
+                <SelectTrigger className="w-44"><SelectValue placeholder="Firma digital" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las firmas</SelectItem>
+                  <SelectItem value="signed"><div className="flex items-center gap-2"><PenLine className="w-4 h-4 text-blue-600" />Firmados digitalmente</div></SelectItem>
+                  <SelectItem value="pending"><div className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-amber-600" />Pendiente de firma</div></SelectItem>
+                </SelectContent>
+              </Select>
+              {canSign && signatureFilter === "pending" && pendingSignContracts.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-indigo-600 border-indigo-200"
+                  onClick={() => {
+                    const visiblePendingIds = filteredContracts.filter(c => !c.is_digitally_signed && c.status === "Vigente").map(c => c.id);
+                    setSelectedForBulkSign(new Set(visiblePendingIds));
+                  }}
+                >
+                  <Users className="w-4 h-4 mr-1" /> Seleccionar todos pendientes
+                </Button>
+              )}
             </div>
 
             {isLoading ? (
-              <div className="flex justify-center py-12">
-                <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-              </div>
+              <div className="flex justify-center py-12"><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
             ) : filteredContracts.length === 0 ? (
               <div className="text-center py-12">
                 <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
@@ -446,74 +489,81 @@ export default function ContractManagement() {
                 {filteredContracts.map(contract => {
                   const emp = allEmployees.find(e => e.id === contract.employee_id);
                   if (!emp) return null;
-
                   const StatusIcon = getStatusConfig(contract.status).icon;
+                  const isPendingSign = !contract.is_digitally_signed && contract.status === "Vigente";
+                  const isSelected = selectedForBulkSign.has(contract.id);
 
                   return (
-                    <div key={contract.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="font-bold text-slate-900">
+                    <div
+                      key={contract.id}
+                      className={`p-4 border rounded-lg hover:shadow-md transition-all ${isSelected ? "border-indigo-400 bg-indigo-50/30" : "border-slate-200"}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Checkbox para firma masiva solo en pendientes */}
+                        {canSign && isPendingSign && (
+                          <div className="pt-1">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleBulkSelect(contract.id)}
+                            />
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          {/* Badges de cabecera */}
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <h4 className="font-bold text-slate-900 text-sm">
                               {emp.employee_code} - {emp.first_name} {emp.last_name}
                             </h4>
                             <Badge className={getStatusConfig(contract.status).color}>
-                              <StatusIcon className="w-3 h-3 mr-1" />
-                              {contract.status}
+                              <StatusIcon className="w-3 h-3 mr-1" />{contract.status}
                             </Badge>
                             <Badge variant="outline">{contract.contract_type}</Badge>
                             {contract.contract_number && (
-                              <Badge className="bg-purple-100 text-purple-700">
-                                #{contract.contract_number}
+                              <Badge className="bg-purple-100 text-purple-700">#{contract.contract_number}</Badge>
+                            )}
+                            {/* Badge de firma digital */}
+                            {contract.is_digitally_signed ? (
+                              <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                                <PenLine className="w-3 h-3 mr-1" />
+                                Firmado digitalmente
+                                {contract.digital_signature_date && (
+                                  <span className="ml-1 opacity-75">
+                                    · {format(new Date(contract.digital_signature_date), "dd/MM/yy HH:mm")}
+                                  </span>
+                                )}
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-amber-100 text-amber-700 border-amber-200">
+                                <AlertCircle className="w-3 h-3 mr-1" />Pendiente firma
                               </Badge>
                             )}
-                            {contract.template_id && (() => {
-                              const tmpl = contractTemplates.find(t => t.id === contract.template_id);
-                              return tmpl ? (
-                                <Badge className="bg-slate-100 text-slate-600 border-slate-200" variant="outline">
-                                  <FileText className="w-3 h-3 mr-1" />
-                                  {tmpl.template_name}
-                                </Badge>
-                              ) : null;
-                            })()}
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <p className="text-slate-600">Cargo</p>
-                              <p className="font-semibold text-slate-900">{contract.position}</p>
-                            </div>
-                            <div>
-                              <p className="text-slate-600">Inicio</p>
-                              <p className="font-semibold text-slate-900">
-                                {format(new Date(contract.start_date), "dd/MM/yyyy")}
-                              </p>
-                            </div>
-                            {contract.end_date && (
-                              <div>
-                                <p className="text-slate-600">Fin</p>
-                                <p className="font-semibold text-slate-900">
-                                  {format(new Date(contract.end_date), "dd/MM/yyyy")}
-                                </p>
-                              </div>
-                            )}
-                            <div>
-                              <p className="text-slate-600">Remuneración</p>
-                              <p className="font-semibold text-indigo-600">
-                                S/ {contract.salary.toFixed(2)}
-                              </p>
-                            </div>
+                          {/* Info del contrato */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                            <div><p className="text-slate-500 text-xs">Cargo</p><p className="font-semibold text-slate-900 truncate">{contract.position}</p></div>
+                            <div><p className="text-slate-500 text-xs">Inicio</p><p className="font-semibold text-slate-900">{format(new Date(contract.start_date), "dd/MM/yyyy")}</p></div>
+                            {contract.end_date && <div><p className="text-slate-500 text-xs">Fin</p><p className="font-semibold text-slate-900">{format(new Date(contract.end_date), "dd/MM/yyyy")}</p></div>}
+                            <div><p className="text-slate-500 text-xs">Remuneración</p><p className="font-semibold text-indigo-600">S/ {contract.salary?.toFixed(2)}</p></div>
                           </div>
+
+                          {/* Firmante */}
+                          {contract.is_digitally_signed && contract.digital_signature_name && (
+                            <p className="text-xs text-blue-600 mt-1">
+                              <Shield className="w-3 h-3 inline mr-1" />
+                              Firmado por: {contract.digital_signature_name} ({contract.digital_signature_by})
+                            </p>
+                          )}
                         </div>
 
-                        <div className="flex gap-2 ml-4">
+                        {/* Acciones */}
+                        <div className="flex flex-wrap gap-1.5 ml-2 shrink-0">
                           <Select
                             value={contract.status}
                             onValueChange={(newStatus) => updateStatusMutation.mutate({ id: contract.id, status: newStatus })}
                           >
-                            <SelectTrigger className="w-32 h-9">
-                              <SelectValue />
-                            </SelectTrigger>
+                            <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Vigente">Vigente</SelectItem>
                               <SelectItem value="Vencido">Vencido</SelectItem>
@@ -521,22 +571,24 @@ export default function ContractManagement() {
                               <SelectItem value="Renovado">Renovado</SelectItem>
                             </SelectContent>
                           </Select>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleGeneratePDF(contract)}
-                            title="Generar PDF"
-                          >
+                          <Button size="sm" variant="outline" onClick={() => handleGeneratePDF(contract)} title="Generar PDF">
                             <Download className="w-4 h-4" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEdit(contract)}
-                            title="Editar"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
+                          {canManage && (
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(contract)} title="Editar">
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {canSign && !contract.is_digitally_signed && (
+                            <Button
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                              onClick={() => handleSignSingle(contract)}
+                              title="Firmar digitalmente"
+                            >
+                              <PenLine className="w-4 h-4 mr-1" /> Firmar
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -560,15 +612,13 @@ export default function ContractManagement() {
           >
             <CardHeader className="border-b">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-xl font-bold">
-                  {editingContract ? "Editar Contrato" : "Nuevo Contrato"}
-                </CardTitle>
+                <CardTitle className="text-xl font-bold">{editingContract ? "Editar Contrato" : "Nuevo Contrato"}</CardTitle>
                 <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
               </div>
             </CardHeader>
             <CardContent className="p-6 max-h-[70vh] overflow-y-auto">
-              <Tabs defaultValue="basic" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-3">
+              <Tabs defaultValue="basic">
+                <TabsList className="grid w-full grid-cols-3 mb-6">
                   <TabsTrigger value="basic">Datos Básicos</TabsTrigger>
                   <TabsTrigger value="work">Condiciones Laborales</TabsTrigger>
                   <TabsTrigger value="details">Detalles</TabsTrigger>
@@ -576,15 +626,12 @@ export default function ContractManagement() {
 
                 <TabsContent value="basic" className="space-y-4">
                   {editingContract && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-blue-900">Número de Contrato:</span>
-                        <span className="text-sm font-bold text-blue-700">{formData.contract_number || "N/A"}</span>
-                      </div>
-                      <p className="text-xs text-blue-600 mt-1">Este campo se genera automáticamente y no puede ser modificado</p>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <span className="text-sm font-medium text-blue-900">N° Contrato: </span>
+                      <span className="text-sm font-bold text-blue-700">{formData.contract_number || "N/A"}</span>
+                      <p className="text-xs text-blue-600 mt-1">El número se genera automáticamente</p>
                     </div>
                   )}
-
                   <div>
                     <Label>Empleado *</Label>
                     <Select
@@ -599,14 +646,7 @@ export default function ContractManagement() {
                       </SelectTrigger>
                       <SelectContent>
                         <div className="p-2 border-b sticky top-0 bg-white z-10">
-                          <Input
-                            placeholder="Buscar empleado..."
-                            value={employeeSearchTerm}
-                            onChange={(e) => setEmployeeSearchTerm(e.target.value)}
-                            className="h-8"
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => e.stopPropagation()}
-                          />
+                          <Input placeholder="Buscar empleado..." value={employeeSearchTerm} onChange={(e) => setEmployeeSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
                         </div>
                         {allEmployees
                           .filter(emp =>
@@ -622,7 +662,6 @@ export default function ContractManagement() {
                       </SelectContent>
                     </Select>
                   </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>Tipo de Contrato *</Label>
@@ -642,23 +681,16 @@ export default function ContractManagement() {
                       >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Indeterminado">Indeterminado</SelectItem>
-                          <SelectItem value="Plazo Fijo">Plazo Fijo</SelectItem>
-                          <SelectItem value="Part-Time">Part-Time</SelectItem>
-                          <SelectItem value="Prácticas">Prácticas</SelectItem>
-                          <SelectItem value="Obra o Servicio">Obra o Servicio</SelectItem>
-                          <SelectItem value="Intermitente">Intermitente</SelectItem>
-                          <SelectItem value="Temporal">Temporal</SelectItem>
+                          {["Indeterminado","Plazo Fijo","Part-Time","Prácticas","Obra o Servicio","Intermitente","Temporal"].map(t => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
-
-                    {/* Selector de Plantilla */}
                     {contractTemplates.length > 0 && (
                       <div>
-                        <Label className="flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          Plantilla de Contrato
+                        <Label className="flex items-center gap-1">
+                          <FileText className="w-4 h-4" />Plantilla</Label>
                         </Label>
                         <Select
                           value={formData.template_id}
@@ -668,71 +700,29 @@ export default function ContractManagement() {
                             <SelectValue placeholder="Seleccionar plantilla" />
                           </SelectTrigger>
                           <SelectContent>
-                            {contractTemplates.map(template => (
-                              <SelectItem key={template.id} value={template.id}>
-                                <div className="flex items-center gap-2">
-                                  {template.is_default && (
-                                    <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-                                  )}
-                                  <span>{template.template_name}</span>
-                                  {template.contract_types?.length > 0 && (
-                                    <span className="text-xs text-slate-500">
-                                      ({template.contract_types.join(", ")})
-                                    </span>
-                                  )}
-                                </div>
+                            {contractTemplates.map(t => (
+                              <SelectItem key={t.id} value={t.id}>
+                                {t.is_default && <Star className="w-3 h-3 inline mr-1 text-amber-500 fill-amber-500" />}{t.template_name}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                        {formData.template_id && (
-                          <p className="text-xs text-slate-500 mt-1">
-                            {contractTemplates.find(t => t.id === formData.template_id)?.description ||
-                              "Esta plantilla se usará al generar el PDF del contrato"}
-                          </p>
-                        )}
                       </div>
                     )}
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <Label>Fecha de Inicio *</Label>
-                      <Input
-                        type="date"
-                        value={formData.start_date}
-                        onChange={(e) => setFormData({...formData, start_date: e.target.value})}
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div><Label>Fecha de Inicio *</Label><Input type="date" value={formData.start_date} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} /></div>
                     {formData.contract_type !== "Indeterminado" && (
-                      <div>
-                        <Label>Fecha de Fin</Label>
-                        <Input
-                          type="date"
-                          value={formData.end_date}
-                          onChange={(e) => setFormData({...formData, end_date: e.target.value})}
-                        />
-                      </div>
+                      <div><Label>Fecha de Fin</Label><Input type="date" value={formData.end_date} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} /></div>
                     )}
-                    <div>
-                      <Label>Fecha de Firma</Label>
-                      <Input
-                        type="date"
-                        value={formData.signed_date}
-                        onChange={(e) => setFormData({...formData, signed_date: e.target.value})}
-                      />
-                    </div>
+                    <div><Label>Fecha de Firma</Label><Input type="date" value={formData.signed_date} onChange={(e) => setFormData({ ...formData, signed_date: e.target.value })} /></div>
                   </div>
-
                   <div>
                     <Label>Estado</Label>
-                    <Select value={formData.status} onValueChange={(v) => setFormData({...formData, status: v})}>
+                    <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Vigente">Vigente</SelectItem>
-                        <SelectItem value="Vencido">Vencido</SelectItem>
-                        <SelectItem value="Rescindido">Rescindido</SelectItem>
-                        <SelectItem value="Renovado">Renovado</SelectItem>
+                        {["Vigente","Vencido","Rescindido","Renovado"].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -742,205 +732,64 @@ export default function ContractManagement() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>Cargo *</Label>
-                      <Select value={formData.position} onValueChange={(val) => setFormData({ ...formData, position: val })}>
+                      <Select value={formData.position} onValueChange={(v) => setFormData({ ...formData, position: v })}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar cargo" /></SelectTrigger>
                         <SelectContent>
-                          <div className="p-2 border-b">
-                            <Input
-                              placeholder="Buscar cargo..."
-                              value={positionSearchTerm}
-                              onChange={(e) => setPositionSearchTerm(e.target.value)}
-                              className="h-8"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </div>
-                          {positions
-                            .filter(pos => pos.name.toLowerCase().includes(positionSearchTerm.toLowerCase()))
-                            .map(pos => (
-                              <SelectItem key={pos.id} value={pos.name}>
-                                {pos.name}
-                              </SelectItem>
-                            ))}
+                          <div className="p-2 border-b"><Input placeholder="Buscar..." value={positionSearchTerm} onChange={(e) => setPositionSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} /></div>
+                          {positions.filter(p => p.name.toLowerCase().includes(positionSearchTerm.toLowerCase())).map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
                       <Label>Departamento/Área</Label>
-                      <Select value={formData.department} onValueChange={(val) => setFormData({ ...formData, department: val })}>
+                      <Select value={formData.department} onValueChange={(v) => setFormData({ ...formData, department: v })}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
                         <SelectContent>
-                          <div className="p-2 border-b">
-                            <Input
-                              placeholder="Buscar departamento..."
-                              value={departmentSearchTerm}
-                              onChange={(e) => setDepartmentSearchTerm(e.target.value)}
-                              className="h-8"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </div>
-                          {departments
-                            .filter(dept => dept.name.toLowerCase().includes(departmentSearchTerm.toLowerCase()))
-                            .map(dept => (
-                              <SelectItem key={dept.id} value={dept.name}>
-                                {dept.name}
-                              </SelectItem>
-                            ))}
+                          <div className="p-2 border-b"><Input placeholder="Buscar..." value={departmentSearchTerm} onChange={(e) => setDepartmentSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} /></div>
+                          {departments.filter(d => d.name.toLowerCase().includes(departmentSearchTerm.toLowerCase())).map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
-
                   <div>
                     <Label>Sede</Label>
-                    <Select value={formData.work_location} onValueChange={(val) => setFormData({ ...formData, work_location: val })}>
+                    <Select value={formData.work_location} onValueChange={(v) => setFormData({ ...formData, work_location: v })}>
                       <SelectTrigger><SelectValue placeholder="Seleccionar sede" /></SelectTrigger>
                       <SelectContent>
-                        <div className="p-2 border-b">
-                          <Input
-                            placeholder="Buscar sede..."
-                            value={siteSearchTerm}
-                            onChange={(e) => setSiteSearchTerm(e.target.value)}
-                            className="h-8"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                        {sites
-                          .filter(site => site.name.toLowerCase().includes(siteSearchTerm.toLowerCase()))
-                          .map(site => (
-                            <SelectItem key={site.id} value={site.name}>
-                              {site.name}
-                            </SelectItem>
-                          ))}
+                        <div className="p-2 border-b"><Input placeholder="Buscar..." value={siteSearchTerm} onChange={(e) => setSiteSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} /></div>
+                        {sites.filter(s => s.name.toLowerCase().includes(siteSearchTerm.toLowerCase())).map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <Label>Remuneración Mensual (S/) *</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={formData.salary}
-                        onChange={(e) => setFormData({...formData, salary: parseFloat(e.target.value)})}
-                      />
-                    </div>
-                    <div>
-                      <Label>Horas Semanales</Label>
-                      <Input
-                        type="number"
-                        value={formData.weekly_hours}
-                        onChange={(e) => setFormData({...formData, weekly_hours: parseInt(e.target.value)})}
-                      />
-                    </div>
-                    <div>
-                      <Label>Periodo de Prueba (días)</Label>
-                      <Input
-                        type="number"
-                        value={formData.trial_period_days}
-                        onChange={(e) => setFormData({...formData, trial_period_days: parseInt(e.target.value)})}
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div><Label>Remuneración (S/) *</Label><Input type="number" step="0.01" value={formData.salary} onChange={(e) => setFormData({ ...formData, salary: e.target.value })} /></div>
+                    <div><Label>Horas Semanales</Label><Input type="number" value={formData.weekly_hours} onChange={(e) => setFormData({ ...formData, weekly_hours: parseInt(e.target.value) })} /></div>
+                    <div><Label>Período de Prueba (días)</Label><Input type="number" value={formData.trial_period_days} onChange={(e) => setFormData({ ...formData, trial_period_days: parseInt(e.target.value) })} /></div>
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <Label>Costo de Actividad (S/)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={formData.activity_cost}
-                        onChange={(e) => setFormData({...formData, activity_cost: parseFloat(e.target.value) || 0})}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <Label>Costo de Alimento (S/)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={formData.food_cost}
-                        onChange={(e) => setFormData({...formData, food_cost: parseFloat(e.target.value) || 0})}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <Label>Costo de Movilidad (S/)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={formData.transport_cost}
-                        onChange={(e) => setFormData({...formData, transport_cost: parseFloat(e.target.value) || 0})}
-                        placeholder="0.00"
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div><Label>Costo Actividad (S/)</Label><Input type="number" step="0.01" value={formData.activity_cost} onChange={(e) => setFormData({ ...formData, activity_cost: e.target.value })} placeholder="0.00" /></div>
+                    <div><Label>Costo Alimento (S/)</Label><Input type="number" step="0.01" value={formData.food_cost} onChange={(e) => setFormData({ ...formData, food_cost: e.target.value })} placeholder="0.00" /></div>
+                    <div><Label>Costo Movilidad (S/)</Label><Input type="number" step="0.01" value={formData.transport_cost} onChange={(e) => setFormData({ ...formData, transport_cost: e.target.value })} placeholder="0.00" /></div>
                   </div>
-
-                  <div>
-                    <Label>Horario de Trabajo</Label>
-                    <Input
-                      value={formData.work_schedule}
-                      onChange={(e) => setFormData({...formData, work_schedule: e.target.value})}
-                      placeholder="Ej: Lunes a Viernes de 9:00 AM a 6:00 PM"
-                    />
-                  </div>
-
+                  <div><Label>Horario de Trabajo</Label><Input value={formData.work_schedule} onChange={(e) => setFormData({ ...formData, work_schedule: e.target.value })} placeholder="Ej: Lunes a Viernes de 9:00 AM a 6:00 PM" /></div>
                   {formData.contract_type !== "Indeterminado" && (
                     <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="renewable"
-                        checked={formData.renewable}
-                        onChange={(e) => setFormData({...formData, renewable: e.target.checked})}
-                        className="w-4 h-4 rounded"
-                      />
+                      <input type="checkbox" id="renewable" checked={formData.renewable} onChange={(e) => setFormData({ ...formData, renewable: e.target.checked })} className="w-4 h-4 rounded" />
                       <label htmlFor="renewable" className="text-sm">Contrato Renovable</label>
                     </div>
                   )}
                 </TabsContent>
 
                 <TabsContent value="details" className="space-y-4">
-                  <div>
-                    <Label>Funciones y Responsabilidades</Label>
-                    <Textarea
-                      value={formData.functions}
-                      onChange={(e) => setFormData({...formData, functions: e.target.value})}
-                      rows={4}
-                      placeholder="Describe las funciones principales del cargo..."
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Beneficios Adicionales</Label>
-                    <Textarea
-                      value={formData.benefits}
-                      onChange={(e) => setFormData({...formData, benefits: e.target.value})}
-                      rows={3}
-                      placeholder="Ej: Seguro médico privado, bono por desempeño..."
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Notas</Label>
-                    <Textarea
-                      value={formData.notes}
-                      onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                      rows={3}
-                      placeholder="Observaciones adicionales..."
-                    />
-                  </div>
+                  <div><Label>Funciones y Responsabilidades</Label><Textarea value={formData.functions} onChange={(e) => setFormData({ ...formData, functions: e.target.value })} rows={4} placeholder="Describe las funciones del cargo..." /></div>
+                  <div><Label>Beneficios Adicionales</Label><Textarea value={formData.benefits} onChange={(e) => setFormData({ ...formData, benefits: e.target.value })} rows={3} placeholder="Seguro médico, bono..." /></div>
+                  <div><Label>Notas</Label><Textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={3} placeholder="Observaciones adicionales..." /></div>
                 </TabsContent>
               </Tabs>
 
               <div className="flex gap-3 mt-6 pt-6 border-t">
-                <Button variant="outline" className="flex-1" onClick={resetForm}>
-                  Cancelar
-                </Button>
-                <Button
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700"
-                  onClick={handleSubmit}
-                  disabled={createContractMutation.isPending || updateContractMutation.isPending}
-                >
+                <Button variant="outline" className="flex-1" onClick={resetForm}>Cancelar</Button>
+                <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleSubmit} disabled={createContractMutation.isPending || updateContractMutation.isPending}>
                   {editingContract ? "Actualizar" : "Crear"} Contrato
                 </Button>
               </div>
@@ -961,74 +810,98 @@ export default function ContractManagement() {
           >
             <CardHeader className="border-b bg-amber-50">
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-amber-100 rounded-lg">
-                  <AlertCircle className="w-6 h-6 text-amber-600" />
-                </div>
+                <div className="p-2 bg-amber-100 rounded-lg"><AlertCircle className="w-6 h-6 text-amber-600" /></div>
                 <div>
-                  <CardTitle className="text-xl font-bold text-slate-900">
-                    Contrato Vigente Detectado
-                  </CardTitle>
-                  <p className="text-sm text-slate-600 mt-1">
-                    Este empleado ya tiene un contrato vigente
-                  </p>
+                  <CardTitle className="text-xl font-bold">Contrato Vigente Detectado</CardTitle>
+                  <p className="text-sm text-slate-600 mt-1">Este empleado ya tiene un contrato vigente</p>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="p-6">
               <div className="mb-6 p-4 bg-slate-50 rounded-lg">
                 <p className="text-sm text-slate-600 mb-2">Contrato actual:</p>
-                <div className="space-y-1">
-                  <p className="font-semibold text-slate-900">
-                    {conflictingContract.position} - {conflictingContract.contract_type}
-                  </p>
-                  <p className="text-sm text-slate-600">
-                    Inicio: {format(new Date(conflictingContract.start_date), "dd/MM/yyyy")}
-                  </p>
-                  <p className="text-sm text-slate-600">
-                    Remuneración: S/ {conflictingContract.salary.toFixed(2)}
+                <p className="font-semibold">{conflictingContract.position} - {conflictingContract.contract_type}</p>
+                <p className="text-sm text-slate-600">Inicio: {format(new Date(conflictingContract.start_date), "dd/MM/yyyy")}</p>
+                <p className="text-sm text-slate-600">Remuneración: S/ {conflictingContract.salary?.toFixed(2)}</p>
+              </div>
+              <p className="text-sm text-slate-700 mb-4">Para registrar el nuevo contrato, primero cambia el estado del contrato actual:</p>
+              <div className="space-y-3">
+                {[{ label: "Marcar como Vencido", value: "Vencido", cls: "text-red-700 border-red-200 bg-red-50 hover:bg-red-100" },
+                  { label: "Marcar como Rescindido", value: "Rescindido", cls: "text-gray-700 border-gray-200 bg-gray-50 hover:bg-gray-100" },
+                  { label: "Marcar como Renovado", value: "Renovado", cls: "text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100" }].map(({ label, value, cls }) => (
+                  <Button key={value} className={`w-full justify-start ${cls}`} variant="outline" onClick={() => handleResolveConflict(value)}>{label}</Button>
+                ))}
+              </div>
+              <div className="mt-4 pt-4 border-t"><Button variant="outline" className="w-full" onClick={() => setConflictingContract(null)}>Cancelar</Button></div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Confirm Sign Modal */}
+      {confirmSign && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-6" onClick={() => { setConfirmSign(null); setSignatureImageUrl(""); }}>
+          <Card className="max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <CardHeader className="border-b bg-blue-50">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg"><PenLine className="w-6 h-6 text-blue-600" /></div>
+                <div>
+                  <CardTitle className="text-xl font-bold">Confirmar Firma Digital</CardTitle>
+                  <p className="text-sm text-slate-600 mt-1">
+                    {confirmSign.mode === 'single'
+                      ? `Contrato ${confirmSign.contract?.contract_number}`
+                      : `${selectedForBulkSign.size} contrato(s) seleccionado(s)`}
                   </p>
                 </div>
               </div>
-
-              <p className="text-sm text-slate-700 mb-4">
-                Para registrar el nuevo contrato, primero debes cambiar el estado del contrato actual.
-                Selecciona el nuevo estado:
-              </p>
-
-              <div className="space-y-3">
-                <Button
-                  className="w-full justify-start bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
-                  variant="outline"
-                  onClick={() => handleResolveConflict("Vencido")}
-                >
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Marcar como Vencido
-                </Button>
-                <Button
-                  className="w-full justify-start bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
-                  variant="outline"
-                  onClick={() => handleResolveConflict("Rescindido")}
-                >
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Marcar como Rescindido
-                </Button>
-                <Button
-                  className="w-full justify-start bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
-                  variant="outline"
-                  onClick={() => handleResolveConflict("Renovado")}
-                >
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Marcar como Renovado
-                </Button>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-900 font-medium mb-1">Firmante:</p>
+                <p className="text-sm text-blue-800">{employee ? `${employee.first_name} ${employee.last_name}` : ""}</p>
+                <p className="text-xs text-blue-700">{currentUser?.email}</p>
+                <p className="text-xs text-blue-600 mt-1">Fecha y hora: {format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
               </div>
 
-              <div className="mt-6 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setConflictingContract(null)}
-                >
-                  Cancelar
+              {/* Firma / Rúbrica */}
+              <div>
+                <Label className="text-sm font-medium text-slate-700 mb-2 block">
+                  Imagen de firma / rúbrica <span className="text-slate-400 font-normal">(opcional)</span>
+                </Label>
+                {signatureImageUrl ? (
+                  <div className="border border-slate-200 rounded-lg p-3 bg-white flex items-center gap-3">
+                    <img src={signatureImageUrl} alt="Firma" className="h-16 object-contain" />
+                    <Button size="sm" variant="outline" className="text-red-600 ml-auto" onClick={() => setSignatureImageUrl("")}>
+                      Quitar
+                    </Button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-lg p-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                    {uploadingSignature ? (
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        Subiendo...
+                      </div>
+                    ) : (
+                      <>
+                        <PenLine className="w-6 h-6 text-slate-400 mb-1" />
+                        <span className="text-sm text-slate-600 font-medium">Subir imagen de firma</span>
+                        <span className="text-xs text-slate-400 mt-0.5">PNG, JPG — fondo blanco recomendado</span>
+                      </>
+                    )}
+                    <input type="file" accept="image/*" className="hidden" onChange={handleSignatureImageUpload} disabled={uploadingSignature} />
+                  </label>
+                )}
+              </div>
+
+              <p className="text-sm text-slate-700">
+                Al confirmar, se registrará la firma digital de forma permanente en {confirmSign.mode === 'single' ? 'este contrato' : 'todos los contratos seleccionados'}.
+                Esta acción no puede deshacerse.
+              </p>
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => { setConfirmSign(null); setSignatureImageUrl(""); }}>Cancelar</Button>
+                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleConfirmSign} disabled={isBulkSigning || signContractMutation.isPending || uploadingSignature}>
+                  {isBulkSigning ? "Firmando..." : <><PenLine className="w-4 h-4 mr-2" /> Confirmar Firma</>}
                 </Button>
               </div>
             </CardContent>

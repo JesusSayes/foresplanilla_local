@@ -48,6 +48,7 @@ const PERMISSION_GROUPS = {
     { key: "contracts.create", label: "Crear contratos" },
     { key: "contracts.edit", label: "Editar contratos" },
     { key: "contracts.delete", label: "Eliminar contratos" },
+    { key: "contracts.sign", label: "Firmar contratos digitalmente" },
   ],
   "Certificados": [
     { key: "certificates.view_own", label: "Ver propios certificados" },
