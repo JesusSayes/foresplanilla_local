@@ -911,7 +911,7 @@ export default function EmployeeManagement() {
                         <div className="flex items-center gap-4 flex-1">
                           {emp.photo_url ? (
                             <img
-                              src={emp.photo_url}
+                              src={`${import.meta.env.VITE_API_URL}${emp.photo_url}`}
                               alt={`${emp.first_name} ${emp.last_name}`}
                               className="w-14 h-14 rounded-full object-cover border-2 border-indigo-200"
                             />
