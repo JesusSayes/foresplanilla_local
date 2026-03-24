@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { generate24HexId } from '../utils/idGenerator.js';
 
 const router = express.Router();
 
@@ -72,8 +73,28 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const data = req.body;
-    const fields = Object.keys(data);
-    const values = Object.values(data);
+    const contractToInsert = {
+      id: generate24HexId(),
+
+      ...data,
+
+      end_date: data.end_date || null,
+      start_date: data.start_date || null,
+      signed_date: data.signed_date || null,
+
+      activity_cost: data.activity_cost ?? 0,
+      food_cost: data.food_cost ?? 0,
+      transport_cost: data.transport_cost ?? 0,
+
+      renewable: data.renewable ?? false,
+      is_sample: data.is_sample ?? false,
+      is_digitally_signed: data.is_digitally_signed ?? false,
+
+      created_date: new Date(),
+      updated_date: new Date()
+    };
+    const fields = Object.keys(contractToInsert);
+    const values = Object.values(contractToInsert);
     const placeholders = fields.map((_, index) => `$${index + 1}`).join(', ');
 
     const result = await pool.query(
@@ -93,8 +114,19 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
+    // evitar que el id sea actualizado
+    delete updates.id;
+
+    // agregar fecha de actualización
+    updates.updated_date = new Date();
+
     const fields = Object.keys(updates);
     const values = Object.values(updates);
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
     const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
 
     const result = await pool.query(

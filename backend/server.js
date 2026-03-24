@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import path from 'path';
 import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -50,6 +51,8 @@ import holidaysRoutes from './routes/holidays.js';
 import attendanceIncidentsRoutes from './routes/attendance/incidents.js';
 import mailerRoutes from './routes/mailer.js';
 import { syncBiotimeAttendance } from './controllers/sync/biotimeSyncController.js';
+import uploadRoutes from "./routes/uploadRoutes.js";
+import derechohabientesRoutes from './routes/derechohabientes.js';
 
 dotenv.config();
 
@@ -137,6 +140,9 @@ app.use('/api/holidays', holidaysRoutes);
 app.use('/api/attendance/incidents', attendanceIncidentsRoutes);
 app.use('/api/master-data', masterDataRoutes);
 app.use('/api/mailer', mailerRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/uploads", express.static(path.join(process.cwd(), 'uploads')));
+app.use('/api/derechohabientes', derechohabientesRoutes);
 
 // Cron: sincronización biotime cada hora
 cron.schedule('0 * * * *', () => {
@@ -177,3 +183,7 @@ app.listen(PORT, () => {
   console.log(`Logs: ${logsDir}`);
   console.log('[Cron] Sync biotime programado cada hora (0 * * * *)');
 });
+app.use("/uploads", (req, res, next) => {
+  console.log('Static request:', req.path, 'from', process.cwd());
+  next();
+}, express.static(path.join(process.cwd(), 'uploads')));

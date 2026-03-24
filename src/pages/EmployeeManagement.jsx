@@ -118,7 +118,7 @@ export default function EmployeeManagement() {
     queryKey: ["derechohabientes", editingEmployee?.id],
     queryFn: async () => {
       if (!editingEmployee?.id) return [];
-      return await base44.entities.Derechohabiente.filter({ employee_id: editingEmployee.id });
+      return await entitiesAPI.Derechohabiente.filter({ employee_id: editingEmployee.id });
     },
     enabled: !!editingEmployee?.id,
   });
@@ -145,7 +145,7 @@ export default function EmployeeManagement() {
   const { data: companyInfo } = useQuery({
     queryKey: ["companyInfo"],
     queryFn: async () => {
-      const companies = await base44.entities.CompanyInfo.list("-created_date", 1);
+      const companies = await entitiesAPI.CompanyInfo.list("-created_date", 1);
       return companies[0] || null;
     },
   });
@@ -425,7 +425,7 @@ export default function EmployeeManagement() {
 
   const createDerechohabienteMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.Derechohabiente.create(data);
+      return await entitiesAPI.Derechohabiente.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["derechohabientes"]);
@@ -441,7 +441,7 @@ export default function EmployeeManagement() {
 
   const updateDerechohabienteMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      return await base44.entities.Derechohabiente.update(id, data);
+      return await entitiesAPI.Derechohabiente.update(id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["derechohabientes"]);
@@ -458,7 +458,7 @@ export default function EmployeeManagement() {
 
   const deleteDerechohabienteMutation = useMutation({
     mutationFn: async (id) => {
-      return await base44.entities.Derechohabiente.delete(id);
+      return await entitiesAPI.Derechohabiente.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["derechohabientes"]);
@@ -911,7 +911,7 @@ export default function EmployeeManagement() {
                         <div className="flex items-center gap-4 flex-1">
                           {emp.photo_url ? (
                             <img
-                              src={emp.photo_url}
+                              src={`${import.meta.env.VITE_API_URL}${emp.photo_url}`}
                               alt={`${emp.first_name} ${emp.last_name}`}
                               className="w-14 h-14 rounded-full object-cover border-2 border-indigo-200"
                             />
@@ -1091,7 +1091,7 @@ export default function EmployeeManagement() {
                 <div className="flex items-center gap-4">
                   {selectedEmployee.photo_url ? (
                     <img
-                      src={selectedEmployee.photo_url}
+                      src={`${import.meta.env.VITE_API_URL}${selectedEmployee.photo_url}`}
                       alt={`${selectedEmployee.first_name} ${selectedEmployee.last_name}`}
                       className="w-16 h-16 rounded-full object-cover border-2 border-indigo-200"
                     />

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
+import { uploadFile } from "@/services/uploadService";
 
 // Conceptos predefinidos según legislación peruana
 const PREDEFINED_CONCEPTS = {
@@ -504,7 +505,8 @@ export default function PayrollConcepts() {
 
     setProcessingFile(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      // const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await uploadFile(file);
 
       const extractedData = await base44.integrations.Core.ExtractDataFromUploadedFile({
         file_url,

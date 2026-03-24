@@ -19,21 +19,15 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
       const templates = await entitiesAPI.ContractTemplate.list();
 
       if (templates && templates.length > 0) {
-        // Si el contrato tiene una plantilla específica, usarla
         if (contract.template_id) {
           template = templates.find(t => t.id === contract.template_id);
         }
-        // Si no, buscar una plantilla específica para el tipo de contrato
         if (!template) {
-          template = templates.find(t =>
-            t.contract_types?.includes(contract.contract_type) && t.is_active
-          );
+          template = templates.find(t => t.contract_types?.includes(contract.contract_type) && t.is_active);
         }
-        // Si no, usar la plantilla por defecto
         if (!template) {
           template = templates.find(t => t.is_default && t.is_active);
         }
-        // Si no hay ninguna, usar la primera disponible
         if (!template) {
           template = templates[0];
         }
@@ -54,7 +48,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     }
   }
 
-  // IMPORTANTE: Cargar datos ACTUALES de la empresa desde CompanyInfo SIEMPRE
+  // Cargar datos ACTUALES de la empresa desde CompanyInfo SIEMPRE
   let freshCompanyData = {};
   try {
     const companyInfoList = await entitiesAPI.CompanyInfo.list("-created_date");
@@ -74,12 +68,10 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     throw new Error("No se pudo cargar la información de la empresa. Por favor, configure los datos de la empresa en Configuración de Empresa.");
   }
 
-  // Validar que exista información de empresa
   if (!freshCompanyData.name || !freshCompanyData.ruc) {
     throw new Error("No se encontró información de empresa registrada. Por favor, configure los datos en Configuración de Empresa.");
   }
 
-  // Datos de la empresa (solo desde CompanyInfo)
   const company = {
     name: freshCompanyData.name,
     ruc: freshCompanyData.ruc,
@@ -108,11 +100,20 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     "{trial_period_days}": (contract.trial_period_days || 90).toString(),
     "{functions}": contract.functions || "",
     "{benefits}": contract.benefits || "",
+    "{benefits_additional}": contract.benefits || "",
+    "{notes}": contract.notes || "",
+    "{activity_cost}": (contract.activity_cost || 0).toFixed(2),
+    "{food_cost}": (contract.food_cost || 0).toFixed(2),
+    "{transport_cost}": (contract.transport_cost || 0).toFixed(2),
     "{renewable_clause}": contract.renewable ? ", siendo renovable según las necesidades de la empresa" : "",
     "{signed_date}": format(new Date(contract.signed_date || contract.start_date), "dd 'de' MMMM 'de' yyyy", { locale: es }),
+    "{company_name}": company.name || "",
+    "{company_ruc}": company.ruc || "",
+    "{company_address}": company.address || "",
+    "{company_representative}": company.representative || "",
+    "{company_representative_doc}": company.representativeDoc || "",
   };
 
-  // Función para reemplazar variables en texto
   const replaceVariables = (text) => {
     if (!text) return "";
     let result = text;
@@ -122,7 +123,6 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     return result;
   };
 
-  // Función auxiliar para agregar texto con salto de página automático
   const addText = (text, fontSize = 10, isBold = false) => {
     doc.setFontSize(fontSize);
     doc.setFont(undefined, isBold ? 'bold' : 'normal');
@@ -140,176 +140,183 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     y += 2;
   };
 
-  // Título
-  doc.setFontSize(16);
+  // ── TÍTULO ──
+  doc.setFontSize(14);
   doc.setFont(undefined, 'bold');
-  doc.text("CONTRATO DE TRABAJO", pageWidth / 2, y, { align: "center" });
-  y += 10;
+  const contractTitle = replaceVariables(template?.contract_title || "CONTRATO DE TRABAJO");
+  const titleLines = contractTitle.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  titleLines.forEach(line => {
+    doc.text(line.toUpperCase(), pageWidth / 2, y, { align: "center" });
+    y += 7;
+  });
 
   doc.setFontSize(12);
-  doc.text(`${contract.contract_type.toUpperCase()}`, pageWidth / 2, y, { align: "center" });
+  const contractSubtitle = replaceVariables(template?.contract_subtitle || "{contract_type}");
+  doc.text(contractSubtitle.toUpperCase(), pageWidth / 2, y, { align: "center" });
   y += 8;
 
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
   doc.text(`Contrato N° ${contract.contract_number || "S/N"}`, pageWidth / 2, y, { align: "center" });
-  y += 3;
+  y += 4;
   doc.text(`Fecha de Firma: ${format(new Date(contract.signed_date || contract.start_date), "dd/MM/yyyy")}`, pageWidth / 2, y, { align: "center" });
   y += 10;
 
-  // Conste por el presente documento
+  // ── TEXTO INTRODUCTORIO ──
   const introText = template?.introduction_text ||
     `Conste por el presente documento el Contrato de Trabajo ${contract.contract_type}, que celebran al amparo del Texto Único Ordenado del Decreto Legislativo N° 728, Ley de Productividad y Competitividad Laboral, aprobado por Decreto Supremo N° 003-97-TR, y normas complementarias:`;
   addText(replaceVariables(introText), 10);
   y += 3;
 
-  // Datos del empleador
-  addText("I. DATOS DEL EMPLEADOR:", 11, true);
-  addText(`Empresa: ${company.name}`);
-  addText(`RUC: ${company.ruc}`);
-  addText(`Domicilio: ${company.address}`);
-  addText(`Representante Legal: ${company.representative}`);
-  addText(`${company.representativeDoc}`);
+  // ── SECCIÓN EMPLEADOR (configurable) ──
+  const employerTitle = template?.employer_section_title || "I. DATOS DEL EMPLEADOR:";
+  addText(replaceVariables(employerTitle), 11, true);
+  const employerText = template?.employer_section_text ||
+    "Empresa: {company_name}\nRUC: {company_ruc}\nDomicilio: {company_address}\nRepresentante Legal: {company_representative}\nDocumento: {company_representative_doc}";
+  addText(replaceVariables(employerText));
   y += 3;
 
-  // Datos del trabajador
-  addText("II. DATOS DEL TRABAJADOR:", 11, true);
-  addText(`Nombres y Apellidos: ${employee.first_name} ${employee.last_name}`);
-  addText(`${employee.document_type}: ${employee.document_number}`);
-  addText(`Domicilio: ${employee.address || "No especificado"}, ${employee.district || ""}, ${employee.province || ""}`);
+  // ── SECCIÓN TRABAJADOR (configurable) ──
+  const workerTitle = template?.worker_section_title || "II. DATOS DEL TRABAJADOR:";
+  addText(replaceVariables(workerTitle), 11, true);
+  const workerText = template?.worker_section_text ||
+    "Nombres y Apellidos: {employee_name}\n{employee_doc_type}: {employee_doc_number}\nDomicilio: {employee_address}";
+  addText(replaceVariables(workerText));
   y += 3;
 
-  // Condiciones del contrato
-  addText("III. OBJETO DEL CONTRATO:", 11, true);
-  const objectText = template?.contract_object_text ||
-    `Por el presente contrato, EL TRABAJADOR se obliga a prestar sus servicios personales a EL EMPLEADOR, desempeñando el cargo de ${contract.position} en el área de ${contract.department || employee.department_name}, bajo subordinación y dependencia de EL EMPLEADOR.`;
-  addText(replaceVariables(objectText));
+  // ── OBJETO DEL CONTRATO ──
+  addText(replaceVariables(template?.section_object_title || "III. OBJETO DEL CONTRATO:"), 11, true);
+  addText(replaceVariables(template?.contract_object_text ||
+    "Por el presente contrato, EL TRABAJADOR se obliga a prestar sus servicios personales a EL EMPLEADOR, desempeñando el cargo de {position} en el área de {department}, bajo subordinación y dependencia de EL EMPLEADOR."));
   y += 3;
 
-  // Funciones
-  if (contract.functions) {
-    addText("IV. FUNCIONES Y RESPONSABILIDADES:", 11, true);
-    const functionsIntro = template?.functions_intro_text || "";
-    if (functionsIntro) addText(replaceVariables(functionsIntro));
-    addText(contract.functions);
+  // ── FUNCIONES Y RESPONSABILIDADES ──
+  addText(replaceVariables(template?.section_functions_title || "IV. FUNCIONES Y RESPONSABILIDADES:"), 11, true);
+  const functionsIntro = template?.functions_intro_text || "El trabajador desempeñará las siguientes funciones y responsabilidades:";
+  if (functionsIntro) addText(replaceVariables(functionsIntro));
+  if (contract.functions) addText(replaceVariables(contract.functions));
+  y += 3;
+
+  // ── VIGENCIA ──
+  addText(replaceVariables(template?.section_duration_title || "V. VIGENCIA DEL CONTRATO:"), 11, true);
+  if (contract.contract_type === "Indeterminado") {
+    addText(replaceVariables(template?.duration_indeterminate_text ||
+      "El presente contrato tiene carácter de INDETERMINADO, iniciando su vigencia el {start_date}."));
+  } else {
+    addText(replaceVariables(template?.duration_fixed_text ||
+      "El presente contrato tendrá una duración determinada, iniciando el {start_date} y finalizando el {end_date}{renewable_clause}."));
+  }
+  if (contract.trial_period_days > 0) {
+    addText(replaceVariables(template?.trial_period_text ||
+      "El contrato está sujeto a un período de prueba de {trial_period_days} días calendario, durante el cual cualquiera de las partes puede darlo por terminado sin expresión de causa."));
+  }
+  y += 3;
+
+  // ── REMUNERACIÓN ──
+  addText(replaceVariables(template?.section_salary_title || "VI. REMUNERACIÓN:"), 11, true);
+  addText(replaceVariables(template?.salary_text ||
+    "EL EMPLEADOR pagará a EL TRABAJADOR una remuneración mensual de S/ {salary} ({salary_words} SOLES), pagadera mensualmente, sujeta a los descuentos de ley."));
+  if (contract.activity_cost > 0) addText(`Costo de Actividad: S/ ${(contract.activity_cost || 0).toFixed(2)}`);
+  if (contract.food_cost > 0) addText(`Costo de Alimento: S/ ${(contract.food_cost || 0).toFixed(2)}`);
+  if (contract.transport_cost > 0) addText(`Costo de Movilidad: S/ ${(contract.transport_cost || 0).toFixed(2)}`);
+  if (contract.benefits) addText(`Beneficios adicionales: ${contract.benefits}`);
+  y += 3;
+
+  // ── JORNADA Y HORARIO ──
+  addText(replaceVariables(template?.section_schedule_title || "VII. JORNADA Y HORARIO DE TRABAJO:"), 11, true);
+  addText(replaceVariables(template?.schedule_text ||
+    "La jornada laboral será de {weekly_hours} horas semanales, distribuidas de la siguiente manera: {work_schedule}."));
+  addText(replaceVariables(template?.work_location_text ||
+    "EL TRABAJADOR prestará sus servicios en: {work_location}."));
+  y += 3;
+
+  // ── OBLIGACIONES ──
+  addText(replaceVariables(template?.section_obligations_title || "VIII. OBLIGACIONES DEL TRABAJADOR:"), 11, true);
+  addText(replaceVariables(template?.obligations_text ||
+    `1. Cumplir con el horario de trabajo establecido y registrar su asistencia.\n2. Desempeñar sus funciones con diligencia, eficiencia y lealtad.\n3. Cumplir con el Reglamento Interno de Trabajo y las políticas de la empresa.\n4. Guardar confidencialidad sobre la información de la empresa.\n5. Cuidar los bienes y recursos de la empresa.`));
+  y += 3;
+
+  // ── BENEFICIOS SOCIALES ──
+  addText(replaceVariables(template?.section_benefits_title || "IX. BENEFICIOS SOCIALES:"), 11, true);
+  addText(replaceVariables(template?.benefits_text ||
+    `EL TRABAJADOR tiene derecho a los siguientes beneficios de acuerdo a la legislación laboral peruana:\n- Gratificaciones legales (Fiestas Patrias y Navidad)\n- Compensación por Tiempo de Servicios (CTS)\n- Vacaciones (30 días calendario por año de servicios)\n- Asignación familiar (si corresponde)\n- Seguro social de salud (EsSalud)`));
+  y += 3;
+
+  // ── TÉRMINO DEL CONTRATO ──
+  addText(replaceVariables(template?.section_termination_title || "X. TÉRMINO DEL CONTRATO:"), 11, true);
+  addText(replaceVariables(template?.termination_text ||
+    "El presente contrato podrá darse por terminado por las causas previstas en la legislación laboral vigente, especialmente las establecidas en el Decreto Supremo N° 003-97-TR."));
+  y += 3;
+
+  // ── DOMICILIO ──
+  addText(replaceVariables(template?.section_domicile_title || "XI. DOMICILIO:"), 11, true);
+  addText(replaceVariables(template?.domicile_text ||
+    "Para efectos del presente contrato, las partes señalan como sus domicilios los indicados en la introducción del presente documento."));
+  y += 3;
+
+  // ── NOTAS (si existen) ──
+  if (contract.notes) {
+    addText("NOTAS:", 11, true);
+    addText(replaceVariables(contract.notes));
     y += 3;
   }
 
-  // Vigencia
-  addText("V. VIGENCIA DEL CONTRATO:", 11, true);
-
-  if (contract.contract_type === "Indeterminado") {
-    const durationText = template?.duration_indeterminate_text ||
-      `El presente contrato tiene carácter de INDETERMINADO, iniciando su vigencia el {start_date}.`;
-    addText(replaceVariables(durationText));
-  } else {
-    const durationText = template?.duration_fixed_text ||
-      `El presente contrato tendrá una duración determinada, iniciando el {start_date} y finalizando el {end_date}{renewable_clause}.`;
-    addText(replaceVariables(durationText));
-  }
-
-  if (contract.trial_period_days > 0) {
-    const trialText = template?.trial_period_text ||
-      `El contrato está sujeto a un período de prueba de {trial_period_days} días calendario, durante el cual cualquiera de las partes puede darlo por terminado sin expresión de causa.`;
-    addText(replaceVariables(trialText));
-  }
-  y += 3;
-
-  // Remuneración
-  addText("VI. REMUNERACIÓN:", 11, true);
-  const salaryText = template?.salary_text ||
-    `EL EMPLEADOR pagará a EL TRABAJADOR una remuneración mensual de S/ {salary} ({salary_words} SOLES), pagadera mensualmente, sujeta a los descuentos de ley.`;
-  addText(replaceVariables(salaryText));
-
-  if (contract.benefits) {
-    addText(`Beneficios adicionales: ${contract.benefits}`);
-  }
-  y += 3;
-
-  // Jornada y horario
-  addText("VII. JORNADA Y HORARIO DE TRABAJO:", 11, true);
-  const scheduleText = template?.schedule_text ||
-    `La jornada laboral será de {weekly_hours} horas semanales, distribuidas de la siguiente manera: {work_schedule}.`;
-  addText(replaceVariables(scheduleText));
-
-  const locationText = template?.work_location_text ||
-    `EL TRABAJADOR prestará sus servicios en: {work_location}.`;
-  addText(replaceVariables(locationText));
-  y += 3;
-
-  // Obligaciones
-  addText("VIII. OBLIGACIONES DEL TRABAJADOR:", 11, true);
-  const obligationsText = template?.obligations_text ||
-    `1. Cumplir con el horario de trabajo establecido y registrar su asistencia.
-2. Desempeñar sus funciones con diligencia, eficiencia y lealtad.
-3. Cumplir con el Reglamento Interno de Trabajo y las políticas de la empresa.
-4. Guardar confidencialidad sobre la información de la empresa.
-5. Cuidar los bienes y recursos de la empresa.`;
-  addText(replaceVariables(obligationsText));
-  y += 3;
-
-  // Beneficios sociales
-  addText("IX. BENEFICIOS SOCIALES:", 11, true);
-  const benefitsText = template?.benefits_text ||
-    `EL TRABAJADOR tiene derecho a los siguientes beneficios de acuerdo a la legislación laboral peruana:
-- Gratificaciones legales (Fiestas Patrias y Navidad)
-- Compensación por Tiempo de Servicios (CTS)
-- Vacaciones (30 días calendario por año de servicios)
-- Asignación familiar (si corresponde)
-- Seguro social de salud (EsSalud)`;
-  addText(replaceVariables(benefitsText));
-  y += 3;
-
-  // Término del contrato
-  addText("X. TÉRMINO DEL CONTRATO:", 11, true);
-  const terminationText = template?.termination_text ||
-    "El presente contrato podrá darse por terminado por las causas previstas en la legislación laboral vigente, especialmente las establecidas en el Decreto Supremo N° 003-97-TR.";
-  addText(replaceVariables(terminationText));
-  y += 3;
-
-  // Cláusulas Personalizadas
+  // ── CLÁUSULAS PERSONALIZADAS ──
   if (customClauses.length > 0) {
-    let clauseNumber = 11;
-    const clauseNumberMap = {
-      "general": "GENERAL",
-      "derechos": "DERECHOS",
-      "obligaciones": "OBLIGACIONES",
-      "confidencialidad": "CONFIDENCIALIDAD",
-      "terminacion": "TERMINACIÓN",
-      "otros": "OTROS"
-    };
-
+    const romanNumerals = ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX"];
+    let clauseNumber = 12;
     for (const clause of customClauses) {
-      const romanNumerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
-      const numeral = clauseNumber < romanNumerals.length ? romanNumerals[clauseNumber - 1] : `${clauseNumber}`;
-
+      const numeral = clauseNumber <= romanNumerals.length ? romanNumerals[clauseNumber - 1] : `${clauseNumber}`;
       addText(`${numeral}. ${clause.title.toUpperCase()}:`, 11, true);
       addText(replaceVariables(clause.content));
       y += 3;
-
       clauseNumber++;
     }
   }
 
-  // Domicilio
-  addText("XI. DOMICILIO:", 11, true);
-  const domicileText = template?.domicile_text ||
-    "Para efectos del presente contrato, las partes señalan como sus domicilios los indicados en la introducción del presente documento.";
-  addText(replaceVariables(domicileText));
-  y += 10;
+  y += 7;
 
-  // Firma
-  const signatureY = y > pageHeight - 60 ? (doc.addPage(), 40) : y;
+  // ── FIRMA ──
+  if (y > pageHeight - 60) {
+    doc.addPage();
+    y = 40;
+  }
 
   doc.setFontSize(10);
+  doc.setFont(undefined, 'normal');
   doc.text(
     `Lima, ${format(new Date(contract.signed_date || contract.start_date), "dd 'de' MMMM 'de' yyyy", { locale: es })}`,
     pageWidth / 2,
-    signatureY,
+    y,
     { align: "center" }
   );
 
-  const sigY = signatureY + 30;
+  const sigY = y + 30;
+
+  // La firma digital del representante legal va al lado del EMPLEADOR (izquierda)
+  if (contract.digital_signature_image_url && contract.is_digitally_signed) {
+    try {
+      await new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const maxW = 40;
+          const maxH = 20;
+          const ratio = Math.min(maxW / img.width, maxH / img.height);
+          const w = img.width * ratio;
+          const h = img.height * ratio;
+          // Centrado sobre la línea del EMPLEADOR (izquierda: x entre 30 y 80, centro = 55)
+          const sigImgX = 55 - w / 2;
+          const sigImgY = sigY - h - 2;
+          doc.addImage(img, 'PNG', sigImgX, sigImgY, w, h);
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = contract.digital_signature_image_url;
+      });
+    } catch (_) { /* continuar sin imagen */ }
+  }
+
   doc.line(30, sigY, 80, sigY);
   doc.line(pageWidth - 80, sigY, pageWidth - 30, sigY);
 
@@ -317,13 +324,21 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   doc.text("EL TRABAJADOR", pageWidth - 55, sigY + 5, { align: "center" });
 
   doc.setFontSize(8);
-  doc.text(company.representative, 55, sigY + 10, { align: "center" });
-  doc.text(company.representativeDoc, 55, sigY + 14, { align: "center" });
+  doc.text(company.representative || "", 55, sigY + 10, { align: "center" });
+  doc.text(company.representativeDoc || "", 55, sigY + 14, { align: "center" });
 
   doc.text(`${employee.first_name} ${employee.last_name}`, pageWidth - 55, sigY + 10, { align: "center" });
   doc.text(`${employee.document_type} ${employee.document_number}`, pageWidth - 55, sigY + 14, { align: "center" });
 
-  // Guardar PDF
+  // Nota de validación de firma digital
+  if (contract.is_digitally_signed && contract.digital_signature_name) {
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 200);
+    const sigNote = `Firmado digitalmente por: ${contract.digital_signature_name} | ${contract.digital_signature_date ? new Date(contract.digital_signature_date).toLocaleString('es-PE') : ''}`;
+    doc.text(sigNote, pageWidth / 2, sigY + 22, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+  }
+
   doc.save(`Contrato_${employee.last_name}_${employee.first_name}_${contract.contract_number || contract.id}.pdf`);
 
   return doc;

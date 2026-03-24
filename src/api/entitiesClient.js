@@ -77,7 +77,7 @@ export const entitiesAPI = {
   LoanType: createEntityAPI('/api/payroll/loan-types'),
   Loan: createEntityAPI('/api/payroll/loans'),
   LoanInstallment: createEntityAPI('/api/payroll/loan-installments'),
-
+  Derechohabiente: createEntityAPI('/api/derechohabientes'),
 };
 
 export default entitiesAPI;
