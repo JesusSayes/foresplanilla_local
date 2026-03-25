@@ -48,6 +48,8 @@ export default function AttendanceManagement() {
   const [existingIncident, setExistingIncident] = useState(null);
   const [incidentSearchTerm, setIncidentSearchTerm] = useState("");
   const [overtimeSearchTerm, setOvertimeSearchTerm] = useState("");
+  const [pageSize, setPageSize] = useState(50);
+  const [currentPage, setCurrentPage] = useState(1);
   const [justificationData, setJustificationData] = useState({
     incident_type: "Olvido de Marcación",
     justification: "",
@@ -675,10 +677,10 @@ export default function AttendanceManagement() {
                     <div className="flex-1 min-w-[180px]">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                        <Input placeholder="Buscar empleado..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+                        <Input placeholder="Buscar empleado..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="pl-10" />
                       </div>
                     </div>
-                    <Select value={selectedSite} onValueChange={setSelectedSite}>
+                    <Select value={selectedSite} onValueChange={(v) => { setSelectedSite(v); setCurrentPage(1); }}>
                       <SelectTrigger className="w-36"><SelectValue placeholder="Sede" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todas</SelectItem>
@@ -688,7 +690,7 @@ export default function AttendanceManagement() {
                           .map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
+                    <Select value={attendanceFilter} onValueChange={(v) => { setAttendanceFilter(v); setCurrentPage(1); }}>
                       <SelectTrigger className="w-44"><SelectValue placeholder="Filtro" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
@@ -745,7 +747,7 @@ export default function AttendanceManagement() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => { setIsRangeMode(!isRangeMode); setDateFrom(null); setDateTo(null); }}
+                      onClick={() => { setIsRangeMode(!isRangeMode); setDateFrom(null); setDateTo(null); setCurrentPage(1); }}
                       className={isRangeMode ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700" : ""}
                     >
                       {isRangeMode ? "Rango activo" : "Por rango"}
@@ -759,8 +761,29 @@ export default function AttendanceManagement() {
                     </Button>
                   </div>
 
+                  {/* Paginación - controles superiores */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-600">Mostrar:</span>
+                      {[50, 100, 200, 400, 1000].map(size => (
+                        <button
+                          key={size}
+                          onClick={() => { setPageSize(size); setCurrentPage(1); }}
+                          className={`px-3 py-1 text-sm rounded-md border transition-colors ${pageSize === size ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-300 hover:border-indigo-400'}`}
+                        >
+                          {size}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-slate-600">
+                      <span>{employeesWithRecords.length} registros · Pág. {currentPage} / {Math.max(1, Math.ceil(employeesWithRecords.length / pageSize))}</span>
+                      <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-slate-50">‹</button>
+                      <button onClick={() => setCurrentPage(p => Math.min(Math.ceil(employeesWithRecords.length / pageSize), p + 1))} disabled={currentPage >= Math.ceil(employeesWithRecords.length / pageSize)} className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-slate-50">›</button>
+                    </div>
+                  </div>
+
                   <div className="space-y-3">
-                    {employeesWithRecords.map((emp, idx) => {
+                    {employeesWithRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((emp, idx) => {
                       const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
                       const vacation = approvedVacations.find(v => v.employee_id === emp.id && v.start_date <= rowDate && v.end_date >= rowDate) || null;
                       const scheduledTimes = vacation ? getScheduledTimes(emp.id) : null;
