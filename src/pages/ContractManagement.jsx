@@ -37,6 +37,8 @@ export default function ContractManagement() {
   const [confirmSign, setConfirmSign] = useState(null); // { mode: 'single'|'bulk', contract?: contract }
   const [isBulkSigning, setIsBulkSigning] = useState(false);
   const [signatureImageUrl, setSignatureImageUrl] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 50;
 
   const queryClient = useQueryClient();
   const { hasPermission, employee, loading: loadingPerms } = usePermissions();
@@ -276,6 +278,9 @@ export default function ContractManagement() {
 
   const pendingSignContracts = contracts.filter(c => !c.is_digitally_signed && c.status === "Vigente");
 
+  // Reset page when filters change
+  const handleFilterChange = (setter) => (val) => { setter(val); setCurrentPage(1); };
+
   const filteredContracts = contracts.filter(c => {
     const emp = allEmployees.find(e => e.id === c.employee_id);
     if (!emp) return false;
@@ -289,6 +294,9 @@ export default function ContractManagement() {
     const matchesSign = signatureFilter === "all" || (signatureFilter === "signed" && c.is_digitally_signed) || (signatureFilter === "pending" && !c.is_digitally_signed);
     return matchesSearch && matchesStatus && matchesSign;
   });
+
+  const totalPages = Math.ceil(filteredContracts.length / PAGE_SIZE);
+  const paginatedContracts = filteredContracts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const stats = {
     total: contracts.length,
@@ -393,9 +401,9 @@ export default function ContractManagement() {
             <div className="flex flex-wrap items-center gap-3 mb-6">
               <div className="flex-1 min-w-56 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <Input placeholder="Buscar por empleado o N° contrato..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+                <Input placeholder="Buscar por empleado o N° contrato..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="pl-9" />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
                 <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los estados</SelectItem>
@@ -405,7 +413,7 @@ export default function ContractManagement() {
                   <SelectItem value="Renovado">Renovado</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={signatureFilter} onValueChange={setSignatureFilter}>
+              <Select value={signatureFilter} onValueChange={(v) => { setSignatureFilter(v); setCurrentPage(1); }}>
                 <SelectTrigger className="w-44"><SelectValue placeholder="Firma digital" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas las firmas</SelectItem>
@@ -426,6 +434,14 @@ export default function ContractManagement() {
                   <Users className="w-4 h-4 mr-1" /> Seleccionar todos pendientes
                 </Button>
               )}
+              {/* Paginación inline */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1 ml-auto">
+                  <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-8 px-2">‹</Button>
+                  <span className="text-sm text-slate-600 px-2">{currentPage} / {totalPages}</span>
+                  <Button size="sm" variant="outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="h-8 px-2">›</Button>
+                </div>
+              )}
             </div>
 
             {isLoading ? (
@@ -437,7 +453,7 @@ export default function ContractManagement() {
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredContracts.map(contract => {
+                {paginatedContracts.map(contract => {
                   const emp = allEmployees.find(e => e.id === contract.employee_id);
                   if (!emp) return null;
                   const StatusIcon = getStatusConfig(contract.status).icon;
