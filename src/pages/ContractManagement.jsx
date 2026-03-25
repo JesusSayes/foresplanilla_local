@@ -237,10 +237,7 @@ export default function ContractManagement() {
   };
 
   const handleSignSingle = (contract) => {
-    // Pre-cargar la firma del representante legal automáticamente
-    if (companyInfo?.legal_representative_signature_url) {
-      setSignatureImageUrl(companyInfo.legal_representative_signature_url);
-    }
+    setSignatureImageUrl(companyInfo?.legal_representative_signature_url || "");
     setConfirmSign({ mode: 'single', contract });
   };
 
@@ -370,9 +367,7 @@ export default function ContractManagement() {
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={() => setSelectedForBulkSign(new Set())}>Deseleccionar</Button>
               <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => {
-                if (companyInfo?.legal_representative_signature_url) {
-                  setSignatureImageUrl(companyInfo.legal_representative_signature_url);
-                }
+                setSignatureImageUrl(companyInfo?.legal_representative_signature_url || "");
                 setConfirmSign({ mode: 'bulk' });
               }}>
                 <PenLine className="w-4 h-4 mr-1" /> Firmar {selectedForBulkSign.size} seleccionados
@@ -771,9 +766,9 @@ export default function ContractManagement() {
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-900 font-medium mb-1">Firmante:</p>
-                <p className="text-sm text-blue-800">{employee ? `${employee.first_name} ${employee.last_name}` : ""}</p>
-                <p className="text-xs text-blue-700">{currentUser?.email}</p>
+                <p className="text-sm text-blue-900 font-medium mb-1">Representante Legal (Firmante):</p>
+                <p className="text-sm text-blue-800">{companyInfo?.legal_representative || "No configurado"}</p>
+                <p className="text-xs text-blue-700">DNI: {companyInfo?.legal_representative_dni || "-"} · {companyInfo?.legal_representative_position || ""}</p>
                 <p className="text-xs text-blue-600 mt-1">Fecha y hora: {format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
               </div>
 
@@ -804,7 +799,7 @@ export default function ContractManagement() {
               </p>
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1" onClick={() => { setConfirmSign(null); setSignatureImageUrl(""); }}>Cancelar</Button>
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleConfirmSign} disabled={isBulkSigning || signContractMutation.isPending || uploadingSignature}>
+                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleConfirmSign} disabled={isBulkSigning || signContractMutation.isPending}>
                   {isBulkSigning ? "Firmando..." : <><PenLine className="w-4 h-4 mr-2" /> Confirmar Firma</>}
                 </Button>
               </div>
