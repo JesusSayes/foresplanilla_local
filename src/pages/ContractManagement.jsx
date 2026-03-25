@@ -37,7 +37,6 @@ export default function ContractManagement() {
   const [confirmSign, setConfirmSign] = useState(null); // { mode: 'single'|'bulk', contract?: contract }
   const [isBulkSigning, setIsBulkSigning] = useState(false);
   const [signatureImageUrl, setSignatureImageUrl] = useState("");
-  const [uploadingSignature, setUploadingSignature] = useState(false);
 
   const queryClient = useQueryClient();
   const { hasPermission, employee, loading: loadingPerms } = usePermissions();
@@ -46,7 +45,6 @@ export default function ContractManagement() {
     base44.auth.me().then(setCurrentUser).catch(console.error);
   }, []);
 
-  const canSign = hasPermission("contracts.sign") || hasPermission("system.admin");
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
@@ -131,20 +129,11 @@ export default function ContractManagement() {
       is_digitally_signed: true,
       digital_signature_date: new Date().toISOString(),
       digital_signature_by: currentUser?.email || "",
-      digital_signature_name: employee ? `${employee.first_name} ${employee.last_name}` : "",
-      digital_signature_image_url: signatureImageUrl || "",
+      digital_signature_name: companyInfo?.legal_representative || (employee ? `${employee.first_name} ${employee.last_name}` : ""),
+      digital_signature_image_url: companyInfo?.legal_representative_signature_url || signatureImageUrl || "",
     }),
     onSuccess: () => queryClient.invalidateQueries(["contracts"]),
   });
-
-  const handleSignatureImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploadingSignature(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    setSignatureImageUrl(file_url);
-    setUploadingSignature(false);
-  };
 
   const initializeForm = (contract = null, emp = null) => {
     const normalizeDate = (d) => {
@@ -248,6 +237,10 @@ export default function ContractManagement() {
   };
 
   const handleSignSingle = (contract) => {
+    // Pre-cargar la firma del representante legal automáticamente
+    if (companyInfo?.legal_representative_signature_url) {
+      setSignatureImageUrl(companyInfo.legal_representative_signature_url);
+    }
     setConfirmSign({ mode: 'single', contract });
   };
 
@@ -331,6 +324,15 @@ export default function ContractManagement() {
 
   const canManage = hasPermission("contracts.create") || hasPermission("system.admin") || employee.role === "admin";
 
+  // El botón "Firmar" solo se habilita para el representante legal:
+  // el DNI del empleado logueado debe coincidir con el DNI del representante legal en CompanyInfo
+  const canSign = !!(
+    employee &&
+    companyInfo?.legal_representative_dni &&
+    employee.document_number &&
+    employee.document_number.trim() === companyInfo.legal_representative_dni.trim()
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
@@ -367,7 +369,12 @@ export default function ContractManagement() {
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={() => setSelectedForBulkSign(new Set())}>Deseleccionar</Button>
-              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => setConfirmSign({ mode: 'bulk' })}>
+              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => {
+                if (companyInfo?.legal_representative_signature_url) {
+                  setSignatureImageUrl(companyInfo.legal_representative_signature_url);
+                }
+                setConfirmSign({ mode: 'bulk' });
+              }}>
                 <PenLine className="w-4 h-4 mr-1" /> Firmar {selectedForBulkSign.size} seleccionados
               </Button>
             </div>
@@ -770,34 +777,24 @@ export default function ContractManagement() {
                 <p className="text-xs text-blue-600 mt-1">Fecha y hora: {format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
               </div>
 
-              {/* Firma / Rúbrica */}
+              {/* Firma del Representante Legal */}
               <div>
                 <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                  Imagen de firma / rúbrica <span className="text-slate-400 font-normal">(opcional)</span>
+                  Firma del Representante Legal
                 </Label>
                 {signatureImageUrl ? (
-                  <div className="border border-slate-200 rounded-lg p-3 bg-white flex items-center gap-3">
-                    <img src={signatureImageUrl} alt="Firma" className="h-16 object-contain" />
-                    <Button size="sm" variant="outline" className="text-red-600 ml-auto" onClick={() => setSignatureImageUrl("")}>
-                      Quitar
-                    </Button>
+                  <div className="border border-green-200 rounded-lg p-3 bg-green-50 flex items-center gap-3">
+                    <img src={signatureImageUrl} alt="Firma" className="h-16 object-contain bg-white border border-slate-200 rounded px-2" />
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-green-800">Firma registrada</p>
+                      <p className="text-xs text-green-700">{companyInfo?.legal_representative}</p>
+                      <p className="text-xs text-green-600">DNI: {companyInfo?.legal_representative_dni}</p>
+                    </div>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-lg p-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
-                    {uploadingSignature ? (
-                      <div className="flex items-center gap-2 text-sm text-slate-500">
-                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                        Subiendo...
-                      </div>
-                    ) : (
-                      <>
-                        <PenLine className="w-6 h-6 text-slate-400 mb-1" />
-                        <span className="text-sm text-slate-600 font-medium">Subir imagen de firma</span>
-                        <span className="text-xs text-slate-400 mt-0.5">PNG, JPG — fondo blanco recomendado</span>
-                      </>
-                    )}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleSignatureImageUpload} disabled={uploadingSignature} />
-                  </label>
+                  <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 text-sm text-amber-800">
+                    No hay firma registrada. Configure la firma en <strong>Información de la Empresa → Representante Legal</strong>.
+                  </div>
                 )}
               </div>
 

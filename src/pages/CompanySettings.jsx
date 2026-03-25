@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Building2, Save, Upload, Phone, Mail, 
-  Globe, User, CreditCard, MapPin, FileText
+  Globe, User, CreditCard, MapPin, FileText, PenLine, X
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,6 +17,7 @@ export default function CompanySettings() {
   const [employee, setEmployee] = useState(null);
   const [logoFile, setLogoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadingSignature, setUploadingSignature] = useState(false);
   const [formData, setFormData] = useState({
     company_name: "",
     ruc: "",
@@ -28,6 +29,7 @@ export default function CompanySettings() {
     legal_representative: "",
     legal_representative_dni: "",
     legal_representative_position: "",
+    legal_representative_signature_url: "",
   });
 
   const queryClient = useQueryClient();
@@ -74,6 +76,7 @@ export default function CompanySettings() {
         legal_representative: companyInfo.legal_representative || "",
         legal_representative_dni: companyInfo.legal_representative_dni || "",
         legal_representative_position: companyInfo.legal_representative_position || "",
+        legal_representative_signature_url: companyInfo.legal_representative_signature_url || "",
       });
     }
   }, [companyInfo]);
@@ -94,6 +97,26 @@ export default function CompanySettings() {
       toast.error("Error al guardar la información");
     },
   });
+
+  const handleSignatureUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Por favor selecciona una imagen válida");
+      return;
+    }
+    setUploadingSignature(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setFormData(prev => ({ ...prev, legal_representative_signature_url: file_url }));
+      toast.success("Firma subida correctamente");
+    } catch (error) {
+      toast.error("Error al subir la firma");
+      console.error(error);
+    } finally {
+      setUploadingSignature(false);
+    }
+  };
 
   const handleLogoUpload = async (e) => {
     const file = e.target.files[0];
@@ -338,6 +361,60 @@ export default function CompanySettings() {
                   onChange={(e) => setFormData({...formData, legal_representative_position: e.target.value})}
                   placeholder="Gerente General"
                 />
+              </div>
+
+              {/* Firma digital */}
+              <div>
+                <Label className="flex items-center gap-2 mb-2">
+                  <PenLine className="w-4 h-4 text-indigo-600" />
+                  Firma Digital del Representante Legal
+                </Label>
+                <p className="text-xs text-slate-500 mb-3">
+                  Esta firma se usará automáticamente en los contratos y documentos oficiales.
+                </p>
+                {formData.legal_representative_signature_url ? (
+                  <div className="flex items-center gap-4 p-4 border border-green-200 bg-green-50 rounded-lg">
+                    <img
+                      src={formData.legal_representative_signature_url}
+                      alt="Firma del representante legal"
+                      className="h-16 object-contain border border-slate-200 bg-white rounded px-2"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-green-800">Firma registrada correctamente</p>
+                      <p className="text-xs text-green-600">Se aplicará en contratos y documentos oficiales</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => setFormData(prev => ({ ...prev, legal_representative_signature_url: "" }))}
+                    >
+                      <X className="w-4 h-4 mr-1" /> Quitar
+                    </Button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg p-6 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors w-full">
+                    {uploadingSignature ? (
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                        Subiendo firma...
+                      </div>
+                    ) : (
+                      <>
+                        <PenLine className="w-8 h-8 text-slate-400 mb-2" />
+                        <span className="text-sm font-medium text-slate-700">Subir imagen de firma / rúbrica</span>
+                        <span className="text-xs text-slate-400 mt-1">PNG, JPG — fondo blanco o transparente recomendado</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleSignatureUpload}
+                      disabled={uploadingSignature}
+                    />
+                  </label>
+                )}
               </div>
             </CardContent>
           </Card>
