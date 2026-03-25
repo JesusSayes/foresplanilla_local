@@ -435,13 +435,11 @@ export default function ContractManagement() {
                 </Button>
               )}
               {/* Paginación inline */}
-              {totalPages > 1 && (
-                <div className="flex items-center gap-1 ml-auto">
-                  <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-8 px-2">‹</Button>
-                  <span className="text-sm text-slate-600 px-2">{currentPage} / {totalPages}</span>
-                  <Button size="sm" variant="outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="h-8 px-2">›</Button>
-                </div>
-              )}
+              <div className="flex items-center gap-1 ml-auto">
+                <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-8 px-2">‹</Button>
+                <span className="text-sm text-slate-600 px-2">{currentPage} / {Math.max(totalPages, 1)}</span>
+                <Button size="sm" variant="outline" disabled={currentPage >= Math.max(totalPages, 1)} onClick={() => setCurrentPage(p => p + 1)} className="h-8 px-2">›</Button>
+              </div>
             </div>
 
             {isLoading ? (
