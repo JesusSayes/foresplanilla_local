@@ -48,7 +48,7 @@ export default function AttendanceManagement() {
   const [existingIncident, setExistingIncident] = useState(null);
   const [incidentSearchTerm, setIncidentSearchTerm] = useState("");
   const [overtimeSearchTerm, setOvertimeSearchTerm] = useState("");
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(300);
   const [currentPage, setCurrentPage] = useState(1);
   const [justificationData, setJustificationData] = useState({
     incident_type: "Olvido de Marcación",
@@ -655,20 +655,30 @@ export default function AttendanceManagement() {
           </div>
 
           <Tabs defaultValue="attendance" className="space-y-6">
-            <TabsList className="grid w-full max-w-2xl grid-cols-3">
-              <TabsTrigger value="attendance">
-                Asistencia del Día
-                {employeesWithRecords.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{employeesWithRecords.length}</Badge>}
-              </TabsTrigger>
-              <TabsTrigger value="incidents">
-                Justificaciones
-                {allIncidents.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{allIncidents.length}</Badge>}
-              </TabsTrigger>
-              <TabsTrigger value="overtime-alerts">
-                Alertas HE
-                {overtimeAlerts.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{overtimeAlerts.length}</Badge>}
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex items-center justify-between gap-3">
+              <TabsList className="grid grid-cols-3">
+                <TabsTrigger value="attendance">
+                  Asistencia del Día
+                  {employeesWithRecords.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{employeesWithRecords.length}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="incidents">
+                  Justificaciones
+                  {allIncidents.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{allIncidents.length}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="overtime-alerts">
+                  Alertas HE
+                  {overtimeAlerts.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{overtimeAlerts.length}</Badge>}
+                </TabsTrigger>
+              </TabsList>
+              <div className="flex items-center gap-2">
+                <Button onClick={handleExportToExcel} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
+                  <Download className="w-4 h-4 mr-2" />Excel
+                </Button>
+                <Button onClick={handlePrint} variant="outline" className="whitespace-nowrap">
+                  <Printer className="w-4 h-4 mr-2" />Imprimir
+                </Button>
+              </div>
+            </div>
 
             <TabsContent value="attendance" className="space-y-6">
               <Card className="border-0 shadow-lg">
@@ -753,32 +763,16 @@ export default function AttendanceManagement() {
                       {isRangeMode ? "Rango activo" : "Por rango"}
                     </Button>
 
-                    <Button onClick={handleExportToExcel} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
-                      <Download className="w-4 h-4 mr-2" />Excel
-                    </Button>
-                    <Button onClick={handlePrint} variant="outline" className="whitespace-nowrap">
-                      <Printer className="w-4 h-4 mr-2" />Imprimir
-                    </Button>
-                  </div>
-
-                  {/* Paginación - controles superiores */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-slate-600">Mostrar:</span>
-                      {[50, 100, 200, 400, 1000].map(size => (
-                        <button
-                          key={size}
-                          onClick={() => { setPageSize(size); setCurrentPage(1); }}
-                          className={`px-3 py-1 text-sm rounded-md border transition-colors ${pageSize === size ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-300 hover:border-indigo-400'}`}
-                        >
-                          {size}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-slate-600">
-                      <span>{employeesWithRecords.length} registros · Pág. {currentPage} / {Math.max(1, Math.ceil(employeesWithRecords.length / pageSize))}</span>
-                      <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-slate-50">‹</button>
-                      <button onClick={() => setCurrentPage(p => Math.min(Math.ceil(employeesWithRecords.length / pageSize), p + 1))} disabled={currentPage >= Math.ceil(employeesWithRecords.length / pageSize)} className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-slate-50">›</button>
+                    {/* Paginación en la misma línea de filtros */}
+                    <div className="flex items-center gap-3 ml-auto">
+                      <span className="text-sm text-slate-500 whitespace-nowrap">
+                        {employeesWithRecords.length === 0 ? "0 registros" : `${Math.min((currentPage - 1) * pageSize + 1, employeesWithRecords.length)}–${Math.min(currentPage * pageSize, employeesWithRecords.length)} de ${employeesWithRecords.length}`}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-8 px-2">‹</Button>
+                        <span className="text-sm text-slate-600 px-2">{currentPage} / {Math.max(Math.ceil(employeesWithRecords.length / pageSize), 1)}</span>
+                        <Button size="sm" variant="outline" disabled={currentPage >= Math.max(Math.ceil(employeesWithRecords.length / pageSize), 1)} onClick={() => setCurrentPage(p => p + 1)} className="h-8 px-2">›</Button>
+                      </div>
                     </div>
                   </div>
 

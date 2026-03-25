@@ -40,12 +40,11 @@ export default function ContractManagement() {
   const [confirmSign, setConfirmSign] = useState(null); // { mode: 'single'|'bulk', contract?: contract }
   const [isBulkSigning, setIsBulkSigning] = useState(false);
   const [signatureImageUrl, setSignatureImageUrl] = useState("");
-  const [uploadingSignature, setUploadingSignature] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 50;
 
   const queryClient = useQueryClient();
   const { hasPermission, employee, loading: loadingPerms } = usePermissions();
-
-  const canSign = hasPermission("contracts.sign") || hasPermission("system.admin");
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
@@ -154,42 +153,16 @@ export default function ContractManagement() {
   });
 
   const signContractMutation = useMutation({
-    // mutationFn: ({ id }) => base44.entities.Contract.update(id, {
-      // is_digitally_signed: true,
-      // digital_signature_date: new Date().toISOString(),
-      // digital_signature_by: currentUser?.email || "",
-      // digital_signature_name: employee ? `${employee.first_name} ${employee.last_name}` : "",
-      // digital_signature_image_url: signatureImageUrl || "",
-    // }),
     mutationFn: async ({ id }) =>
       await entitiesAPI.Contract.update(id, {
         is_digitally_signed: true,
         digital_signature_date: new Date().toISOString(),
         digital_signature_by: currentUser?.email || "",
-        digital_signature_name: employee
-          ? `${employee.first_name} ${employee.last_name}`
-          : "",
-        digital_signature_image_url: signatureImageUrl || "",
+        digital_signature_name: companyInfo?.legal_representative || (employee ? `${employee.first_name} ${employee.last_name}` : ""),
+        digital_signature_image_url: companyInfo?.legal_representative_signature_url || signatureImageUrl || "",
     }),
     onSuccess: () => queryClient.invalidateQueries(["contracts"]),
   });
-
-  const handleSignatureImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploadingSignature(true);
-    // const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    try{
-      const { file_url } = await uploadFile(file);
-      setSignatureImageUrl(file_url);
-      toast.success("Firma subida correctamente");
-      } catch (error) {
-        console.error(error);
-        toast.error("Error al subir la firma");
-      } finally {
-        setUploadingSignature(false);
-      }
-  };
 
   const initializeForm = (contract = null, emp = null) => {
     const normalizeDate = (d) => {
@@ -315,6 +288,7 @@ export default function ContractManagement() {
   };
 
   const handleSignSingle = (contract) => {
+    setSignatureImageUrl(companyInfo?.legal_representative_signature_url || "");
     setConfirmSign({ mode: 'single', contract });
   };
 
@@ -353,6 +327,9 @@ export default function ContractManagement() {
 
   const pendingSignContracts = contracts.filter(c => !c.is_digitally_signed && c.status === "Vigente");
 
+  // Reset page when filters change
+  const handleFilterChange = (setter) => (val) => { setter(val); setCurrentPage(1); };
+
   const filteredContracts = contracts.filter(c => {
     const emp = allEmployees.find(e => e.id === c.employee_id);
     if (!emp) return false;
@@ -366,6 +343,9 @@ export default function ContractManagement() {
     const matchesSign = signatureFilter === "all" || (signatureFilter === "signed" && c.is_digitally_signed) || (signatureFilter === "pending" && !c.is_digitally_signed);
     return matchesSearch && matchesStatus && matchesSign;
   });
+
+  const totalPages = Math.ceil(filteredContracts.length / PAGE_SIZE);
+  const paginatedContracts = filteredContracts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const stats = {
     total: contracts.length,
@@ -397,6 +377,15 @@ export default function ContractManagement() {
   }
 
   const canManage = hasPermission("contracts.create") || hasPermission("system.admin") || employee.role === "admin";
+
+  // El botón "Firmar" solo se habilita para el representante legal:
+  // el DNI del empleado logueado debe coincidir con el DNI del representante legal en CompanyInfo
+  const canSign = !!(
+    employee &&
+    companyInfo?.legal_representative_dni &&
+    employee.document_number &&
+    employee.document_number.trim() === companyInfo.legal_representative_dni.trim()
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -434,7 +423,10 @@ export default function ContractManagement() {
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={() => setSelectedForBulkSign(new Set())}>Deseleccionar</Button>
-              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => setConfirmSign({ mode: 'bulk' })}>
+              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => {
+                setSignatureImageUrl(companyInfo?.legal_representative_signature_url || "");
+                setConfirmSign({ mode: 'bulk' });
+              }}>
                 <PenLine className="w-4 h-4 mr-1" /> Firmar {selectedForBulkSign.size} seleccionados
               </Button>
             </div>
@@ -458,9 +450,9 @@ export default function ContractManagement() {
             <div className="flex flex-wrap items-center gap-3 mb-6">
               <div className="flex-1 min-w-56 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <Input placeholder="Buscar por empleado o N° contrato..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+                <Input placeholder="Buscar por empleado o N° contrato..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="pl-9" />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
                 <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los estados</SelectItem>
@@ -470,7 +462,7 @@ export default function ContractManagement() {
                   <SelectItem value="Renovado">Renovado</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={signatureFilter} onValueChange={setSignatureFilter}>
+              <Select value={signatureFilter} onValueChange={(v) => { setSignatureFilter(v); setCurrentPage(1); }}>
                 <SelectTrigger className="w-44"><SelectValue placeholder="Firma digital" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas las firmas</SelectItem>
@@ -491,6 +483,17 @@ export default function ContractManagement() {
                   <Users className="w-4 h-4 mr-1" /> Seleccionar todos pendientes
                 </Button>
               )}
+              {/* Contador y Paginación inline */}
+              <div className="flex items-center gap-3 ml-auto">
+              <span className="text-sm text-slate-500 whitespace-nowrap">
+                {filteredContracts.length === 0 ? "0 registros" : `${Math.min((currentPage - 1) * PAGE_SIZE + 1, filteredContracts.length)}–${Math.min(currentPage * PAGE_SIZE, filteredContracts.length)} de ${filteredContracts.length}`}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-8 px-2">‹</Button>
+                <span className="text-sm text-slate-600 px-2">{currentPage} / {Math.max(totalPages, 1)}</span>
+                <Button size="sm" variant="outline" disabled={currentPage >= Math.max(totalPages, 1)} onClick={() => setCurrentPage(p => p + 1)} className="h-8 px-2">›</Button>
+              </div>
+              </div>
             </div>
 
             {isLoading ? (
@@ -502,7 +505,7 @@ export default function ContractManagement() {
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredContracts.map(contract => {
+                {paginatedContracts.map(contract => {
                   const emp = allEmployees.find(e => e.id === contract.employee_id);
                   if (!emp) return null;
                   const StatusIcon = getStatusConfig(contract.status).icon;
@@ -873,40 +876,30 @@ export default function ContractManagement() {
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-900 font-medium mb-1">Firmante:</p>
-                <p className="text-sm text-blue-800">{employee ? `${employee.first_name} ${employee.last_name}` : ""}</p>
-                <p className="text-xs text-blue-700">{currentUser?.email}</p>
+                <p className="text-sm text-blue-900 font-medium mb-1">Representante Legal (Firmante):</p>
+                <p className="text-sm text-blue-800">{companyInfo?.legal_representative || "No configurado"}</p>
+                <p className="text-xs text-blue-700">DNI: {companyInfo?.legal_representative_dni || "-"} · {companyInfo?.legal_representative_position || ""}</p>
                 <p className="text-xs text-blue-600 mt-1">Fecha y hora: {format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
               </div>
 
-              {/* Firma / Rúbrica */}
+              {/* Firma del Representante Legal */}
               <div>
                 <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                  Imagen de firma / rúbrica <span className="text-slate-400 font-normal">(opcional)</span>
+                  Firma del Representante Legal
                 </Label>
                 {signatureImageUrl ? (
-                  <div className="border border-slate-200 rounded-lg p-3 bg-white flex items-center gap-3">
-                    <img src={signatureImageUrl} alt="Firma" className="h-16 object-contain" />
-                    <Button size="sm" variant="outline" className="text-red-600 ml-auto" onClick={() => setSignatureImageUrl("")}>
-                      Quitar
-                    </Button>
+                  <div className="border border-green-200 rounded-lg p-3 bg-green-50 flex items-center gap-3">
+                    <img src={signatureImageUrl} alt="Firma" className="h-16 object-contain bg-white border border-slate-200 rounded px-2" />
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-green-800">Firma registrada</p>
+                      <p className="text-xs text-green-700">{companyInfo?.legal_representative}</p>
+                      <p className="text-xs text-green-600">DNI: {companyInfo?.legal_representative_dni}</p>
+                    </div>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-lg p-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
-                    {uploadingSignature ? (
-                      <div className="flex items-center gap-2 text-sm text-slate-500">
-                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                        Subiendo...
-                      </div>
-                    ) : (
-                      <>
-                        <PenLine className="w-6 h-6 text-slate-400 mb-1" />
-                        <span className="text-sm text-slate-600 font-medium">Subir imagen de firma</span>
-                        <span className="text-xs text-slate-400 mt-0.5">PNG, JPG — fondo blanco recomendado</span>
-                      </>
-                    )}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleSignatureImageUpload} disabled={uploadingSignature} />
-                  </label>
+                  <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 text-sm text-amber-800">
+                    No hay firma registrada. Configure la firma en <strong>Información de la Empresa → Representante Legal</strong>.
+                  </div>
                 )}
               </div>
 
@@ -916,7 +909,7 @@ export default function ContractManagement() {
               </p>
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1" onClick={() => { setConfirmSign(null); setSignatureImageUrl(""); }}>Cancelar</Button>
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleConfirmSign} disabled={isBulkSigning || signContractMutation.isPending || uploadingSignature}>
+                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleConfirmSign} disabled={isBulkSigning || signContractMutation.isPending}>
                   {isBulkSigning ? "Firmando..." : <><PenLine className="w-4 h-4 mr-2" /> Confirmar Firma</>}
                 </Button>
               </div>
