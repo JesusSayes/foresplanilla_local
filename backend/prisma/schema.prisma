@@ -95,23 +95,24 @@ model certificate {
 }
 
 model company_info {
-  company_name                  String?
-  ruc                           String?
-  address                       String?
-  phone                         String?
-  email                         String?
-  logo_url                      String?
-  legal_representative          String?
-  legal_representative_dni      String?
-  legal_representative_position String?
-  website                       String?
-  is_active                     Boolean?
-  id                            String    @id(map: "companyinfo_pkey") @db.VarChar(255)
-  created_date                  DateTime? @db.Timestamp(6)
-  updated_date                  DateTime? @db.Timestamp(6)
-  created_by_id                 String?
-  created_by                    String?
-  is_sample                     Boolean?
+  company_name                       String?
+  ruc                                String?
+  address                            String?
+  phone                              String?
+  email                              String?
+  logo_url                           String?
+  legal_representative               String?
+  legal_representative_dni           String?
+  legal_representative_position      String?
+  website                            String?
+  is_active                          Boolean?
+  id                                 String    @id(map: "companyinfo_pkey") @db.VarChar(255)
+  created_date                       DateTime? @db.Timestamp(6)
+  updated_date                       DateTime? @db.Timestamp(6)
+  created_by_id                      String?
+  created_by                         String?
+  is_sample                          Boolean?
+  legal_representative_signature_url String?
 }
 
 model contract {

@@ -1,4 +1,4 @@
-import jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { entitiesAPI } from "@/api/entitiesClient";
@@ -102,9 +102,9 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     "{benefits}": contract.benefits || "",
     "{benefits_additional}": contract.benefits || "",
     "{notes}": contract.notes || "",
-    "{activity_cost}": (contract.activity_cost || 0).toFixed(2),
-    "{food_cost}": (contract.food_cost || 0).toFixed(2),
-    "{transport_cost}": (contract.transport_cost || 0).toFixed(2),
+    "{activity_cost}": Number(contract.activity_cost || 0).toFixed(2),
+    "{food_cost}": Number(contract.food_cost || 0).toFixed(2),
+    "{transport_cost}": Number(contract.transport_cost || 0).toFixed(2),
     "{renewable_clause}": contract.renewable ? ", siendo renovable según las necesidades de la empresa" : "",
     "{signed_date}": format(new Date(contract.signed_date || contract.start_date), "dd 'de' MMMM 'de' yyyy", { locale: es }),
     "{company_name}": company.name || "",
@@ -312,7 +312,11 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
           resolve();
         };
         img.onerror = () => resolve();
-        img.src = contract.digital_signature_image_url;
+
+        // img.src = contract.digital_signature_image_url;
+        console.log(contract.digital_signature_image_url);
+        console.log(`${import.meta.env.VITE_API_URL}${contract.digital_signature_image_url}`);
+        img.src = `${import.meta.env.VITE_API_URL}${contract.digital_signature_image_url}`;
       });
     } catch (_) { /* continuar sin imagen */ }
   }

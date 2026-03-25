@@ -48,6 +48,8 @@ export default function AttendanceManagement() {
   const [existingIncident, setExistingIncident] = useState(null);
   const [incidentSearchTerm, setIncidentSearchTerm] = useState("");
   const [overtimeSearchTerm, setOvertimeSearchTerm] = useState("");
+  const [pageSize, setPageSize] = useState(300);
+  const [currentPage, setCurrentPage] = useState(1);
   const [justificationData, setJustificationData] = useState({
     incident_type: "Olvido de Marcación",
     justification: "",
@@ -653,20 +655,30 @@ export default function AttendanceManagement() {
           </div>
 
           <Tabs defaultValue="attendance" className="space-y-6">
-            <TabsList className="grid w-full max-w-2xl grid-cols-3">
-              <TabsTrigger value="attendance">
-                Asistencia del Día
-                {employeesWithRecords.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{employeesWithRecords.length}</Badge>}
-              </TabsTrigger>
-              <TabsTrigger value="incidents">
-                Justificaciones
-                {allIncidents.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{allIncidents.length}</Badge>}
-              </TabsTrigger>
-              <TabsTrigger value="overtime-alerts">
-                Alertas HE
-                {overtimeAlerts.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{overtimeAlerts.length}</Badge>}
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex items-center justify-between gap-3">
+              <TabsList className="grid grid-cols-3">
+                <TabsTrigger value="attendance">
+                  Asistencia del Día
+                  {employeesWithRecords.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{employeesWithRecords.length}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="incidents">
+                  Justificaciones
+                  {allIncidents.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{allIncidents.length}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="overtime-alerts">
+                  Alertas HE
+                  {overtimeAlerts.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{overtimeAlerts.length}</Badge>}
+                </TabsTrigger>
+              </TabsList>
+              <div className="flex items-center gap-2">
+                <Button onClick={handleExportToExcel} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
+                  <Download className="w-4 h-4 mr-2" />Excel
+                </Button>
+                <Button onClick={handlePrint} variant="outline" className="whitespace-nowrap">
+                  <Printer className="w-4 h-4 mr-2" />Imprimir
+                </Button>
+              </div>
+            </div>
 
             <TabsContent value="attendance" className="space-y-6">
               <Card className="border-0 shadow-lg">
@@ -675,10 +687,10 @@ export default function AttendanceManagement() {
                     <div className="flex-1 min-w-[180px]">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                        <Input placeholder="Buscar empleado..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+                        <Input placeholder="Buscar empleado..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="pl-10" />
                       </div>
                     </div>
-                    <Select value={selectedSite} onValueChange={setSelectedSite}>
+                    <Select value={selectedSite} onValueChange={(v) => { setSelectedSite(v); setCurrentPage(1); }}>
                       <SelectTrigger className="w-36"><SelectValue placeholder="Sede" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todas</SelectItem>
@@ -688,7 +700,7 @@ export default function AttendanceManagement() {
                           .map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
+                    <Select value={attendanceFilter} onValueChange={(v) => { setAttendanceFilter(v); setCurrentPage(1); }}>
                       <SelectTrigger className="w-44"><SelectValue placeholder="Filtro" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
@@ -745,22 +757,27 @@ export default function AttendanceManagement() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => { setIsRangeMode(!isRangeMode); setDateFrom(null); setDateTo(null); }}
+                      onClick={() => { setIsRangeMode(!isRangeMode); setDateFrom(null); setDateTo(null); setCurrentPage(1); }}
                       className={isRangeMode ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700" : ""}
                     >
                       {isRangeMode ? "Rango activo" : "Por rango"}
                     </Button>
 
-                    <Button onClick={handleExportToExcel} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
-                      <Download className="w-4 h-4 mr-2" />Excel
-                    </Button>
-                    <Button onClick={handlePrint} variant="outline" className="whitespace-nowrap">
-                      <Printer className="w-4 h-4 mr-2" />Imprimir
-                    </Button>
+                    {/* Paginación en la misma línea de filtros */}
+                    <div className="flex items-center gap-3 ml-auto">
+                      <span className="text-sm text-slate-500 whitespace-nowrap">
+                        {employeesWithRecords.length === 0 ? "0 registros" : `${Math.min((currentPage - 1) * pageSize + 1, employeesWithRecords.length)}–${Math.min(currentPage * pageSize, employeesWithRecords.length)} de ${employeesWithRecords.length}`}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-8 px-2">‹</Button>
+                        <span className="text-sm text-slate-600 px-2">{currentPage} / {Math.max(Math.ceil(employeesWithRecords.length / pageSize), 1)}</span>
+                        <Button size="sm" variant="outline" disabled={currentPage >= Math.max(Math.ceil(employeesWithRecords.length / pageSize), 1)} onClick={() => setCurrentPage(p => p + 1)} className="h-8 px-2">›</Button>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-3">
-                    {employeesWithRecords.map((emp, idx) => {
+                    {employeesWithRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((emp, idx) => {
                       const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
                       const vacation = approvedVacations.find(v => v.employee_id === emp.id && v.start_date <= rowDate && v.end_date >= rowDate) || null;
                       const scheduledTimes = vacation ? getScheduledTimes(emp.id) : null;
