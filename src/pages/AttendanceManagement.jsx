@@ -752,22 +752,15 @@ export default function AttendanceManagement() {
                     </Button>
 
                     {/* Paginación en la misma línea de filtros */}
-                    <div className="flex items-center gap-2 ml-auto">
-                      <span className="text-sm text-slate-500">Mostrar:</span>
-                      {[100, 200, 300, 500, 1000].map(size => (
-                        <button
-                          key={size}
-                          onClick={() => { setPageSize(size); setCurrentPage(1); }}
-                          className={`px-2 py-1 text-xs rounded-md border transition-colors ${pageSize === size ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-300 hover:border-indigo-400'}`}
-                        >
-                          {size}
-                        </button>
-                      ))}
-                      <span className="text-sm text-slate-500 whitespace-nowrap ml-1">
-                        {employeesWithRecords.length === 0 ? "0 reg." : `${Math.min((currentPage-1)*pageSize+1,employeesWithRecords.length)}–${Math.min(currentPage*pageSize,employeesWithRecords.length)} de ${employeesWithRecords.length}`}
+                    <div className="flex items-center gap-3 ml-auto">
+                      <span className="text-sm text-slate-500 whitespace-nowrap">
+                        {employeesWithRecords.length === 0 ? "0 registros" : `${Math.min((currentPage - 1) * pageSize + 1, employeesWithRecords.length)}–${Math.min(currentPage * pageSize, employeesWithRecords.length)} de ${employeesWithRecords.length}`}
                       </span>
-                      <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-2 py-1 border rounded text-sm disabled:opacity-40 hover:bg-slate-50">‹</button>
-                      <button onClick={() => setCurrentPage(p => Math.min(Math.ceil(employeesWithRecords.length / pageSize), p + 1))} disabled={currentPage >= Math.ceil(employeesWithRecords.length / pageSize)} className="px-2 py-1 border rounded text-sm disabled:opacity-40 hover:bg-slate-50">›</button>
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-8 px-2">‹</Button>
+                        <span className="text-sm text-slate-600 px-2">{currentPage} / {Math.max(Math.ceil(employeesWithRecords.length / pageSize), 1)}</span>
+                        <Button size="sm" variant="outline" disabled={currentPage >= Math.max(Math.ceil(employeesWithRecords.length / pageSize), 1)} onClick={() => setCurrentPage(p => p + 1)} className="h-8 px-2">›</Button>
+                      </div>
                     </div>
                   </div>
 
