@@ -434,11 +434,16 @@ export default function ContractManagement() {
                   <Users className="w-4 h-4 mr-1" /> Seleccionar todos pendientes
                 </Button>
               )}
-              {/* Paginación inline */}
-              <div className="flex items-center gap-1 ml-auto">
+              {/* Contador y Paginación inline */}
+              <div className="flex items-center gap-3 ml-auto">
+              <span className="text-sm text-slate-500 whitespace-nowrap">
+                {filteredContracts.length === 0 ? "0 registros" : `${Math.min((currentPage - 1) * PAGE_SIZE + 1, filteredContracts.length)}–${Math.min(currentPage * PAGE_SIZE, filteredContracts.length)} de ${filteredContracts.length}`}
+              </span>
+              <div className="flex items-center gap-1">
                 <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-8 px-2">‹</Button>
                 <span className="text-sm text-slate-600 px-2">{currentPage} / {Math.max(totalPages, 1)}</span>
                 <Button size="sm" variant="outline" disabled={currentPage >= Math.max(totalPages, 1)} onClick={() => setCurrentPage(p => p + 1)} className="h-8 px-2">›</Button>
+              </div>
               </div>
             </div>
 
