@@ -16,7 +16,7 @@ export const getAll = async (req, res) => {
 export const getById = async (req, res) => {
   try {
     const template = await prisma.contract_template.findUnique({
-      where: { id: parseInt(req.params.id) }
+      where: { id: req.params.id }
     });
     if (!template) return res.status(404).json({ error: 'Template not found' });
     res.json(template);
@@ -39,7 +39,7 @@ export const create = async (req, res) => {
 export const update = async (req, res) => {
   try {
     const template = await prisma.contract_template.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id: req.params.id },
       data: req.body
     });
     res.json(template);
@@ -51,7 +51,7 @@ export const update = async (req, res) => {
 export const deleteTemplate = async (req, res) => {
   try {
     await prisma.contract_template.delete({
-      where: { id: parseInt(req.params.id) }
+      where: { id: req.params.id }
     });
     res.status(204).send();
   } catch (error) {
