@@ -132,7 +132,7 @@ export default function CompanySettings() {
 
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setFormData({ ...formData, logo_url: file_url });
+      setFormData(prev => ({ ...prev, logo_url: file_url }));
       toast.success("Logo subido correctamente");
     } catch (error) {
       toast.error("Error al subir el logo");
@@ -151,7 +151,15 @@ export default function CompanySettings() {
     saveMutation.mutate(formData);
   };
 
-  if (!employee || employee.role !== "admin") {
+  if (!employee || isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!["admin", "super_admin"].includes(employee.role)) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <Card className="max-w-md">
@@ -160,14 +168,6 @@ export default function CompanySettings() {
             <p className="text-slate-600">Solo administradores pueden configurar la empresa</p>
           </CardContent>
         </Card>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
