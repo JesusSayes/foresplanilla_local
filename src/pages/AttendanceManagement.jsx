@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle, 
-  AlertCircle, Users, Search, FileText, Download, Database, History, Printer, Palmtree
+  AlertCircle, Users, Search, FileText, Download, Database, History, Printer, Palmtree, CalendarClock
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
@@ -23,6 +23,7 @@ import { usePermissions } from "../components/hooks/usePermissions";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
 import JustifyModal from "../components/attendance/JustifyModal";
+import AssignScheduleModal from "../components/attendance/AssignScheduleModal";
 
 export default function AttendanceManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -44,6 +45,8 @@ export default function AttendanceManagement() {
   const [showJustifyModal, setShowJustifyModal] = useState(false);
   const [justifyingEmployee, setJustifyingEmployee] = useState(null);
   const [existingIncident, setExistingIncident] = useState(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [schedulingEmployee, setSchedulingEmployee] = useState(null);
   const [incidentSearchTerm, setIncidentSearchTerm] = useState("");
   const [overtimeSearchTerm, setOvertimeSearchTerm] = useState("");
   const [pageSize, setPageSize] = useState(300);
@@ -215,20 +218,37 @@ export default function AttendanceManagement() {
     onError: () => toast.error("Error al importar marcaciones"),
   });
 
-  const getEmployeeSchedule = (empId) => {
-    let schedule = workSchedules.find(s => s.employee_id === empId && s.is_active);
-    if (!schedule) {
-      const emp = allEmployees.find(e => e.id === empId);
-      if (emp?.department_name) {
-        schedule = workSchedules.find(s =>
-          s.is_active &&
-          (s.departments?.includes(emp.department_name) || s.department_name === emp.department_name)
-        );
-      }
-    }
-    return schedule;
+  // Obtener horario vigente para un empleado en una fecha específica (respeta effective_from/to)
+  const getEmployeeScheduleForDate = (empId, dateStr) => {
+    const emp = allEmployees.find(e => e.id === empId);
+    const dStr = dateStr || format(selectedDate, "yyyy-MM-dd");
+
+    const candidates = workSchedules.filter(s => {
+      if (!s.is_active) return false;
+      const isForEmployee = s.employee_id === empId;
+      const isForDept = !s.employee_id && emp?.department_name &&
+        (s.departments?.includes(emp.department_name) || s.department_name === emp.department_name);
+      return isForEmployee || isForDept;
+    });
+
+    const empSchedules = candidates.filter(s => s.employee_id === empId);
+    const deptSchedules = candidates.filter(s => !s.employee_id);
+
+    const findBest = (list) => {
+      const valid = list.filter(s => {
+        const from = s.effective_from || "0000-01-01";
+        const to = s.effective_to || "9999-12-31";
+        return from <= dStr && to >= dStr;
+      });
+      valid.sort((a, b) => (b.effective_from || "0000-01-01").localeCompare(a.effective_from || "0000-01-01"));
+      return valid[0] || null;
+    };
+
+    return findBest(empSchedules) || findBest(deptSchedules) || null;
   };
 
+  // Compatibilidad: sin fecha usa la fecha seleccionada
+  const getEmployeeSchedule = (empId) => getEmployeeScheduleForDate(empId, format(selectedDate, "yyyy-MM-dd"));
   const isOvertimeAuthorized = (empId) => getEmployeeSchedule(empId)?.overtime_authorized || false;
 
   const handleEditRecord = (record) => {
@@ -246,29 +266,45 @@ export default function AttendanceManagement() {
     if (!editingRecord) return;
     const clockIn = editingRecord.clock_in;
     const clockOut = editingRecord.clock_out;
-    const scheduledStart = editingRecord.scheduled_start || "09:00";
+    const recordDate = editingRecord.date;
+
+    // Obtener el horario vigente para ese empleado en esa fecha específica
+    const schedule = getEmployeeScheduleForDate(editingRecord.employee_id, recordDate);
+    const dow = new Date(recordDate + "T00:00:00").getDay();
+    const dayStartMap = ["sunday_start", "monday_start", "tuesday_start", "wednesday_start", "thursday_start", "friday_start", "saturday_start"];
+    const dayEndMap = ["sunday_end", "monday_end", "tuesday_end", "wednesday_end", "thursday_end", "friday_end", "saturday_end"];
+    const scheduledStart = schedule?.[dayStartMap[dow]] || editingRecord.scheduled_start || "09:00";
+    const scheduledEnd = schedule?.[dayEndMap[dow]] || editingRecord.scheduled_end || "18:00";
+    const breakMinutes = schedule?.break_duration_minutes ?? 60;
+    const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
+
     let workedHours = 0;
     let lateMinutes = 0;
     let isLate = false;
 
-    if (clockIn && clockOut) {
-      const [inHour, inMin] = clockIn.split(":").map(Number);
-      const [outHour, outMin] = clockOut.split(":").map(Number);
-      const totalMinutes = (outHour * 60 + outMin) - (inHour * 60 + inMin) - 60;
-      workedHours = Math.max(0, totalMinutes / 60);
-      const [schedHour, schedMin] = scheduledStart.split(":").map(Number);
-      lateMinutes = Math.max(0, (inHour * 60 + inMin) - (schedHour * 60 + schedMin));
+    if (clockIn) {
+      const [inH, inM] = clockIn.split(":").map(Number);
+      const [schedH, schedM] = scheduledStart.split(":").map(Number);
+      const rawLate = (inH * 60 + inM) - (schedH * 60 + schedM);
+      lateMinutes = rawLate > toleranceMinutes ? rawLate : 0;
       isLate = lateMinutes > 0;
 
-      if (workedHours > 8 && !isOvertimeAuthorized(editingRecord.employee_id)) {
-        await base44.entities.OvertimeAlert.create({
-          employee_id: editingRecord.employee_id,
-          attendance_record_id: editingRecord.id,
-          alert_date: editingRecord.date,
-          overtime_hours: workedHours - 8,
-          status: "Pendiente",
-        });
-        toast.warning(`⚠️ Alerta: ${(workedHours - 8).toFixed(2)}h extras sin autorización.`);
+      if (clockOut) {
+        const [outH, outM] = clockOut.split(":").map(Number);
+        const totalMinutes = (outH * 60 + outM) - (inH * 60 + inM) - breakMinutes;
+        workedHours = Math.max(0, totalMinutes / 60);
+
+        const scheduleAuthorized = schedule?.overtime_authorized || false;
+        if (workedHours > 8 && !scheduleAuthorized) {
+          await base44.entities.OvertimeAlert.create({
+            employee_id: editingRecord.employee_id,
+            attendance_record_id: editingRecord.id,
+            alert_date: recordDate,
+            overtime_hours: workedHours - 8,
+            status: "Pendiente",
+          });
+          toast.warning(`⚠️ Alerta: ${(workedHours - 8).toFixed(2)}h extras sin autorización.`);
+        }
       }
     }
 
@@ -283,6 +319,8 @@ export default function AttendanceManagement() {
         notes: editingRecord.notes,
         status: editingRecord.status,
         is_absent: editingRecord.status === "Ausente",
+        scheduled_start: scheduledStart,
+        scheduled_end: scheduledEnd,
       }
     });
   };
@@ -783,14 +821,24 @@ export default function AttendanceManagement() {
                                 {emp.first_name[0]}{emp.last_name[0]}
                               </div>
                               <div className="w-48 shrink-0">
-                                <h4 className="font-bold text-slate-900 text-sm">{emp.first_name} {emp.last_name}</h4>
-                                <p className="text-xs text-slate-600">{emp.employee_code} • {emp.department_name}</p>
-                                {vacation && (
-                                  <p className="text-xs text-amber-700 font-medium mt-0.5">
-                                    🌴 {vacation.request_type}
-                                  </p>
-                                )}
-                              </div>
+                                 <h4 className="font-bold text-slate-900 text-sm">{emp.first_name} {emp.last_name}</h4>
+                                 <p className="text-xs text-slate-600">{emp.employee_code} • {emp.department_name}</p>
+                                 {(() => {
+                                   const sched = getEmployeeScheduleForDate(emp.id, rowDate);
+                                   if (!sched) return <p className="text-xs text-red-500 mt-0.5">Sin horario</p>;
+                                   const dow2 = new Date(rowDate + "T00:00:00").getDay();
+                                   const starts = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+                                   const ends = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+                                   const st = sched[starts[dow2]]; const en = sched[ends[dow2]];
+                                   if (!st) return <p className="text-xs text-slate-400 mt-0.5">Día libre</p>;
+                                   return <p className="text-xs text-indigo-600 mt-0.5">🕐 {st}–{en}</p>;
+                                 })()}
+                                 {vacation && (
+                                   <p className="text-xs text-amber-700 font-medium mt-0.5">
+                                     🌴 {vacation.request_type}
+                                   </p>
+                                 )}
+                               </div>
                               {/* Columna fecha */}
                               <div className="w-24 shrink-0 text-center">
                                 <p className="text-xs text-slate-500 mb-0.5">Fecha</p>
@@ -874,6 +922,15 @@ export default function AttendanceManagement() {
                                     <FileText className="w-4 h-4 mr-1" />Justificar
                                   </Button>
                                 )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                  onClick={() => { setSchedulingEmployee(emp); setShowScheduleModal(true); }}
+                                  title="Asignar/cambiar horario"
+                                >
+                                  <CalendarClock className="w-4 h-4" />
+                                </Button>
                                 <Button size="sm" variant="outline" onClick={() => { setHistoryEmployeeId(emp.id); setShowHistory(true); }}>
                                   <History className="w-4 h-4" />
                                 </Button>
@@ -1259,6 +1316,18 @@ export default function AttendanceManagement() {
               <Button onClick={() => { setShowHistory(false); setHistoryEmployeeId(null); }} className="w-full mt-4" variant="outline">Cerrar</Button>
             </div>
           </div>
+        )}
+
+        {/* Assign Schedule Modal */}
+        {showScheduleModal && schedulingEmployee && (
+          <AssignScheduleModal
+            employee={schedulingEmployee}
+            onClose={() => { setShowScheduleModal(false); setSchedulingEmployee(null); }}
+            onSuccess={() => {
+              queryClient.invalidateQueries(["workSchedules"]);
+              queryClient.invalidateQueries(["todayAttendance"]);
+            }}
+          />
         )}
 
         {/* Justify Modal — componente separado */}
