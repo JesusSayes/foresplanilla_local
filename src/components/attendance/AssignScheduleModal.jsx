@@ -6,30 +6,121 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Clock, RefreshCw, CheckCircle, ChevronDown, Search } from "lucide-react";
+import { CalendarIcon, Clock, RefreshCw, CheckCircle, ChevronDown, Search, X } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 
+// Selector de fecha inline (sin Popover/portal para evitar conflictos con overflow)
+function InlineDatePicker({ value, onChange, label, hint, className = "" }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div className={className}>
+      {label && <Label className="font-semibold text-slate-800 mb-2 block">{label}</Label>}
+      <div className="relative" ref={ref}>
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="w-full flex items-center gap-2 px-3 py-2 border border-green-200 bg-green-50 hover:bg-green-100 rounded-md text-sm text-green-700 font-medium transition-colors"
+        >
+          <CalendarIcon className="w-4 h-4 text-green-600 shrink-0" />
+          {value ? format(value, "dd 'de' MMMM yyyy", { locale: es }) : <span className="text-slate-400">Sin fecha</span>}
+        </button>
+        {open && (
+          <div className="absolute z-[200] mt-1 bg-white border border-slate-200 rounded-lg shadow-xl left-0">
+            <Calendar
+              mode="single"
+              selected={value}
+              onSelect={d => { if (d) { onChange(d); setOpen(false); } }}
+              locale={es}
+              initialFocus
+            />
+          </div>
+        )}
+      </div>
+      {hint && <p className="text-xs text-slate-500 mt-1">{hint}</p>}
+    </div>
+  );
+}
+
+function InlineDatePickerOptional({ value, onChange, label }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div>
+      {label && <Label className="font-semibold text-slate-800 mb-2 block">{label}</Label>}
+      <div className="flex gap-2" ref={ref}>
+        <div className="relative flex-1">
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            className="w-full flex items-center gap-2 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-md text-sm transition-colors"
+          >
+            <CalendarIcon className="w-4 h-4 text-slate-400 shrink-0" />
+            {value
+              ? <span className="text-slate-800">{format(value, "dd 'de' MMMM yyyy", { locale: es })}</span>
+              : <span className="text-slate-400">Sin fecha de fin</span>
+            }
+          </button>
+          {open && (
+            <div className="absolute z-[200] mt-1 bg-white border border-slate-200 rounded-lg shadow-xl left-0">
+              <Calendar
+                mode="single"
+                selected={value}
+                onSelect={d => { onChange(d || null); setOpen(false); }}
+                locale={es}
+                initialFocus
+              />
+            </div>
+          )}
+        </div>
+        {value && (
+          <Button variant="outline" size="sm" onClick={() => onChange(null)} className="text-slate-500 shrink-0">
+            <X className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
   const [effectiveFrom, setEffectiveFrom] = useState(new Date());
-  const [effectiveTo, setEffectiveTo] = useState(null); // null = sin fin
+  const [effectiveTo, setEffectiveTo] = useState(null);
   const [selectedScheduleId, setSelectedScheduleId] = useState("");
   const [recalcRange, setRecalcRange] = useState(true);
   const [saving, setSaving] = useState(false);
   const [scheduleSearchTerm, setScheduleSearchTerm] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   const { data: allSchedules = [] } = useQuery({
     queryKey: ["workSchedules"],
     queryFn: () => base44.entities.WorkSchedule.list("-effective_from"),
   });
 
-  // Horarios plantilla (sin employee_id asignado → son plantillas) + horarios del empleado
   const templateSchedules = allSchedules.filter(s => !s.employee_id && s.is_active);
   const empSchedules = allSchedules.filter(s => s.employee_id === employee.id && s.is_active);
 
-  // Horario actualmente vigente para el empleado
   const today = format(new Date(), "yyyy-MM-dd");
   const currentSchedule = (() => {
     const empCandidates = empSchedules.filter(s => {
@@ -41,9 +132,21 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
     return empCandidates[0] || null;
   })();
 
-  const filteredSchedules = [...templateSchedules, ...empSchedules].filter(s =>
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const visibleSchedules = templateSchedules.filter(s =>
     s.schedule_name.toLowerCase().includes(scheduleSearchTerm.toLowerCase())
   );
+
+  const selectedScheduleObj = allSchedules.find(s => s.id === selectedScheduleId);
 
   const getSchedulePreview = (s) => {
     if (!s) return null;
@@ -56,6 +159,8 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
       { day: "Sáb", start: s.saturday_start, end: s.saturday_end },
     ].filter(d => d.start);
   };
+
+  const preview = getSchedulePreview(selectedScheduleObj);
 
   const handleSave = async () => {
     if (!selectedScheduleId) {
@@ -71,18 +176,15 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
       const effectiveFromStr = format(effectiveFrom, "yyyy-MM-dd");
       const effectiveToStr = effectiveTo ? format(effectiveTo, "yyyy-MM-dd") : null;
 
-      // 1. Cerrar horarios individuales del empleado que se superpongan con el nuevo rango
+      // 1. Cerrar horarios individuales del empleado que se superpongan
       for (const s of empSchedules) {
-        const sFrom = s.effective_from || "0000-01-01";
         const sTo = s.effective_to || "9999-12-31";
-        // Si el horario existente se superpone con el nuevo rango, ajustar su fecha de fin
         if (sTo >= effectiveFromStr) {
-          // Calcular el día anterior a effectiveFrom
           const dayBefore = new Date(effectiveFromStr + "T00:00:00");
           dayBefore.setDate(dayBefore.getDate() - 1);
           const dayBeforeStr = format(dayBefore, "yyyy-MM-dd");
+          const sFrom = s.effective_from || "0000-01-01";
           if (dayBeforeStr < sFrom) {
-            // Si el horario comienza después, eliminarlo directamente
             await base44.entities.WorkSchedule.update(s.id, { is_active: false });
           } else {
             await base44.entities.WorkSchedule.update(s.id, { effective_to: dayBeforeStr });
@@ -90,7 +192,7 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
         }
       }
 
-      // 2. Crear nuevo WorkSchedule individual para el empleado
+      // 2. Crear nuevo WorkSchedule individual
       await base44.entities.WorkSchedule.create({
         employee_id: employee.id,
         schedule_name: `${selectedSchedule.schedule_name} - ${employee.first_name} ${employee.last_name}`,
@@ -117,15 +219,13 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
         is_active: true,
       });
 
-      // 3. Recalcular asistencias en el rango si se solicitó
+      // 3. Recalcular asistencias si se solicitó
       if (recalcRange) {
-        const dateFrom = effectiveFromStr;
-        // Si hay fecha fin, recalcular hasta esa fecha; si no, recalcular hasta hoy
         const dateTo = effectiveToStr || format(new Date(), "yyyy-MM-dd");
-        if (dateFrom <= dateTo) {
+        if (effectiveFromStr <= dateTo) {
           const res = await base44.functions.invoke("recalcularAsistencia", {
             employee_id: employee.id,
-            date_from: dateFrom,
+            date_from: effectiveFromStr,
             date_to: dateTo,
           });
           toast.success(`Horario asignado y ${res.data?.updated || 0} registros recalculados`);
@@ -145,27 +245,6 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
     }
   };
 
-  const selectedScheduleObj = allSchedules.find(s => s.id === selectedScheduleId);
-  const preview = getSchedulePreview(selectedScheduleObj);
-
-  // Custom searchable dropdown state
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const visibleSchedules = templateSchedules.filter(s =>
-    s.schedule_name.toLowerCase().includes(scheduleSearchTerm.toLowerCase())
-  );
-
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-6"
@@ -183,9 +262,9 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
             <Button variant="ghost" size="icon" onClick={onClose}>✕</Button>
           </div>
         </CardHeader>
-        <CardContent className="p-6 space-y-5">
+        <CardContent className="p-6 space-y-5 overflow-visible">
 
-          {/* Horario actual */}
+          {/* Horario actual vigente */}
           {currentSchedule && (
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
               <p className="text-xs text-slate-500 mb-1">Horario actual vigente:</p>
@@ -197,7 +276,7 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Selección de horario — dropdown propio con búsqueda */}
+          {/* Selector de horario con búsqueda */}
           <div>
             <Label className="font-semibold text-slate-800 mb-2 block">Nuevo Horario *</Label>
             <div className="relative" ref={dropdownRef}>
@@ -211,9 +290,8 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
                 </span>
                 <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
               </button>
-
               {dropdownOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-64 flex flex-col">
+                <div className="absolute z-[150] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-64 flex flex-col">
                   <div className="p-2 border-b shrink-0">
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -251,11 +329,11 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
             </div>
           </div>
 
-          {/* Preview del horario */}
+          {/* Preview del horario seleccionado */}
           {preview && preview.length > 0 && (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-xs font-semibold text-blue-700 mb-2 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />Vista previa del horario
+                <Clock className="w-3.5 h-3.5" /> Vista previa del horario
               </p>
               <div className="grid grid-cols-3 gap-1.5">
                 {preview.map(d => (
@@ -266,52 +344,29 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
                 ))}
               </div>
               {selectedScheduleObj?.tolerance_minutes > 0 && (
-                <p className="text-xs text-blue-600 mt-2">Tolerancia: {selectedScheduleObj.tolerance_minutes} min · Break: {selectedScheduleObj.break_duration_minutes ?? 60} min</p>
+                <p className="text-xs text-blue-600 mt-2">
+                  Tolerancia: {selectedScheduleObj.tolerance_minutes} min · Break: {selectedScheduleObj.break_duration_minutes ?? 60} min
+                </p>
               )}
             </div>
           )}
 
-          {/* Fecha desde */}
-          <div>
-            <Label className="font-semibold text-slate-800 mb-2 block">Vigente desde *</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start bg-green-50 border-green-200 hover:bg-green-100">
-                  <CalendarIcon className="mr-2 h-4 w-4 text-green-700" />
-                  <span className="text-green-700">{format(effectiveFrom, "dd 'de' MMMM yyyy", { locale: es })}</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={effectiveFrom} onSelect={d => d && setEffectiveFrom(d)} locale={es} />
-              </PopoverContent>
-            </Popover>
-            <p className="text-xs text-slate-500 mt-1">El nuevo horario aplicará desde esta fecha en adelante.</p>
-          </div>
+          {/* Vigente desde — calendario inline */}
+          <InlineDatePicker
+            label="Vigente desde *"
+            value={effectiveFrom}
+            onChange={setEffectiveFrom}
+            hint="El nuevo horario aplicará desde esta fecha en adelante."
+          />
 
-          {/* Fecha hasta (opcional) */}
-          <div>
-            <Label className="font-semibold text-slate-800 mb-2 block">Vigente hasta <span className="font-normal text-slate-400">(opcional — dejar vacío = sin fecha de fin)</span></Label>
-            <div className="flex gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="flex-1 justify-start">
-                    <CalendarIcon className="mr-2 h-4 w-4 text-slate-500" />
-                    {effectiveTo ? format(effectiveTo, "dd 'de' MMMM yyyy", { locale: es }) : <span className="text-slate-400">Sin fecha de fin</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={effectiveTo} onSelect={d => setEffectiveTo(d)} locale={es} />
-                </PopoverContent>
-              </Popover>
-              {effectiveTo && (
-                <Button variant="outline" size="sm" onClick={() => setEffectiveTo(null)} className="text-slate-500">
-                  Quitar
-                </Button>
-              )}
-            </div>
-          </div>
+          {/* Vigente hasta — opcional, calendario inline */}
+          <InlineDatePickerOptional
+            label={<>Vigente hasta <span className="font-normal text-slate-400">(opcional — dejar vacío = sin fecha de fin)</span></>}
+            value={effectiveTo}
+            onChange={setEffectiveTo}
+          />
 
-          {/* Opción recálculo */}
+          {/* Recalcular asistencias */}
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <label className="flex items-start gap-3 cursor-pointer">
               <input
