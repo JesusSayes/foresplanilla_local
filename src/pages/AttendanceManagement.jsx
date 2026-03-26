@@ -831,7 +831,12 @@ export default function AttendanceManagement() {
                                    const ends = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
                                    const st = sched[starts[dow2]]; const en = sched[ends[dow2]];
                                    if (!st) return <p className="text-xs text-slate-400 mt-0.5">Día libre</p>;
-                                   return <p className="text-xs text-indigo-600 mt-0.5">🕐 {st}–{en}</p>;
+                                   return (
+                                     <>
+                                       <p className="text-xs text-slate-500 mt-0.5 truncate" title={sched.schedule_name}>{sched.schedule_name}</p>
+                                       <p className="text-xs text-indigo-600">🕐 {st}–{en}</p>
+                                     </>
+                                   );
                                  })()}
                                  {vacation && (
                                    <p className="text-xs text-amber-700 font-medium mt-0.5">
