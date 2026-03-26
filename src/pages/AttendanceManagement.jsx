@@ -1024,13 +1024,28 @@ export default function AttendanceManagement() {
                                 variant="outline"
                                 className="flex-1 text-blue-700 border-blue-300 hover:bg-blue-50"
                                 onClick={async () => {
-                                  await base44.entities.OvertimeAlert.update(alert.id, { status: "Aprobado", notes: `HE aceptadas solo para el día ${alert.alert_date}` });
+                                  // 1. Marcar overtime_authorized=true en el registro del día
                                   if (record) {
-                                    await base44.entities.AttendanceRecord.update(record.id, { notes: (record.notes ? record.notes + " | " : "") + `HE aceptadas: ${alert.overtime_hours.toFixed(2)}h (${alert.alert_date})` });
+                                    await base44.entities.AttendanceRecord.update(record.id, {
+                                      overtime_authorized: true,
+                                      notes: (record.notes ? record.notes + " | " : "") + `HE aceptadas: ${alert.overtime_hours.toFixed(2)}h (${alert.alert_date})`
+                                    });
                                   }
+                                  // 2. Marcar alerta como aprobada
+                                  await base44.entities.OvertimeAlert.update(alert.id, {
+                                    status: "Aprobado",
+                                    notes: `HE aceptadas solo para el día ${alert.alert_date}`
+                                  });
+                                  // 3. Recalcular asistencia del día (tardanza + HE 25% + HE 35%)
+                                  await base44.functions.invoke("recalcularAsistencia", {
+                                    employee_id: alert.employee_id,
+                                    date_from: alert.alert_date,
+                                    date_to: alert.alert_date,
+                                  });
                                   queryClient.invalidateQueries(["overtimeAlerts"]);
                                   queryClient.invalidateQueries(["todayAttendance"]);
-                                  toast.success(`HE aceptadas solo para el ${format(new Date(alert.alert_date + "T00:00:00"), "dd MMM yyyy", { locale: es })}`);
+                                  queryClient.invalidateQueries(["attendanceRecords"]);
+                                  toast.success(`HE aceptadas y recalculadas para el ${format(new Date(alert.alert_date + "T00:00:00"), "dd MMM yyyy", { locale: es })}: HE25% y HE35% actualizadas`);
                                 }}
                               >
                                 <CheckCircle className="w-4 h-4 mr-2" />Aceptar HE (solo este día)
