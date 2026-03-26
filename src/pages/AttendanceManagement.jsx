@@ -977,44 +977,74 @@ export default function AttendanceManagement() {
                   ) : (
                     <div className="space-y-4">
                       {overtimeAlerts.filter(a => {
-                        if (!accessibleEmployeeIds.has(a.employee_id)) return false;
-                        if (!overtimeSearchTerm) return true;
-                        const emp = allEmployees.find(e => e.id === a.employee_id);
-                        const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
-                        return name.includes(overtimeSearchTerm.toLowerCase());
+                       if (!accessibleEmployeeIds.has(a.employee_id)) return false;
+                       if (!overtimeSearchTerm) return true;
+                       const emp = allEmployees.find(e => e.id === a.employee_id);
+                       const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
+                       return name.includes(overtimeSearchTerm.toLowerCase());
                       }).map(alert => {
-                        const emp = allEmployees.find(e => e.id === alert.employee_id);
-                        const record = todayRecords.find(r => r.id === alert.attendance_record_id);
-                        return (
-                          <div key={alert.id} className="p-4 border-2 border-red-200 bg-red-50 rounded-lg">
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <h4 className="font-bold text-slate-900">{emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                  <Badge className="bg-red-600 text-white">{alert.overtime_hours.toFixed(2)}h extras</Badge>
-                                </div>
-                                <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position} • {emp?.department_name}</p>
-                                <p className="text-sm text-slate-700">📅 {format(new Date(alert.alert_date), "dd MMM yyyy", { locale: es })}</p>
-                                {record && <p className="text-sm text-slate-600 mt-2">Marcación: {record.clock_in} - {record.clock_out} ({record.worked_hours?.toFixed(2)}h trabajadas)</p>}
-                              </div>
-                            </div>
-                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
-                              <p className="text-sm text-yellow-900">⚠️ Este empleado NO está autorizado para realizar horas extras. Por favor, verifica la marcación o autoriza las horas extras desde Gestión de Horarios.</p>
-                            </div>
-                            <div className="flex gap-3">
-                               <Button size="sm" variant="outline" className="flex-1" onClick={() => record && handleEditRecord(record)}>
-                                 <Edit className="w-4 h-4 mr-2" />Corregir Marcación
-                               </Button>
-                               <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
-                                 await base44.entities.OvertimeAlert.update(alert.id, { status: "Descartado" });
-                                 queryClient.invalidateQueries(["overtimeAlerts"]);
-                                 toast.success("Alerta descartada");
-                               }}>
-                                 <XCircle className="w-4 h-4 mr-2" />Descartar
-                               </Button>
+                       const emp = allEmployees.find(e => e.id === alert.employee_id);
+                       const record = todayRecords.find(r => r.id === alert.attendance_record_id);
+                       const alertSched = emp ? getEmployeeScheduleForDate(emp.id, alert.alert_date) : null;
+                       const alertDow = new Date(alert.alert_date + "T00:00:00").getDay();
+                       const dowStarts = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+                       const dowEnds   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+                       const schedStart = alertSched?.[dowStarts[alertDow]];
+                       const schedEnd   = alertSched?.[dowEnds[alertDow]];
+                       const schedName  = alertSched?.schedule_name?.replace(new RegExp(`\\s*-\\s*${emp?.first_name}\\s+${emp?.last_name}\\s*$`, 'i'), '') || null;
+
+                       return (
+                         <div key={alert.id} className="p-4 border-2 border-red-200 bg-red-50 rounded-lg">
+                           <div className="flex items-start justify-between mb-4">
+                             <div className="flex-1">
+                               <div className="flex items-center gap-3 mb-2">
+                                 <h4 className="font-bold text-slate-900">{emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
+                                 <Badge className="bg-red-600 text-white">{alert.overtime_hours.toFixed(2)}h extras</Badge>
+                               </div>
+                               <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position} • {emp?.department_name}</p>
+                               <p className="text-sm text-slate-700">📅 {format(new Date(alert.alert_date + "T00:00:00"), "dd MMM yyyy", { locale: es })}</p>
+                               {record && <p className="text-sm text-slate-600 mt-1">Marcación: {record.clock_in} - {record.clock_out} ({record.worked_hours?.toFixed(2)}h trabajadas)</p>}
+                               {alertSched && (
+                                 <p className="text-sm text-slate-600 mt-1">
+                                   🗓️ Horario: <span className="font-medium">{schedName}</span>
+                                   {schedStart && schedEnd && <span className="text-indigo-600 ml-1">({schedStart}–{schedEnd})</span>}
+                                 </p>
+                               )}
                              </div>
-                          </div>
-                        );
+                           </div>
+                           <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
+                             <p className="text-sm text-yellow-900">⚠️ Este empleado <strong>no está autorizado</strong> para realizar horas extras de forma permanente. Puede corregir la marcación, descartar la alerta o <strong>aceptar las HE únicamente para este día</strong> sin modificar su autorización general.</p>
+                           </div>
+                           <div className="flex gap-2 flex-wrap">
+                              <Button size="sm" variant="outline" className="flex-1" onClick={() => record && handleEditRecord(record)}>
+                                <Edit className="w-4 h-4 mr-2" />Corregir Marcación
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 text-blue-700 border-blue-300 hover:bg-blue-50"
+                                onClick={async () => {
+                                  await base44.entities.OvertimeAlert.update(alert.id, { status: "Aprobado", notes: `HE aceptadas solo para el día ${alert.alert_date}` });
+                                  if (record) {
+                                    await base44.entities.AttendanceRecord.update(record.id, { notes: (record.notes ? record.notes + " | " : "") + `HE aceptadas: ${alert.overtime_hours.toFixed(2)}h (${alert.alert_date})` });
+                                  }
+                                  queryClient.invalidateQueries(["overtimeAlerts"]);
+                                  queryClient.invalidateQueries(["todayAttendance"]);
+                                  toast.success(`HE aceptadas solo para el ${format(new Date(alert.alert_date + "T00:00:00"), "dd MMM yyyy", { locale: es })}`);
+                                }}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />Aceptar HE (solo este día)
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
+                                await base44.entities.OvertimeAlert.update(alert.id, { status: "Descartado" });
+                                queryClient.invalidateQueries(["overtimeAlerts"]);
+                                toast.success("Alerta descartada");
+                              }}>
+                                <XCircle className="w-4 h-4 mr-2" />Descartar
+                              </Button>
+                            </div>
+                         </div>
+                       );
                       })}
                     </div>
                   )}
