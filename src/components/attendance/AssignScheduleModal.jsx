@@ -1,16 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Clock, RefreshCw, CheckCircle } from "lucide-react";
-import { format, addMonths } from "date-fns";
+import { CalendarIcon, Clock, RefreshCw, CheckCircle, ChevronDown, Search } from "lucide-react";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 
@@ -150,6 +148,24 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
   const selectedScheduleObj = allSchedules.find(s => s.id === selectedScheduleId);
   const preview = getSchedulePreview(selectedScheduleObj);
 
+  // Custom searchable dropdown state
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const visibleSchedules = templateSchedules.filter(s =>
+    s.schedule_name.toLowerCase().includes(scheduleSearchTerm.toLowerCase())
+  );
+
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-6"
@@ -181,34 +197,58 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Selección de horario */}
+          {/* Selección de horario — dropdown propio con búsqueda */}
           <div>
             <Label className="font-semibold text-slate-800 mb-2 block">Nuevo Horario *</Label>
-            <Select value={selectedScheduleId} onValueChange={setSelectedScheduleId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar horario..." />
-              </SelectTrigger>
-              <SelectContent>
-                <div className="p-2 border-b sticky top-0 bg-white z-10">
-                  <Input
-                    placeholder="Buscar horario..."
-                    value={scheduleSearchTerm}
-                    onChange={e => setScheduleSearchTerm(e.target.value)}
-                    className="h-8"
-                    onClick={e => e.stopPropagation()}
-                    onKeyDown={e => e.stopPropagation()}
-                  />
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
+                className="w-full flex items-center justify-between border border-input rounded-md px-3 py-2 text-sm bg-white shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-1 focus:ring-ring"
+                onClick={() => setDropdownOpen(o => !o)}
+              >
+                <span className={selectedScheduleObj ? "text-slate-900" : "text-slate-400"}>
+                  {selectedScheduleObj ? selectedScheduleObj.schedule_name : "Seleccionar horario..."}
+                </span>
+                <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+              </button>
+
+              {dropdownOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-64 flex flex-col">
+                  <div className="p-2 border-b shrink-0">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Input
+                        autoFocus
+                        placeholder="Buscar horario..."
+                        value={scheduleSearchTerm}
+                        onChange={e => setScheduleSearchTerm(e.target.value)}
+                        className="pl-8 h-8"
+                      />
+                    </div>
+                  </div>
+                  <div className="overflow-y-auto">
+                    {visibleSchedules.length === 0 ? (
+                      <p className="text-sm text-slate-400 text-center py-4">No se encontraron horarios</p>
+                    ) : (
+                      visibleSchedules.map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 hover:text-indigo-800 transition-colors ${selectedScheduleId === s.id ? "bg-indigo-50 text-indigo-800 font-semibold" : "text-slate-800"}`}
+                          onClick={() => {
+                            setSelectedScheduleId(s.id);
+                            setScheduleSearchTerm("");
+                            setDropdownOpen(false);
+                          }}
+                        >
+                          {s.schedule_name}
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </div>
-                {templateSchedules.length > 0 && (
-                  <>
-                    <div className="px-2 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wide">Plantillas</div>
-                    {templateSchedules.filter(s => s.schedule_name.toLowerCase().includes(scheduleSearchTerm.toLowerCase())).map(s => (
-                      <SelectItem key={s.id} value={s.id}>{s.schedule_name}</SelectItem>
-                    ))}
-                  </>
-                )}
-              </SelectContent>
-            </Select>
+              )}
+            </div>
           </div>
 
           {/* Preview del horario */}
