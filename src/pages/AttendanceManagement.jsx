@@ -833,7 +833,7 @@ export default function AttendanceManagement() {
                                    if (!st) return <p className="text-xs text-slate-400 mt-0.5">Día libre</p>;
                                    return (
                                      <>
-                                       <p className="text-xs text-slate-500 mt-0.5 truncate" title={sched.schedule_name}>{sched.schedule_name}</p>
+                                       <p className="text-xs text-slate-500 mt-0.5 truncate" title={sched.schedule_name}>{sched.schedule_name.replace(new RegExp(`\\s*-\\s*${emp.first_name}\\s+${emp.last_name}\\s*$`, 'i'), '')}</p>
                                        <p className="text-xs text-indigo-600">🕐 {st}–{en}</p>
                                      </>
                                    );
