@@ -27,12 +27,27 @@ export default function EmployeeForm({
   ubigeos,
   professions,
   allContracts,
+  allEmployees = [],
   derechohabientes,
   onDerechohabienteAdd,
   onDerechohabienteEdit,
   onDerechohabienteDelete,
 }) {
   const { hasPermission } = usePermissions();
+
+  // Auto-generar código FPxxxx al abrir para nuevo empleado
+  React.useEffect(() => {
+    if (!editingEmployee) {
+      const fpCodes = allEmployees
+        .map(e => e.employee_code)
+        .filter(c => c && /^FP\d{4}$/.test(c))
+        .map(c => parseInt(c.slice(2), 10));
+      const maxNum = fpCodes.length > 0 ? Math.max(...fpCodes) : 0;
+      const nextNum = String(maxNum + 1).padStart(4, "0");
+      setFormData(prev => ({ ...prev, employee_code: `FP${nextNum}` }));
+    }
+  }, []);
+
   const [positionSearchTerm, setPositionSearchTerm] = React.useState("");
   const [departmentSearchTerm, setDepartmentSearchTerm] = React.useState("");
   const [professionSearchTerm, setProfessionSearchTerm] = React.useState("");
@@ -151,10 +166,13 @@ export default function EmployeeForm({
                     <div>
                       <Label>Código de Empleado <span className="text-red-600">*</span></Label>
                       <Input
-                        value={formData.employee_code}
+                        value={formData.employee_code || "Generando..."}
                         disabled
-                        className="bg-slate-100 text-slate-600 cursor-not-allowed font-mono font-semibold"
+                        className="bg-indigo-50 text-indigo-700 cursor-not-allowed font-mono font-semibold border-indigo-200"
                       />
+                      {!editingEmployee && (
+                        <p className="text-xs text-indigo-500 mt-1">⚡ Código autogenerado</p>
+                      )}
                     </div>
                     <div>
                       <Label>Tipo de Documento <span className="text-red-600">*</span></Label>

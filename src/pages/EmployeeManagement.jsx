@@ -612,26 +612,12 @@ export default function EmployeeManagement() {
     });
   };
 
-  const generateEmployeeCode = () => {
-    // Buscar todos los códigos con formato FPxxxx y tomar el mayor número
-    const fpCodes = allEmployees
-      .map(e => e.employee_code)
-      .filter(c => c && /^FP\d{4}$/.test(c))
-      .map(c => parseInt(c.slice(2), 10));
-    const maxNum = fpCodes.length > 0 ? Math.max(...fpCodes) : 0;
-    const nextNum = String(maxNum + 1).padStart(4, "0");
-    return `FP${nextNum}`;
-  };
-
   const handleCreate = () => {
     if (!hasPermission("employees.create")) {
       toast.error("No tienes permisos para crear empleados");
       return;
     }
-    const autoCode = generateEmployeeCode();
     initializeForm();
-    // Sobrescribir el código con el autogenerado (initializeForm lo deja vacío para nuevos)
-    setTimeout(() => setFormData(prev => ({ ...prev, employee_code: autoCode })), 0);
     setEditingEmployee(null);
     setShowForm(true);
   };
@@ -1070,6 +1056,7 @@ export default function EmployeeManagement() {
           ubigeos={ubigeos}
           professions={professions}
           allContracts={allContracts}
+          allEmployees={allEmployees}
           derechohabientes={derechohabientes}
           onDerechohabienteAdd={(data) => createDerechohabienteMutation.mutate(data)}
           onDerechohabienteEdit={(id, data) => updateDerechohabienteMutation.mutate({ id, data })}
