@@ -66,6 +66,21 @@ Deno.serve(async (req) => {
     const startDate = body.startDate || body.start_date;
     const endDate = body.endDate || body.end_date;
 
+    // Config enviada desde el formulario (con fallbacks a defaults)
+    const cfg = body.config || {};
+    const TABLE_NAME       = cfg.tableName          || "iclock_transaction";
+    const FIELD_EMP_CODE   = cfg.fieldEmpCode        || "emp_code";
+    const FIELD_PUNCH_TIME = cfg.fieldPunchTime       || "punch_time";
+    const FIELD_TERMINAL   = cfg.fieldTerminal        || "terminal_alias";
+    const FIELD_PUNCH_STATE = cfg.fieldPunchState     || "punch_state";
+    const EMP_PAD_LENGTH   = cfg.empCodePadLength !== undefined ? cfg.empCodePadLength : 8;
+    const EMP_CODE_FIELD   = cfg.empCodeField         || "document_number";
+    const WINDOW_MIN       = cfg.windowMinutes !== undefined ? cfg.windowMinutes : 120;
+    const DEFAULT_START    = cfg.defaultScheduledStart || "09:00";
+    const DEFAULT_END      = cfg.defaultScheduledEnd   || "18:00";
+    const DEFAULT_BREAK    = cfg.defaultBreakMinutes !== undefined ? cfg.defaultBreakMinutes : 60;
+    const DEFAULT_TOL      = cfg.defaultToleranceMinutes !== undefined ? cfg.defaultToleranceMinutes : 10;
+
     const dateFrom = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const dateTo = endDate ? new Date(endDate) : new Date();
 
@@ -86,13 +101,13 @@ Deno.serve(async (req) => {
     try {
       const { rows } = await client.query(
         `SELECT
-          t.emp_code,
-          t.punch_time,
-          t.punch_state,
-          t.terminal_alias
-        FROM iclock_transaction t
-        WHERE t.punch_time >= $1 AND t.punch_time < $2
-        ORDER BY t.emp_code, t.punch_time ASC`,
+          t.${FIELD_EMP_CODE}   AS emp_code,
+          t.${FIELD_PUNCH_TIME} AS punch_time,
+          t.${FIELD_PUNCH_STATE} AS punch_state,
+          t.${FIELD_TERMINAL}   AS terminal_alias
+        FROM ${TABLE_NAME} t
+        WHERE t.${FIELD_PUNCH_TIME} >= $1 AND t.${FIELD_PUNCH_TIME} < $2
+        ORDER BY t.${FIELD_EMP_CODE}, t.${FIELD_PUNCH_TIME} ASC`,
         [dateFrom, new Date(dateTo.getTime() + 86400000)]
       );
       transactions = rows;
@@ -104,7 +119,8 @@ Deno.serve(async (req) => {
     // 2. Agrupar marcaciones por empCode + fecha → lista de punches
     const punchMap = {}; // key: `${empCode}__${dateKey}` → [Date, ...]
     for (const tx of transactions) {
-      const empCode = tx.emp_code?.toString().padStart(8, '0');
+      const rawEmpCode = tx.emp_code?.toString();
+      const empCode = EMP_PAD_LENGTH > 0 && rawEmpCode ? rawEmpCode.padStart(EMP_PAD_LENGTH, '0') : rawEmpCode;
       if (!empCode) continue;
       const punchTime = new Date(tx.punch_time);
       const dateKey = punchTime.toISOString().slice(0, 10);
@@ -119,12 +135,7 @@ Deno.serve(async (req) => {
       return h * 60 + m;
     };
 
-    // Clasifica punches usando el horario programado con ventana ±2 horas (120 min)
-    // clockIn  = punch más cercana al scheduledStart dentro de [scheduledStart-120, scheduledStart+120]
-    // clockOut = punch más cercana al scheduledEnd   dentro de [scheduledEnd-120,   scheduledEnd+120]
-    //            que sea POSTERIOR a clockIn
-    const WINDOW_MIN = 120;
-
+    // Clasifica punches usando el horario programado con ventana configurable (config.windowMinutes)
     function classifyPunches(sortedPunches, scheduledStart, scheduledEnd) {
       const schInMin  = toMin(scheduledStart);
       const schOutMin = toMin(scheduledEnd);
@@ -132,7 +143,7 @@ Deno.serve(async (req) => {
       // Candidatos para entrada: dentro de la ventana del horario de entrada
       const inCandidates = sortedPunches.filter(p => {
         const pm = p.getHours() * 60 + p.getMinutes();
-        return Math.abs(pm - schInMin) <= WINDOW_MIN;
+        return Math.abs(pm - schInMin) <= WINDOW_MIN;  // WINDOW_MIN del scope externo
       });
       // Elegir el más cercano al horario programado de entrada
       inCandidates.sort((a, b) => {
@@ -146,7 +157,7 @@ Deno.serve(async (req) => {
       // Candidatos para salida: dentro de la ventana del horario de salida, posterior a entrada
       const outCandidates = sortedPunches.filter(p => {
         const pm = p.getHours() * 60 + p.getMinutes();
-        if (clockInMin !== null && pm <= clockInMin) return false; // debe ser posterior a la entrada
+        if (clockInMin !== null && pm <= clockInMin) return false;
         return Math.abs(pm - schOutMin) <= WINDOW_MIN;
       });
       outCandidates.sort((a, b) => {
@@ -169,7 +180,6 @@ Deno.serve(async (req) => {
       };
     }
 
-    // El punchSummary ya NO puede calcularse aquí sin el horario → se calculará por empleado+día más abajo
     // Guardamos los punches crudos ordenados para usarlos después
     const punchRaw = {}; // key → sortedPunches[]
     for (const [key, punches] of Object.entries(punchMap)) {
@@ -183,17 +193,10 @@ Deno.serve(async (req) => {
       base44.entities.WorkSchedule.list("-updated_date"),
     ]);
 
-    // Mapear document_number → employee
-    const employeeByDoc = {};
-    for (const emp of employees) {
-      if (emp.document_number) {
-        employeeByDoc[emp.document_number.padStart(8, '0')] = emp;
-      }
-    }
-
     // 4. Para cada empleado × cada día del rango → upsert AttendanceRecord
     for (const emp of employees) {
-      const empCodeKey = emp.document_number?.padStart(8, '0');
+      const rawCode = emp[EMP_CODE_FIELD];
+      const empCodeKey = EMP_PAD_LENGTH > 0 && rawCode ? rawCode.toString().padStart(EMP_PAD_LENGTH, '0') : rawCode?.toString();
 
       for (const dateStr of allDates) {
         const punchKey = `${empCodeKey}__${dateStr}`;
@@ -204,13 +207,13 @@ Deno.serve(async (req) => {
         const dow = new Date(dateStr + "T00:00:00").getDay();
         const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
         const dayEndMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-        const scheduledStart = schedule ? (schedule[dayStartMap[dow]] || "09:00") : "09:00";
-        const scheduledEnd   = schedule ? (schedule[dayEndMap[dow]]   || "18:00") : "18:00";
+        const scheduledStart = schedule ? (schedule[dayStartMap[dow]] || DEFAULT_START) : DEFAULT_START;
+        const scheduledEnd   = schedule ? (schedule[dayEndMap[dow]]   || DEFAULT_END)   : DEFAULT_END;
 
         const punch = rawPunches ? classifyPunches(rawPunches, scheduledStart, scheduledEnd) : null;
 
-        const breakMinutes   = schedule?.break_duration_minutes ?? 60;
-        const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
+        const breakMinutes     = schedule?.break_duration_minutes ?? DEFAULT_BREAK;
+        const toleranceMinutes = schedule?.tolerance_minutes       ?? DEFAULT_TOL;
 
         let clockIn = null, clockOut = null, workedHours = null;
         let isLate = false, lateMinutes = 0;

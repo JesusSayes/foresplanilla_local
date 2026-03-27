@@ -14,19 +14,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import SyncMonitor from "../components/attendance/SyncMonitor";
+import BiotimeSyncConfig from "../components/attendance/BiotimeSyncConfig";
 
 export default function DatabaseConfig() {
   const [employee, setEmployee] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingConnection, setEditingConnection] = useState(null);
   const [showMonitor, setShowMonitor] = useState(null);
-  const [syncDateFrom, setSyncDateFrom] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 7);
-    return d.toISOString().slice(0, 10);
-  });
-  const [syncDateTo, setSyncDateTo] = useState(() => new Date().toISOString().slice(0, 10));
-  const [syncResult, setSyncResult] = useState(null);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [formData, setFormData] = useState({
     connection_name: "",
     connection_type: "MySQL",
@@ -105,29 +99,6 @@ export default function DatabaseConfig() {
       toast.error("Error al eliminar la conexión");
     },
   });
-
-  const handleBiotimeSync = async () => {
-    if (!syncDateFrom || !syncDateTo) { toast.error("Selecciona el rango de fechas"); return; }
-    setIsSyncing(true);
-    setSyncResult(null);
-    try {
-      const response = await base44.functions.invoke('syncBiotimeAttendance', {
-        startDate: syncDateFrom,
-        endDate: syncDateTo,
-      });
-      setSyncResult(response.data);
-      if (response.data?.success) {
-        toast.success(`Sincronización completada: ${response.data.inserted} insertados, ${response.data.updated} actualizados`);
-      } else {
-        toast.error(`Error: ${response.data?.error || "Error desconocido"}`);
-      }
-    } catch (err) {
-      toast.error("Error al ejecutar la sincronización: " + err.message);
-      setSyncResult({ success: false, error: err.message });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   const testConnectionMutation = useMutation({
     mutationFn: async (connectionData) => {
@@ -245,81 +216,7 @@ export default function DatabaseConfig() {
         </div>
 
         {/* Panel Sincronización Biotime */}
-        <Card className="border-0 shadow-lg mb-6">
-          <CardHeader className="border-b bg-gradient-to-r from-indigo-50 to-blue-50">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-600 rounded-lg"><RefreshCw className="w-5 h-5 text-white" /></div>
-              <div>
-                <CardTitle className="text-lg">Sincronización Biotime</CardTitle>
-                <p className="text-xs text-slate-600 mt-0.5">Importa marcaciones y genera registros para todos los empleados activos</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="flex flex-wrap items-end gap-4">
-              <div>
-                <Label className="text-xs text-slate-600">Fecha Desde</Label>
-                <Input type="date" value={syncDateFrom} onChange={(e) => setSyncDateFrom(e.target.value)} className="mt-1 w-44" />
-              </div>
-              <div>
-                <Label className="text-xs text-slate-600">Fecha Hasta</Label>
-                <Input type="date" value={syncDateTo} onChange={(e) => setSyncDateTo(e.target.value)} className="mt-1 w-44" />
-              </div>
-              <Button
-                onClick={handleBiotimeSync}
-                disabled={isSyncing}
-                className="bg-indigo-600 hover:bg-indigo-700 h-9"
-              >
-                {isSyncing
-                  ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Sincronizando...</>
-                  : <><Play className="w-4 h-4 mr-2" />Ejecutar Sincronización</>}
-              </Button>
-            </div>
-
-            {/* Resultado */}
-            {syncResult && (
-              <div className={`mt-4 p-4 rounded-lg border ${syncResult.success ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
-                {syncResult.success ? (
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="font-semibold text-green-800">Sincronización completada</span>
-                      <span className="text-xs text-green-600 ml-auto">{syncResult.durationMs ? `${(syncResult.durationMs / 1000).toFixed(1)}s` : ""}</span>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {[
-                        { label: "Insertados", value: syncResult.inserted, color: "text-green-700" },
-                        { label: "Actualizados", value: syncResult.updated, color: "text-blue-700" },
-                        { label: "Empleados", value: syncResult.totalEmployees, color: "text-indigo-700" },
-                        { label: "Días", value: syncResult.totalDays, color: "text-slate-700" },
-                      ].map(({ label, value, color }) => (
-                        <div key={label} className="bg-white rounded-lg p-3 text-center border border-slate-100">
-                          <p className={`text-2xl font-bold ${color}`}>{value ?? 0}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">{label}</p>
-                        </div>
-                      ))}
-                    </div>
-                    {syncResult.errors > 0 && (
-                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                        <p className="text-sm font-semibold text-amber-800">{syncResult.errors} error(es) durante la sincronización:</p>
-                        <ul className="mt-1 space-y-0.5 max-h-24 overflow-y-auto">
-                          {(syncResult.errorDetails || []).map((e, i) => (
-                            <li key={i} className="text-xs text-amber-700">• {e}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-red-600" />
-                    <span className="text-red-800 font-semibold">Error: {syncResult.error}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <BiotimeSyncConfig />
 
         {/* Sync Monitor */}
         {showMonitor && (
