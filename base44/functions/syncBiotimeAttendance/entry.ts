@@ -101,8 +101,8 @@ Deno.serve(async (req) => {
     }
     console.log(`[BiotimeSync] ${transactions.length} marcaciones obtenidas del Biotime`);
 
-    // 2. Agrupar marcaciones por empCode + fecha → { clockIn, clockOut }
-    const punchMap = {}; // key: `${empCode}__${dateKey}`
+    // 2. Agrupar marcaciones por empCode + fecha → lista de punches
+    const punchMap = {}; // key: `${empCode}__${dateKey}` → [Date, ...]
     for (const tx of transactions) {
       const empCode = tx.emp_code?.toString().padStart(8, '0');
       if (!empCode) continue;
@@ -112,17 +112,69 @@ Deno.serve(async (req) => {
       if (!punchMap[key]) punchMap[key] = [];
       punchMap[key].push(punchTime);
     }
-    // Para cada grupo ordenar y obtener primera y última marcación
-    const punchSummary = {}; // key → { clockIn, clockOut }
+
+    // Helper: convierte "HH:MM" a minutos desde medianoche
+    const toMin = (hhmm) => {
+      const [h, m] = (hhmm || "00:00").split(":").map(Number);
+      return h * 60 + m;
+    };
+
+    // Clasifica punches usando el horario programado con ventana ±2 horas (120 min)
+    // clockIn  = punch más cercana al scheduledStart dentro de [scheduledStart-120, scheduledStart+120]
+    // clockOut = punch más cercana al scheduledEnd   dentro de [scheduledEnd-120,   scheduledEnd+120]
+    //            que sea POSTERIOR a clockIn
+    const WINDOW_MIN = 120;
+
+    function classifyPunches(sortedPunches, scheduledStart, scheduledEnd) {
+      const schInMin  = toMin(scheduledStart);
+      const schOutMin = toMin(scheduledEnd);
+
+      // Candidatos para entrada: dentro de la ventana del horario de entrada
+      const inCandidates = sortedPunches.filter(p => {
+        const pm = p.getHours() * 60 + p.getMinutes();
+        return Math.abs(pm - schInMin) <= WINDOW_MIN;
+      });
+      // Elegir el más cercano al horario programado de entrada
+      inCandidates.sort((a, b) => {
+        const am = a.getHours() * 60 + a.getMinutes();
+        const bm = b.getHours() * 60 + b.getMinutes();
+        return Math.abs(am - schInMin) - Math.abs(bm - schInMin);
+      });
+      const clockInPunch = inCandidates[0] || null;
+      const clockInMin = clockInPunch ? (clockInPunch.getHours() * 60 + clockInPunch.getMinutes()) : null;
+
+      // Candidatos para salida: dentro de la ventana del horario de salida, posterior a entrada
+      const outCandidates = sortedPunches.filter(p => {
+        const pm = p.getHours() * 60 + p.getMinutes();
+        if (clockInMin !== null && pm <= clockInMin) return false; // debe ser posterior a la entrada
+        return Math.abs(pm - schOutMin) <= WINDOW_MIN;
+      });
+      outCandidates.sort((a, b) => {
+        const am = a.getHours() * 60 + a.getMinutes();
+        const bm = b.getHours() * 60 + b.getMinutes();
+        return Math.abs(am - schOutMin) - Math.abs(bm - schOutMin);
+      });
+      const clockOutPunch = outCandidates[0] || null;
+
+      let workedHours = null;
+      if (clockInPunch && clockOutPunch) {
+        workedHours = parseFloat(((clockOutPunch - clockInPunch) / 3600000).toFixed(2));
+        if (workedHours < 0) workedHours = null;
+      }
+
+      return {
+        clockIn:  clockInPunch  ? `${String(clockInPunch.getHours()).padStart(2,'0')}:${String(clockInPunch.getMinutes()).padStart(2,'0')}` : null,
+        clockOut: clockOutPunch ? `${String(clockOutPunch.getHours()).padStart(2,'0')}:${String(clockOutPunch.getMinutes()).padStart(2,'0')}` : null,
+        workedHours,
+      };
+    }
+
+    // El punchSummary ya NO puede calcularse aquí sin el horario → se calculará por empleado+día más abajo
+    // Guardamos los punches crudos ordenados para usarlos después
+    const punchRaw = {}; // key → sortedPunches[]
     for (const [key, punches] of Object.entries(punchMap)) {
       punches.sort((a, b) => a - b);
-      punchSummary[key] = {
-        clockIn: punches[0].toTimeString().slice(0, 5),
-        clockOut: punches.length > 1 ? punches[punches.length - 1].toTimeString().slice(0, 5) : null,
-        workedHours: punches.length > 1
-          ? parseFloat(((punches[punches.length - 1] - punches[0]) / 3600000).toFixed(2))
-          : null,
-      };
+      punchRaw[key] = punches;
     }
 
     // 3. Obtener todos los empleados activos del sistema
@@ -145,16 +197,18 @@ Deno.serve(async (req) => {
 
       for (const dateStr of allDates) {
         const punchKey = `${empCodeKey}__${dateStr}`;
-        const punch = punchSummary[punchKey] || null;
+        const rawPunches = punchRaw[punchKey] || null;
 
+        // Clasificar las marcaciones usando la ventana ±2h respecto al horario programado
         const schedule = getScheduleForDate(emp.id, emp.department_name, allSchedules, dateStr);
-
-        // Horario programado del día
         const dow = new Date(dateStr + "T00:00:00").getDay();
         const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
         const dayEndMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
         const scheduledStart = schedule ? (schedule[dayStartMap[dow]] || "09:00") : "09:00";
         const scheduledEnd   = schedule ? (schedule[dayEndMap[dow]]   || "18:00") : "18:00";
+
+        const punch = rawPunches ? classifyPunches(rawPunches, scheduledStart, scheduledEnd) : null;
+
         const breakMinutes   = schedule?.break_duration_minutes ?? 60;
         const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
 
