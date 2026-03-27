@@ -89,6 +89,7 @@ import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "BackfillAsistencia": BackfillAsistencia,
     "AccessDeviceConfig": AccessDeviceConfig,
     "Attendance": Attendance,
     "AttendanceManagement": AttendanceManagement,
