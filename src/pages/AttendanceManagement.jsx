@@ -88,10 +88,10 @@ export default function AttendanceManagement() {
     queryKey: ["todayAttendance", selectedDate, dateFrom, dateTo, isRangeMode],
     queryFn: async () => {
       if (isRangeMode && dateFrom && dateTo) {
-        // Cargar todos los registros en el rango
-        const allRecs = await base44.entities.AttendanceRecord.list("-date", 2000);
         const fromStr = format(dateFrom, "yyyy-MM-dd");
         const toStr = format(dateTo, "yyyy-MM-dd");
+        // Cargar registros en el rango con filtro por fecha
+        const allRecs = await base44.entities.AttendanceRecord.list("-date", 5000);
         return allRecs.filter(r => r.date >= fromStr && r.date <= toStr);
       }
       const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -424,86 +424,51 @@ export default function AttendanceManagement() {
     ? allEmployees
     : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
-  const filteredEmployees = siteAllowedEmployees.filter(emp => {
-    const matchesSearch =
-      emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
-    return matchesSearch && matchesSite;
-  });
+  // filteredEmployees se mantiene para compatibilidad con otros usos menores
+  const filteredEmployees = siteAllowedEmployees;
 
   // IDs de empleados accesibles para filtrar incidentes y alertas
   const accessibleEmployeeIds = new Set(siteAllowedEmployees.map(e => e.id));
 
-  // En modo rango: generar una fila por cada combinación empleado × fecha con registro
-  // En modo fecha única: comportamiento original (todos los empleados para esa fecha)
-  let employeesWithRecords = [];
+  // Construir filas a partir de los registros existentes en la BD
+  // Cada fila = un AttendanceRecord existente, enriquecido con datos del empleado
+  const employeeMap = new Map(siteAllowedEmployees.map(e => [e.id, e]));
 
-  if (isRangeMode && dateFrom && dateTo) {
-    // Generar todas las fechas del rango
-    const dateList = [];
-    const cur = new Date(dateFrom);
-    cur.setHours(0, 0, 0, 0);
-    const end = new Date(dateTo);
-    end.setHours(0, 0, 0, 0);
-    while (cur <= end) {
-      dateList.push(format(cur, "yyyy-MM-dd"));
-      cur.setDate(cur.getDate() + 1);
-    }
-
-    // Para cada empleado filtrado × cada fecha → una fila (tenga o no registro)
-    const rows = [];
-    for (const emp of filteredEmployees) {
-      // Excluir empleados cesados antes del rango
-      if (emp.termination_date) {
-        const termination = new Date(emp.termination_date + "T00:00:00");
-        const rangeStart = new Date(dateFrom); rangeStart.setHours(0, 0, 0, 0);
-        if (rangeStart > termination) continue;
-      }
-      for (const dateStr of dateList) {
-        // Si el empleado estaba cesado en esta fecha específica, omitir
-        if (emp.termination_date) {
-          const termination = new Date(emp.termination_date + "T00:00:00");
-          const rowDay = new Date(dateStr + "T00:00:00");
-          if (rowDay > termination) continue;
-        }
-        const record = todayRecords.find(r => r.employee_id === emp.id && r.date === dateStr);
-        rows.push({ ...emp, record, displayDate: dateStr });
-      }
-    }
-    // Ordenar: fecha más reciente primero, luego por nombre
-    rows.sort((a, b) => {
-      if (b.displayDate !== a.displayDate) return b.displayDate.localeCompare(a.displayDate);
-      return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+  let employeesWithRecords = todayRecords
+    .map(record => {
+      const emp = employeeMap.get(record.employee_id);
+      if (!emp) return null; // registro de empleado fuera del scope de sedes
+      return { ...emp, record, displayDate: record.date };
+    })
+    .filter(row => {
+      if (!row) return false;
+      // Filtro de búsqueda por nombre/código
+      const matchesSearch =
+        !searchTerm ||
+        row.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        row.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (row.employee_code || "").toLowerCase().includes(searchTerm.toLowerCase());
+      // Filtro de sede
+      const matchesSite =
+        selectedSite === "all" ||
+        row.site === selectedSite ||
+        (selectedSite === "sin_sede" && !row.site);
+      // Filtro de estado de asistencia
+      const matchesAttendance = (() => {
+        if (attendanceFilter === "all") return true;
+        if (attendanceFilter === "sin_entrada") return !row.record?.clock_in;
+        if (attendanceFilter === "sin_salida") return row.record?.clock_in && !row.record?.clock_out;
+        if (attendanceFilter === "con_tardanza") return row.record?.is_late;
+        return true;
+      })();
+      return matchesSearch && matchesSite && matchesAttendance;
     });
 
-    employeesWithRecords = rows.filter(emp => {
-      if (attendanceFilter === "all") return true;
-      if (attendanceFilter === "sin_entrada") return !emp.record?.clock_in;
-      if (attendanceFilter === "sin_salida") return emp.record?.clock_in && !emp.record?.clock_out;
-      if (attendanceFilter === "con_tardanza") return emp.record?.is_late;
-      return true;
-    });
-  } else {
-    employeesWithRecords = filteredEmployees.filter(emp => {
-      if (emp.termination_date) {
-        const termination = new Date(emp.termination_date + "T00:00:00");
-        const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
-        if (selected > termination) return false;
-      }
-      return true;
-    }).map(emp => {
-      const record = todayRecords.find(r => r.employee_id === emp.id);
-      return { ...emp, record, displayDate: format(selectedDate, "yyyy-MM-dd") };
-    }).filter(emp => {
-      if (attendanceFilter === "all") return true;
-      if (attendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
-      if (attendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
-      if (attendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
-      return true;
-    });
-  }
+  // Ordenar: fecha más reciente primero, luego nombre
+  employeesWithRecords.sort((a, b) => {
+    if (b.displayDate !== a.displayDate) return b.displayDate.localeCompare(a.displayDate);
+    return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+  });
 
   const handleExportToExcel = () => {
     const dataToExport = employeesWithRecords.map(emp => {
@@ -687,7 +652,7 @@ export default function AttendanceManagement() {
             <div className="flex items-center justify-between gap-3">
               <TabsList className="grid grid-cols-3">
                 <TabsTrigger value="attendance">
-                  Asistencia del Día
+                  {isRangeMode && dateFrom && dateTo ? "Registros del Rango" : "Asistencia del Día"}
                   {employeesWithRecords.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{employeesWithRecords.length}</Badge>}
                 </TabsTrigger>
                 <TabsTrigger value="incidents">
@@ -806,6 +771,19 @@ export default function AttendanceManagement() {
                     </div>
                   </div>
 
+                  {employeesWithRecords.length === 0 && (
+                    <div className="text-center py-16 text-slate-500">
+                      <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                      <p className="font-semibold text-slate-700 mb-1">No hay registros de asistencia</p>
+                      <p className="text-sm">
+                        {isRangeMode && dateFrom && dateTo
+                          ? `No se encontraron marcaciones entre ${format(dateFrom, "dd MMM yyyy", { locale: es })} y ${format(dateTo, "dd MMM yyyy", { locale: es })}`
+                          : `No hay marcaciones registradas para el ${format(selectedDate, "dd MMM yyyy", { locale: es })}`
+                        }
+                      </p>
+                      <p className="text-xs text-slate-400 mt-2">Los registros aparecen al sincronizar desde el marcador biométrico</p>
+                    </div>
+                  )}
                   <div className="space-y-3">
                     {employeesWithRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((emp, idx) => {
                       const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
