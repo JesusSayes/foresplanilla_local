@@ -53,6 +53,7 @@ import mailerRoutes from './routes/mailer.js';
 import { syncBiotimeAttendance } from './controllers/sync/biotimeSyncController.js';
 import uploadRoutes from "./routes/uploadRoutes.js";
 import derechohabientesRoutes from './routes/derechohabientes.js';
+import recalcularAsistenciaRoutes from './routes/attendance/recalcularAsistencia.js';
 
 dotenv.config();
 
@@ -143,6 +144,7 @@ app.use('/api/mailer', mailerRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/uploads", express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api/derechohabientes', derechohabientesRoutes);
+app.use('/api/attendance/recalcular', recalcularAsistenciaRoutes);
 
 // Cron: sincronización biotime cada hora
 cron.schedule('0 * * * *', () => {

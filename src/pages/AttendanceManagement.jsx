@@ -26,6 +26,7 @@ import { generateAutoClockings } from "../components/attendance/AutoClockingJob"
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 import JustifyModal from "../components/attendance/JustifyModal";
 import AssignScheduleModal from "../components/attendance/AssignScheduleModal";
+import recalcularAsistenciaService from '@/services/recalcularAsistenciaService';
 
 export default function AttendanceManagement() {
   const { user: currentUser } = useAuth();
@@ -1053,11 +1054,17 @@ export default function AttendanceManagement() {
                                     notes: `HE aceptadas solo para el día ${alert.alert_date}`
                                   });
                                   // 3. Recalcular asistencia del día (tardanza + HE 25% + HE 35%)
-                                  await base44.functions.invoke("recalcularAsistencia", {
-                                    employee_id: alert.employee_id,
-                                    date_from: alert.alert_date,
-                                    date_to: alert.alert_date,
-                                  });
+                                  // await base44.functions.invoke("recalcularAsistencia", {
+                                  //   employee_id: alert.employee_id,
+                                  //   date_from: alert.alert_date,
+                                  //   date_to: alert.alert_date,
+                                  // });
+                                  await recalcularAsistenciaService.invoke(
+                                    alert.employee_id,
+                                    alert.alert_date,
+                                    alert.alert_date
+                                  );
+
                                   queryClient.invalidateQueries(["overtimeAlerts"]);
                                   queryClient.invalidateQueries(["todayAttendance"]);
                                   queryClient.invalidateQueries(["attendanceRecords"]);

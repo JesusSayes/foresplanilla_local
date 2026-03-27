@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+//import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { CalendarIcon, Clock, RefreshCw, CheckCircle, ChevronDown, Search, X } f
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import recalcularAsistenciaService from '@/services/recalcularAsistenciaService';
 
 // Selector de fecha inline (sin Popover/portal para evitar conflictos con overflow)
 function InlineDatePicker({ value, onChange, label, hint, className = "" }) {
@@ -223,11 +224,17 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
       if (recalcRange) {
         const dateTo = effectiveToStr || format(new Date(), "yyyy-MM-dd");
         if (effectiveFromStr <= dateTo) {
-          const res = await base44.functions.invoke("recalcularAsistencia", {
-            employee_id: employee.id,
-            date_from: effectiveFromStr,
-            date_to: dateTo,
-          });
+          // const res = await base44.functions.invoke("recalcularAsistencia", {
+          //   employee_id: employee.id,
+          //   date_from: effectiveFromStr,
+          //   date_to: dateTo,
+          // });
+          
+          const res = await recalcularAsistenciaService.invoke(
+            employee.id, 
+            effectiveFromStr, 
+            dateTo
+          );
           toast.success(`Horario asignado y ${res.data?.updated || 0} registros recalculados`);
         } else {
           toast.success("Horario asignado correctamente");
