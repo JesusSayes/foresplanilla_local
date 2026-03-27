@@ -3,19 +3,55 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 /**
  * Genera automáticamente registros de asistencia para todos los empleados activos.
  *
- * - Rango: desde max(date_from, hire_date_o_inicio_contrato) hasta HOY (hora Perú).
- * - Omite días con registro existente, feriados y días sin turno en el horario.
- * - Exonerados de marcación → clock_in/clock_out automático (Completo).
- * - No exonerados → registro en blanco (Ausente), pendiente de marcación.
+ * Modos de uso:
+ * 1. CRON DIARIO (sin parámetros): solo genera el registro de HOY para todos los empleados.
+ * 2. BACKFILL (date_from): genera registros desde date_from hasta hoy, de a employee_batch empleados.
  *
  * Body params opcionales:
- *   date_from   → fecha mínima de inicio, ej: "2026-01-01" (backfill)
- *   employee_id → procesar solo un empleado específico
+ *   date_from      → fecha mínima de inicio, ej: "2026-01-01" (activa modo backfill)
+ *   employee_id    → procesar solo un empleado específico
+ *   employee_batch → cuántos empleados procesar por llamada (default: 50 en cron, 5 en backfill)
+ *   skip_employees → saltar los primeros N empleados (para paginación de backfill)
  *
  * Cron automático: 1 5 * * *  (00:01 hora Perú = 05:01 UTC)
  */
 
 const DAY_NAMES = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+function parseSDKResponse(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (raw == null) return [];
+  if (typeof raw === "object") {
+    const vals = Object.values(raw);
+    return (vals.length > 0 && typeof vals[0] === "object" && vals[0] !== null) ? vals : [];
+  }
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : Object.values(parsed);
+    } catch { return []; }
+  }
+  return [];
+}
+
+async function listAll(entity, query = null, sortField = "-created_date") {
+  const PAGE = 10;
+  const results = [];
+  let skip = 0;
+  while (true) {
+    await sleep(150);
+    const raw = query
+      ? await entity.filter(query, sortField, PAGE, skip)
+      : await entity.list(sortField, PAGE, skip);
+    const items = parseSDKResponse(raw);
+    results.push(...items);
+    if (items.length < PAGE) break;
+    skip += PAGE;
+    if (skip > 100000) break;
+  }
+  return results;
+}
 
 function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
   const candidates = schedules.filter(s => {
@@ -64,40 +100,11 @@ function todayInPeru() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
-// Normaliza la respuesta del SDK (puede llegar como string JSON, array, u objeto)
-function parseSDKResponse(raw) {
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === "string") {
-    try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : Object.values(parsed); }
-    catch { return []; }
-  }
-  if (raw && typeof raw === "object") return raw.items || raw.data || Object.values(raw);
-  return [];
-}
-
-// Llama filter() o list() paginando con skip hasta agotar resultados
-async function listAll(entity, query = null, sortField = "-created_date", pageSize = 50) {
-  const results = [];
-  let skip = 0;
-  while (true) {
-    const raw = query
-      ? await entity.filter(query, sortField, pageSize, skip)
-      : await entity.list(sortField, pageSize, skip);
-    const items = parseSDKResponse(raw);
-    results.push(...items);
-    if (items.length < pageSize) break;
-    skip += pageSize;
-    if (skip > 200000) break;
-  }
-  return results;
-}
-
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const db     = base44.asServiceRole;
 
-    // Auth opcional: si hay sesión, verificar que sea admin
     try {
       const user = await base44.auth.me();
       if (user && user.role !== "admin" && user.role !== "super_admin") {
@@ -106,40 +113,40 @@ Deno.serve(async (req) => {
     } catch { /* scheduler sin sesión → ok */ }
 
     let body = {};
-    try { body = await req.json(); } catch { /* sin body */ }
-    const forcedDateFrom   = body.date_from   || null; // ej: "2026-01-01"
-    const filterEmployeeId = body.employee_id || null;
+    try { body = await req.json(); } catch {}
+    const forcedDateFrom   = body.date_from      || null;
+    const filterEmployeeId = body.employee_id    || null;
+    const skipEmployees    = body.skip_employees || 0;
+    const isBackfill       = !!forcedDateFrom;
+
+    // En modo backfill usamos lotes pequeños para evitar rate limit
+    // En modo cron diario procesamos todos (solo 1 día = pocas escrituras)
+    const defaultBatch = isBackfill ? 5 : 200;
+    const employeeBatch = body.employee_batch || defaultBatch;
 
     const todayStr = todayInPeru();
 
-    // ── Carga maestra paginada en paralelo ────────────────────────────────────
-    const [allEmpRaw, schedulesRaw, holidaysRaw, contractsRaw, allRecordsRaw] = await Promise.all([
-      listAll(db.entities.Employee,        null,              "-created_date", 50),
-      listAll(db.entities.WorkSchedule,    null,              "-effective_from", 50),
-      listAll(db.entities.Holiday,         null,              "-date", 50),
-      listAll(db.entities.Contract,        null,              "-created_date", 50),
-      listAll(db.entities.AttendanceRecord, null,             "-date", 50),
+    // ── Carga maestra (datos que no cambian entre empleados) ─────────────────
+    const [allEmpRaw, schedulesRaw, holidaysRaw, contractsRaw] = await Promise.all([
+      listAll(db.entities.Employee,     null, "-created_date"),
+      listAll(db.entities.WorkSchedule, null, "-effective_from"),
+      listAll(db.entities.Holiday,      null, "-date"),
+      listAll(db.entities.Contract,     null, "-created_date"),
     ]);
 
-    const allEmployees    = allEmpRaw.filter(e => e.status === "Activo");
-    const activeScheds    = schedulesRaw.filter(s => s.is_active);
-    const holidays        = holidaysRaw;
-    const vigentContracts = contractsRaw.filter(c => c.status === "Vigente");
-    const holidayDates = new Set(holidays.map(h => h.date?.slice(0, 10)));
+    const allEmployeesActive = allEmpRaw.filter(e => e.status === "Activo");
+    const activeScheds       = schedulesRaw.filter(s => s.is_active);
+    const holidayDates       = new Set(holidaysRaw.map(h => (h.date || "").slice(0, 10)));
+    const vigentContracts    = contractsRaw.filter(c => c.status === "Vigente");
 
-    // Índice de registros existentes: "employeeId|YYYY-MM-DD" → true
-    const existingIndex = new Set(
-      allRecordsRaw.map(r => `${r.employee_id}|${(r.date || "").slice(0, 10)}`)
-    );
-
-    const employees = filterEmployeeId
-      ? allEmployees.filter(e => e.id === filterEmployeeId)
-      : allEmployees;
+    let employees = filterEmployeeId
+      ? allEmployeesActive.filter(e => e.id === filterEmployeeId)
+      : allEmployeesActive.slice(skipEmployees, skipEmployees + employeeBatch);
 
     let totalCreated = 0;
     let totalSkipped = 0;
     const errors     = [];
-    const BATCH      = 50;
+    const BULK       = 20;
 
     for (const emp of employees) {
       try {
@@ -152,17 +159,29 @@ Deno.serve(async (req) => {
         }
 
         const contractStart = startDateRaw.slice(0, 10);
-        const startStr = (forcedDateFrom && forcedDateFrom > contractStart)
-          ? forcedDateFrom
-          : contractStart;
+        // En modo cron diario solo procesamos HOY para evitar recalcular todo el historial
+        const startStr = isBackfill
+          ? ((forcedDateFrom > contractStart) ? forcedDateFrom : contractStart)
+          : todayStr; // cron: solo hoy
 
         if (startStr > todayStr) { totalSkipped++; continue; }
+
+        // Cargar registros existentes solo de este empleado en el rango
+        await sleep(150);
+        const empRecordsRaw = isBackfill
+          ? await listAll(db.entities.AttendanceRecord, { employee_id: emp.id }, "-date")
+          : await (async () => {
+              const raw = await db.entities.AttendanceRecord.filter({ employee_id: emp.id, date: todayStr }, "-date", 5, 0);
+              return parseSDKResponse(raw);
+            })();
+
+        const existingDates = new Set(empRecordsRaw.map(r => (r.date || "").slice(0, 10)));
 
         const allDates        = dateRange(startStr, todayStr);
         const recordsToCreate = [];
 
         for (const dateStr of allDates) {
-          if (existingIndex.has(`${emp.id}|${dateStr}`)) continue;
+          if (existingDates.has(dateStr)) continue;
           if (holidayDates.has(dateStr)) continue;
 
           const schedule = getScheduleForDate(emp.id, emp.department_name, activeScheds, dateStr);
@@ -200,12 +219,13 @@ Deno.serve(async (req) => {
               : "Registro generado automáticamente - Pendiente de marcación",
           });
 
-          existingIndex.add(`${emp.id}|${dateStr}`);
+          existingDates.add(dateStr);
         }
 
-        for (let i = 0; i < recordsToCreate.length; i += BATCH) {
-          await db.entities.AttendanceRecord.bulkCreate(recordsToCreate.slice(i, i + BATCH));
-          totalCreated += recordsToCreate.slice(i, i + BATCH).length;
+        for (let i = 0; i < recordsToCreate.length; i += BULK) {
+          await sleep(200);
+          await db.entities.AttendanceRecord.bulkCreate(recordsToCreate.slice(i, i + BULK));
+          totalCreated += recordsToCreate.slice(i, i + BULK).length;
         }
 
       } catch (empError) {
@@ -213,13 +233,19 @@ Deno.serve(async (req) => {
       }
     }
 
+    const hasMore = !filterEmployeeId && (skipEmployees + employeeBatch) < allEmployeesActive.length;
+
     return Response.json({
-      success:             true,
-      date:                todayStr,
-      employees_processed: employees.length,
-      records_created:     totalCreated,
-      records_skipped:     totalSkipped,
-      errors:              errors.length > 0 ? errors : undefined,
+      success:                true,
+      mode:                   isBackfill ? "backfill" : "cron_diario",
+      date:                   todayStr,
+      employees_processed:    employees.length,
+      records_created:        totalCreated,
+      records_skipped:        totalSkipped,
+      total_active_employees: allEmployeesActive.length,
+      next_skip:              hasMore ? skipEmployees + employeeBatch : null,
+      has_more:               hasMore,
+      errors:                 errors.length > 0 ? errors : undefined,
     });
 
   } catch (error) {
