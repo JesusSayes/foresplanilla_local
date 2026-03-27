@@ -10,11 +10,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Database, Plus, Trash2, Edit2, CheckCircle, 
-  AlertCircle, RefreshCw, Server, Key, Activity, Play, Clock
+  AlertCircle, RefreshCw, Server, Key, Activity
 } from "lucide-react";
 import { toast } from "sonner";
 import SyncMonitor from "../components/attendance/SyncMonitor";
-import BiotimeSyncConfig from "../components/attendance/BiotimeSyncConfig";
 
 export default function DatabaseConfig() {
   const [employee, setEmployee] = useState(null);
@@ -214,9 +213,6 @@ export default function DatabaseConfig() {
             Nueva Conexión
           </Button>
         </div>
-
-        {/* Panel Sincronización Biotime */}
-        <BiotimeSyncConfig />
 
         {/* Sync Monitor */}
         {showMonitor && (
