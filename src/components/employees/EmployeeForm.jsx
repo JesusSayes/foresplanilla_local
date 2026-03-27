@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Users, Trash2, Plus, Edit, Loader2 } from "lucide-react";
+import { Users, Trash2, Plus, Edit, Loader2, Search } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
@@ -44,6 +44,37 @@ export default function EmployeeForm({
   const [selectedDepartamento, setSelectedDepartamento] = React.useState(editingEmployee?.department || "");
   const [selectedProvincia, setSelectedProvincia] = React.useState(editingEmployee?.province || "");
   const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
+  const [lookingUpDni, setLookingUpDni] = React.useState(false);
+
+  const handleDniLookup = async () => {
+    const dni = formData.document_number;
+    if (!dni || dni.length !== 8) {
+      toast.error("Ingresa un DNI válido de 8 dígitos");
+      return;
+    }
+    setLookingUpDni(true);
+    try {
+      const response = await fetch(`https://apiperu.dev/api/dni/${dni}`, {
+        headers: { "Authorization": "Bearer 20b6666ddda099db4204cf53854f8ca04d950a4eead89029e77999b0726181cb" }
+      });
+      const data = await response.json();
+      if (data.success && data.data) {
+        const { nombres, apellido_paterno, apellido_materno } = data.data;
+        setFormData({
+          ...formData,
+          first_name: nombres || formData.first_name,
+          last_name: `${apellido_paterno || ""} ${apellido_materno || ""}`.trim(),
+        });
+        toast.success("Datos del DNI cargados correctamente");
+      } else {
+        toast.error("DNI no encontrado o inválido");
+      }
+    } catch {
+      toast.error("Error al consultar el DNI");
+    } finally {
+      setLookingUpDni(false);
+    }
+  };
   const [showDerechohabienteForm, setShowDerechohabienteForm] = React.useState(false);
   const [editingDH, setEditingDH] = React.useState(null);
   const [dhFormData, setDhFormData] = React.useState({});
@@ -135,11 +166,26 @@ export default function EmployeeForm({
                     </div>
                     <div>
                       <Label>Número de Documento <span className="text-red-600">*</span></Label>
-                      <Input
-                        value={formData.document_number}
-                        onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setFormData({ ...formData, document_number: v.slice(0, formData.document_type === 'DNI' ? 8 : 20) }); }}
-                        className={!formData.document_number ? "border-red-300" : ""}
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          value={formData.document_number}
+                          onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setFormData({ ...formData, document_number: v.slice(0, formData.document_type === 'DNI' ? 8 : 20) }); }}
+                          className={!formData.document_number ? "border-red-300 flex-1" : "flex-1"}
+                        />
+                        {formData.document_type === "DNI" && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={handleDniLookup}
+                            disabled={lookingUpDni || formData.document_number?.length !== 8}
+                            title="Buscar datos por DNI"
+                            className="shrink-0 border-indigo-300 text-indigo-600 hover:bg-indigo-50"
+                          >
+                            {lookingUpDni ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
