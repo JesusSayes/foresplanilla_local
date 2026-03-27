@@ -88,7 +88,7 @@ export default function AttendanceManagement() {
     queryFn: async () => {
       if (isRangeMode && dateFrom && dateTo) {
         // Cargar todos los registros en el rango
-        const allRecs = await base44.entities.AttendanceRecord.list("-date", 2000);
+        const allRecs = await entitiesAPI.AttendanceRecord.list("-date", 2000);
         const fromStr = format(dateFrom, "yyyy-MM-dd");
         const toStr = format(dateTo, "yyyy-MM-dd");
         return allRecs.filter(r => r.date >= fromStr && r.date <= toStr);
@@ -283,7 +283,7 @@ export default function AttendanceManagement() {
     const recordDate = editingRecord.date;
 
     // 1. Guardar clock_in/out y notas primero
-    await base44.entities.AttendanceRecord.update(editingRecord.id, {
+    await entitiesAPI.AttendanceRecord.update(editingRecord.id, {
       clock_in: clockIn || null,
       clock_out: clockOut || null,
       notes: editingRecord.notes,
@@ -312,12 +312,12 @@ export default function AttendanceManagement() {
       const overtimeAuth = editingRecord.overtime_authorized ?? schedule.overtime_authorized ?? false;
       if (extraHrs > 0 && !overtimeAuth) {
         // Verificar si ya existe alerta pendiente para este registro
-        const existingAlert = await base44.entities.OvertimeAlert.filter({
+        const existingAlert = await entitiesAPI.OvertimeAlert.filter({
           attendance_record_id: editingRecord.id,
           status: "Pendiente",
         });
         if (!existingAlert || existingAlert.length === 0) {
-          await base44.entities.OvertimeAlert.create({
+          await entitiesAPI.OvertimeAlert.create({
             employee_id: editingRecord.employee_id,
             attendance_record_id: editingRecord.id,
             alert_date: recordDate,
@@ -330,11 +330,16 @@ export default function AttendanceManagement() {
     }
 
     // 3. Recalcular con el backend (tardanza + HE 25% + HE 35%)
-    await base44.functions.invoke("recalcularAsistencia", {
-      employee_id: editingRecord.employee_id,
-      date_from: recordDate,
-      date_to: recordDate,
-    });
+    // await base44.functions.invoke("recalcularAsistencia", {
+      // employee_id: editingRecord.employee_id,
+      // date_from: recordDate,
+      // date_to: recordDate,
+    // });
+    await recalcularAsistenciaService.invoke(
+      editingRecord.employee_id,
+      recordDate,
+      recordDate
+    );
 
     queryClient.invalidateQueries(["todayAttendance"]);
     queryClient.invalidateQueries(["overtimeAlerts"]);
@@ -1016,10 +1021,12 @@ export default function AttendanceManagement() {
                              <div className="flex-1">
                                <div className="flex items-center gap-3 mb-2">
                                  <h4 className="font-bold text-slate-900">{emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                 <Badge className="bg-red-600 text-white">{alert.overtime_hours.toFixed(2)}h extras</Badge>
+                                 <Badge className="bg-red-600 text-white">{Number(alert.overtime_hours || 0).toFixed(2)}h extras</Badge>
                                </div>
                                <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position} • {emp?.department_name}</p>
-                               <p className="text-sm text-slate-700">📅 {format(new Date(alert.alert_date + "T00:00:00"), "dd MMM yyyy", { locale: es })}</p>
+                               <p className="text-sm text-slate-700">
+                                 📅 {(() => { try { return format(parseISO(alert.alert_date), "dd MMM yyyy", { locale: es }); } catch { return "Sin fecha"; } })()}
+                               </p>
                                {record && <p className="text-sm text-slate-600 mt-1">Marcación: {record.clock_in} - {record.clock_out} ({record.worked_hours?.toFixed(2)}h trabajadas)</p>}
                                {alertSched && (
                                  <p className="text-sm text-slate-600 mt-1">
@@ -1043,13 +1050,13 @@ export default function AttendanceManagement() {
                                 onClick={async () => {
                                   // 1. Marcar overtime_authorized=true en el registro del día
                                   if (record) {
-                                    await base44.entities.AttendanceRecord.update(record.id, {
+                                    await entitiesAPI.AttendanceRecord.update(record.id, {
                                       overtime_authorized: true,
                                       notes: (record.notes ? record.notes + " | " : "") + `HE aceptadas: ${alert.overtime_hours.toFixed(2)}h (${alert.alert_date})`
                                     });
                                   }
                                   // 2. Marcar alerta como aprobada
-                                  await base44.entities.OvertimeAlert.update(alert.id, {
+                                  await entitiesAPI.OvertimeAlert.update(alert.id, {
                                     status: "Aprobado",
                                     notes: `HE aceptadas solo para el día ${alert.alert_date}`
                                   });
@@ -1074,7 +1081,7 @@ export default function AttendanceManagement() {
                                 <CheckCircle className="w-4 h-4 mr-2" />Aceptar HE (solo este día)
                               </Button>
                               <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
-                                await base44.entities.OvertimeAlert.update(alert.id, { status: "Descartado" });
+                                await entitiesAPI.OvertimeAlert.update(alert.id, { status: "Descartado" });
                                 queryClient.invalidateQueries(["overtimeAlerts"]);
                                 toast.success("Alerta descartada");
                               }}>

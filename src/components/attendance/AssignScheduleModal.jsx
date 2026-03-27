@@ -116,7 +116,7 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
 
   const { data: allSchedules = [] } = useQuery({
     queryKey: ["workSchedules"],
-    queryFn: () => base44.entities.WorkSchedule.list("-effective_from"),
+    queryFn: () => entitiesAPI.WorkSchedule.list("-effective_from"),
   });
 
   const templateSchedules = allSchedules.filter(s => !s.employee_id && s.is_active);
@@ -164,6 +164,7 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
   const preview = getSchedulePreview(selectedScheduleObj);
 
   const handleSave = async () => {
+    console.log("CLICK ASIGNAR HORARIO");
     if (!selectedScheduleId) {
       toast.error("Selecciona un horario");
       return;
@@ -171,6 +172,7 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
 
     setSaving(true);
     try {
+      console.log("try");
       const selectedSchedule = allSchedules.find(s => s.id === selectedScheduleId);
       if (!selectedSchedule) throw new Error("Horario no encontrado");
 
@@ -181,20 +183,24 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
       for (const s of empSchedules) {
         const sTo = s.effective_to || "9999-12-31";
         if (sTo >= effectiveFromStr) {
-          const dayBefore = new Date(effectiveFromStr + "T00:00:00");
-          dayBefore.setDate(dayBefore.getDate() - 1);
-          const dayBeforeStr = format(dayBefore, "yyyy-MM-dd");
+          // const dayBefore = new Date(effectiveFromStr + "T00:00:00");
+          // dayBefore.setDate(dayBefore.getDate() - 1);
+          // const dayBeforeStr = format(dayBefore, "yyyy-MM-dd");
           const sFrom = s.effective_from || "0000-01-01";
+          const [year, month, day] = effectiveFromStr.split("-").map(Number);
+          const dayBefore = new Date(year, month - 1, day - 1);
+          const dayBeforeStr = format(dayBefore, "yyyy-MM-dd");
+
           if (dayBeforeStr < sFrom) {
-            await base44.entities.WorkSchedule.update(s.id, { is_active: false });
+            await entitiesAPI.WorkSchedule.update(s.id, { is_active: false });
           } else {
-            await base44.entities.WorkSchedule.update(s.id, { effective_to: dayBeforeStr });
+            await entitiesAPI.WorkSchedule.update(s.id, { effective_to: dayBeforeStr });
           }
         }
       }
 
       // 2. Crear nuevo WorkSchedule individual
-      await base44.entities.WorkSchedule.create({
+      await entitiesAPI.WorkSchedule.create({
         employee_id: employee.id,
         schedule_name: `${selectedSchedule.schedule_name} - ${employee.first_name} ${employee.last_name}`,
         effective_from: effectiveFromStr,
@@ -229,10 +235,10 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
           //   date_from: effectiveFromStr,
           //   date_to: dateTo,
           // });
-          
+
           const res = await recalcularAsistenciaService.invoke(
-            employee.id, 
-            effectiveFromStr, 
+            employee.id,
+            effectiveFromStr,
             dateTo
           );
           toast.success(`Horario asignado y ${res.data?.updated || 0} registros recalculados`);
@@ -252,6 +258,7 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
     }
   };
 
+    try {
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-6"
@@ -414,4 +421,7 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
       </Card>
     </div>
   );
+    } catch (error) {
+      console.log("Error al asignar horario: " + error.message);
+    }
 }
