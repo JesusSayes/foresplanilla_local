@@ -28,6 +28,7 @@ export default function EmployeeForm({
   professions,
   allContracts,
   allEmployees = [],
+  formErrors = [],
   derechohabientes,
   onDerechohabienteAdd,
   onDerechohabienteEdit,
@@ -143,6 +144,23 @@ export default function EmployeeForm({
           </div>
         </CardHeader>
         <CardContent className="p-6 max-h-[70vh] overflow-y-auto">
+          {formErrors.length > 0 && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-300 rounded-lg">
+              <div className="flex items-start gap-2">
+                <span className="text-red-600 font-bold text-lg leading-none mt-0.5">⚠</span>
+                <div>
+                  <p className="text-sm font-bold text-red-700 mb-1">
+                    {formErrors.length === 1 ? "Se encontró un error:" : `Se encontraron ${formErrors.length} errores:`}
+                  </p>
+                  <ul className="space-y-1">
+                    {formErrors.map((err, i) => (
+                      <li key={i} className="text-sm text-red-600">• {err}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
           <Tabs defaultValue="personal" className="space-y-6">
             <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="personal">Personal</TabsTrigger>
