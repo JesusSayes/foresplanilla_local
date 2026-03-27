@@ -150,7 +150,11 @@ export default function EmployeeForm({
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label>Código de Empleado <span className="text-red-600">*</span></Label>
-                      <Input value={formData.employee_code} onChange={(e) => setFormData({ ...formData, employee_code: e.target.value })} className={!formData.employee_code ? "border-red-300" : ""} />
+                      <Input
+                        value={formData.employee_code}
+                        disabled
+                        className="bg-slate-100 text-slate-600 cursor-not-allowed font-mono font-semibold"
+                      />
                     </div>
                     <div>
                       <Label>Tipo de Documento <span className="text-red-600">*</span></Label>
@@ -191,11 +195,23 @@ export default function EmployeeForm({
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label>Nombres <span className="text-red-600">*</span></Label>
-                      <Input value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} className={!formData.first_name ? "border-red-300" : ""} />
+                      <Input
+                        value={formData.first_name}
+                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                        disabled={formData.document_type === "DNI"}
+                        className={`${!formData.first_name ? "border-red-300" : ""} ${formData.document_type === "DNI" ? "bg-slate-100 text-slate-600 cursor-not-allowed" : ""}`}
+                        placeholder={formData.document_type === "DNI" ? "Se completa al buscar DNI" : ""}
+                      />
                     </div>
                     <div>
                       <Label>Apellidos <span className="text-red-600">*</span></Label>
-                      <Input value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} className={!formData.last_name ? "border-red-300" : ""} />
+                      <Input
+                        value={formData.last_name}
+                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                        disabled={formData.document_type === "DNI"}
+                        className={`${!formData.last_name ? "border-red-300" : ""} ${formData.document_type === "DNI" ? "bg-slate-100 text-slate-600 cursor-not-allowed" : ""}`}
+                        placeholder={formData.document_type === "DNI" ? "Se completa al buscar DNI" : ""}
+                      />
                     </div>
                     <div>
                       <Label>Género</Label>
