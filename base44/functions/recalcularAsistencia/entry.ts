@@ -122,15 +122,33 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'employee_id, date_from y date_to son requeridos' }, { status: 400 });
     }
 
-    const [employee, allSchedules] = await Promise.all([
+    function parseSDKResponse(raw) {
+      if (Array.isArray(raw)) return raw;
+      if (raw == null) return [];
+      if (typeof raw === "object") {
+        const vals = Object.values(raw);
+        return (vals.length > 0 && typeof vals[0] === "object" && vals[0] !== null) ? vals : [];
+      }
+      if (typeof raw === "string") {
+        try {
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : Object.values(parsed);
+        } catch { return []; }
+      }
+      return [];
+    }
+
+    const [empRaw, schedulesRaw] = await Promise.all([
       base44.entities.Employee.filter({ id: employee_id }),
       base44.entities.WorkSchedule.list("-effective_from"),
     ]);
 
+    const employee = parseSDKResponse(empRaw);
+    const allSchedules = parseSDKResponse(schedulesRaw);
     const emp = employee[0];
     if (!emp) return Response.json({ error: 'Empleado no encontrado' }, { status: 404 });
 
-    const allRecords = await base44.entities.AttendanceRecord.filter({ employee_id });
+    const allRecords = parseSDKResponse(await base44.entities.AttendanceRecord.filter({ employee_id }));
     const recordsInRange = allRecords.filter(r => r.date >= date_from && r.date <= date_to);
 
     let updated = 0;
