@@ -1,14 +1,14 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
-import pg from 'npm:pg@8.11.3';
 
-const { Pool } = pg;
 let biotimePool = null;
 
-function getBiotimePool() {
+async function getBiotimePool() {
   if (!biotimePool) {
     const connStr = Deno.env.get("BIOTIME_DATABASE_URL");
     if (!connStr) throw new Error("BIOTIME_DATABASE_URL no configurado");
-    biotimePool = new Pool({ connectionString: connStr });
+    const pg = await import('npm:pg@8.11.3');
+    const Pool = pg.default?.Pool || pg.Pool;
+    biotimePool = new Pool({ connectionString: connStr, connectionTimeoutMillis: 5000 });
   }
   return biotimePool;
 }
@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
     // 2. Obtener marcaciones del Biotime para este día
     let punchRaw = {}; // key: empCodePadded → [Date, ...]
     try {
-      const pool   = getBiotimePool();
+      const pool   = await getBiotimePool();
       const client = await pool.connect();
       try {
         const dayStart = new Date(targetDate + "T00:00:00");
