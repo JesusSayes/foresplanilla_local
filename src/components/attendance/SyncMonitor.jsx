@@ -21,7 +21,7 @@ export default function SyncMonitor({ connectionId, connectionName }) {
     queryFn: async () => {
       const allLogs = await base44.entities.SyncLog.filter(
         { connection_id: connectionId },
-        "-sync_date",
+        "-created_date",
         10
       );
       return allLogs;
