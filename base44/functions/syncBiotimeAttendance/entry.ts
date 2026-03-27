@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
     // 3. Obtener todos los empleados activos del sistema
     const [employees, allSchedules] = await Promise.all([
       base44.entities.Employee.filter({ status: 'Activo' }),
-      base44.entities.WorkSchedule.list("-effective_from"),
+      base44.entities.WorkSchedule.list("-updated_date"),
     ]);
 
     // Mapear document_number → employee
