@@ -276,8 +276,11 @@ export default function AttendanceManagement() {
     setShowEditModal(true);
   };
 
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
   const handleSaveEdit = async () => {
-    if (!editingRecord) return;
+    if (!editingRecord || isSavingEdit) return;
+    setIsSavingEdit(true);
     const clockIn = editingRecord.clock_in;
     const clockOut = editingRecord.clock_out;
     const recordDate = editingRecord.date;
@@ -346,6 +349,7 @@ export default function AttendanceManagement() {
     toast.success("Registro actualizado y métricas recalculadas");
     setShowEditModal(false);
     setEditingRecord(null);
+    setIsSavingEdit(false);
   };
 
   const handleApproveIncident = async (incident) => {
@@ -1347,8 +1351,8 @@ export default function AttendanceManagement() {
                   </div>
                   <div className="flex gap-3">
                     <Button variant="outline" className="flex-1" onClick={() => setShowEditModal(false)}>Cancelar</Button>
-                    <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleSaveEdit} disabled={updateRecordMutation.isPending}>
-                      {updateRecordMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                    <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleSaveEdit} disabled={isSavingEdit}>
+                      {isSavingEdit ? "Guardando..." : "Guardar Cambios"}
                     </Button>
                   </div>
                 </div>

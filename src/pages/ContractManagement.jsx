@@ -750,24 +750,44 @@ export default function ContractManagement() {
                 <TabsContent value="work" className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label>Cargo *</Label>
-                      <Select value={formData.position} onValueChange={(v) => setFormData({ ...formData, position: v })}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar cargo" /></SelectTrigger>
+                      <Label>Departamento/Área</Label>
+                      <Select value={formData.department} onValueChange={(v) => setFormData({ ...formData, department: v, position: "" })}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
                         <SelectContent>
-                          <div className="p-2 border-b"><Input placeholder="Buscar..." value={positionSearchTerm} onChange={(e) => setPositionSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} /></div>
-                          {positions.filter(p => p.name.toLowerCase().includes(positionSearchTerm.toLowerCase())).map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                          <div className="p-2 border-b"><Input placeholder="Buscar..." value={departmentSearchTerm} onChange={(e) => setDepartmentSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} /></div>
+                          {departments.filter(d => d.name.toLowerCase().includes(departmentSearchTerm.toLowerCase())).map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
-                      <Label>Departamento/Área</Label>
-                      <Select value={formData.department} onValueChange={(v) => setFormData({ ...formData, department: v })}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
+                      <Label>Cargo *</Label>
+                      <Select
+                        value={formData.position}
+                        onValueChange={(v) => setFormData({ ...formData, position: v })}
+                        disabled={!formData.department}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={formData.department ? "Seleccionar cargo" : "Selecciona primero un departamento"} />
+                        </SelectTrigger>
                         <SelectContent>
-                          <div className="p-2 border-b"><Input placeholder="Buscar..." value={departmentSearchTerm} onChange={(e) => setDepartmentSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} /></div>
-                          {departments.filter(d => d.name.toLowerCase().includes(departmentSearchTerm.toLowerCase())).map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
+                          <div className="p-2 border-b"><Input placeholder="Buscar..." value={positionSearchTerm} onChange={(e) => setPositionSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} /></div>
+                          {positions
+                            .filter(p => {
+                              const matchesDept = !formData.department || p.department === formData.department;
+                              const matchesSearch = p.name.toLowerCase().includes(positionSearchTerm.toLowerCase());
+                              return matchesDept && matchesSearch;
+                            })
+                            .map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                          {positions.filter(p => p.department === formData.department).length === 0 && formData.department && (
+                            <div className="px-3 py-4 text-sm text-slate-400 text-center">No hay cargos para este departamento</div>
+                          )}
                         </SelectContent>
                       </Select>
+                      {formData.department && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          {positions.filter(p => p.department === formData.department).length} cargo(s) disponible(s)
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div>
