@@ -11,5 +11,6 @@ router.post('/', controller.create);
 router.put('/:id', controller.update);
 router.delete('/:id', controller.delete);
 router.post('/filter', controller.filter);
+router.post('/backfill', controller.backfill);
 
 export default router
