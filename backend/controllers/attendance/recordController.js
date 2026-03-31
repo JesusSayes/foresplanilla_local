@@ -3,6 +3,15 @@ import crypto from 'crypto';
 
 const prisma = new PrismaClient()
 
+const serializeRecord = (r) => ({
+  ...r,
+  date: r.date ? r.date.toISOString().slice(0, 10) : null,
+  worked_hours:       r.worked_hours       != null ? Number(r.worked_hours)       : null,
+  regular_hours:      r.regular_hours      != null ? Number(r.regular_hours)      : null,
+  overtime_hours_25:  r.overtime_hours_25  != null ? Number(r.overtime_hours_25)  : null,
+  overtime_hours_35:  r.overtime_hours_35  != null ? Number(r.overtime_hours_35)  : null,
+});
+
 export const getAll = async (req, res) => {
   try {
     const { sort = '-date' } = req.query;
@@ -12,7 +21,7 @@ export const getAll = async (req, res) => {
     const records = await prisma.attendance_record.findMany({
       orderBy: { [field]: desc ? 'desc' : 'asc' }
     });
-    res.json(records);
+    res.json(records.map(serializeRecord));
   } catch (error) {
     console.error('Error obteniendo attendance record', error);
     res.status(500).json({ error: error.message });
@@ -26,7 +35,7 @@ export const getById =  async (req, res) => {
       // include: { employee: true, schedule: true, incidents: true }
     });
     if (!record) return res.status(404).json({ error: 'Record not found' });
-    res.json(record);
+    res.json(serializeRecord(record));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -63,7 +72,7 @@ export const create = async (req, res) => {
         is_sample: data.is_sample ?? false,
       },
     });
-    res.status(201).json(record);
+    res.status(201).json(serializeRecord(record));
   } catch (error) {
     console.error('Error en AttendanceRecord.create:', error);
     res.status(500).json({ error: error.message });
@@ -76,7 +85,7 @@ export const update = async (req, res) => {
       where: { id: req.params.id },
       data: req.body
     });
-    res.json(record);
+    res.json(serializeRecord(record));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -127,7 +136,7 @@ export const filter = async (req, res) => {
       orderBy: { [field]: desc ? 'desc' : 'asc' }
     });
 
-    res.json(records);
+    res.json(records.map(serializeRecord));
   } catch (error) {
     console.error('Filter records error:', error);
     res.status(500).json({ error: error.message });

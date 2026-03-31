@@ -55,24 +55,28 @@ model attendance_incident {
 }
 
 model attendance_record {
-  employee_id     String?
-  date            DateTime? @db.Date
-  clock_in        String?
-  clock_out       String?
-  scheduled_start String?
-  scheduled_end   String?
-  worked_hours    Decimal?  @db.Decimal(18, 2)
-  is_late         Boolean?
-  late_minutes    Int?
-  is_absent       Boolean?
-  status          String?
-  notes           String?
-  id              String    @id(map: "attendancerecord_pkey") @db.VarChar(255)
-  created_date    DateTime? @db.Timestamp(6)
-  updated_date    DateTime? @db.Timestamp(6)
-  created_by_id   String?
-  created_by      String?
-  is_sample       Boolean?
+  employee_id         String?
+  date                DateTime? @db.Date
+  clock_in            String?
+  clock_out           String?
+  scheduled_start     String?
+  scheduled_end       String?
+  worked_hours        Decimal?  @db.Decimal(18, 2)
+  is_late             Boolean?
+  late_minutes        Int?
+  is_absent           Boolean?
+  status              String?
+  notes               String?
+  id                  String    @id(map: "attendancerecord_pkey") @db.VarChar(255)
+  created_date        DateTime? @db.Timestamp(6)
+  updated_date        DateTime? @db.Timestamp(6)
+  created_by_id       String?
+  created_by          String?
+  is_sample           Boolean?
+  regular_hours       Decimal?  @db.Decimal(18, 2)
+  overtime_hours_25   Decimal?  @db.Decimal(18, 2)
+  overtime_hours_35   Decimal?  @db.Decimal(18, 2)
+  overtime_authorized Boolean?
 }
 
 model bank {

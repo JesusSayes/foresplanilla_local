@@ -922,13 +922,13 @@ export default function AttendanceManagement() {
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">HE 25%</p>
                                   <p className={`font-semibold ${!vacation && (emp.record?.overtime_hours_25 > 0) ? 'text-blue-600' : 'text-slate-400'}`}>
-                                    {vacation ? "0.00" : (emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h
+                                    {vacation ? "0.00" : Number(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h
                                   </p>
                                 </div>
                                 <div className="text-center">
                                   <p className="text-xs text-slate-600 mb-1">HE 35%</p>
                                   <p className={`font-semibold ${!vacation && (emp.record?.overtime_hours_35 > 0) ? 'text-purple-600' : 'text-slate-400'}`}>
-                                    {vacation ? "0.00" : (emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h
+                                    {vacation ? "0.00" : Number(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h
                                   </p>
                                 </div>
                               </div>
