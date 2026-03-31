@@ -42,6 +42,7 @@ export default function EmployeeManagement() {
   const [showDerechohabienteForm, setShowDerechohabienteForm] = useState(false);
   const [editingDerechohabiente, setEditingDerechohabiente] = useState(null);
   const [derechohabienteFormData, setDerechohabienteFormData] = useState({});
+  const [formErrors, setFormErrors] = useState([]);
 
   const { hasPermission, getAccessibleSites, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -630,6 +631,7 @@ export default function EmployeeManagement() {
   const handleSubmit = async () => {
     // Si está editando, permitir actualización parcial
     if (editingEmployee) {
+      setFormErrors([]);
       updateEmployeeMutation.mutate({
         id: editingEmployee.id,
         data: formData,
@@ -638,42 +640,32 @@ export default function EmployeeManagement() {
       return;
     }
 
-    // Solo validar campos obligatorios al crear un nuevo empleado
-    const missingFields = [];
+    const errors = [];
 
-    if (!formData.employee_code) missingFields.push("Código de Empleado");
-    if (!formData.document_number) missingFields.push("Número de Documento");
-    if (!formData.first_name) missingFields.push("Nombres");
-    if (!formData.last_name) missingFields.push("Apellidos");
+    if (!formData.employee_code) errors.push("Código de Empleado es obligatorio");
+    if (!formData.document_number) errors.push("Número de Documento es obligatorio");
+    if (!formData.first_name) errors.push("Nombres es obligatorio");
+    if (!formData.last_name) errors.push("Apellidos es obligatorio");
 
-    if (missingFields.length > 0) {
-      toast.error(
-        `❌ Campos obligatorios faltantes: ${missingFields.join(", ")}`,
-        { duration: 5000 }
-      );
-      return;
+    if (formData.document_type === 'DNI' && formData.document_number && formData.document_number.length !== 8) {
+      errors.push("El DNI debe tener exactamente 8 dígitos");
     }
 
-    // Validaciones adicionales solo al crear
-    if (formData.document_type === 'DNI' && formData.document_number.length !== 8) {
-      toast.error("❌ El DNI debe tener exactamente 8 dígitos");
-      return;
-    }
-
-    // Validar DNI duplicado
+    // Validar documento duplicado
     const existingEmployee = allEmployees.find(emp =>
       emp.document_number === formData.document_number &&
       emp.document_type === formData.document_type
     );
-
     if (existingEmployee) {
-      toast.error(
-        `❌ Ya existe un empleado con este ${formData.document_type}: ${formData.document_number} (${existingEmployee.first_name} ${existingEmployee.last_name})`,
-        { duration: 6000 }
-      );
+      errors.push(`Ya existe un empleado con este ${formData.document_type}: ${formData.document_number} — ${existingEmployee.first_name} ${existingEmployee.last_name} (${existingEmployee.employee_code})`);
+    }
+
+    if (errors.length > 0) {
+      setFormErrors(errors);
       return;
     }
 
+    setFormErrors([]);
     createEmployeeMutation.mutate(formData);
   };
 
@@ -715,6 +707,7 @@ export default function EmployeeManagement() {
     setFormData({});
     setEditingEmployee(null);
     setShowForm(false);
+    setFormErrors([]);
   };
 
   // Obtener sedes accesibles según el rol (null = todas)
@@ -1047,6 +1040,8 @@ export default function EmployeeManagement() {
           ubigeos={ubigeos}
           professions={professions}
           allContracts={allContracts}
+          allEmployees={allEmployees}
+          formErrors={formErrors}
           derechohabientes={derechohabientes}
           onDerechohabienteAdd={(data) => createDerechohabienteMutation.mutate(data)}
           onDerechohabienteEdit={(id, data) => updateDerechohabienteMutation.mutate({ id, data })}

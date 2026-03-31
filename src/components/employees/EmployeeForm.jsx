@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Users, Trash2, Plus, Edit, Loader2 } from "lucide-react";
+import { Users, Trash2, Plus, Edit, Loader2, Search } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 // import { base44 } from "@/api/base44Client";
@@ -28,12 +28,28 @@ export default function EmployeeForm({
   ubigeos,
   professions,
   allContracts,
+  allEmployees = [],
+  formErrors = [],
   derechohabientes,
   onDerechohabienteAdd,
   onDerechohabienteEdit,
   onDerechohabienteDelete,
 }) {
   const { hasPermission } = usePermissions();
+
+  // Auto-generar código FPxxxx al abrir para nuevo empleado
+  React.useEffect(() => {
+    if (!editingEmployee) {
+      const fpCodes = allEmployees
+        .map(e => e.employee_code)
+        .filter(c => c && /^FP\d{4}$/.test(c))
+        .map(c => parseInt(c.slice(2), 10));
+      const maxNum = fpCodes.length > 0 ? Math.max(...fpCodes) : 0;
+      const nextNum = String(maxNum + 1).padStart(4, "0");
+      setFormData(prev => ({ ...prev, employee_code: `FP${nextNum}` }));
+    }
+  }, []);
+
   const [positionSearchTerm, setPositionSearchTerm] = React.useState("");
   const [departmentSearchTerm, setDepartmentSearchTerm] = React.useState("");
   const [professionSearchTerm, setProfessionSearchTerm] = React.useState("");
@@ -45,6 +61,37 @@ export default function EmployeeForm({
   const [selectedDepartamento, setSelectedDepartamento] = React.useState(editingEmployee?.department || "");
   const [selectedProvincia, setSelectedProvincia] = React.useState(editingEmployee?.province || "");
   const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
+  const [lookingUpDni, setLookingUpDni] = React.useState(false);
+
+  const handleDniLookup = async () => {
+    const dni = formData.document_number;
+    if (!dni || dni.length !== 8) {
+      toast.error("Ingresa un DNI válido de 8 dígitos");
+      return;
+    }
+    setLookingUpDni(true);
+    try {
+      const response = await fetch(`https://apiperu.dev/api/dni/${dni}`, {
+        headers: { "Authorization": "Bearer 20b6666ddda099db4204cf53854f8ca04d950a4eead89029e77999b0726181cb" }
+      });
+      const data = await response.json();
+      if (data.success && data.data) {
+        const { nombres, apellido_paterno, apellido_materno } = data.data;
+        setFormData({
+          ...formData,
+          first_name: nombres || formData.first_name,
+          last_name: `${apellido_paterno || ""} ${apellido_materno || ""}`.trim(),
+        });
+        toast.success("Datos del DNI cargados correctamente");
+      } else {
+        toast.error("DNI no encontrado o inválido");
+      }
+    } catch {
+      toast.error("Error al consultar el DNI");
+    } finally {
+      setLookingUpDni(false);
+    }
+  };
   const [showDerechohabienteForm, setShowDerechohabienteForm] = React.useState(false);
   const [editingDH, setEditingDH] = React.useState(null);
   const [dhFormData, setDhFormData] = React.useState({});
@@ -98,6 +145,23 @@ export default function EmployeeForm({
           </div>
         </CardHeader>
         <CardContent className="p-6 max-h-[70vh] overflow-y-auto">
+          {formErrors.length > 0 && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-300 rounded-lg">
+              <div className="flex items-start gap-2">
+                <span className="text-red-600 font-bold text-lg leading-none mt-0.5">⚠</span>
+                <div>
+                  <p className="text-sm font-bold text-red-700 mb-1">
+                    {formErrors.length === 1 ? "Se encontró un error:" : `Se encontraron ${formErrors.length} errores:`}
+                  </p>
+                  <ul className="space-y-1">
+                    {formErrors.map((err, i) => (
+                      <li key={i} className="text-sm text-red-600">• {err}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
           <Tabs defaultValue="personal" className="space-y-6">
             <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="personal">Personal</TabsTrigger>
@@ -120,7 +184,14 @@ export default function EmployeeForm({
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label>Código de Empleado <span className="text-red-600">*</span></Label>
-                      <Input value={formData.employee_code} onChange={(e) => setFormData({ ...formData, employee_code: e.target.value })} className={!formData.employee_code ? "border-red-300" : ""} />
+                      <Input
+                        value={formData.employee_code || "Generando..."}
+                        disabled
+                        className="bg-indigo-50 text-indigo-700 cursor-not-allowed font-mono font-semibold border-indigo-200"
+                      />
+                      {!editingEmployee && (
+                        <p className="text-xs text-indigo-500 mt-1">⚡ Código autogenerado</p>
+                      )}
                     </div>
                     <div>
                       <Label>Tipo de Documento <span className="text-red-600">*</span></Label>
@@ -136,21 +207,48 @@ export default function EmployeeForm({
                     </div>
                     <div>
                       <Label>Número de Documento <span className="text-red-600">*</span></Label>
-                      <Input
-                        value={formData.document_number}
-                        onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setFormData({ ...formData, document_number: v.slice(0, formData.document_type === 'DNI' ? 8 : 20) }); }}
-                        className={!formData.document_number ? "border-red-300" : ""}
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          value={formData.document_number}
+                          onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setFormData({ ...formData, document_number: v.slice(0, formData.document_type === 'DNI' ? 8 : 20) }); }}
+                          className={!formData.document_number ? "border-red-300 flex-1" : "flex-1"}
+                        />
+                        {formData.document_type === "DNI" && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={handleDniLookup}
+                            disabled={lookingUpDni || formData.document_number?.length !== 8}
+                            title="Buscar datos por DNI"
+                            className="shrink-0 border-indigo-300 text-indigo-600 hover:bg-indigo-50"
+                          >
+                            {lookingUpDni ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label>Nombres <span className="text-red-600">*</span></Label>
-                      <Input value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} className={!formData.first_name ? "border-red-300" : ""} />
+                      <Input
+                        value={formData.first_name}
+                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                        disabled={formData.document_type === "DNI"}
+                        className={`${!formData.first_name ? "border-red-300" : ""} ${formData.document_type === "DNI" ? "bg-slate-100 text-slate-600 cursor-not-allowed" : ""}`}
+                        placeholder={formData.document_type === "DNI" ? "Se completa al buscar DNI" : ""}
+                      />
                     </div>
                     <div>
                       <Label>Apellidos <span className="text-red-600">*</span></Label>
-                      <Input value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} className={!formData.last_name ? "border-red-300" : ""} />
+                      <Input
+                        value={formData.last_name}
+                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                        disabled={formData.document_type === "DNI"}
+                        className={`${!formData.last_name ? "border-red-300" : ""} ${formData.document_type === "DNI" ? "bg-slate-100 text-slate-600 cursor-not-allowed" : ""}`}
+                        placeholder={formData.document_type === "DNI" ? "Se completa al buscar DNI" : ""}
+                      />
                     </div>
                     <div>
                       <Label>Género</Label>

@@ -9,9 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Clock, Plus, Edit, Trash2, Users, User, Calendar, Search, ChevronsUpDown, Check, X
+  Clock, Plus, Edit, Trash2, Users, User, Calendar, Search, ChevronsUpDown, Check, X, CalendarIcon
 } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
@@ -63,6 +67,7 @@ export default function ScheduleManagement() {
   const [assignFormData, setAssignFormData] = useState({
     employee_id: null,
     departments: [],
+    effective_from: new Date(),
   });
 
   const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
@@ -192,7 +197,7 @@ export default function ScheduleManagement() {
       return;
     }
     setEditingAssignment(null);
-    setAssignFormData({ employee_id: null, departments: [] });
+    setAssignFormData({ employee_id: null, departments: [], effective_from: new Date() });
     setSelectedTemplateId("");
     setTemplateSearch("");
     setEmployeeSearch("");
@@ -206,6 +211,7 @@ export default function ScheduleManagement() {
     setAssignFormData({
       employee_id: assignment.employee_id || null,
       departments: assignment.departments || (assignment.department_name ? [assignment.department_name] : []),
+      effective_from: assignment.effective_from ? new Date(assignment.effective_from + "T00:00:00") : new Date(),
     });
 
     // Buscar la plantilla que corresponde a esta asignación por nombre
@@ -267,18 +273,17 @@ export default function ScheduleManagement() {
       return;
     }
 
+    const effectiveFromStr = format(assignFormData.effective_from, "yyyy-MM-dd");
+
     if (editingAssignment) {
-      // Si se seleccionó una nueva plantilla, copiar sus datos al horario asignado
       if (selectedTemplateId) {
         const template = templates.find(t => t.id === selectedTemplateId);
-        if (!template) {
-          toast.error("Plantilla no encontrada");
-          return;
-        }
+        if (!template) { toast.error("Plantilla no encontrada"); return; }
         const updatedData = {
           ...template,
           employee_id: assignFormData.employee_id,
           departments: assignFormData.departments,
+          effective_from: effectiveFromStr,
         };
         delete updatedData.id;
         delete updatedData.created_date;
@@ -286,29 +291,25 @@ export default function ScheduleManagement() {
         delete updatedData.created_by;
         updateAssignmentMutation.mutate({ id: editingAssignment.id, data: updatedData });
       } else {
-        const updatedData = {
+        updateAssignmentMutation.mutate({ id: editingAssignment.id, data: {
           employee_id: assignFormData.employee_id,
           departments: assignFormData.departments,
-        };
-        updateAssignmentMutation.mutate({ id: editingAssignment.id, data: updatedData });
+          effective_from: effectiveFromStr,
+        }});
       }
     } else {
       const template = templates.find(t => t.id === selectedTemplateId);
-      if (!template) {
-        toast.error("Plantilla no encontrada");
-        return;
-      }
-
+      if (!template) { toast.error("Plantilla no encontrada"); return; }
       const newAssignment = {
         ...template,
         employee_id: assignFormData.employee_id,
         departments: assignFormData.departments,
+        effective_from: effectiveFromStr,
       };
       delete newAssignment.id;
       delete newAssignment.created_date;
       delete newAssignment.updated_date;
       delete newAssignment.created_by;
-
       createAssignmentMutation.mutate(newAssignment);
     }
   };
@@ -341,7 +342,7 @@ export default function ScheduleManagement() {
   };
 
   const resetAssignForm = () => {
-    setAssignFormData({ employee_id: null, departments: [] });
+    setAssignFormData({ employee_id: null, departments: [], effective_from: new Date() });
     setSelectedTemplateId("");
     setTemplateSearch("");
     setEmployeeSearch("");
@@ -642,16 +643,21 @@ export default function ScheduleManagement() {
                               )}
                             </div>
                             <div className="space-y-1 text-sm">
-                              <p className="text-slate-600">
-                                <strong>Horario:</strong> {schedule.schedule_name}
-                              </p>
-                              <p className="text-slate-600">
-                                <strong>Lun-Vie:</strong> {schedule.monday_start || "--"} - {schedule.monday_end || "--"}
-                              </p>
-                              <div className="flex gap-4 text-slate-600">
-                                <span><strong>Break:</strong> {schedule.break_duration_minutes} min</span>
-                                <span><strong>Tolerancia:</strong> {schedule.tolerance_minutes} min</span>
-                              </div>
+                             <p className="text-slate-600">
+                               <strong>Horario:</strong> {schedule.schedule_name}
+                             </p>
+                             <p className="text-slate-600">
+                               <strong>Lun-Vie:</strong> {schedule.monday_start || "--"} - {schedule.monday_end || "--"}
+                             </p>
+                             <div className="flex gap-4 text-slate-600">
+                               <span><strong>Break:</strong> {schedule.break_duration_minutes} min</span>
+                               <span><strong>Tolerancia:</strong> {schedule.tolerance_minutes} min</span>
+                             </div>
+                             {schedule.effective_from && (
+                               <p className="text-slate-500">
+                                 <strong>Vigente desde:</strong> {schedule.effective_from}
+                               </p>
+                             )}
                             </div>
                           </div>
                           <div className="flex gap-2">
@@ -795,8 +801,9 @@ export default function ScheduleManagement() {
                                 size="sm"
                                 onClick={() => {
                                   setAssignFormData({
-                                    employee_id: emp.id,
-                                    departments: [],
+                                   employee_id: emp.id,
+                                   departments: [],
+                                   effective_from: new Date(),
                                   });
                                   setEmployeeSearch(`${emp.first_name} ${emp.last_name} - ${emp.employee_code}`);
                                   setEditingAssignment(null);
@@ -1363,18 +1370,46 @@ export default function ScheduleManagement() {
                 )}
               </div>
 
-              <div className="flex gap-3 pt-4 border-t">
-                <Button variant="outline" className="flex-1" onClick={resetAssignForm}>
-                  Cancelar
-                </Button>
-                <Button
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700"
-                  onClick={handleSubmitAssignment}
-                  disabled={createAssignmentMutation.isPending || updateAssignmentMutation.isPending}
-                >
-                  {editingAssignment ? "Actualizar" : "Asignar"} Horario
-                </Button>
+              {/* Vigente desde */}
+              <div>
+                <Label className="font-semibold text-slate-800 mb-2 block">
+                  Vigente desde *
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start bg-green-50 border-green-200 hover:bg-green-100">
+                      <CalendarIcon className="mr-2 h-4 w-4 text-green-700" />
+                      <span className="text-green-700">
+                        {format(assignFormData.effective_from, "dd 'de' MMMM yyyy", { locale: es })}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarPicker
+                      mode="single"
+                      selected={assignFormData.effective_from}
+                      onSelect={d => d && setAssignFormData({ ...assignFormData, effective_from: d })}
+                      locale={es}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-slate-500 mt-1">
+                  El horario aplicará a partir de esta fecha en adelante.
+                </p>
               </div>
+
+              <div className="flex gap-3 pt-4 border-t">
+                 <Button variant="outline" className="flex-1" onClick={resetAssignForm}>
+                   Cancelar
+                 </Button>
+                 <Button
+                   className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                   onClick={handleSubmitAssignment}
+                   disabled={createAssignmentMutation.isPending || updateAssignmentMutation.isPending}
+                 >
+                   {editingAssignment ? "Actualizar" : "Asignar"} Horario
+                 </Button>
+               </div>
             </CardContent>
           </Card>
         </div>

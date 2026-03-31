@@ -109,7 +109,7 @@ export default function MyProfile() {
     );
   }
 
-  const yearsOfService = employee.hire_date 
+  const yearsOfService = employee.hire_date
     ? Math.floor((new Date() - new Date(employee.hire_date)) / (365.25 * 24 * 60 * 60 * 1000))
     : 0;
 
@@ -184,8 +184,8 @@ export default function MyProfile() {
               <CardContent className="p-8 text-center">
                 <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-xl">
                   {employee.photo_url ? (
-                    <img 
-                      src={employee.photo_url} 
+                    <img
+                      src={`${import.meta.env.VITE_API_URL}${employee.photo_url}`}
                       alt={employee.first_name}
                       className="w-full h-full rounded-full object-cover"
                     />
@@ -193,13 +193,13 @@ export default function MyProfile() {
                     <User className="w-16 h-16" />
                   )}
                 </div>
-                
+
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">
                   {employee.first_name} {employee.last_name}
                 </h2>
-                
+
                 <p className="text-slate-600 mb-4">{employee.position}</p>
-                
+
                 <div className="flex flex-wrap gap-2 justify-center mb-6">
                   <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200">
                     {employee.employee_code}
@@ -447,8 +447,8 @@ export default function MyProfile() {
               <div className="text-sm text-blue-900">
                 <p className="font-semibold mb-1">Información importante</p>
                 <p>
-                  Los campos marcados con asterisco (*) son obligatorios. 
-                  Si necesitas actualizar información personal como nombres, documento de identidad o datos laborales, 
+                  Los campos marcados con asterisco (*) son obligatorios.
+                  Si necesitas actualizar información personal como nombres, documento de identidad o datos laborales,
                   contacta al área de Recursos Humanos.
                 </p>
               </div>

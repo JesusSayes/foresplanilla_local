@@ -1,0 +1,225 @@
+import { PrismaClient } from '@prisma/client';
+import { generate24HexId } from '../utils/idGenerator.js';
+
+const prisma = new PrismaClient();
+
+const DAY_NAMES = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+
+function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
+  const candidates = schedules.filter(s => {
+    const isForEmployee = s.employee_id === employeeId;
+    const isForDept = !s.employee_id && departmentName &&
+      (Array.isArray(s.departments)
+        ? s.departments.includes(departmentName)
+        : s.department_name === departmentName);
+    return isForEmployee || isForDept;
+  });
+
+  const findBest = (list) => {
+    const valid = list.filter(s => {
+      const from = s.effective_from ? s.effective_from.toISOString().slice(0,10) : "0000-01-01";
+      const to   = s.effective_to   ? s.effective_to.toISOString().slice(0,10)   : "9999-12-31";
+      return from <= dateStr && dateStr <= to;
+    });
+    valid.sort((a, b) => {
+      const af = a.effective_from ? a.effective_from.toISOString().slice(0,10) : "0000-01-01";
+      const bf = b.effective_from ? b.effective_from.toISOString().slice(0,10) : "0000-01-01";
+      return bf.localeCompare(af);
+    });
+    return valid[0] || null;
+  };
+
+  return findBest(candidates.filter(s => s.employee_id === employeeId))
+      || findBest(candidates.filter(s => !s.employee_id))
+      || null;
+}
+
+function calcWorkedHours(startTime, endTime, breakMinutes) {
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  return Math.max(0, ((eh * 60 + em) - (sh * 60 + sm) - (breakMinutes || 60)) / 60);
+}
+
+function dateRange(startStr, endStr) {
+  const dates = [];
+  const cur = new Date(startStr + "T00:00:00");
+  const end = new Date(endStr   + "T00:00:00");
+  while (cur <= end) {
+    dates.push(cur.toISOString().slice(0, 10));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+function todayInPeru() {
+  const now    = new Date();
+  const peruMs = now.getTime() + now.getTimezoneOffset() * 60000 + (-5 * 60 * 60000);
+  const d      = new Date(peruMs);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+/**
+ * Genera automáticamente registros de asistencia para todos los empleados activos.
+ *
+ * Modos de uso:
+ * 1. CRON DIARIO (sin parámetros): solo genera el registro de HOY para todos los empleados.
+ * 2. BACKFILL (date_from): genera registros desde date_from hasta hoy, de a employee_batch empleados.
+ *
+ * Params opcionales:
+ *   date_from      → fecha mínima de inicio, ej: "2026-01-01" (activa modo backfill)
+ *   employee_id    → procesar solo un empleado específico
+ *   employee_batch → cuántos empleados procesar por llamada (default: 200 en cron, 5 en backfill)
+ *   skip_employees → saltar los primeros N empleados (para paginación de backfill)
+ */
+export async function generarAsistenciaDiaria({ date_from = null, employee_id = null, employee_batch = null, cursor_employee = null } = {}) {
+  const forcedDateFrom   = date_from;
+  const filterEmployeeId = employee_id;
+  const isBackfill       = !!forcedDateFrom;
+  const defaultBatch     = isBackfill ? 5 : 200;
+  const employeeBatch    = Number(employee_batch) || defaultBatch;
+  const todayStr         = todayInPeru();
+
+  const [schedulesRaw, holidaysRaw, contractsRaw] = await Promise.all([
+    prisma.work_schedule.findMany({ where: { is_active: true }, orderBy: { id: 'asc' } }),
+    prisma.holiday.findMany({ orderBy: { date: 'desc' } }),
+    prisma.contract.findMany({ where: { status: "Vigente" }, orderBy: { id: 'asc' } }),
+  ]);
+
+  const holidayDates    = new Set(holidaysRaw.map(h => h.date ? h.date.toISOString().slice(0,10) : ""));
+  const vigentContracts = contractsRaw;
+
+  // Paginación con cursor sobre empleados activos
+  const employeeQuery = {
+    where:   { status: "Activo", ...(filterEmployeeId ? { id: filterEmployeeId } : {}) },
+    orderBy: { id: 'asc' },
+    take:    filterEmployeeId ? 1 : employeeBatch,
+    ...(cursor_employee ? { cursor: { id: cursor_employee }, skip: 1 } : {}),
+  };
+  const employees = await prisma.employee.findMany(employeeQuery);
+
+  // Total de activos (para has_more)
+  const totalActive = await prisma.employee.count({ where: { status: "Activo" } });
+
+  let totalCreated = 0;
+  let totalSkipped = 0;
+  const errors = [];
+
+  for (const emp of employees) {
+    try {
+      const empContract  = vigentContracts.find(c => c.employee_id === emp.id);
+      const startDateRaw = empContract?.start_date || emp.hire_date;
+
+      if (!startDateRaw) { totalSkipped++; continue; }
+
+      const contractStart = startDateRaw.toISOString().slice(0, 10);
+      const startStr = isBackfill
+        ? ((forcedDateFrom > contractStart) ? forcedDateFrom : contractStart)
+        : todayStr;
+
+      if (startStr > todayStr) { totalSkipped++; continue; }
+
+      // Paginación con cursor sobre registros existentes del empleado
+      const existingDates = new Set();
+      let cursorRecord = null;
+      while (true) {
+        const page = await prisma.attendance_record.findMany({
+          where:   { employee_id: emp.id, ...(isBackfill ? {} : { date: new Date(todayStr + "T00:00:00") }) },
+          select:  { id: true, date: true },
+          orderBy: { id: 'asc' },
+          take:    500,
+          ...(cursorRecord ? { cursor: { id: cursorRecord }, skip: 1 } : {}),
+        });
+        for (const r of page) {
+          if (r.date) existingDates.add(r.date.toISOString().slice(0,10));
+        }
+        if (page.length < 500) break;
+        cursorRecord = page[page.length - 1].id;
+      }
+
+      const allDates        = dateRange(startStr, todayStr);
+      const recordsToCreate = [];
+
+      for (const dateStr of allDates) {
+        if (existingDates.has(dateStr)) continue;
+        if (holidayDates.has(dateStr)) continue;
+
+        const schedule = getScheduleForDate(emp.id, emp.department_name, schedulesRaw, dateStr);
+        if (!schedule) continue;
+
+        const dow    = new Date(dateStr + "T00:00:00").getDay();
+        const day    = DAY_NAMES[dow];
+        const startT = schedule[`${day}_start`];
+        const endT   = schedule[`${day}_end`];
+
+        if (!startT || !endT || startT.trim() === "" || endT.trim() === "") continue;
+
+        const isExempt  = !!schedule.exempt_from_clocking;
+        const breakMin  = schedule.break_duration_minutes || 60;
+        const worked    = isExempt ? calcWorkedHours(startT, endT, breakMin) : 0;
+        const overtimeAuth = schedule.overtime_authorized || false;
+
+        recordsToCreate.push({
+          id:                  generate24HexId(),
+          employee_id:         emp.id,
+          date:                new Date(dateStr + "T00:00:00"),
+          scheduled_start:     startT,
+          scheduled_end:       endT,
+          clock_in:            isExempt ? startT : null,
+          clock_out:           isExempt ? endT   : null,
+          worked_hours:        worked,
+          regular_hours:       worked,
+          overtime_hours_25:   0,
+          overtime_hours_35:   0,
+          overtime_authorized: overtimeAuth,
+          is_late:             false,
+          late_minutes:        0,
+          is_absent:           !isExempt,
+          status:              isExempt ? "Completo" : "Ausente",
+          notes:               isExempt
+            ? "Registro automático - Exonerado de marcación física"
+            : "Registro generado automáticamente - Pendiente de marcación",
+          created_date:        new Date(),
+          updated_date:        new Date(),
+        });
+
+        existingDates.add(dateStr);
+      }
+
+      if (recordsToCreate.length > 0) {
+        await prisma.attendance_record.createMany({ data: recordsToCreate, skipDuplicates: true });
+        totalCreated += recordsToCreate.length;
+      }
+
+    } catch (empError) {
+      errors.push({ employee_id: emp.id, name: `${emp.first_name} ${emp.last_name}`, error: empError.message });
+    }
+  }
+
+  const lastEmployee  = employees[employees.length - 1];
+  const nextCursor    = !filterEmployeeId && employees.length === employeeBatch ? lastEmployee?.id : null;
+
+  return {
+    success:                true,
+    mode:                   isBackfill ? "backfill" : "cron_diario",
+    date:                   todayStr,
+    employees_processed:    employees.length,
+    records_created:        totalCreated,
+    records_skipped:        totalSkipped,
+    total_active_employees: totalActive,
+    next_cursor:            nextCursor,
+    has_more:               !!nextCursor,
+    errors:                 errors.length > 0 ? errors : undefined,
+  };
+}
+
+if (process.argv[1].endsWith('generarAsistenciaDiaria.js')) {
+  const args = {};
+  for (let i = 2; i < process.argv.length; i++) {
+    const [k, v] = process.argv[i].split('=');
+    if (k && v) args[k.replace('--','')] = v;
+  }
+  generarAsistenciaDiaria(args)
+    .then(r => { console.log(JSON.stringify(r, null, 2)); process.exit(0); })
+    .catch(e => { console.error(e); process.exit(1); })
+    .finally(() => prisma.$disconnect());
+}

@@ -156,7 +156,7 @@ export default function Dashboard() {
               <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-xl">
                 {employee.photo_url ? (
                   <img
-                    src={employee.photo_url}
+                    src={`${import.meta.env.VITE_API_URL}${employee.photo_url}`}
                     alt={employee.first_name}
                     className="w-full h-full rounded-2xl object-cover"
                   />
