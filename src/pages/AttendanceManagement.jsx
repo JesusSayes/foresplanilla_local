@@ -327,7 +327,7 @@ export default function AttendanceManagement() {
             overtime_hours: extraHrs,
             status: "Pendiente",
           });
-          toast.warning(`⚠️ ${extraHrs.toFixed(2)}h extras sin autorización — se generó alerta.`);
+          toast.warning(`⚠️ ${Number(extraHrs || 0).toFixed(2)}h extras sin autorización — se generó alerta.`);
         }
       }
     }
@@ -562,7 +562,7 @@ export default function AttendanceManagement() {
         'Sede': emp.site || 'Sin sede',
         'Entrada': emp.record?.clock_in || '--:--',
         'Salida': emp.record?.clock_out || '--:--',
-        'Horas Trabajadas': workedHours.toFixed(2),
+        'Horas Trabajadas': Number(workedHours || 0).toFixed(2),
         'Tardanza (min)': emp.record?.late_minutes || 0,
         'HE 25%': (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
         'HE 35%': (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
@@ -590,7 +590,7 @@ export default function AttendanceManagement() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) { toast.error('Por favor, permite las ventanas emergentes para imprimir'); return; }
     const filterText = attendanceFilter === "all" ? "Todos los empleados" : attendanceFilter === "sin_entrada" ? "Sin marcar entrada" : attendanceFilter === "sin_salida" ? "Sin marcar salida" : "Con tardanza";
-    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>Código</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; return `<tr><td>${emp.employee_code}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${emp.record?.clock_in || '--:--'}</td><td>${emp.record?.clock_out || '--:--'}</td><td>${wh.toFixed(2)}h</td><td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h</td><td>${(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
+    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>Código</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; return `<tr><td>${emp.employee_code}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${emp.record?.clock_in || '--:--'}</td><td>${emp.record?.clock_out || '--:--'}</td><td>${Number(wh || 0).toFixed(2)}h</td><td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h</td><td>${(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
     printWindow.document.write(printContent);
     printWindow.document.close();
   };
@@ -1031,7 +1031,7 @@ export default function AttendanceManagement() {
                                <p className="text-sm text-slate-700">
                                  📅 {(() => { try { return format(parseISO(alert.alert_date), "dd MMM yyyy", { locale: es }); } catch { return "Sin fecha"; } })()}
                                </p>
-                               {record && <p className="text-sm text-slate-600 mt-1">Marcación: {record.clock_in} - {record.clock_out} ({record.worked_hours?.toFixed(2)}h trabajadas)</p>}
+                               {record && <p className="text-sm text-slate-600 mt-1">Marcación: {record.clock_in} - {record.clock_out} ({Number(record.worked_hours || 0).toFixed(2)}h trabajadas)</p>}
                                {alertSched && (
                                  <p className="text-sm text-slate-600 mt-1">
                                    🗓️ Horario: <span className="font-medium">{schedName}</span>

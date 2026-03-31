@@ -54,6 +54,7 @@ import { syncBiotimeAttendance } from './controllers/sync/biotimeSyncController.
 import uploadRoutes from "./routes/uploadRoutes.js";
 import derechohabientesRoutes from './routes/derechohabientes.js';
 import recalcularAsistenciaRoutes from './routes/attendance/recalcularAsistencia.js';
+import { generarAsistenciaDiaria } from './scripts/generarAsistenciaDiaria.js';
 
 dotenv.config();
 
@@ -147,9 +148,15 @@ app.use('/api/derechohabientes', derechohabientesRoutes);
 app.use('/api/attendance/recalcular', recalcularAsistenciaRoutes);
 
 // Cron: sincronización biotime cada hora
-cron.schedule('0 * * * *', () => {
-  console.log('[Cron] Ejecutando sync biotime...');
-  syncBiotimeAttendance().catch(err => console.error('[Cron] Error en sync biotime:', err.message));
+// cron.schedule('0 * * * *', () => {
+  // console.log('[Cron] Ejecutando sync biotime...');
+  // syncBiotimeAttendance().catch(err => console.error('[Cron] Error en sync biotime:', err.message));
+// });
+
+// Cron: generar asistencia diaria a las 05:01 UTC (00:01 hora Perú)
+cron.schedule('1 5 * * *', () => {
+  console.log('[Cron] Ejecutando generarAsistenciaDiaria...');
+  generarAsistenciaDiaria({ mode: 'cron' }).catch(err => console.error('[Cron] Error en generarAsistenciaDiaria:', err.message));
 });
 
 // 404 handler
@@ -184,6 +191,7 @@ app.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
   console.log(`Logs: ${logsDir}`);
   console.log('[Cron] Sync biotime programado cada hora (0 * * * *)');
+  console.log('[Cron] Generar asistencia diaria programado a las 05:01 UTC (1 5 * * *)');
 });
 app.use("/uploads", (req, res, next) => {
   console.log('Static request:', req.path, 'from', process.cwd());
