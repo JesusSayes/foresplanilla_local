@@ -375,11 +375,23 @@ export default function AttendanceManagement() {
     });
   };
 
+  const [justifyingSchedule, setJustifyingSchedule] = useState(null);
+
   const handleJustifyClick = (emp, record, overrideDate) => {
     setJustifyingEmployee(emp);
 
     const dateStr = overrideDate || format(selectedDate, "yyyy-MM-dd");
     setJustifyingDate(overrideDate ? new Date(overrideDate + "T00:00:00") : selectedDate);
+
+    // Obtener el horario del empleado para la fecha específica
+    const sched = getEmployeeScheduleForDate(emp.id, dateStr);
+    const dow = new Date(dateStr + "T00:00:00").getDay();
+    const dayStarts = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+    const dayEnds   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+    setJustifyingSchedule(sched ? {
+      start: sched[dayStarts[dow]] || "09:00",
+      end:   sched[dayEnds[dow]]   || "18:00",
+    } : { start: "09:00", end: "18:00" });
     // Buscar justificación previa para este empleado en esta fecha
     const prevIncident = allIncidents.find(
       i => i.employee_id === emp.id && i.incident_date === dateStr
@@ -1402,15 +1414,17 @@ export default function AttendanceManagement() {
             justificationData={justificationData}
             setJustificationData={setJustificationData}
             selectedDate={justifyingDate || selectedDate}
+            employeeSchedule={justifyingSchedule}
             todayRecords={todayRecords}
             employee={employee}
             existingIncident={existingIncident}
-            onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); setExistingIncident(null); setJustifyingDate(null); }}
+            onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); setExistingIncident(null); setJustifyingDate(null); setJustifyingSchedule(null); }}
             onSuccess={() => {
               setShowJustifyModal(false);
               setJustifyingEmployee(null);
               setExistingIncident(null);
               setJustifyingDate(null);
+              setJustifyingSchedule(null);
               setJustificationData({ incident_type: "Olvido de Marcación", justification: "", supporting_document_url: "", justified_time_start: "09:00", justified_time_end: "18:00", full_day_justification: true });
               queryClient.invalidateQueries(["allIncidents"]);
               queryClient.invalidateQueries(["todayAttendance"]);

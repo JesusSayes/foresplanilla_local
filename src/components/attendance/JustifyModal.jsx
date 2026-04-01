@@ -17,12 +17,24 @@ export default function JustifyModal({
   justificationData,
   setJustificationData,
   selectedDate,
+  employeeSchedule,
   todayRecords,
   employee,
   existingIncident,
   onClose,
   onSuccess,
 }) {
+  // Horas del horario real del empleado (fallback a 09:00-18:00)
+  const schedStart = employeeSchedule?.start || "09:00";
+  const schedEnd   = employeeSchedule?.end   || "18:00";
+
+  // Calcular horas del día completo según horario
+  const getFullDayHours = () => {
+    const [sh, sm] = schedStart.split(":").map(Number);
+    const [eh, em] = schedEnd.split(":").map(Number);
+    const totalMin = (eh * 60 + em) - (sh * 60 + sm);
+    return Math.max(0, totalMin / 60);
+  };
   const [uploadingFile, setUploadingFile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState("");
@@ -114,14 +126,14 @@ export default function JustifyModal({
 
     setSubmitting(true);
     try {
-      const timeStart = justificationData.full_day_justification ? "09:00" : justificationData.justified_time_start;
-      const timeEnd = justificationData.full_day_justification ? "18:00" : justificationData.justified_time_end;
+      const timeStart = justificationData.full_day_justification ? schedStart : justificationData.justified_time_start;
+      const timeEnd = justificationData.full_day_justification ? schedEnd : justificationData.justified_time_end;
 
       let hoursToAdjust = 0;
       let lateMinutesToAdjust = 0;
 
       if (justificationData.full_day_justification) {
-        hoursToAdjust = 8;
+        hoursToAdjust = getFullDayHours();
       } else if (timeStart && timeEnd) {
         const [sh, sm] = timeStart.split(":").map(Number);
         const [eh, em] = timeEnd.split(":").map(Number);
@@ -362,15 +374,17 @@ export default function JustifyModal({
                       setJustificationData({
                         ...justificationData,
                         full_day_justification: e.target.checked,
-                        justified_time_start: e.target.checked ? "09:00" : justificationData.justified_time_start,
-                        justified_time_end: e.target.checked ? "18:00" : justificationData.justified_time_end,
+                        justified_time_start: e.target.checked ? schedStart : justificationData.justified_time_start,
+                        justified_time_end: e.target.checked ? schedEnd : justificationData.justified_time_end,
                       });
                       setValidationError("");
                     }}
                     className="w-4 h-4 text-indigo-600"
                   />
                   <label className="text-sm font-medium text-slate-900">
-                    {multiDateMode ? "Día completo (8 horas) — aplica a todos los días" : "Justificar día completo (8 horas)"}
+                    {multiDateMode
+                      ? `Día completo (${schedStart}–${schedEnd}, ${getFullDayHours().toFixed(1)}h) — aplica a todos los días`
+                      : `Justificar día completo (${schedStart}–${schedEnd}, ${getFullDayHours().toFixed(1)}h)`}
                   </label>
                 </div>
 
