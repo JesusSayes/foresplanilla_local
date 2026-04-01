@@ -318,7 +318,10 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
         console.log(`${import.meta.env.VITE_API_URL}${contract.digital_signature_image_url}`);
         img.src = `${import.meta.env.VITE_API_URL}${contract.digital_signature_image_url}`;
       });
-    } catch (_) { /* continuar sin imagen */ }
+    } catch (error)
+    { /* continuar sin imagen */
+      console.log(error.message);
+    }
   }
 
   doc.line(30, sigY, 80, sigY);

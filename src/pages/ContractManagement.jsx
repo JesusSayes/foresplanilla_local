@@ -909,7 +909,7 @@ export default function ContractManagement() {
                 </Label>
                 {signatureImageUrl ? (
                   <div className="border border-green-200 rounded-lg p-3 bg-green-50 flex items-center gap-3">
-                    <img src={signatureImageUrl} alt="Firma" className="h-16 object-contain bg-white border border-slate-200 rounded px-2" />
+                    <img src={`${import.meta.env.VITE_API_URL}${signatureImageUrl}`} alt="Firma" className="h-16 object-contain bg-white border border-slate-200 rounded px-2" />
                     <div className="flex-1">
                       <p className="text-xs font-semibold text-green-800">Firma registrada</p>
                       <p className="text-xs text-green-700">{companyInfo?.legal_representative}</p>

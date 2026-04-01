@@ -19,15 +19,29 @@ export default function JustifyModal({
   justificationData,
   setJustificationData,
   selectedDate,
+  employeeSchedule,
   todayRecords,
   employee,
   existingIncident,
+  workSchedules = [],
   onClose,
   onSuccess,
 }) {
+  // Horas del horario real del empleado (fallback a 09:00-18:00)
+  const schedStart = employeeSchedule?.start || "09:00";
+  const schedEnd   = employeeSchedule?.end   || "18:00";
+
+  // Calcular horas del día completo según horario
+  const getFullDayHours = () => {
+    const [sh, sm] = schedStart.split(":").map(Number);
+    const [eh, em] = schedEnd.split(":").map(Number);
+    const totalMin = (eh * 60 + em) - (sh * 60 + sm);
+    return Math.max(0, totalMin / 60);
+  };
   const [uploadingFile, setUploadingFile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState("");
+  const [overtimeAlert, setOvertimeAlert] = useState(null);
 
   // Multi-date mode
   const [multiDateMode, setMultiDateMode] = useState(false);
@@ -117,14 +131,14 @@ export default function JustifyModal({
 
     setSubmitting(true);
     try {
-      const timeStart = justificationData.full_day_justification ? "09:00" : justificationData.justified_time_start;
-      const timeEnd = justificationData.full_day_justification ? "18:00" : justificationData.justified_time_end;
+      const timeStart = justificationData.full_day_justification ? schedStart : justificationData.justified_time_start;
+      const timeEnd = justificationData.full_day_justification ? schedEnd : justificationData.justified_time_end;
 
       let hoursToAdjust = 0;
       let lateMinutesToAdjust = 0;
 
       if (justificationData.full_day_justification) {
-        hoursToAdjust = 8;
+        hoursToAdjust = getFullDayHours();
       } else if (timeStart && timeEnd) {
         const [sh, sm] = timeStart.split(":").map(Number);
         const [eh, em] = timeEnd.split(":").map(Number);
@@ -171,13 +185,17 @@ export default function JustifyModal({
           is_late: newLateMinutes > 0,
           status: newLateMinutes === 0 && newWorkedHours >= 8 ? "Completo" : "Justificado",
         };
-        if (timeStart) recordUpdate.clock_in = timeStart;
-        if (timeEnd) recordUpdate.clock_out = timeEnd;
 
+        // Preserve original clock_in/clock_out if they already exist — don't overwrite with justified times
+        if (!existingRecord?.clock_in && timeStart) recordUpdate.clock_in = timeStart;
+        if (!existingRecord?.clock_out && timeEnd) recordUpdate.clock_out = timeEnd;
+
+        let savedRecordId = null;
         if (existingRecord) {
           await entitiesAPI.AttendanceRecord.update(existingRecord.id, recordUpdate);
+          savedRecordId = existingRecord.id;
         } else {
-          await entitiesAPI.AttendanceRecord.create({
+          const created = await entitiesAPI.AttendanceRecord.create({
             employee_id: justifyingEmployee.id,
             date: dateStr,
             clock_in: timeStart || null,
@@ -188,6 +206,53 @@ export default function JustifyModal({
             is_absent: false,
             status: "Justificado",
           });
+          savedRecordId = created?.id;
+        }
+
+        // Check if the original record had overtime without authorization → create alert
+        if (existingRecord?.clock_in && existingRecord?.clock_out) {
+          const schedule = workSchedules.find(s => {
+            if (!s.is_active) return false;
+            const from = s.effective_from || "0000-01-01";
+            const to = s.effective_to || "9999-12-31";
+            const fromStr = typeof from === "string" ? from : from.toISOString().slice(0, 10);
+            const toStr = typeof to === "string" ? to : to.toISOString().slice(0, 10);
+            return (s.employee_id === justifyingEmployee.id || (!s.employee_id)) &&
+              fromStr <= dateStr && toStr >= dateStr;
+          });
+
+          if (schedule) {
+            const dow = new Date(dateStr + "T00:00:00").getDay();
+            const dayEndMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+            const schedEnd = schedule[dayEndMap[dow]] || "18:00";
+            const breakMin = schedule.break_duration_minutes ?? 60;
+            const [inH, inM] = existingRecord.clock_in.split(":").map(Number);
+            const [outH, outM] = existingRecord.clock_out.split(":").map(Number);
+            const [endH, endM] = schedEnd.split(":").map(Number);
+            const workedMin = (outH * 60 + outM) - (inH * 60 + inM) - breakMin;
+            const workedHrs = Math.max(0, workedMin / 60);
+            const schedEndMin = endH * 60 + endM;
+            const normalHrs = Math.max(0, (schedEndMin - (inH * 60 + inM) - breakMin) / 60);
+            const extraHrs = Math.max(0, workedHrs - normalHrs);
+            const overtimeAuth = existingRecord.overtime_authorized ?? schedule.overtime_authorized ?? false;
+
+            if (extraHrs > 0 && !overtimeAuth && savedRecordId) {
+              const existingAlert = await entitiesAPI.OvertimeAlert.filter({
+                attendance_record_id: savedRecordId,
+                status: "Pendiente",
+              });
+              if (!existingAlert || existingAlert.length === 0) {
+                await entitiesAPI.OvertimeAlert.create({
+                  employee_id: justifyingEmployee.id,
+                  attendance_record_id: savedRecordId,
+                  alert_date: dateStr,
+                  overtime_hours: extraHrs,
+                  status: "Pendiente",
+                });
+                toast.warning(`⚠️ ${Number(extraHrs).toFixed(2)}h extras sin autorización — se generó alerta.`);
+              }
+            }
+          }
         }
       }
 
@@ -365,15 +430,17 @@ export default function JustifyModal({
                       setJustificationData({
                         ...justificationData,
                         full_day_justification: e.target.checked,
-                        justified_time_start: e.target.checked ? "09:00" : justificationData.justified_time_start,
-                        justified_time_end: e.target.checked ? "18:00" : justificationData.justified_time_end,
+                        justified_time_start: e.target.checked ? schedStart : justificationData.justified_time_start,
+                        justified_time_end: e.target.checked ? schedEnd : justificationData.justified_time_end,
                       });
                       setValidationError("");
                     }}
                     className="w-4 h-4 text-indigo-600"
                   />
                   <label className="text-sm font-medium text-slate-900">
-                    {multiDateMode ? "Día completo (8 horas) — aplica a todos los días" : "Justificar día completo (8 horas)"}
+                    {multiDateMode
+                      ? `Día completo (${schedStart}–${schedEnd}, ${getFullDayHours().toFixed(1)}h) — aplica a todos los días`
+                      : `Justificar día completo (${schedStart}–${schedEnd}, ${getFullDayHours().toFixed(1)}h)`}
                   </label>
                 </div>
 

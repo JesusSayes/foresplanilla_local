@@ -18,7 +18,7 @@ export const LocalAuthProvider = ({ children }) => {
       setIsLoadingAuth(true);
       setAuthError(null);
 
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('token');
 
       if (!token) {
         setIsLoadingAuth(false);
@@ -35,7 +35,7 @@ export const LocalAuthProvider = ({ children }) => {
       console.error('Error verificando autenticación:', error);
       setIsAuthenticated(false);
       setUser(null);
-      localStorage.removeItem('auth_token');
+      localStorage.removeItem('token');
       localStorage.removeItem('user_data');
     } finally {
       setIsLoadingAuth(false);
@@ -48,7 +48,7 @@ export const LocalAuthProvider = ({ children }) => {
       const response = await authAPI.login(email, password);
 
       // Guardar token y datos del usuario
-      localStorage.setItem('auth_token', response.token);
+      localStorage.setItem('token', response.token);
       localStorage.setItem('user_data', JSON.stringify(response.user));
 
       setUser(response.user);
@@ -68,7 +68,7 @@ export const LocalAuthProvider = ({ children }) => {
     } finally {
       setUser(null);
       setIsAuthenticated(false);
-      localStorage.removeItem('auth_token');
+      localStorage.removeItem('token');
       localStorage.removeItem('user_data');
     }
   };
