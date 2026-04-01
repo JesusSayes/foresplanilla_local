@@ -48,6 +48,7 @@ export default function AttendanceManagement() {
   const [showJustifyModal, setShowJustifyModal] = useState(false);
   const [justifyingEmployee, setJustifyingEmployee] = useState(null);
   const [existingIncident, setExistingIncident] = useState(null);
+  const [justifyingDate, setJustifyingDate] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [schedulingEmployee, setSchedulingEmployee] = useState(null);
   const [incidentSearchTerm, setIncidentSearchTerm] = useState("");
@@ -393,10 +394,23 @@ export default function AttendanceManagement() {
     });
   };
 
+  const [justifyingSchedule, setJustifyingSchedule] = useState(null);
+
   const handleJustifyClick = (emp, record, overrideDate) => {
     setJustifyingEmployee(emp);
 
     const dateStr = overrideDate || format(selectedDate, "yyyy-MM-dd");
+    setJustifyingDate(overrideDate ? new Date(overrideDate + "T00:00:00") : selectedDate);
+
+    // Obtener el horario del empleado para la fecha específica
+    const sched = getEmployeeScheduleForDate(emp.id, dateStr);
+    const dow = new Date(dateStr + "T00:00:00").getDay();
+    const dayStarts = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+    const dayEnds   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+    setJustifyingSchedule(sched ? {
+      start: sched[dayStarts[dow]] || "09:00",
+      end:   sched[dayEnds[dow]]   || "18:00",
+    } : { start: "09:00", end: "18:00" });
     // Buscar justificación previa para este empleado en esta fecha
     const prevIncident = allIncidents.find(
       i => i.employee_id === emp.id && i.incident_date === dateStr
@@ -463,19 +477,22 @@ export default function AttendanceManagement() {
   // En modo fecha única: comportamiento original (todos los empleados para esa fecha)
   let employeesWithRecords = [];
 
+  const todayDateStr = format(new Date(), "yyyy-MM-dd");
+
   if (isRangeMode && dateFrom && dateTo) {
-    // Generar todas las fechas del rango
+    // Generar todas las fechas del rango, solo hasta hoy
     const dateList = [];
     const cur = new Date(dateFrom);
     cur.setHours(0, 0, 0, 0);
     const end = new Date(dateTo);
     end.setHours(0, 0, 0, 0);
     while (cur <= end) {
-      dateList.push(format(cur, "yyyy-MM-dd"));
+      const dateStr = format(cur, "yyyy-MM-dd");
+      if (dateStr <= todayDateStr) dateList.push(dateStr);
       cur.setDate(cur.getDate() + 1);
     }
 
-    // Para cada empleado filtrado × cada fecha → una fila (tenga o no registro)
+    // Para cada empleado filtrado × cada fecha → una fila (solo si existe registro en BD)
     const rows = [];
     for (const emp of filteredEmployees) {
       // Excluir empleados cesados antes del rango
@@ -492,6 +509,7 @@ export default function AttendanceManagement() {
           if (rowDay > termination) continue;
         }
         const record = todayRecords.find(r => r.employee_id === emp.id && r.date === dateStr);
+        if (!record) continue; // solo mostrar si existe registro en la BD
         rows.push({ ...emp, record, displayDate: dateStr });
       }
     }
@@ -509,46 +527,61 @@ export default function AttendanceManagement() {
       return true;
     });
   } else {
+    // Solo mostrar empleados que tengan un registro en la BD para la fecha seleccionada (no futura)
+    const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
+    if (selectedDateStr > todayDateStr) {
+      employeesWithRecords = [];
+    } else {
     employeesWithRecords = filteredEmployees.filter(emp => {
       if (emp.termination_date) {
         const termination = new Date(emp.termination_date + "T00:00:00");
         const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
         if (selected > termination) return false;
       }
-      return true;
+      const record = todayRecords.find(r => r.employee_id === emp.id);
+      return !!record; // solo si existe registro en la BD
     }).map(emp => {
       const record = todayRecords.find(r => r.employee_id === emp.id);
       return { ...emp, record, displayDate: format(selectedDate, "yyyy-MM-dd") };
     }).filter(emp => {
       if (attendanceFilter === "all") return true;
-      if (attendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
-      if (attendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
-      if (attendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
+      if (attendanceFilter === "sin_entrada") return !emp.record.clock_in;
+      if (attendanceFilter === "sin_salida") return emp.record.clock_in && !emp.record.clock_out;
+      if (attendanceFilter === "con_tardanza") return emp.record.is_late;
       return true;
     });
+    } // end else (fecha no futura)
   }
 
   const handleExportToExcel = () => {
     const dataToExport = employeesWithRecords.map(emp => {
       const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
       const workedHours = emp.record?.worked_hours || 0;
-      const overtimeHours = Math.max(0, workedHours - 8);
 
-      // Buscar papeleta (justificación/incidencia) vinculada a este empleado y fecha
-      const incident = allIncidents.find(
+      // Buscar la papeleta más reciente vinculada a este empleado y fecha
+      const incidentsForRow = allIncidents.filter(
         i => i.employee_id === emp.id && i.incident_date === rowDate
       );
+      // Priorizar aprobada > pendiente > rechazada
+      const incident = incidentsForRow.find(i => i.status === 'Aprobada')
+        || incidentsForRow.find(i => i.status === 'Pendiente')
+        || incidentsForRow[0]
+        || null;
 
-      // Calcular tiempo de la papeleta
+      // Calcular tiempo justificado
       let tiempoPapeleta = '';
       if (incident) {
         if (incident.full_day_justification) {
-          tiempoPapeleta = '8.00 h';
+          const ts = incident.justified_time_start || '09:00';
+          const te = incident.justified_time_end || '18:00';
+          const [sh, sm] = ts.split(':').map(Number);
+          const [eh, em] = te.split(':').map(Number);
+          const hrs = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
+          tiempoPapeleta = `${hrs.toFixed(2)} h`;
         } else if (incident.justified_time_start && incident.justified_time_end) {
           const [sh, sm] = incident.justified_time_start.split(':').map(Number);
           const [eh, em] = incident.justified_time_end.split(':').map(Number);
-          const mins = (eh * 60 + em) - (sh * 60 + sm);
-          tiempoPapeleta = `${(Math.max(0, mins) / 60).toFixed(2)} h`;
+          tiempoPapeleta = `${Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60).toFixed(2)} h`;
         }
       }
 
@@ -566,13 +599,18 @@ export default function AttendanceManagement() {
         'Tardanza (min)': emp.record?.late_minutes || 0,
         'HE 25%': (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
         'HE 35%': (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
-        'Estado': emp.record?.status || 'Sin marcar',
-        'Papeleta': incident ? incident.justification : '',
-        'Tipo Papeleta': incident ? incident.incident_type : '',
-        'Hora Papeleta': incident
-          ? (incident.full_day_justification ? 'Día completo' : `${incident.justified_time_start || ''} - ${incident.justified_time_end || ''}`)
+        'Estado Asistencia': emp.record?.status || 'Sin marcar',
+        'Tipo Incidente': incident ? incident.incident_type : '',
+        'Estado Papeleta': incident ? incident.status : '',
+        'Período Justificado': incident
+          ? (incident.full_day_justification
+              ? `Día completo (${incident.justified_time_start || '09:00'} - ${incident.justified_time_end || '18:00'})`
+              : `${incident.justified_time_start || ''} - ${incident.justified_time_end || ''}`)
           : '',
-        'Tiempo Papeleta': tiempoPapeleta,
+        'Horas Justificadas': tiempoPapeleta,
+        'Justificación': incident ? incident.justification : '',
+        'Revisado por': incident?.reviewed_by || '',
+        'Comentarios Revisión': incident?.review_comments || '',
       };
     });
     const ws = XLSX.utils.json_to_sheet(dataToExport);
@@ -1434,16 +1472,18 @@ export default function AttendanceManagement() {
             justifyingEmployee={justifyingEmployee}
             justificationData={justificationData}
             setJustificationData={setJustificationData}
-            selectedDate={selectedDate}
+            selectedDate={justifyingDate || selectedDate}
+            employeeSchedule={justifyingSchedule}
             todayRecords={todayRecords}
             employee={employee}
             existingIncident={existingIncident}
-            workSchedules={workSchedules}
-            onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); setExistingIncident(null); }}
+            onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); setExistingIncident(null); setJustifyingDate(null); setJustifyingSchedule(null); }}
             onSuccess={() => {
               setShowJustifyModal(false);
               setJustifyingEmployee(null);
               setExistingIncident(null);
+              setJustifyingDate(null);
+              setJustifyingSchedule(null);
               setJustificationData({ incident_type: "Olvido de Marcación", justification: "", supporting_document_url: "", justified_time_start: "09:00", justified_time_end: "18:00", full_day_justification: true });
               queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
               queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
