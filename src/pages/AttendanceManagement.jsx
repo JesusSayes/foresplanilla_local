@@ -45,6 +45,7 @@ export default function AttendanceManagement() {
   const [showJustifyModal, setShowJustifyModal] = useState(false);
   const [justifyingEmployee, setJustifyingEmployee] = useState(null);
   const [existingIncident, setExistingIncident] = useState(null);
+  const [justifyingDate, setJustifyingDate] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [schedulingEmployee, setSchedulingEmployee] = useState(null);
   const [incidentSearchTerm, setIncidentSearchTerm] = useState("");
@@ -378,6 +379,7 @@ export default function AttendanceManagement() {
     setJustifyingEmployee(emp);
 
     const dateStr = overrideDate || format(selectedDate, "yyyy-MM-dd");
+    setJustifyingDate(overrideDate ? new Date(overrideDate + "T00:00:00") : selectedDate);
     // Buscar justificación previa para este empleado en esta fecha
     const prevIncident = allIncidents.find(
       i => i.employee_id === emp.id && i.incident_date === dateStr
@@ -1399,15 +1401,16 @@ export default function AttendanceManagement() {
             justifyingEmployee={justifyingEmployee}
             justificationData={justificationData}
             setJustificationData={setJustificationData}
-            selectedDate={selectedDate}
+            selectedDate={justifyingDate || selectedDate}
             todayRecords={todayRecords}
             employee={employee}
             existingIncident={existingIncident}
-            onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); setExistingIncident(null); }}
+            onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); setExistingIncident(null); setJustifyingDate(null); }}
             onSuccess={() => {
               setShowJustifyModal(false);
               setJustifyingEmployee(null);
               setExistingIncident(null);
+              setJustifyingDate(null);
               setJustificationData({ incident_type: "Olvido de Marcación", justification: "", supporting_document_url: "", justified_time_start: "09:00", justified_time_end: "18:00", full_day_justification: true });
               queryClient.invalidateQueries(["allIncidents"]);
               queryClient.invalidateQueries(["todayAttendance"]);
