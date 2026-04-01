@@ -444,19 +444,22 @@ export default function AttendanceManagement() {
   // En modo fecha única: comportamiento original (todos los empleados para esa fecha)
   let employeesWithRecords = [];
 
+  const todayDateStr = format(new Date(), "yyyy-MM-dd");
+
   if (isRangeMode && dateFrom && dateTo) {
-    // Generar todas las fechas del rango
+    // Generar todas las fechas del rango, solo hasta hoy
     const dateList = [];
     const cur = new Date(dateFrom);
     cur.setHours(0, 0, 0, 0);
     const end = new Date(dateTo);
     end.setHours(0, 0, 0, 0);
     while (cur <= end) {
-      dateList.push(format(cur, "yyyy-MM-dd"));
+      const dateStr = format(cur, "yyyy-MM-dd");
+      if (dateStr <= todayDateStr) dateList.push(dateStr);
       cur.setDate(cur.getDate() + 1);
     }
 
-    // Para cada empleado filtrado × cada fecha → una fila (tenga o no registro)
+    // Para cada empleado filtrado × cada fecha → una fila (solo si existe registro en BD)
     const rows = [];
     for (const emp of filteredEmployees) {
       // Excluir empleados cesados antes del rango
@@ -473,6 +476,7 @@ export default function AttendanceManagement() {
           if (rowDay > termination) continue;
         }
         const record = todayRecords.find(r => r.employee_id === emp.id && r.date === dateStr);
+        if (!record) continue; // solo mostrar si existe registro en la BD
         rows.push({ ...emp, record, displayDate: dateStr });
       }
     }
@@ -490,7 +494,11 @@ export default function AttendanceManagement() {
       return true;
     });
   } else {
-    // Solo mostrar empleados que tengan un registro en la BD para la fecha seleccionada
+    // Solo mostrar empleados que tengan un registro en la BD para la fecha seleccionada (no futura)
+    const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
+    if (selectedDateStr > todayDateStr) {
+      employeesWithRecords = [];
+    } else {
     employeesWithRecords = filteredEmployees.filter(emp => {
       if (emp.termination_date) {
         const termination = new Date(emp.termination_date + "T00:00:00");
@@ -509,6 +517,7 @@ export default function AttendanceManagement() {
       if (attendanceFilter === "con_tardanza") return emp.record.is_late;
       return true;
     });
+    } // end else (fecha no futura)
   }
 
   const handleExportToExcel = () => {
