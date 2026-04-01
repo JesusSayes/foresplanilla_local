@@ -538,23 +538,31 @@ export default function AttendanceManagement() {
     const dataToExport = employeesWithRecords.map(emp => {
       const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
       const workedHours = emp.record?.worked_hours || 0;
-      const overtimeHours = Math.max(0, workedHours - 8);
 
-      // Buscar papeleta (justificación/incidencia) vinculada a este empleado y fecha
-      const incident = allIncidents.find(
+      // Buscar la papeleta más reciente vinculada a este empleado y fecha
+      const incidentsForRow = allIncidents.filter(
         i => i.employee_id === emp.id && i.incident_date === rowDate
       );
+      // Priorizar aprobada > pendiente > rechazada
+      const incident = incidentsForRow.find(i => i.status === 'Aprobada')
+        || incidentsForRow.find(i => i.status === 'Pendiente')
+        || incidentsForRow[0]
+        || null;
 
-      // Calcular tiempo de la papeleta
+      // Calcular tiempo justificado
       let tiempoPapeleta = '';
       if (incident) {
         if (incident.full_day_justification) {
-          tiempoPapeleta = '8.00 h';
+          const ts = incident.justified_time_start || '09:00';
+          const te = incident.justified_time_end || '18:00';
+          const [sh, sm] = ts.split(':').map(Number);
+          const [eh, em] = te.split(':').map(Number);
+          const hrs = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
+          tiempoPapeleta = `${hrs.toFixed(2)} h`;
         } else if (incident.justified_time_start && incident.justified_time_end) {
           const [sh, sm] = incident.justified_time_start.split(':').map(Number);
           const [eh, em] = incident.justified_time_end.split(':').map(Number);
-          const mins = (eh * 60 + em) - (sh * 60 + sm);
-          tiempoPapeleta = `${(Math.max(0, mins) / 60).toFixed(2)} h`;
+          tiempoPapeleta = `${Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60).toFixed(2)} h`;
         }
       }
 
@@ -572,13 +580,18 @@ export default function AttendanceManagement() {
         'Tardanza (min)': emp.record?.late_minutes || 0,
         'HE 25%': (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
         'HE 35%': (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
-        'Estado': emp.record?.status || 'Sin marcar',
-        'Papeleta': incident ? incident.justification : '',
-        'Tipo Papeleta': incident ? incident.incident_type : '',
-        'Hora Papeleta': incident
-          ? (incident.full_day_justification ? 'Día completo' : `${incident.justified_time_start || ''} - ${incident.justified_time_end || ''}`)
+        'Estado Asistencia': emp.record?.status || 'Sin marcar',
+        'Tipo Incidente': incident ? incident.incident_type : '',
+        'Estado Papeleta': incident ? incident.status : '',
+        'Período Justificado': incident
+          ? (incident.full_day_justification
+              ? `Día completo (${incident.justified_time_start || '09:00'} - ${incident.justified_time_end || '18:00'})`
+              : `${incident.justified_time_start || ''} - ${incident.justified_time_end || ''}`)
           : '',
-        'Tiempo Papeleta': tiempoPapeleta,
+        'Horas Justificadas': tiempoPapeleta,
+        'Justificación': incident ? incident.justification : '',
+        'Revisado por': incident?.reviewed_by || '',
+        'Comentarios Revisión': incident?.review_comments || '',
       };
     });
     const ws = XLSX.utils.json_to_sheet(dataToExport);
