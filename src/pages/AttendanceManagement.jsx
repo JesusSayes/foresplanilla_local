@@ -445,19 +445,37 @@ export default function AttendanceManagement() {
   let employeesWithRecords = [];
 
   if (isRangeMode && dateFrom && dateTo) {
-    const fromStr = format(dateFrom, "yyyy-MM-dd");
-    const toStr = format(dateTo, "yyyy-MM-dd");
+    // Generar todas las fechas del rango
+    const dateList = [];
+    const cur = new Date(dateFrom);
+    cur.setHours(0, 0, 0, 0);
+    const end = new Date(dateTo);
+    end.setHours(0, 0, 0, 0);
+    while (cur <= end) {
+      dateList.push(format(cur, "yyyy-MM-dd"));
+      cur.setDate(cur.getDate() + 1);
+    }
 
-    // Solo mostrar registros que existen en la BD dentro del rango
-    const rows = todayRecords
-      .filter(record => record.date >= fromStr && record.date <= toStr)
-      .map(record => {
-        const emp = filteredEmployees.find(e => e.id === record.employee_id);
-        if (!emp) return null;
-        return { ...emp, record, displayDate: record.date };
-      })
-      .filter(Boolean);
-
+    // Para cada empleado filtrado × cada fecha → una fila (tenga o no registro)
+    const rows = [];
+    for (const emp of filteredEmployees) {
+      // Excluir empleados cesados antes del rango
+      if (emp.termination_date) {
+        const termination = new Date(emp.termination_date + "T00:00:00");
+        const rangeStart = new Date(dateFrom); rangeStart.setHours(0, 0, 0, 0);
+        if (rangeStart > termination) continue;
+      }
+      for (const dateStr of dateList) {
+        // Si el empleado estaba cesado en esta fecha específica, omitir
+        if (emp.termination_date) {
+          const termination = new Date(emp.termination_date + "T00:00:00");
+          const rowDay = new Date(dateStr + "T00:00:00");
+          if (rowDay > termination) continue;
+        }
+        const record = todayRecords.find(r => r.employee_id === emp.id && r.date === dateStr);
+        rows.push({ ...emp, record, displayDate: dateStr });
+      }
+    }
     // Ordenar: fecha más reciente primero, luego por nombre
     rows.sort((a, b) => {
       if (b.displayDate !== a.displayDate) return b.displayDate.localeCompare(a.displayDate);
@@ -472,21 +490,23 @@ export default function AttendanceManagement() {
       return true;
     });
   } else {
-    // Solo mostrar registros que existen en la BD para la fecha seleccionada
-    employeesWithRecords = todayRecords
-      .map(record => {
-        const emp = filteredEmployees.find(e => e.id === record.employee_id);
-        if (!emp) return null;
-        return { ...emp, record, displayDate: format(selectedDate, "yyyy-MM-dd") };
-      })
-      .filter(Boolean)
-      .filter(emp => {
-        if (attendanceFilter === "all") return true;
-        if (attendanceFilter === "sin_entrada") return !emp.record?.clock_in;
-        if (attendanceFilter === "sin_salida") return emp.record?.clock_in && !emp.record?.clock_out;
-        if (attendanceFilter === "con_tardanza") return emp.record?.is_late;
-        return true;
-      });
+    employeesWithRecords = filteredEmployees.filter(emp => {
+      if (emp.termination_date) {
+        const termination = new Date(emp.termination_date + "T00:00:00");
+        const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
+        if (selected > termination) return false;
+      }
+      return true;
+    }).map(emp => {
+      const record = todayRecords.find(r => r.employee_id === emp.id);
+      return { ...emp, record, displayDate: format(selectedDate, "yyyy-MM-dd") };
+    }).filter(emp => {
+      if (attendanceFilter === "all") return true;
+      if (attendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
+      if (attendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
+      if (attendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
+      return true;
+    });
   }
 
   const handleExportToExcel = () => {
