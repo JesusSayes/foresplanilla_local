@@ -684,6 +684,7 @@ model work_schedule {
   created_by_id          String?
   created_by             String?
   is_sample              Boolean?
+  effective_from         DateTime? @db.Date
 }
 
 model vacation_request {

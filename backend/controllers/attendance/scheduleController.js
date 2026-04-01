@@ -27,11 +27,12 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const { id, created_date, updated_date, created_by, ...data } = req.body;
+    const { id, created_date, updated_date, created_by, effective_from, ...data } = req.body;
     const schedule = await prisma.work_schedule.create({
       data: {
         id: generate24HexId(),
-        ...data
+        ...data,
+        effective_from: effective_from ? new Date(effective_from) : null,
       }
     });
     res.status(201).json(schedule);
@@ -42,10 +43,13 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
-    const { id, created_date, updated_date, created_by, ...data } = req.body;
+    const { id, created_date, updated_date, created_by, effective_from, ...data } = req.body;
     const schedule = await prisma.work_schedule.update({
       where: { id: req.params.id },
-      data: req.body
+      data: {
+        ...data,
+        effective_from: effective_from ? new Date(effective_from) : null,
+      }
     });
     res.json(schedule);
   } catch (error) {
