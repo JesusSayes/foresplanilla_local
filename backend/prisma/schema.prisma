@@ -737,6 +737,7 @@ model overtime_alert {
   alert_date           DateTime  @db.Timestamp(6)
   overtime_hours       Decimal   @db.Decimal(5, 2)
   status               String?   @default("Pendiente") @db.VarChar(50)
+  notes                String?
 }
 
 model segurovidaley {

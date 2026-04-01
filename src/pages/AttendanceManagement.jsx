@@ -16,7 +16,7 @@ import {
   AlertCircle, Users, Search, FileText, Download, Database, History, Printer, Palmtree, CalendarClock
 } from "lucide-react";
 import * as XLSX from 'xlsx';
-import { format, parse } from "date-fns";
+import { format, parse, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
@@ -1056,7 +1056,7 @@ export default function AttendanceManagement() {
                                   if (record) {
                                     await entitiesAPI.AttendanceRecord.update(record.id, {
                                       overtime_authorized: true,
-                                      notes: (record.notes ? record.notes + " | " : "") + `HE aceptadas: ${alert.overtime_hours.toFixed(2)}h (${alert.alert_date})`
+                                      notes: (record.notes ? record.notes + " | " : "") + `HE aceptadas: ${Number(alert.overtime_hours || 0).toFixed(2)}h (${alert.alert_date})`
                                     });
                                   }
                                   // 2. Marcar alerta como aprobada
@@ -1079,7 +1079,8 @@ export default function AttendanceManagement() {
                                   queryClient.invalidateQueries(["overtimeAlerts"]);
                                   queryClient.invalidateQueries(["todayAttendance"]);
                                   queryClient.invalidateQueries(["attendanceRecords"]);
-                                  toast.success(`HE aceptadas y recalculadas para el ${format(new Date(alert.alert_date + "T00:00:00"), "dd MMM yyyy", { locale: es })}: HE25% y HE35% actualizadas`);
+                                  const alertDate = parseISO(alert.alert_date);
+                                  toast.success(`HE aceptadas y recalculadas para el ${format(alertDate, "dd MMM yyyy", { locale: es })}: HE25% y HE35% actualizadas`);
                                 }}
                               >
                                 <CheckCircle className="w-4 h-4 mr-2" />Aceptar HE (solo este día)
@@ -1437,6 +1438,7 @@ export default function AttendanceManagement() {
             todayRecords={todayRecords}
             employee={employee}
             existingIncident={existingIncident}
+            workSchedules={workSchedules}
             onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); setExistingIncident(null); }}
             onSuccess={() => {
               setShowJustifyModal(false);
@@ -1445,6 +1447,7 @@ export default function AttendanceManagement() {
               setJustificationData({ incident_type: "Olvido de Marcación", justification: "", supporting_document_url: "", justified_time_start: "09:00", justified_time_end: "18:00", full_day_justification: true });
               queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
               queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+              queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
             }}
           />
         )}

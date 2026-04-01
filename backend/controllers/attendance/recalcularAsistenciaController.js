@@ -16,11 +16,15 @@ function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
 
   const findBest = (list) => {
     const valid = list.filter(s => {
-      const from = s.effective_from || "0000-01-01";
-      const to = s.effective_to || "9999-12-31";
+      const from = s.effective_from ? s.effective_from.toISOString().slice(0, 10) : '0000-01-01';
+      const to = s.effective_to ? s.effective_to.toISOString().slice(0, 10) : '9999-12-31';
       return from <= dateStr && to >= dateStr;
     });
-    valid.sort((a, b) => (b.effective_from || "0000-01-01").localeCompare(a.effective_from || "0000-01-01"));
+    valid.sort((a, b) => {
+      const af = a.effective_from ? a.effective_from.toISOString() : '0000-01-01';
+      const bf = b.effective_from ? b.effective_from.toISOString() : '0000-01-01';
+      return bf.localeCompare(af);
+    });
     return valid[0] || null;
   };
 
@@ -118,22 +122,32 @@ const recalcularAsistencia = async (req, res) => {
 
     const [employee, allSchedules] = await Promise.all([
       prisma.employee.findUnique({ where: { id: employee_id } }),
-      prisma.workSchedule.findMany({ where: { is_active: true }, orderBy: { effective_from: 'desc' } }),
+      prisma.work_schedule.findMany({ where: { is_active: true }, orderBy: { effective_from: 'desc' } }),
     ]);
 
     if (!employee) {
       return res.status(404).json({ error: 'Empleado no encontrado' });
     }
 
-    const allRecords = await prisma.attendanceRecord.findMany({ where: { employee_id } });
-    const recordsInRange = allRecords.filter(r => r.date >= date_from && r.date <= date_to);
+    const recordsInRange = await prisma.attendance_record.findMany({
+      where: {
+        employee_id,
+        date: {
+          gte: new Date(date_from),
+          lte: new Date(date_to),
+        },
+      },
+    });
 
     let updated = 0;
 
     for (const record of recordsInRange) {
-      const schedule = getScheduleForDate(employee_id, employee.department_name, allSchedules, record.date);
+      const dateStr = record.date ? record.date.toISOString().slice(0, 10) : null;
+      if (!dateStr) continue;
+
+      const schedule = getScheduleForDate(employee_id, employee.department_name, allSchedules, dateStr);
       const overtimeAuth = record.overtime_authorized ?? schedule?.overtime_authorized ?? false;
-      const metrics = calcularMetricas(record, schedule, record.date, overtimeAuth);
+      const metrics = calcularMetricas(record, schedule, dateStr, overtimeAuth);
 
       let status = record.status;
       if (record.clock_in && record.clock_out) {
@@ -144,7 +158,7 @@ const recalcularAsistencia = async (req, res) => {
         status = record.status === "Justificado" ? "Justificado" : "Ausente";
       }
 
-      await prisma.attendanceRecord.update({
+      await prisma.attendance_record.update({
         where: { id: record.id },
         data: {
           worked_hours: metrics.worked_hours,
