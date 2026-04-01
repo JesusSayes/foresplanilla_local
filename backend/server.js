@@ -148,10 +148,10 @@ app.use('/api/derechohabientes', derechohabientesRoutes);
 app.use('/api/attendance/recalcular', recalcularAsistenciaRoutes);
 
 // Cron: sincronización biotime cada hora
-// cron.schedule('0 * * * *', () => {
-  // console.log('[Cron] Ejecutando sync biotime...');
-  // syncBiotimeAttendance().catch(err => console.error('[Cron] Error en sync biotime:', err.message));
-// });
+cron.schedule('0 * * * *', () => {
+  console.log('[Cron] Ejecutando sync biotime...');
+  syncBiotimeAttendance().catch(err => console.error('[Cron] Error en sync biotime:', err.message));
+});
 
 // Cron: generar asistencia diaria a las 05:01 UTC (00:01 hora Perú)
 cron.schedule('1 5 * * *', () => {
