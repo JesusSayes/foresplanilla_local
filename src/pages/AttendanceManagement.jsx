@@ -490,21 +490,23 @@ export default function AttendanceManagement() {
       return true;
     });
   } else {
+    // Solo mostrar empleados que tengan un registro en la BD para la fecha seleccionada
     employeesWithRecords = filteredEmployees.filter(emp => {
       if (emp.termination_date) {
         const termination = new Date(emp.termination_date + "T00:00:00");
         const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
         if (selected > termination) return false;
       }
-      return true;
+      const record = todayRecords.find(r => r.employee_id === emp.id);
+      return !!record; // solo si existe registro en la BD
     }).map(emp => {
       const record = todayRecords.find(r => r.employee_id === emp.id);
       return { ...emp, record, displayDate: format(selectedDate, "yyyy-MM-dd") };
     }).filter(emp => {
       if (attendanceFilter === "all") return true;
-      if (attendanceFilter === "sin_entrada") return !emp.record || !emp.record.clock_in;
-      if (attendanceFilter === "sin_salida") return emp.record && emp.record.clock_in && !emp.record.clock_out;
-      if (attendanceFilter === "con_tardanza") return emp.record && emp.record.is_late;
+      if (attendanceFilter === "sin_entrada") return !emp.record.clock_in;
+      if (attendanceFilter === "sin_salida") return emp.record.clock_in && !emp.record.clock_out;
+      if (attendanceFilter === "con_tardanza") return emp.record.is_late;
       return true;
     });
   }
