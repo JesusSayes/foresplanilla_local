@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Users, Plus, Edit, Eye, UserX, UserCheck, Search, 
-  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History, Loader2, Trash2
+  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History, Loader2, Trash2, Upload
 } from "lucide-react";
 import { createPageUrl } from "../utils";
 import { format } from "date-fns";
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import EmployeeHistory from "../components/employees/EmployeeHistory";
 import EmployeeForm from "../components/employees/EmployeeForm";
+import ImportDerechohabientesModal from "../components/employees/ImportDerechohabientesModal";
 
 export default function EmployeeManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -42,6 +43,7 @@ export default function EmployeeManagement() {
   const [editingDerechohabiente, setEditingDerechohabiente] = useState(null);
   const [derechohabienteFormData, setDerechohabienteFormData] = useState({});
   const [formErrors, setFormErrors] = useState([]);
+  const [showImportDH, setShowImportDH] = useState(false);
 
   const { hasPermission, getAccessibleSites, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -824,6 +826,14 @@ export default function EmployeeManagement() {
                 Importar Empleados
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={() => setShowImportDH(true)}
+              className="border-teal-300 text-teal-700 hover:bg-teal-50"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Importar Derechohabientes
+            </Button>
           </div>
         </div>
 
@@ -1059,6 +1069,17 @@ export default function EmployeeManagement() {
       )}
 
 
+
+      {/* Import Derechohabientes Modal */}
+      {showImportDH && (
+        <ImportDerechohabientesModal
+          employees={allEmployees}
+          onClose={() => setShowImportDH(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries(["derechohabientes"]);
+          }}
+        />
+      )}
 
       {/* History Modal */}
       {showHistory && (
