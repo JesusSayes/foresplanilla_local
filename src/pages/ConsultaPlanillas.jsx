@@ -33,13 +33,15 @@ const STATUS_COLORS = {
   Calculada: "bg-yellow-100 text-yellow-700",
   Aprobada:  "bg-blue-100 text-blue-700",
   Pagada:    "bg-green-100 text-green-700",
+  default:   "bg-slate-100 text-slate-700",
 };
 
 // Deriva el status consolidado del grupo a partir de sus boletas
 const getGrupoStatus = (payslips) => {
   if (!payslips || payslips.length === 0) return "Calculada";
-  if (payslips.every(p => p.status === "Pagada"))   return "Pagada";
+  if (payslips.every(p => p.status === "Pagada")) return "Pagada";
   if (payslips.every(p => p.status === "Aprobada" || p.status === "Pagada")) return "Aprobada";
+  if (payslips.some(p => p.status === "Aprobada")) return "Aprobada";
   return "Calculada";
 };
 
@@ -69,15 +71,22 @@ export default function ConsultaPlanillas() {
       });
     });
     base44.entities.CompanyInfo.filter({ is_active: true }).then(res => {
-      if (res?.length > 0) setCompanyInfo(res[0]);
+      if (res?.length > 0) {
+        const ci = res[0];
+        setCompanyInfo(ci);
+        // Cargar firmantes guardados en CompanyInfo
+        try {
+          const gg = ci.firmante_gg ? JSON.parse(ci.firmante_gg) : null;
+          const del = ci.firmante_delegado ? JSON.parse(ci.firmante_delegado) : null;
+          if (gg || del) setFirmantes({ firmante_gg: gg, firmante_delegado: del });
+        } catch (e) { /* noop */ }
+      }
     });
-    // Cargar configuración de firmantes desde CompanyInfo (campo extra)
-    // Se maneja dentro de ConfigFirmantesModal
   }, []);
 
   const { data: allPayslips = [], isLoading } = useQuery({
     queryKey: ["allPayslipsConsulta"],
-    queryFn: () => base44.entities.Payslip.list("-year,-month", 2000),
+    queryFn: () => base44.entities.Payslip.list("-created_date", 5000),
   });
 
   const { data: allEmployees = [] } = useQuery({
@@ -519,10 +528,17 @@ export default function ConsultaPlanillas() {
         <ConfigFirmantesModal
           companyInfo={companyInfo}
           onClose={() => setShowConfigFirmantes(false)}
-          onSave={(data) => {
+          onSave={async (data) => {
             setFirmantes(data);
             setShowConfigFirmantes(false);
             toast.success("Firmantes configurados correctamente");
+            // Persistir en CompanyInfo para que se recarguen automáticamente
+            if (companyInfo?.id) {
+              await base44.entities.CompanyInfo.update(companyInfo.id, {
+                firmante_gg: JSON.stringify(data.firmante_gg || {}),
+                firmante_delegado: JSON.stringify(data.firmante_delegado || {}),
+              });
+            }
           }}
         />
       )}
