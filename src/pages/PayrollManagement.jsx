@@ -1058,19 +1058,20 @@ export default function PayrollManagement() {
                           const totalDesc = planillasDelTipo.reduce((s, p) => s + (p.total_deductions || 0), 0);
                           const allPagada   = planillasDelTipo.every(p => p.status === "Pagada");
                           const allAprobada = !allPagada && planillasDelTipo.every(p => p.status === "Aprobada");
-                          const puedeAprobar = !allPagada && !allAprobada; // cualquier estado que no sea aprobada/pagada
+                          const puedeAprobar = !allPagada && !allAprobada;
+                          const hayMixto = !allPagada && !allAprobada && planillasDelTipo.some(p => p.status === "Aprobada");
 
                           const statusBadgeColor =
                             allPagada   ? "bg-green-100 text-green-700 border-green-200" :
                             allAprobada ? "bg-blue-100 text-blue-700 border-blue-200" :
                             "bg-yellow-100 text-yellow-700 border-yellow-200";
                           const statusLabel =
-                            allPagada ? "Pagada" : allAprobada ? "Aprobada" : "Generada";
+                            allPagada ? "✓ Pagada" : allAprobada ? "✓ Aprobada" : "Generada";
 
                           return (
-                            <Card key={tipo} className="border-0 shadow-lg">
+                            <Card key={tipo} className={`border-2 shadow-lg ${allAprobada ? "border-blue-300" : allPagada ? "border-green-300" : "border-transparent"}`}>
                               {/* Cabecera de la planilla */}
-                              <CardHeader className="border-b bg-slate-50/60 pb-4">
+                              <CardHeader className={`border-b pb-4 ${allAprobada ? "bg-blue-50" : allPagada ? "bg-green-50" : "bg-slate-50/60"}`}>
                                 <div className="flex items-start justify-between gap-4">
                                   <div>
                                     <div className="flex items-center gap-3 mb-1">
@@ -1120,6 +1121,25 @@ export default function PayrollManagement() {
                                     )}
                                   </div>
                                 </div>
+                                {/* Banner de estado aprobada/pagada */}
+                                {allAprobada && (
+                                  <div className="mt-4 flex items-center gap-3 p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                                    <CheckCircle className="w-5 h-5 text-blue-600 shrink-0" />
+                                    <div>
+                                      <p className="font-bold text-blue-800 text-sm">Planilla Aprobada</p>
+                                      <p className="text-xs text-blue-600">Esta planilla ha sido aprobada y está lista para pago.</p>
+                                    </div>
+                                  </div>
+                                )}
+                                {allPagada && (
+                                  <div className="mt-4 flex items-center gap-3 p-3 bg-green-100 border border-green-300 rounded-lg">
+                                    <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+                                    <div>
+                                      <p className="font-bold text-green-800 text-sm">Planilla Pagada</p>
+                                      <p className="text-xs text-green-600">El pago de esta planilla ha sido procesado.</p>
+                                    </div>
+                                  </div>
+                                )}
                                 {/* Totales cabecera */}
                                 {canViewAmounts && (
                                   <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-200">
