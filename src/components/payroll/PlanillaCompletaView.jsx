@@ -35,12 +35,24 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
           .no-print { display: none !important; }
           .print-page {
             width: 277mm;
-            min-height: 190mm;
-            page-break-after: always;
             box-sizing: border-box;
           }
-          .print-table { font-size: 7pt; }
+          .print-table {
+            font-size: 7pt;
+            width: 100%;
+            border-collapse: collapse;
+          }
+          .print-table thead {
+            display: table-header-group;
+          }
+          .print-table tfoot {
+            display: table-footer-group;
+          }
+          .print-table tbody tr {
+            page-break-inside: avoid;
+          }
           .print-header { font-size: 8pt; }
+          .firma-section { page-break-inside: avoid; }
         }
       `}</style>
 
@@ -61,7 +73,7 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
       <div className="bg-slate-200 min-h-screen p-6 print:bg-white print:p-0">
         <div
           className="print-page bg-white mx-auto shadow-xl print:shadow-none"
-          style={{ width: "277mm", minHeight: "190mm", padding: "8mm", boxSizing: "border-box" }}
+          style={{ width: "277mm", padding: "8mm", boxSizing: "border-box" }}
         >
 
           {/* ENCABEZADO */}
@@ -111,11 +123,11 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
 
           {/* TABLA DE DETALLE */}
           <div className="overflow-hidden rounded border border-slate-200 mb-3">
-            <table className="w-full print-table" style={{ fontSize: "7.5pt", borderCollapse: "collapse" }}>
-              <thead>
-                <tr className="bg-indigo-600 text-white">
+            <table className="w-full print-table" style={{ fontSize: "7.5pt", borderCollapse: "collapse", width: "100%" }}>
+              <thead style={{ display: "table-header-group" }}>
+                <tr style={{ backgroundColor: "#4338ca", color: "white" }}>
                   {["#","Código","Apellidos y Nombres","Documento","Cargo","Días","Rem. Básica","Otros Ing.","Total Ing.","AFP/ONP","Otros Desc.","Total Desc.","NETO","Firma"].map(h => (
-                    <th key={h} className="px-1.5 py-1.5 text-left font-semibold whitespace-nowrap" style={{ fontSize: "7pt" }}>{h}</th>
+                    <th key={h} style={{ padding: "4px 6px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap", fontSize: "7pt", backgroundColor: "#4338ca", color: "white" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -161,7 +173,7 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
           </div>
 
           {/* FIRMAS */}
-          <div className="grid grid-cols-2 gap-12 pt-3 border-t border-slate-200">
+          <div className="firma-section grid grid-cols-2 gap-12 pt-3 border-t border-slate-200">
             {[firmante1, firmante2].map((f, i) => (
               <div key={i} className="text-center">
                 {f.firma_url ? (
