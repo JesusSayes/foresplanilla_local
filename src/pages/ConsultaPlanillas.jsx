@@ -35,6 +35,14 @@ const STATUS_COLORS = {
   Pagada:    "bg-green-100 text-green-700",
 };
 
+// Deriva el status consolidado del grupo a partir de sus boletas
+const getGrupoStatus = (payslips) => {
+  if (!payslips || payslips.length === 0) return "Calculada";
+  if (payslips.every(p => p.status === "Pagada"))   return "Pagada";
+  if (payslips.every(p => p.status === "Aprobada" || p.status === "Pagada")) return "Aprobada";
+  return "Calculada";
+};
+
 export default function ConsultaPlanillas() {
   const [employee, setEmployee] = useState(null);
   const [companyInfo, setCompanyInfo] = useState(null);
@@ -90,12 +98,13 @@ export default function ConsultaPlanillas() {
           payroll_type: p.payroll_type,
           payroll_number: p.payroll_number || `${p.payroll_type}-${p.year}-${String(p.month).padStart(2,"0")}`,
           period: p.period || format(new Date(p.year, p.month - 1), "MMMM yyyy", { locale: es }),
-          status: p.status,
           payslips: [],
         };
       }
       map[key].payslips.push(p);
     });
+    // Calcular status consolidado para cada grupo
+    Object.values(map).forEach(g => { g.status = getGrupoStatus(g.payslips); });
     return Object.values(map).sort((a, b) => {
       if (b.year !== a.year) return b.year - a.year;
       if (b.month !== a.month) return b.month - a.month;
@@ -345,20 +354,24 @@ export default function ConsultaPlanillas() {
         </div>
 
         {/* KPIs del año */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-4 gap-3 mb-6">
           {[
             { label: `Planillas ${filterYear}`, value: gruposAnio.length, icon: FileText, color: "indigo" },
             { label: "Empleados únicos", value: totalEmps, icon: Users, color: "blue" },
-            { label: `Total neto ${filterYear}`, value: `S/ ${totalAnio.toFixed(2)}`, icon: DollarSign, color: "green", big: true },
+            { label: `Total neto ${filterYear}`, value: `S/ ${totalAnio.toFixed(2)}`, icon: DollarSign, color: "green" },
             { label: "Tipos de planilla", value: [...new Set(gruposAnio.map(g => g.payroll_type))].length, icon: Calendar, color: "purple" },
-          ].map(({ label, value, icon: Icon, color, big }) => (
-            <Card key={label} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <CardContent className="p-5">
-                <div className={`inline-flex p-2 rounded-xl bg-${color}-100 mb-3`}>
-                  <Icon className={`w-5 h-5 text-${color}-600`} />
+          ].map(({ label, value, icon: Icon, color }) => (
+            <Card key={label} className="border-0 shadow-lg">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 bg-${color}-100 rounded-lg shrink-0`}>
+                    <Icon className={`w-4 h-4 text-${color}-600`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xl font-bold text-slate-900 leading-tight">{value}</div>
+                    <p className="text-slate-600 text-xs truncate">{label}</p>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-500 mb-1">{label}</p>
-                <p className={`font-bold text-slate-900 ${big ? "text-xl text-green-600" : "text-2xl"}`}>{value}</p>
               </CardContent>
             </Card>
           ))}
