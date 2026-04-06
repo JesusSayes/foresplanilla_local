@@ -94,6 +94,7 @@ export default function EmployeeForm({
   const [showDerechohabienteForm, setShowDerechohabienteForm] = React.useState(false);
   const [editingDH, setEditingDH] = React.useState(null);
   const [dhFormData, setDhFormData] = React.useState({});
+  const [savingDH, setSavingDH] = React.useState(false);
 
   const departamentos = [...new Set(ubigeos.map(u => u.departamento))].sort();
   const provincias = selectedDepartamento
@@ -117,19 +118,27 @@ export default function EmployeeForm({
     ? allContracts.find(c => c.employee_id === editingEmployee.id && c.status === "Vigente")
     : null;
 
-  const handleSaveDH = () => {
-    if (!dhFormData.document_number || !dhFormData.first_name || !dhFormData.last_name || !dhFormData.birth_date) {
-      toast.error("Complete los campos obligatorios");
+  const handleSaveDH = async () => {
+    if (!dhFormData.document_number || !dhFormData.first_name || !dhFormData.birth_date || !dhFormData.relationship) {
+      toast.error("Complete los campos obligatorios: Documento, Nombres, Fecha Nacimiento y Relación");
       return;
     }
-    if (editingDH) {
-      onDerechohabienteEdit(editingDH.id, dhFormData);
-    } else {
-      onDerechohabienteAdd({ ...dhFormData, employee_id: editingEmployee.id });
+    setSavingDH(true);
+    try {
+      // Construir apellidos completos si se ingresaron por separado
+      const fullLastName = [dhFormData.last_name_paterno, dhFormData.last_name_materno].filter(Boolean).join(" ") || dhFormData.last_name || "";
+      const payload = { ...dhFormData, last_name: fullLastName };
+      if (editingDH) {
+        await onDerechohabienteEdit(editingDH.id, payload);
+      } else {
+        await onDerechohabienteAdd({ ...payload, employee_id: editingEmployee.id });
+      }
+      setShowDerechohabienteForm(false);
+      setEditingDH(null);
+      setDhFormData({});
+    } finally {
+      setSavingDH(false);
     }
-    setShowDerechohabienteForm(false);
-    setEditingDH(null);
-    setDhFormData({});
   };
 
   return (
@@ -520,12 +529,15 @@ export default function EmployeeForm({
                         <div key={dh.id} className="p-4 border rounded-lg hover:bg-slate-50">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <h4 className="font-semibold text-slate-900">{dh.first_name} {dh.last_name}</h4>
-                              <div className="grid grid-cols-2 gap-4 mt-2 text-sm text-slate-600">
+                              <h4 className="font-semibold text-slate-900">{dh.first_name} {dh.last_name_paterno || ""} {dh.last_name_materno || ""}{!dh.last_name_paterno && !dh.last_name_materno ? dh.last_name : ""}</h4>
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm text-slate-600">
                                 <span><strong>Documento:</strong> {dh.document_type} {dh.document_number}</span>
                                 <span><strong>Relación:</strong> {dh.relationship}</span>
                                 <span><strong>Nacimiento:</strong> {dh.birth_date ? format(new Date(dh.birth_date), "dd/MM/yyyy") : "N/A"}</span>
                                 <span><strong>Edad:</strong> {calculateAge(dh.birth_date)} años</span>
+                                {dh.phone && <span><strong>Teléfono:</strong> {dh.phone}</span>}
+                                {dh.email && <span><strong>Email:</strong> {dh.email}</span>}
+                                {dh.ubigeo && <span className="col-span-2"><strong>Ubigeo:</strong> {dh.ubigeo}</span>}
                               </div>
                               <Badge className={`mt-2 ${dh.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{dh.is_active ? "Activo" : "Inactivo"}</Badge>
                             </div>
@@ -539,46 +551,137 @@ export default function EmployeeForm({
                     </div>
                   )}
                   {showDerechohabienteForm && (
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-6">
-                      <Card className="max-w-2xl w-full">
-                        <CardHeader className="border-b">
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+                      <Card className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                        <CardHeader className="border-b sticky top-0 bg-white z-10">
                           <div className="flex items-center justify-between">
                             <CardTitle>{editingDH ? "Editar" : "Agregar"} Derechohabiente</CardTitle>
                             <Button variant="ghost" size="icon" onClick={() => { setShowDerechohabienteForm(false); setEditingDH(null); setDhFormData({}); }}>✕</Button>
                           </div>
                         </CardHeader>
-                        <CardContent className="p-6 space-y-4">
+                        <CardContent className="p-6 space-y-5">
+                          {/* Documento */}
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Documento</p>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label>Tipo Doc *</Label>
+                                <Select value={dhFormData.document_type || "DNI"} onValueChange={(v) => setDhFormData({...dhFormData, document_type: v})}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="DNI">DNI</SelectItem>
+                                    <SelectItem value="CE">CE</SelectItem>
+                                    <SelectItem value="Pasaporte">Pasaporte</SelectItem>
+                                    <SelectItem value="Partida de Nacimiento">Partida de Nac.</SelectItem>
+                                    <SelectItem value="L.E / DNI">L.E / DNI</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label>N° Documento *</Label>
+                                <Input value={dhFormData.document_number || ""} onChange={(e) => setDhFormData({...dhFormData, document_number: e.target.value.replace(/\D/g,'')})} />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Datos personales */}
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Datos Personales</p>
+                            <div className="grid grid-cols-2 gap-4 mb-3">
+                              <div><Label>Nombres *</Label><Input value={dhFormData.first_name || ""} onChange={(e) => setDhFormData({...dhFormData, first_name: e.target.value})} /></div>
+                              <div><Label>Apellido Paterno</Label><Input value={dhFormData.last_name_paterno || ""} onChange={(e) => setDhFormData({...dhFormData, last_name_paterno: e.target.value})} /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mb-3">
+                              <div><Label>Apellido Materno</Label><Input value={dhFormData.last_name_materno || ""} onChange={(e) => setDhFormData({...dhFormData, last_name_materno: e.target.value})} /></div>
+                              <div>
+                                <Label>Género</Label>
+                                <Select value={dhFormData.gender || "M"} onValueChange={(v) => setDhFormData({...dhFormData, gender: v})}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent><SelectItem value="M">Masculino</SelectItem><SelectItem value="F">Femenino</SelectItem></SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div><Label>Fecha Nacimiento *</Label><Input type="date" value={dhFormData.birth_date || ""} onChange={(e) => setDhFormData({...dhFormData, birth_date: e.target.value})} /></div>
+                              <div>
+                                <Label>Relación *</Label>
+                                <Select value={dhFormData.relationship || "Hijo/a"} onValueChange={(v) => setDhFormData({...dhFormData, relationship: v})}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Cónyuge">Cónyuge</SelectItem>
+                                    <SelectItem value="Concubino/a">Concubino/a</SelectItem>
+                                    <SelectItem value="Hijo/a">Hijo/a</SelectItem>
+                                    <SelectItem value="Hijo Menor de Edad">Hijo Menor de Edad</SelectItem>
+                                    <SelectItem value="Padre">Padre</SelectItem>
+                                    <SelectItem value="Madre">Madre</SelectItem>
+                                    <SelectItem value="Otro">Otro</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div><Label>Cód. País</Label><Input value={dhFormData.country_code || ""} onChange={(e) => setDhFormData({...dhFormData, country_code: e.target.value})} placeholder="PER" /></div>
+                            </div>
+                          </div>
+
+                          {/* Documento de sustento */}
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Documento de Sustento del Vínculo</p>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div className="col-span-2"><Label>Tipo de Documento Sustento</Label><Input value={dhFormData.document_type_sustento || ""} onChange={(e) => setDhFormData({...dhFormData, document_type_sustento: e.target.value})} placeholder="Ej: Acta de matrimonio civil" /></div>
+                              <div><Label>N° Doc. Sustento</Label><Input value={dhFormData.document_number_sustento || ""} onChange={(e) => setDhFormData({...dhFormData, document_number_sustento: e.target.value})} /></div>
+                            </div>
+                          </div>
+
+                          {/* Dirección 1 */}
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Dirección 1</p>
+                            <div className="space-y-3">
+                              <div><Label>Descripción</Label><Input value={dhFormData.address || ""} onChange={(e) => setDhFormData({...dhFormData, address: e.target.value})} /></div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div><Label>Referencia</Label><Input value={dhFormData.address_reference || ""} onChange={(e) => setDhFormData({...dhFormData, address_reference: e.target.value})} /></div>
+                                <div><Label>Ubigeo (Dept-Prov-Dist)</Label><Input value={dhFormData.ubigeo || ""} onChange={(e) => setDhFormData({...dhFormData, ubigeo: e.target.value})} placeholder="LIMA-LIMA-MIRAFLORES" /></div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Dirección 2 */}
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Dirección 2 (opcional)</p>
+                            <div className="space-y-3">
+                              <div><Label>Descripción</Label><Input value={dhFormData.address2 || ""} onChange={(e) => setDhFormData({...dhFormData, address2: e.target.value})} /></div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div><Label>Referencia</Label><Input value={dhFormData.address_reference2 || ""} onChange={(e) => setDhFormData({...dhFormData, address_reference2: e.target.value})} /></div>
+                                <div><Label>Ubigeo</Label><Input value={dhFormData.ubigeo2 || ""} onChange={(e) => setDhFormData({...dhFormData, ubigeo2: e.target.value})} /></div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Contacto y EsSalud */}
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Contacto y EsSalud</p>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div><Label>Teléfono</Label><Input value={dhFormData.phone || ""} onChange={(e) => setDhFormData({...dhFormData, phone: e.target.value})} /></div>
+                              <div className="col-span-2"><Label>Correo Electrónico</Label><Input type="email" value={dhFormData.email || ""} onChange={(e) => setDhFormData({...dhFormData, email: e.target.value})} /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mt-3">
+                              <div><Label>Ind. Centro Asistencial EsSalud</Label><Input value={dhFormData.health_center_indicator || ""} onChange={(e) => setDhFormData({...dhFormData, health_center_indicator: e.target.value})} /></div>
+                              <div><Label>Código Ciudad</Label><Input value={dhFormData.city_code || ""} onChange={(e) => setDhFormData({...dhFormData, city_code: e.target.value})} /></div>
+                            </div>
+                          </div>
+
+                          {/* Estado */}
                           <div className="grid grid-cols-2 gap-4">
-                            <div><Label>Tipo Doc *</Label>
-                              <Select value={dhFormData.document_type} onValueChange={(v) => setDhFormData({...dhFormData, document_type: v})}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent><SelectItem value="DNI">DNI</SelectItem><SelectItem value="CE">CE</SelectItem><SelectItem value="Pasaporte">Pasaporte</SelectItem><SelectItem value="Partida de Nacimiento">Partida de Nac.</SelectItem></SelectContent>
-                              </Select>
-                            </div>
-                            <div><Label>N° Documento *</Label><Input value={dhFormData.document_number} onChange={(e) => setDhFormData({...dhFormData, document_number: e.target.value.replace(/\D/g,'')})} /></div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div><Label>Nombres *</Label><Input value={dhFormData.first_name} onChange={(e) => setDhFormData({...dhFormData, first_name: e.target.value})} /></div>
-                            <div><Label>Apellidos *</Label><Input value={dhFormData.last_name} onChange={(e) => setDhFormData({...dhFormData, last_name: e.target.value})} /></div>
-                          </div>
-                          <div className="grid grid-cols-3 gap-4">
-                            <div><Label>Género</Label>
-                              <Select value={dhFormData.gender} onValueChange={(v) => setDhFormData({...dhFormData, gender: v})}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent><SelectItem value="M">Masculino</SelectItem><SelectItem value="F">Femenino</SelectItem></SelectContent>
-                              </Select>
-                            </div>
-                            <div><Label>Fecha Nacimiento *</Label><Input type="date" value={dhFormData.birth_date} onChange={(e) => setDhFormData({...dhFormData, birth_date: e.target.value})} /></div>
-                            <div><Label>Relación</Label>
-                              <Select value={dhFormData.relationship} onValueChange={(v) => setDhFormData({...dhFormData, relationship: v})}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent><SelectItem value="Cónyuge">Cónyuge</SelectItem><SelectItem value="Hijo/a">Hijo/a</SelectItem><SelectItem value="Padre">Padre</SelectItem><SelectItem value="Madre">Madre</SelectItem><SelectItem value="Otro">Otro</SelectItem></SelectContent>
-                              </Select>
+                            <div><Label>Fecha de Alta</Label><Input type="date" value={dhFormData.registration_date || ""} onChange={(e) => setDhFormData({...dhFormData, registration_date: e.target.value})} /></div>
+                            <div className="flex items-end gap-3 pb-1">
+                              <input type="checkbox" id="dh_is_active" checked={dhFormData.is_active ?? true} onChange={(e) => setDhFormData({...dhFormData, is_active: e.target.checked})} className="w-4 h-4" />
+                              <label htmlFor="dh_is_active" className="text-sm font-medium text-slate-700 cursor-pointer">Activo</label>
                             </div>
                           </div>
+
                           <div className="flex gap-3 pt-4 border-t">
-                            <Button variant="outline" className="flex-1" onClick={() => { setShowDerechohabienteForm(false); setEditingDH(null); setDhFormData({}); }}>Cancelar</Button>
-                            <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleSaveDH}>Guardar</Button>
+                            <Button variant="outline" className="flex-1" disabled={savingDH} onClick={() => { setShowDerechohabienteForm(false); setEditingDH(null); setDhFormData({}); }}>Cancelar</Button>
+                            <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleSaveDH} disabled={savingDH}>
+                              {savingDH ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</> : "Guardar"}
+                            </Button>
                           </div>
                         </CardContent>
                       </Card>
