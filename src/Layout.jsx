@@ -243,6 +243,7 @@ export default function Layout({ children, currentPageName }) {
         submenu.push({ name: "Centros de Costo", path: "CostCenterManagement" });
         submenu.push({ name: "Consulta Valorizada", path: "CostCenterValuation" });
       }
+      submenu.push({ name: "Asientos Contables", path: "AsientosContables" });
       items.push({ name: "Gestión Planillas", icon: FileText, path: "PayrollManagement", submenu });
     }
 

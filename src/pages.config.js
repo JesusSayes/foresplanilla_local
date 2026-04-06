@@ -78,6 +78,7 @@ import PayslipTemplateConfig from './pages/PayslipTemplateConfig';
 import Payslips from './pages/Payslips';
 import Reports from './pages/Reports';
 import RoleManagement from './pages/RoleManagement';
+import AsientosContables from './pages/AsientosContables';
 import BackfillAsistencia from './pages/BackfillAsistencia';
 import ScheduleManagement from './pages/ScheduleManagement';
 import SystemRoleInitializer from './pages/SystemRoleInitializer';
@@ -89,6 +90,7 @@ import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "AsientosContables": AsientosContables,
     "BackfillAsistencia": BackfillAsistencia,
     "AccessDeviceConfig": AccessDeviceConfig,
     "Attendance": Attendance,
