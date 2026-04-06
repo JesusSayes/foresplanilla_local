@@ -193,12 +193,9 @@ export default function PayrollManagement() {
   // Aprobar planilla completa (todas las boletas de un tipo/periodo)
   const approveFullPayrollMutation = useMutation({
     mutationFn: async ({ year, month, payrollType }) => {
-      const toApprove = existingPayslips.filter(p =>
-        p.payroll_type === payrollType &&
-        p.month === month &&
-        p.year === year &&
-        (p.status === "Generada" || p.status === "Calculada")
-      );
+      // Re-fetch para asegurar datos frescos
+      const fresh = await base44.entities.Payslip.filter({ month, year, payroll_type: payrollType });
+      const toApprove = fresh.filter(p => p.status !== "Aprobada" && p.status !== "Pagada");
       await Promise.all(toApprove.map(p => base44.entities.Payslip.update(p.id, { status: "Aprobada" })));
       return toApprove.length;
     },
@@ -213,12 +210,8 @@ export default function PayrollManagement() {
   // Aprobar y marcar como pagada planilla completa
   const payFullPayrollMutation = useMutation({
     mutationFn: async ({ year, month, payrollType }) => {
-      const toPay = existingPayslips.filter(p =>
-        p.payroll_type === payrollType &&
-        p.month === month &&
-        p.year === year &&
-        p.status === "Aprobada"
-      );
+      const fresh = await base44.entities.Payslip.filter({ month, year, payroll_type: payrollType });
+      const toPay = fresh.filter(p => p.status === "Aprobada");
       await Promise.all(toPay.map(p => base44.entities.Payslip.update(p.id, { status: "Pagada" })));
       return toPay.length;
     },
@@ -1063,9 +1056,9 @@ export default function PayrollManagement() {
                           const totalNeto = planillasDelTipo.reduce((s, p) => s + (p.net_pay || 0), 0);
                           const totalIngresos = planillasDelTipo.reduce((s, p) => s + (p.total_income || 0), 0);
                           const totalDesc = planillasDelTipo.reduce((s, p) => s + (p.total_deductions || 0), 0);
-                          const allGenerada = planillasDelTipo.every(p => p.status === "Generada" || p.status === "Calculada");
-                          const allAprobada = planillasDelTipo.every(p => p.status === "Aprobada");
                           const allPagada   = planillasDelTipo.every(p => p.status === "Pagada");
+                          const allAprobada = !allPagada && planillasDelTipo.every(p => p.status === "Aprobada");
+                          const puedeAprobar = !allPagada && !allAprobada; // cualquier estado que no sea aprobada/pagada
 
                           const statusBadgeColor =
                             allPagada   ? "bg-green-100 text-green-700 border-green-200" :
@@ -1097,31 +1090,31 @@ export default function PayrollManagement() {
                                     </p>
                                   </div>
                                   {/* Acciones a nivel de planilla completa */}
-                                  <div className="flex gap-2 shrink-0">
-                                    {allGenerada && canEdit && (
+                                  <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                                    {puedeAprobar && (
                                       <Button
                                         size="sm"
-                                        className="bg-blue-600 hover:bg-blue-700"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow"
                                         onClick={() => approveFullPayrollMutation.mutate({ year: selectedYear, month: selectedMonth, payrollType: tipo })}
                                         disabled={approveFullPayrollMutation.isPending}
                                       >
                                         <CheckCircle className="w-4 h-4 mr-2" />
-                                        Aprobar Planilla Completa
+                                        {approveFullPayrollMutation.isPending ? "Aprobando..." : "✓ Aprobar Planilla Completa"}
                                       </Button>
                                     )}
-                                    {allAprobada && canEdit && (
+                                    {allAprobada && (
                                       <Button
                                         size="sm"
-                                        className="bg-green-600 hover:bg-green-700"
+                                        className="bg-green-600 hover:bg-green-700 text-white font-semibold shadow"
                                         onClick={() => payFullPayrollMutation.mutate({ year: selectedYear, month: selectedMonth, payrollType: tipo })}
                                         disabled={payFullPayrollMutation.isPending}
                                       >
                                         <Lock className="w-4 h-4 mr-2" />
-                                        Marcar como Pagada
+                                        {payFullPayrollMutation.isPending ? "Procesando..." : "Marcar como Pagada"}
                                       </Button>
                                     )}
                                     {allPagada && (
-                                      <Badge className="bg-green-100 text-green-700 border border-green-300 px-3 py-1.5">
+                                      <Badge className="bg-green-100 text-green-700 border border-green-300 px-3 py-1.5 text-sm">
                                         ✓ Planilla Pagada
                                       </Badge>
                                     )}
