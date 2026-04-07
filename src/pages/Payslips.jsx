@@ -10,6 +10,7 @@ import {
   FileText, Download, Search, Calendar as CalendarIcon,
   TrendingUp, TrendingDown, Filter, Eye, Settings
 } from "lucide-react";
+import PayslipPreview from "../components/payroll/PayslipPreview";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { createPageUrl } from "../utils";
@@ -308,130 +309,24 @@ export default function Payslips() {
         {/* Detail Modal */}
         {selectedPayslip && (
           <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
             onClick={() => setSelectedPayslip(null)}
           >
-            <Card 
-              className="max-w-2xl w-full max-h-[90vh] overflow-auto"
+            <div 
+              className="max-w-2xl w-full my-8"
               onClick={(e) => e.stopPropagation()}
             >
-              <CardHeader className="border-b bg-slate-50/50 sticky top-0 z-10">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-2xl font-bold mb-2">
-                      Detalle de Boleta
-                    </CardTitle>
-                    <p className="text-slate-600">{selectedPayslip.period}</p>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => setSelectedPayslip(null)}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-6">
-                  {/* Ingresos */}
-                  <div>
-                    <h3 className="font-bold text-slate-900 mb-4 text-lg">Ingresos</h3>
-                    <div className="space-y-3 bg-green-50 rounded-lg p-4">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Remuneración básica</span>
-                        <span className="font-semibold">S/ {selectedPayslip.base_salary?.toFixed(2)}</span>
-                      </div>
-                      {selectedPayslip.family_allowance > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Asignación familiar</span>
-                          <span className="font-semibold">S/ {selectedPayslip.family_allowance?.toFixed(2)}</span>
-                        </div>
-                      )}
-                      {selectedPayslip.overtime_pay > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Horas extras</span>
-                          <span className="font-semibold">S/ {selectedPayslip.overtime_pay?.toFixed(2)}</span>
-                        </div>
-                      )}
-                      {selectedPayslip.bonuses > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Bonificaciones</span>
-                          <span className="font-semibold">S/ {selectedPayslip.bonuses?.toFixed(2)}</span>
-                        </div>
-                      )}
-                      <div className="pt-3 border-t border-green-200">
-                        <div className="flex justify-between font-bold text-green-700">
-                          <span>Total Ingresos</span>
-                          <span>S/ {selectedPayslip.total_income?.toFixed(2)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Descuentos */}
-                  <div>
-                    <h3 className="font-bold text-slate-900 mb-4 text-lg">Descuentos</h3>
-                    <div className="space-y-3 bg-red-50 rounded-lg p-4">
-                      {selectedPayslip.pension_deduction > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">AFP/ONP</span>
-                          <span className="font-semibold">S/ {selectedPayslip.pension_deduction?.toFixed(2)}</span>
-                        </div>
-                      )}
-                      {selectedPayslip.income_tax > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Renta 5ta</span>
-                          <span className="font-semibold">S/ {selectedPayslip.income_tax?.toFixed(2)}</span>
-                        </div>
-                      )}
-                      {selectedPayslip.tardiness_discount > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Tardanzas</span>
-                          <span className="font-semibold">S/ {selectedPayslip.tardiness_discount?.toFixed(2)}</span>
-                        </div>
-                      )}
-                      {selectedPayslip.absence_discount > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Inasistencias</span>
-                          <span className="font-semibold">S/ {selectedPayslip.absence_discount?.toFixed(2)}</span>
-                        </div>
-                      )}
-                      <div className="pt-3 border-t border-red-200">
-                        <div className="flex justify-between font-bold text-red-700">
-                          <span>Total Descuentos</span>
-                          <span>S/ {selectedPayslip.total_deductions?.toFixed(2)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Neto */}
-                  <div className="bg-indigo-50 rounded-lg p-6">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xl font-bold text-slate-900">Neto a Pagar</span>
-                      <span className="text-3xl font-bold text-indigo-600">
-                        S/ {selectedPayslip.net_pay?.toFixed(2)}
-                      </span>
-                    </div>
-                    {selectedPayslip.payment_date && (
-                      <p className="text-slate-600 text-sm mt-2">
-                        Fecha de pago: {format(new Date(selectedPayslip.payment_date), "dd 'de' MMMM, yyyy", { locale: es })}
-                      </p>
-                    )}
-                  </div>
-
-                  <Button 
-                    className="w-full bg-indigo-600 hover:bg-indigo-700"
-                    onClick={() => handleDownload(selectedPayslip)}
-                    disabled={!selectedPayslip.pdf_url}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Descargar Boleta PDF
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              <div className="flex justify-between items-center mb-3">
+                <Button variant="outline" className="bg-white" onClick={() => setSelectedPayslip(null)}>
+                  ← Volver al Detalle
+                </Button>
+              </div>
+              <PayslipPreview
+                payslip={selectedPayslip}
+                employee={employee}
+                showPrintButton={true}
+              />
+            </div>
           </div>
         )}
       </div>

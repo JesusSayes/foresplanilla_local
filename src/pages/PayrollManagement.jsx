@@ -1492,6 +1492,7 @@ export default function PayrollManagement() {
                 payslip={previewPayslip} 
                 employee={allEmployees.find(e => e.id === previewPayslip.employee_id)}
                 companyInfo={companyInfo}
+                showPrintButton={true}
               />
             </div>
           </div>
