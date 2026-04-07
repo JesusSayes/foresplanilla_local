@@ -145,46 +145,46 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
         .join("")}
     </tr>
   </thead>
-  <tfoot>
-    <tr class="totales-row">
-      <td colspan="5" style="padding:4px 5px;">TOTALES GENERALES</td>
-      <td style="padding:4px 5px;text-align:center;">${totalDias}</td>
-      <td style="padding:4px 5px;text-align:right;">${sorted.reduce((s,{payslip:p})=>s+(p.base_salary||0),0).toFixed(2)}</td>
-      <td style="padding:4px 5px;text-align:right;">${sorted.reduce((s,{payslip:p})=>s+((p.total_income||0)-(p.base_salary||0)),0).toFixed(2)}</td>
-      <td style="padding:4px 5px;text-align:right;color:#15803d;">${totalIncome.toFixed(2)}</td>
-      <td style="padding:4px 5px;text-align:right;">${sorted.reduce((s,{payslip:p})=>s+(p.pension_deduction||0),0).toFixed(2)}</td>
-      <td style="padding:4px 5px;text-align:right;">${sorted.reduce((s,{payslip:p})=>s+((p.total_deductions||0)-(p.pension_deduction||0)),0).toFixed(2)}</td>
-      <td style="padding:4px 5px;text-align:right;color:#dc2626;">${totalDesc.toFixed(2)}</td>
-      <td style="padding:4px 5px;text-align:right;color:#4338ca;font-size:8.5pt;">${totalNeto.toFixed(2)}</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td colspan="14" style="padding:8px 0 0 0;background:#fff;border:none;">
-        <!-- FIRMAS -->
-        <div class="firmas">
-          <div class="firma-cell">
-            ${firma1Html}
-            <div style="font-size:7.5pt;font-weight:700;color:#0f172a;">${firmante1.nombre}</div>
-            <div style="font-size:7pt;color:#475569;">${firmante1.cargo}</div>
-            ${firmante1.dni ? `<div style="font-size:6.5pt;color:#94a3b8;">DNI: ${firmante1.dni}</div>` : ""}
-          </div>
-          <div class="firma-cell">
-            ${firma2Html}
-            <div style="font-size:7.5pt;font-weight:700;color:#0f172a;">${firmante2.nombre}</div>
-            <div style="font-size:7pt;color:#475569;">${firmante2.cargo}</div>
-            ${firmante2.dni ? `<div style="font-size:6.5pt;color:#94a3b8;">DNI: ${firmante2.dni}</div>` : ""}
-          </div>
-        </div>
-        <div class="footer-note">
-          Documento generado el ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })} — Sistema de Recursos Humanos
-        </div>
-      </td>
-    </tr>
-  </tfoot>
+  <tfoot></tfoot>
   <tbody>
     ${rowsHtml}
   </tbody>
 </table>
+<!-- TOTALES Y FIRMAS — solo al final, fuera de la tabla -->
+<table style="width:100%;border-collapse:collapse;margin-top:0;">
+  <tbody>
+    <tr style="background:#eef2ff;border-top:2px solid #a5b4fc;font-weight:700;">
+      <td colspan="5" style="padding:4px 5px;font-size:7.5pt;">TOTALES GENERALES</td>
+      <td style="padding:4px 5px;text-align:center;font-size:7.5pt;">${totalDias}</td>
+      <td style="padding:4px 5px;text-align:right;font-size:7.5pt;">${sorted.reduce((s,{payslip:p})=>s+(p.base_salary||0),0).toFixed(2)}</td>
+      <td style="padding:4px 5px;text-align:right;font-size:7.5pt;">${sorted.reduce((s,{payslip:p})=>s+((p.total_income||0)-(p.base_salary||0)),0).toFixed(2)}</td>
+      <td style="padding:4px 5px;text-align:right;color:#15803d;font-size:7.5pt;">${totalIncome.toFixed(2)}</td>
+      <td style="padding:4px 5px;text-align:right;font-size:7.5pt;">${sorted.reduce((s,{payslip:p})=>s+(p.pension_deduction||0),0).toFixed(2)}</td>
+      <td style="padding:4px 5px;text-align:right;font-size:7.5pt;">${sorted.reduce((s,{payslip:p})=>s+((p.total_deductions||0)-(p.pension_deduction||0)),0).toFixed(2)}</td>
+      <td style="padding:4px 5px;text-align:right;color:#dc2626;font-size:7.5pt;">${totalDesc.toFixed(2)}</td>
+      <td style="padding:4px 5px;text-align:right;color:#4338ca;font-size:8.5pt;">${totalNeto.toFixed(2)}</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+<!-- FIRMAS -->
+<div class="firmas">
+  <div class="firma-cell">
+    ${firma1Html}
+    <div style="font-size:7.5pt;font-weight:700;color:#0f172a;">${firmante1.nombre}</div>
+    <div style="font-size:7pt;color:#475569;">${firmante1.cargo}</div>
+    ${firmante1.dni ? `<div style="font-size:6.5pt;color:#94a3b8;">DNI: ${firmante1.dni}</div>` : ""}
+  </div>
+  <div class="firma-cell">
+    ${firma2Html}
+    <div style="font-size:7.5pt;font-weight:700;color:#0f172a;">${firmante2.nombre}</div>
+    <div style="font-size:7pt;color:#475569;">${firmante2.cargo}</div>
+    ${firmante2.dni ? `<div style="font-size:6.5pt;color:#94a3b8;">DNI: ${firmante2.dni}</div>` : ""}
+  </div>
+</div>
+<div class="footer-note">
+  Documento generado el ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })} — Sistema de Recursos Humanos
+</div>
 <script>window.onload = function(){ window.print(); window.onafterprint = function(){ window.close(); }; }</script>
 </body>
 </html>`;
