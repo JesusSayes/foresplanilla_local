@@ -17,6 +17,7 @@ import {
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { todayLima, todayDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
 import { usePermissions } from "../components/hooks/usePermissions";
@@ -28,7 +29,7 @@ import AssignScheduleModal from "../components/attendance/AssignScheduleModal";
 export default function AttendanceManagement() {
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(todayDateLima());
   const [dateFrom, setDateFrom] = useState(null);
   const [dateTo, setDateTo] = useState(null);
   const [isRangeMode, setIsRangeMode] = useState(false);
@@ -353,7 +354,7 @@ export default function AttendanceManagement() {
       data: {
         status: "Aprobada",
         reviewed_by: `${employee.first_name} ${employee.last_name}`,
-        review_date: format(new Date(), "yyyy-MM-dd"),
+        review_date: todayLima(),
         review_comments: reviewComments || "Aprobada",
       }
     });
@@ -369,7 +370,7 @@ export default function AttendanceManagement() {
       data: {
         status: "Rechazada",
         reviewed_by: `${employee.first_name} ${employee.last_name}`,
-        review_date: format(new Date(), "yyyy-MM-dd"),
+        review_date: todayLima(),
         review_comments: reviewComments,
       }
     });
@@ -458,7 +459,7 @@ export default function AttendanceManagement() {
   // En modo fecha única: comportamiento original (todos los empleados para esa fecha)
   let employeesWithRecords = [];
 
-  const todayDateStr = format(new Date(), "yyyy-MM-dd");
+  const todayDateStr = todayLima();
 
   if (isRangeMode && dateFrom && dateTo) {
     // Generar todas las fechas del rango, solo hasta hoy
@@ -1149,11 +1150,11 @@ export default function AttendanceManagement() {
                                     <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm">
                                       <Badge className="bg-orange-100 text-orange-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="p-3 bg-slate-50 rounded-lg mb-4">
+                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es })}</span>
+                                      </div>
+                                      </div>
+                                      </div>
+                                      <div className="p-3 bg-slate-50 rounded-lg mb-4">
                                   <p className="text-sm font-semibold text-slate-900 mb-1">Justificación:</p>
                                   <p className="text-sm text-slate-700">{incident.justification}</p>
                                 </div>
@@ -1205,7 +1206,7 @@ export default function AttendanceManagement() {
                                     <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm flex-wrap">
                                       <Badge className="bg-green-100 text-green-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
+                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es })}</span>
                                       <Badge className="bg-green-600 text-white">Aprobada</Badge>
                                     </div>
                                   </div>
@@ -1222,18 +1223,18 @@ export default function AttendanceManagement() {
                                 )}
                                 <div className="flex items-center gap-4 text-xs text-slate-600">
                                   <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
-                                  <span>Fecha: {incident.review_date ? format(new Date(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                                  <span>Fecha: {incident.review_date ? format(new Date(incident.review_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
+                                  </div>
+                                  </div>
+                                  );
+                                  })}
+                                  </div>
+                                  )}
+                                  </CardContent>
+                                  </Card>
+                                  </TabsContent>
 
-                <TabsContent value="rejected">
+                                  <TabsContent value="rejected">
                   <Card className="border-0 shadow-lg">
                     <CardHeader className="border-b bg-red-50/50"><CardTitle className="text-xl font-bold flex items-center gap-2"><XCircle className="w-5 h-5 text-red-600" />Justificaciones Rechazadas</CardTitle></CardHeader>
                     <CardContent className="p-6">
@@ -1257,7 +1258,7 @@ export default function AttendanceManagement() {
                                     <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm flex-wrap">
                                       <Badge className="bg-red-100 text-red-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
+                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es })}</span>
                                       <Badge className="bg-red-600 text-white">Rechazada</Badge>
                                     </div>
                                   </div>
@@ -1274,17 +1275,17 @@ export default function AttendanceManagement() {
                                 )}
                                 <div className="flex items-center gap-4 text-xs text-slate-600">
                                   <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
-                                  <span>Fecha: {incident.review_date ? format(new Date(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+                                  <span>Fecha: {incident.review_date ? format(new Date(incident.review_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
+                                  </div>
+                                  </div>
+                                  );
+                                  })}
+                                  </div>
+                                  )}
+                                  </CardContent>
+                                  </Card>
+                                  </TabsContent>
+                                  </Tabs>
             </TabsContent>
           </Tabs>
         </div>
@@ -1366,7 +1367,7 @@ export default function AttendanceManagement() {
                 <div className="space-y-6">
                   <div className="p-4 bg-slate-50 rounded-lg">
                     <p className="text-sm text-slate-600 mb-2"><strong>Tipo:</strong> {reviewingIncident.incident_type}</p>
-                    <p className="text-sm text-slate-600 mb-2"><strong>Fecha:</strong> {format(new Date(reviewingIncident.incident_date), "dd 'de' MMMM, yyyy", { locale: es })}</p>
+                    <p className="text-sm text-slate-600 mb-2"><strong>Fecha:</strong> {format(new Date(reviewingIncident.incident_date + "T12:00:00-05:00"), "dd 'de' MMMM, yyyy", { locale: es })}</p>
                     {reviewingIncident.full_day_justification ? (
                       <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> <Badge className="bg-blue-100 text-blue-700">Día completo (8 horas)</Badge></p>
                     ) : (

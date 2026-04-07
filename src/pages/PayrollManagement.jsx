@@ -15,6 +15,7 @@ import {
 import { usePermissions } from "../components/hooks/usePermissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import ConceptsManager from "../components/payroll/ConceptsManager";
@@ -355,7 +356,7 @@ export default function PayrollManagement() {
         other_deductions: result.totals.totalDeductions,
         total_deductions: adjustedDeductions,
         net_pay: adjustedNetPay,
-        payment_date: format(new Date(selectedYear, selectedMonth - 1, payrollType === "Quincenal" ? 15 : 30), "yyyy-MM-dd"),
+        payment_date: `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-${payrollType === "Quincenal" ? "15" : "30"}`,
         status: "Generada",
         calculation_summary: result.summary,
         calculation_log: result.calculationLog,
