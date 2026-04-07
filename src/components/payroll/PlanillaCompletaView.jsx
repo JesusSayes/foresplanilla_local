@@ -42,8 +42,18 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
             width: 100%;
             border-collapse: collapse;
           }
+          .print-table {
+            border-collapse: collapse !important;
+            width: 100% !important;
+          }
           .print-table thead {
-            display: table-header-group;
+            display: table-header-group !important;
+          }
+          .print-table thead tr th {
+            background-color: #4338ca !important;
+            color: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           .print-table tbody tr {
             page-break-inside: avoid;
@@ -123,9 +133,9 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
 
           {/* TABLA DE DETALLE */}
           <div className="overflow-hidden rounded border border-slate-200 mb-3">
-            <table className="w-full print-table" style={{ fontSize: "7.5pt", borderCollapse: "collapse", width: "100%" }}>
-              <thead style={{ display: "table-header-group" }}>
-                <tr style={{ backgroundColor: "#4338ca", color: "white" }}>
+            <table className="w-full print-table" style={{ fontSize: "7.5pt", borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+              <thead>
+                <tr>
                   {["#","Código","Apellidos y Nombres","Documento","Cargo","Días","Rem. Básica","Otros Ing.","Total Ing.","AFP/ONP","Otros Desc.","Total Desc.","NETO","Firma"].map(h => (
                     <th key={h} style={{ padding: "4px 6px", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap", fontSize: "7pt", backgroundColor: "#4338ca", color: "white" }}>{h}</th>
                   ))}
