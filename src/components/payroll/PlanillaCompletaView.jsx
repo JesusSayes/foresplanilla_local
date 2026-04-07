@@ -45,10 +45,10 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
           .print-table thead {
             display: table-header-group;
           }
-          .print-table tfoot {
-            display: table-footer-group;
-          }
           .print-table tbody tr {
+            page-break-inside: avoid;
+          }
+          .totales-row {
             page-break-inside: avoid;
           }
           .print-header { font-size: 8pt; }
@@ -155,20 +155,23 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
                   </tr>
                 ))}
               </tbody>
-              <tfoot>
+            </table>
+            {/* TOTALES — fuera del tfoot para que aparezcan SOLO en la última página */}
+            <table className="w-full print-table totales-row" style={{ fontSize: "7.5pt", borderCollapse: "collapse", width: "100%" }}>
+              <tbody>
                 <tr style={{ backgroundColor: "#eef2ff", borderTop: "2px solid #a5b4fc", fontWeight: "bold" }}>
-                  <td colSpan={5} className="px-1.5 py-1.5 text-slate-800">TOTALES GENERALES</td>
-                  <td className="px-1.5 py-1.5 text-center">{totalDias}</td>
-                  <td className="px-1.5 py-1.5 text-right">{sorted.reduce((s,{payslip:p}) => s+(p.base_salary||0),0).toFixed(2)}</td>
-                  <td className="px-1.5 py-1.5 text-right">{sorted.reduce((s,{payslip:p}) => s+((p.total_income||0)-(p.base_salary||0)),0).toFixed(2)}</td>
-                  <td className="px-1.5 py-1.5 text-right" style={{ color: "#15803d" }}>{totalIncome.toFixed(2)}</td>
-                  <td className="px-1.5 py-1.5 text-right">{sorted.reduce((s,{payslip:p}) => s+(p.pension_deduction||0),0).toFixed(2)}</td>
-                  <td className="px-1.5 py-1.5 text-right">{sorted.reduce((s,{payslip:p}) => s+((p.total_deductions||0)-(p.pension_deduction||0)),0).toFixed(2)}</td>
-                  <td className="px-1.5 py-1.5 text-right" style={{ color: "#dc2626" }}>{totalDesc.toFixed(2)}</td>
-                  <td className="px-1.5 py-1.5 text-right" style={{ color: "#4338ca", fontSize: "9pt" }}>{totalNeto.toFixed(2)}</td>
+                  <td colSpan={5} className="px-1.5 py-1.5 text-slate-800" style={{ padding: "4px 6px" }}>TOTALES GENERALES</td>
+                  <td style={{ padding: "4px 6px", textAlign: "center" }}>{totalDias}</td>
+                  <td style={{ padding: "4px 6px", textAlign: "right" }}>{sorted.reduce((s,{payslip:p}) => s+(p.base_salary||0),0).toFixed(2)}</td>
+                  <td style={{ padding: "4px 6px", textAlign: "right" }}>{sorted.reduce((s,{payslip:p}) => s+((p.total_income||0)-(p.base_salary||0)),0).toFixed(2)}</td>
+                  <td style={{ padding: "4px 6px", textAlign: "right", color: "#15803d" }}>{totalIncome.toFixed(2)}</td>
+                  <td style={{ padding: "4px 6px", textAlign: "right" }}>{sorted.reduce((s,{payslip:p}) => s+(p.pension_deduction||0),0).toFixed(2)}</td>
+                  <td style={{ padding: "4px 6px", textAlign: "right" }}>{sorted.reduce((s,{payslip:p}) => s+((p.total_deductions||0)-(p.pension_deduction||0)),0).toFixed(2)}</td>
+                  <td style={{ padding: "4px 6px", textAlign: "right", color: "#dc2626" }}>{totalDesc.toFixed(2)}</td>
+                  <td style={{ padding: "4px 6px", textAlign: "right", color: "#4338ca", fontSize: "9pt" }}>{totalNeto.toFixed(2)}</td>
                   <td />
                 </tr>
-              </tfoot>
+              </tbody>
             </table>
           </div>
 
