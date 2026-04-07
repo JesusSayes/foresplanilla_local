@@ -211,7 +211,7 @@ export default function ScheduleManagement() {
     setAssignFormData({
       employee_id: assignment.employee_id || null,
       departments: assignment.departments || (assignment.department_name ? [assignment.department_name] : []),
-      effective_from: assignment.effective_from ? new Date(assignment.effective_from + "T00:00:00") : new Date(),
+      effective_from: assignment.effective_from ? new Date(assignment.effective_from.split('T')[0] + "T00:00:00") : new Date(),
     });
 
     // Buscar la plantilla que corresponde a esta asignación por nombre
