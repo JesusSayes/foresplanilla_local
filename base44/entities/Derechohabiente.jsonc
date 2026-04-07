@@ -1,0 +1,148 @@
+{
+  "name": "Derechohabiente",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado titular"
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "DNI",
+        "CE",
+        "Pasaporte",
+        "Partida de Nacimiento",
+        "L.E / DNI",
+        "Otro"
+      ],
+      "default": "DNI",
+      "description": "Tipo de documento del derechohabiente"
+    },
+    "document_number": {
+      "type": "string",
+      "description": "N\u00famero de documento del derechohabiente"
+    },
+    "first_name": {
+      "type": "string",
+      "description": "Nombres"
+    },
+    "last_name": {
+      "type": "string",
+      "description": "Apellidos (paterno + materno)"
+    },
+    "last_name_paterno": {
+      "type": "string",
+      "description": "Apellido paterno"
+    },
+    "last_name_materno": {
+      "type": "string",
+      "description": "Apellido materno"
+    },
+    "gender": {
+      "type": "string",
+      "enum": [
+        "M",
+        "F"
+      ],
+      "description": "G\u00e9nero"
+    },
+    "birth_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de nacimiento"
+    },
+    "relationship": {
+      "type": "string",
+      "enum": [
+        "C\u00f3nyuge",
+        "Concubino/a",
+        "Hijo/a",
+        "Hijo Menor de Edad",
+        "Padre",
+        "Madre",
+        "Otro"
+      ],
+      "description": "Relaci\u00f3n con el empleado"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "C\u00f3digo de pa\u00eds (ej: PER)"
+    },
+    "document_type_sustento": {
+      "type": "string",
+      "description": "Tipo de documento de sustento del v\u00ednculo familiar"
+    },
+    "document_number_sustento": {
+      "type": "string",
+      "description": "N\u00famero de documento de sustento"
+    },
+    "conception_month": {
+      "type": "string",
+      "description": "Mes de concepci\u00f3n (para hijos)"
+    },
+    "address": {
+      "type": "string",
+      "description": "Descripci\u00f3n de direcci\u00f3n 1"
+    },
+    "address_reference": {
+      "type": "string",
+      "description": "Referencia de direcci\u00f3n 1"
+    },
+    "ubigeo": {
+      "type": "string",
+      "description": "Ubigeo de direcci\u00f3n 1 (Dept-Prov-Dist)"
+    },
+    "address2": {
+      "type": "string",
+      "description": "Descripci\u00f3n de direcci\u00f3n 2"
+    },
+    "address_reference2": {
+      "type": "string",
+      "description": "Referencia de direcci\u00f3n 2"
+    },
+    "ubigeo2": {
+      "type": "string",
+      "description": "Ubigeo de direcci\u00f3n 2"
+    },
+    "health_center_indicator": {
+      "type": "string",
+      "description": "Indicador de centro asistencial EsSalud"
+    },
+    "city_code": {
+      "type": "string",
+      "description": "C\u00f3digo de ciudad"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono"
+    },
+    "email": {
+      "type": "string",
+      "description": "Correo electr\u00f3nico"
+    },
+    "registration_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de alta"
+    },
+    "deregistration_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de baja"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Derechohabiente activo"
+    }
+  },
+  "required": [
+    "employee_id",
+    "document_number",
+    "first_name",
+    "last_name",
+    "birth_date",
+    "relationship"
+  ]
+}
