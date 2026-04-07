@@ -1053,21 +1053,19 @@ export default function PayrollManagement() {
                       <div className="space-y-6">
                         {tipos.map(tipo => {
                           const planillasDelTipo = filteredPayslips.filter(p => p.payroll_type === tipo);
-                          const statusGroup = planillasDelTipo[0]?.status || "Generada";
                           const totalNeto = planillasDelTipo.reduce((s, p) => s + (p.net_pay || 0), 0);
                           const totalIngresos = planillasDelTipo.reduce((s, p) => s + (p.total_income || 0), 0);
                           const totalDesc = planillasDelTipo.reduce((s, p) => s + (p.total_deductions || 0), 0);
                           const allPagada   = planillasDelTipo.every(p => p.status === "Pagada");
-                          const allAprobada = !allPagada && planillasDelTipo.every(p => p.status === "Aprobada");
+                          const allAprobada = !allPagada && planillasDelTipo.every(p => p.status === "Aprobada" || p.status === "Pagada") && planillasDelTipo.some(p => p.status === "Aprobada");
                           const puedeAprobar = !allPagada && !allAprobada;
-                          const hayMixto = !allPagada && !allAprobada && planillasDelTipo.some(p => p.status === "Aprobada");
 
                           const statusBadgeColor =
                             allPagada   ? "bg-green-100 text-green-700 border-green-200" :
                             allAprobada ? "bg-blue-100 text-blue-700 border-blue-200" :
                             "bg-yellow-100 text-yellow-700 border-yellow-200";
                           const statusLabel =
-                            allPagada ? "✓ Pagada" : allAprobada ? "✓ Aprobada" : "Generada";
+                            allPagada ? "✓ Pagada" : allAprobada ? "✓ Aprobada" : "Calculada";
 
                           return (
                             <Card key={tipo} className={`border-2 shadow-lg ${allAprobada ? "border-blue-300" : allPagada ? "border-green-300" : "border-transparent"}`}>
