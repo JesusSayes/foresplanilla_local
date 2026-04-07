@@ -194,15 +194,14 @@ export default function PayrollManagement() {
   // Aprobar planilla completa (todas las boletas de un tipo/periodo)
   const approveFullPayrollMutation = useMutation({
     mutationFn: async ({ year, month, payrollType }) => {
-      // Re-fetch para asegurar datos frescos
       const fresh = await base44.entities.Payslip.filter({ month, year, payroll_type: payrollType });
       const toApprove = fresh.filter(p => p.status !== "Aprobada" && p.status !== "Pagada");
       await Promise.all(toApprove.map(p => base44.entities.Payslip.update(p.id, { status: "Aprobada" })));
       return toApprove.length;
     },
     onSuccess: (count) => {
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["allPayslips"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
       toast.success(`✓ Planilla aprobada — ${count} boleta(s) actualizadas`);
     },
     onError: () => toast.error("Error al aprobar la planilla"),
@@ -217,8 +216,8 @@ export default function PayrollManagement() {
       return toPay.length;
     },
     onSuccess: (count) => {
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["allPayslips"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
       toast.success(`✓ Planilla marcada como pagada — ${count} boleta(s)`);
     },
     onError: () => toast.error("Error al marcar como pagada"),
@@ -357,7 +356,7 @@ export default function PayrollManagement() {
         total_deductions: adjustedDeductions,
         net_pay: adjustedNetPay,
         payment_date: `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-${payrollType === "Quincenal" ? "15" : "30"}`,
-        status: "Generada",
+        status: "Calculada",
         calculation_summary: result.summary,
         calculation_log: result.calculationLog,
         has_errors: result.errors.length > 0,
