@@ -464,8 +464,9 @@ export default function PayrollManagement() {
     ) : true;
     
     const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
+    const matchesType = p.payroll_type === payrollType;
     
-    return matchesSearch && matchesDept;
+    return matchesSearch && matchesDept && matchesType;
   });
 
   const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
