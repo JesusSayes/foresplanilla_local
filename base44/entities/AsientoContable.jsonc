@@ -1,0 +1,207 @@
+{
+  "name": "AsientoContable",
+  "type": "object",
+  "properties": {
+    "annomes": {
+      "type": "string",
+      "description": "Per\u00edodo contable en formato AAAAMM (ej: 202604)"
+    },
+    "subdiario": {
+      "type": "string",
+      "description": "C\u00f3digo del subdiario contable (ej: 08=Planillas, 01=Caja, etc.)"
+    },
+    "comprobante": {
+      "type": "string",
+      "description": "N\u00famero de comprobante del asiento"
+    },
+    "cuenta": {
+      "type": "string",
+      "description": "C\u00f3digo de cuenta contable (ref. AccountingAccount)"
+    },
+    "cuenta_id": {
+      "type": "string",
+      "description": "ID de la cuenta contable en AccountingAccount"
+    },
+    "fecha_doc": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del documento"
+    },
+    "tipo_anexo": {
+      "type": "string",
+      "description": "Tipo de anexo: P=Proveedor, C=Cliente, T=Trabajador, O=Otros"
+    },
+    "cod_anexo": {
+      "type": "string",
+      "description": "C\u00f3digo del anexo (RUC, DNI del trabajador, etc.)"
+    },
+    "tipo_doc": {
+      "type": "string",
+      "description": "Tipo de documento (RH=Recibo Hon., PL=Planilla, FA=Factura, etc.)"
+    },
+    "nro_doc": {
+      "type": "string",
+      "description": "N\u00famero del documento"
+    },
+    "fecha_vencimiento": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de vencimiento del documento"
+    },
+    "moneda": {
+      "type": "string",
+      "enum": [
+        "PEN",
+        "USD",
+        "EUR"
+      ],
+      "default": "PEN",
+      "description": "Moneda del asiento"
+    },
+    "importe": {
+      "type": "number",
+      "default": 0,
+      "description": "Importe del movimiento en la moneda indicada"
+    },
+    "conversion_tc": {
+      "type": "string",
+      "description": "Tipo de conversi\u00f3n de tipo de cambio (ej: C=Compra, V=Venta, M=Manual)"
+    },
+    "tc": {
+      "type": "number",
+      "default": 1,
+      "description": "Tipo de cambio aplicado"
+    },
+    "importe_soles": {
+      "type": "number",
+      "default": 0,
+      "description": "Importe convertido a soles (calculado)"
+    },
+    "glosa": {
+      "type": "string",
+      "description": "Glosa de cabecera del asiento"
+    },
+    "glosa_mov": {
+      "type": "string",
+      "description": "Glosa del movimiento individual"
+    },
+    "debe_haber": {
+      "type": "string",
+      "enum": [
+        "D",
+        "H"
+      ],
+      "description": "D=Debe / H=Haber"
+    },
+    "centro_costos": {
+      "type": "string",
+      "description": "C\u00f3digo o nombre del centro de costos"
+    },
+    "centro_costos_id": {
+      "type": "string",
+      "description": "ID del centro de costos en CostCenter"
+    },
+    "medio_pago": {
+      "type": "string",
+      "description": "Medio de pago (Transferencia, Cheque, Efectivo, etc.)"
+    },
+    "fecha_registro": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de registro del asiento en el sistema"
+    },
+    "anulado": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el asiento est\u00e1 anulado"
+    },
+    "motivo_anulacion": {
+      "type": "string",
+      "description": "Motivo de la anulaci\u00f3n si aplica"
+    },
+    "origen": {
+      "type": "string",
+      "enum": [
+        "Manual",
+        "Planilla",
+        "CTS",
+        "Gratificacion",
+        "Liquidacion",
+        "Vacaciones",
+        "Prestamo",
+        "Otro"
+      ],
+      "default": "Manual",
+      "description": "Origen del asiento contable"
+    },
+    "payslip_id": {
+      "type": "string",
+      "description": "ID de la boleta de planilla relacionada (Payslip)"
+    },
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado relacionado (Employee)"
+    },
+    "payroll_period": {
+      "type": "string",
+      "description": "Per\u00edodo de planilla (Mes YYYY)"
+    },
+    "payroll_type": {
+      "type": "string",
+      "enum": [
+        "Quincenal",
+        "Mensual",
+        "Adicional",
+        "SNP",
+        "CTS",
+        "Gratificacion",
+        "Liquidacion"
+      ],
+      "description": "Tipo de planilla relacionada"
+    },
+    "migrado": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el asiento ha sido migrado al sistema contable externo"
+    },
+    "fecha_migracion": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora en que fue migrado al sistema contable"
+    },
+    "sistema_destino": {
+      "type": "string",
+      "description": "Sistema contable de destino (CONCAR, SIIGO, SAP, etc.)"
+    },
+    "codigo_migracion": {
+      "type": "string",
+      "description": "C\u00f3digo o referencia devuelta por el sistema contable al migrar"
+    },
+    "migrado_por": {
+      "type": "string",
+      "description": "Email del usuario que realiz\u00f3 la migraci\u00f3n"
+    },
+    "error_migracion": {
+      "type": "string",
+      "description": "Mensaje de error si la migraci\u00f3n fall\u00f3"
+    },
+    "estado_migracion": {
+      "type": "string",
+      "enum": [
+        "Pendiente",
+        "Migrado",
+        "Error",
+        "Excluido"
+      ],
+      "default": "Pendiente",
+      "description": "Estado de migraci\u00f3n al sistema contable externo"
+    }
+  },
+  "required": [
+    "annomes",
+    "cuenta",
+    "comprobante",
+    "debe_haber",
+    "importe"
+  ]
+}

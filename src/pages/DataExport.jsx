@@ -294,11 +294,24 @@ const ENTITY_SCHEMAS = {
     description: "TEXT", pdf_url: "TEXT",
     requested_by_employee: "BOOLEAN", status: "TEXT"
   },
+  AsientoContable: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    annomes: "TEXT", subdiario: "TEXT", comprobante: "TEXT", cuenta: "TEXT", cuenta_id: "TEXT",
+    fecha_doc: "DATE", tipo_anexo: "TEXT", cod_anexo: "TEXT", tipo_doc: "TEXT", nro_doc: "TEXT",
+    fecha_vencimiento: "DATE", moneda: "TEXT", importe: "DECIMAL(18,2)", conversion_tc: "TEXT",
+    tc: "DECIMAL(18,6)", importe_soles: "DECIMAL(18,2)", glosa: "TEXT", glosa_mov: "TEXT",
+    debe_haber: "TEXT", centro_costos: "TEXT", centro_costos_id: "TEXT", medio_pago: "TEXT",
+    fecha_registro: "DATE", anulado: "BOOLEAN", motivo_anulacion: "TEXT", origen: "TEXT",
+    payslip_id: "TEXT", employee_id: "TEXT", payroll_period: "TEXT", payroll_type: "TEXT",
+    migrado: "BOOLEAN", fecha_migracion: "TIMESTAMP", sistema_destino: "TEXT",
+    codigo_migracion: "TEXT", migrado_por: "TEXT", error_migracion: "TEXT", estado_migracion: "TEXT"
+  },
   CompanyInfo: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     company_name: "TEXT", ruc: "TEXT", address: "TEXT", phone: "TEXT", email: "TEXT",
     logo_url: "TEXT", legal_representative: "TEXT", legal_representative_dni: "TEXT",
-    legal_representative_position: "TEXT", website: "TEXT", is_active: "BOOLEAN"
+    legal_representative_position: "TEXT", legal_representative_signature_url: "TEXT",
+    website: "TEXT", is_active: "BOOLEAN", firmante_gg: "TEXT", firmante_delegado: "TEXT"
   },
   PayslipTemplate: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
@@ -338,6 +351,7 @@ const ENTITY_GROUPS = [
   { label: "Vacaciones", entities: ["VacationRequest", "VacationBalance"] },
   { label: "Planillas y Remuneración", entities: ["Payslip", "PayrollConcept", "LoanType", "Loan", "LoanInstallment"] },
   { label: "Centros de Costo", entities: ["CostCenter", "CostCenterAssignment", "CostCenterChangeLog", "CostCenterCategory", "AccountingAccount"] },
+  { label: "Contabilidad", entities: ["AsientoContable"] },
   { label: "Datos Maestros", entities: ["Holiday", "Position", "Department", "Bank", "Site", "AFP", "Profession", "Ubigeo", "RMV", "UIT", "SeguroVidaLey"] },
   { label: "Roles y Permisos", entities: ["Role"] },
   { label: "Certificados", entities: ["Certificate"] },
