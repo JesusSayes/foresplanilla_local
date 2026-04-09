@@ -44,6 +44,7 @@ import NotificationSettings from "./pages/NotificationSettings";
 import DataExport from "./pages/DataExport";
 import SystemRoleInitializer from "./pages/SystemRoleInitializer";
 import LoanManagement from "./pages/LoanManagement";
+import ConsultaPlanillas from "./pages/ConsultaPlanillas";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -268,6 +269,11 @@ const AuthenticatedApp = () => {
       <Route path="/SystemRoleInitializer" element={
         <ProtectedRoute>
           <Layout currentPageName="SystemRoleInitializer"><SystemRoleInitializer /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/ConsultaPlanillas" element={
+        <ProtectedRoute>
+          <Layout currentPageName="ConsultaPlanillas"><ConsultaPlanillas /></Layout>
         </ProtectedRoute>
       } />
     </Routes>

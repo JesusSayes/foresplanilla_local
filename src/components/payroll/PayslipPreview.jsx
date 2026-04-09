@@ -110,35 +110,35 @@ export default function PayslipPreview({ payslip, employee, companyInfo }) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-slate-600">Remuneración Básica</span>
-              <span className="font-semibold text-slate-900">S/ {payslip.base_salary?.toFixed(2)}</span>
+              <span className="font-semibold text-slate-900">S/ {Number(payslip.base_salary || 0).toFixed(2)}</span>
             </div>
             {payslip.family_allowance > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Asignación Familiar</span>
-                <span className="font-semibold text-slate-900">S/ {payslip.family_allowance?.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">S/ {Number(payslip.family_allowance || 0).toFixed(2)}</span>
               </div>
             )}
             {payslip.overtime_pay > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Horas Extras</span>
-                <span className="font-semibold text-slate-900">S/ {payslip.overtime_pay?.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">S/ {Number(payslip.overtime_pay || 0).toFixed(2)}</span>
               </div>
             )}
             {payslip.bonuses > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Bonificaciones</span>
-                <span className="font-semibold text-slate-900">S/ {payslip.bonuses?.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">S/ {Number(payslip.bonuses || 0).toFixed(2)}</span>
               </div>
             )}
             {payslip.commissions > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Comisiones</span>
-                <span className="font-semibold text-slate-900">S/ {payslip.commissions?.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">S/ {Number(payslip.commissions || 0).toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between pt-2 border-t border-green-200">
               <span className="font-bold text-green-700">TOTAL INGRESOS</span>
-              <span className="font-bold text-green-700 text-lg">S/ {payslip.total_income?.toFixed(2)}</span>
+              <span className="font-bold text-green-700 text-lg">S/ {Number(payslip.total_income || 0).toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -153,54 +153,54 @@ export default function PayslipPreview({ payslip, employee, companyInfo }) {
             {payslip.pension_deduction > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">AFP/ONP</span>
-                <span className="font-semibold text-slate-900">S/ {payslip.pension_deduction?.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">S/ {Number(payslip.pension_deduction || 0).toFixed(2)}</span>
               </div>
             )}
             {payslip.health_insurance > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Seguro de Salud</span>
-                <span className="font-semibold text-slate-900">S/ {payslip.health_insurance?.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">S/ {Number(payslip.health_insurance || 0).toFixed(2)}</span>
               </div>
             )}
             {payslip.income_tax > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Impuesto 5ta Categoría</span>
-                <span className="font-semibold text-slate-900">S/ {payslip.income_tax?.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">S/ {Number(payslip.income_tax || 0).toFixed(2)}</span>
               </div>
             )}
             {payslip.tardiness_discount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Descuento por Tardanzas</span>
-                <span className="font-semibold text-slate-900">S/ {payslip.tardiness_discount?.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">S/ {Number(payslip.tardiness_discount || 0).toFixed(2)}</span>
               </div>
             )}
             {payslip.absence_discount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Descuento por Inasistencias</span>
-                <span className="font-semibold text-slate-900">S/ {payslip.absence_discount?.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">S/ {Number(payslip.absence_discount || 0).toFixed(2)}</span>
               </div>
             )}
             {payslip.advance_deduction > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Adelanto Quincenal</span>
-                <span className="font-semibold text-slate-900">S/ {payslip.advance_deduction?.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">S/ {Number(payslip.advance_deduction || 0).toFixed(2)}</span>
               </div>
             )}
             {payslip.loan_deduction > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Préstamos</span>
-                <span className="font-semibold text-slate-900">S/ {payslip.loan_deduction?.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">S/ {Number(payslip.loan_deduction || 0).toFixed(2)}</span>
               </div>
             )}
             {payslip.other_deductions > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Otros Descuentos</span>
-                <span className="font-semibold text-slate-900">S/ {payslip.other_deductions?.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">S/ {Number(payslip.other_deductions || 0).toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between pt-2 border-t border-red-200">
               <span className="font-bold text-red-700">TOTAL DESCUENTOS</span>
-              <span className="font-bold text-red-700 text-lg">S/ {payslip.total_deductions?.toFixed(2)}</span>
+              <span className="font-bold text-red-700 text-lg">S/ {Number(payslip.total_deductions || 0).toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -211,7 +211,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo }) {
             <div>
               <p className="text-slate-600 text-sm mb-1">NETO A PAGAR</p>
               <p className="text-4xl font-bold text-indigo-600">
-                S/ {payslip.net_pay?.toFixed(2)}
+                S/ {Number(payslip.net_pay || 0).toFixed(2)}
               </p>
             </div>
             <div className="text-right text-sm text-slate-600">
@@ -243,7 +243,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo }) {
                         {item.name}
                         {item.formula && <span className="text-slate-500 ml-1">({item.formula})</span>}
                       </span>
-                      <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                      <span className="font-semibold">S/ {Number(item.amount || 0).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -257,7 +257,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo }) {
                         {item.name}
                         {item.formula && <span className="text-slate-500 ml-1">({item.formula})</span>}
                       </span>
-                      <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                      <span className="font-semibold">S/ {Number(item.amount || 0).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>

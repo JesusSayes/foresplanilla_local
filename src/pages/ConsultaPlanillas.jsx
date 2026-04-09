@@ -47,6 +47,7 @@ const getGrupoStatus = (payslips) => {
 };
 
 export default function ConsultaPlanillas() {
+  const { user: currentUser } = useAuth();
   const [employee, setEmployee] = useState(null);
   const [companyInfo, setCompanyInfo] = useState(null);
   const [firmantes, setFirmantes] = useState(null);
@@ -245,9 +246,9 @@ export default function ConsultaPlanillas() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             {[
               { label: "Empleados incluidos", value: stats.empleados, icon: Users, color: "blue" },
-              { label: "Total Ingresos", value: `S/ ${stats.totalIncome.toFixed(2)}`, icon: DollarSign, color: "green" },
-              { label: "Total Descuentos", value: `S/ ${stats.totalDesc.toFixed(2)}`, icon: DollarSign, color: "red" },
-              { label: "Total Neto a Pagar", value: `S/ ${stats.totalNeto.toFixed(2)}`, icon: DollarSign, color: "indigo", big: true },
+              { label: "Total Ingresos", value: `S/ ${Number(stats.totalIncome || 0).toFixed(2)}`, icon: DollarSign, color: "green" },
+              { label: "Total Descuentos", value: `S/ ${Number(stats.totalDesc || 0).toFixed(2)}`, icon: DollarSign, color: "red" },
+              { label: "Total Neto a Pagar", value: `S/ ${Number(stats.totalNeto || 0).toFixed(2)}`, icon: DollarSign, color: "indigo", big: true },
             ].map(({ label, value, icon: Icon, color, big }) => (
               <Card key={label} className="border-0 shadow-lg">
                 <CardContent className="p-5">
@@ -295,9 +296,9 @@ export default function ConsultaPlanillas() {
                         <td className="px-4 py-3 text-slate-600 text-xs">{emp.position || "—"}</td>
                         <td className="px-4 py-3 text-slate-600 text-xs">{emp.department_name || "—"}</td>
                         <td className="px-4 py-3 text-center font-medium">{p.worked_days}</td>
-                        <td className="px-4 py-3 text-green-700 font-semibold">S/ {(p.total_income || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-red-600 font-semibold">S/ {(p.total_deductions || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 font-bold text-indigo-700 text-base">S/ {(p.net_pay || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-green-700 font-semibold">S/ {Number(p.total_income || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-red-600 font-semibold">S/ {Number(p.total_deductions || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 font-bold text-indigo-700 text-base">S/ {Number(p.net_pay || 0).toFixed(2)}</td>
                         <td className="px-4 py-3">
                           <Badge className={STATUS_COLORS[p.status] || "bg-slate-100"}>{p.status}</Badge>
                         </td>
@@ -328,9 +329,9 @@ export default function ConsultaPlanillas() {
                     <tr>
                       <td colSpan={5} className="px-4 py-3 font-bold text-slate-900 text-sm">TOTALES</td>
                       <td className="px-4 py-3 font-bold text-center">{payslipsConEmp.reduce((s, {p}) => s + (p.worked_days || 0), 0)}</td>
-                      <td className="px-4 py-3 font-bold text-green-700">S/ {stats.totalIncome.toFixed(2)}</td>
-                      <td className="px-4 py-3 font-bold text-red-600">S/ {stats.totalDesc.toFixed(2)}</td>
-                      <td className="px-4 py-3 font-bold text-indigo-700 text-base">S/ {stats.totalNeto.toFixed(2)}</td>
+                      <td className="px-4 py-3 font-bold text-green-700">S/ {Number(stats.totalIncome || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 font-bold text-red-600">S/ {Number(stats.totalDesc || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 font-bold text-indigo-700 text-base">S/ {Number(stats.totalNeto || 0).toFixed(2)}</td>
                       <td colSpan={2}></td>
                     </tr>
                   </tfoot>
@@ -371,7 +372,7 @@ export default function ConsultaPlanillas() {
           {[
             { label: `Planillas ${filterYear}`, value: gruposAnio.length, icon: FileText, color: "indigo" },
             { label: "Empleados únicos", value: totalEmps, icon: Users, color: "blue" },
-            { label: `Total neto ${filterYear}`, value: `S/ ${totalAnio.toFixed(2)}`, icon: DollarSign, color: "green" },
+            { label: `Total neto ${filterYear}`, value: `S/ ${Number(totalAnio || 0).toFixed(2)}`, icon: DollarSign, color: "green" },
             { label: "Tipos de planilla", value: [...new Set(gruposAnio.map(g => g.payroll_type))].length, icon: Calendar, color: "purple" },
           ].map(({ label, value, icon: Icon, color }) => (
             <Card key={label} className="border-0 shadow-lg">
@@ -486,15 +487,15 @@ export default function ConsultaPlanillas() {
                         </div>
                         <div>
                           <p className="text-xs text-slate-400 mb-0.5">Ingresos</p>
-                          <p className="font-semibold text-green-600 text-sm">S/ {stats.totalIncome.toFixed(2)}</p>
+                          <p className="font-semibold text-green-600 text-sm">S/ {Number(stats.totalIncome || 0).toFixed(2)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-slate-400 mb-0.5">Descuentos</p>
-                          <p className="font-semibold text-red-500 text-sm">S/ {stats.totalDesc.toFixed(2)}</p>
+                          <p className="font-semibold text-red-500 text-sm">S/ {Number(stats.totalDesc || 0).toFixed(2)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-slate-400 mb-0.5">Neto Total</p>
-                          <p className="font-bold text-indigo-700 text-base">S/ {stats.totalNeto.toFixed(2)}</p>
+                          <p className="font-bold text-indigo-700 text-base">S/ {Number(stats.totalNeto || 0).toFixed(2)}</p>
                         </div>
                       </div>
 

@@ -105,9 +105,9 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
           <div className="grid grid-cols-4 gap-3 mb-3">
             {[
               { label: "N° de Trabajadores", value: sorted.length, prefix: "" },
-              { label: "Total Ingresos",     value: totalIncome.toFixed(2), prefix: "S/" },
-              { label: "Total Descuentos",   value: totalDesc.toFixed(2),   prefix: "S/" },
-              { label: "TOTAL NETO A PAGAR", value: totalNeto.toFixed(2),   prefix: "S/", highlight: true },
+              { label: "Total Ingresos",     value: Number(totalIncome || 0).toFixed(2), prefix: "S/" },
+              { label: "Total Descuentos",   value: Number(totalDesc || 0).toFixed(2),   prefix: "S/" },
+              { label: "TOTAL NETO A PAGAR", value: Number(totalNeto || 0).toFixed(2),   prefix: "S/", highlight: true },
             ].map(({ label, value, prefix, highlight }) => (
               <div
                 key={label}
@@ -142,13 +142,13 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
                     <td className="px-1.5 py-1 text-slate-600 whitespace-nowrap">{emp.document_type} {emp.document_number}</td>
                     <td className="px-1.5 py-1 text-slate-600" style={{ maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.position || "—"}</td>
                     <td className="px-1.5 py-1 text-center">{p.worked_days}</td>
-                    <td className="px-1.5 py-1 text-right">{(p.base_salary || 0).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right">{((p.total_income || 0) - (p.base_salary || 0)).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right font-semibold" style={{ color: "#15803d" }}>{(p.total_income || 0).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right">{(p.pension_deduction || 0).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right">{((p.total_deductions || 0) - (p.pension_deduction || 0)).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right font-semibold" style={{ color: "#dc2626" }}>{(p.total_deductions || 0).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right font-bold" style={{ color: "#4338ca" }}>{(p.net_pay || 0).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right">{Number(p.base_salary || 0).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right">{Number((p.total_income || 0) - (p.base_salary || 0)).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right font-semibold" style={{ color: "#15803d" }}>{Number(p.total_income || 0).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right">{Number(p.pension_deduction || 0).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right">{Number((p.total_deductions || 0) - (p.pension_deduction || 0)).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right font-semibold" style={{ color: "#dc2626" }}>{Number(p.total_deductions || 0).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right font-bold" style={{ color: "#4338ca" }}>{Number(p.net_pay || 0).toFixed(2)}</td>
                     <td className="px-1.5 py-1">
                       <div style={{ height: "20px", border: "1px dashed #cbd5e1", borderRadius: "3px", minWidth: "50px" }} />
                     </td>
@@ -159,13 +159,13 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
                 <tr style={{ backgroundColor: "#eef2ff", borderTop: "2px solid #a5b4fc", fontWeight: "bold" }}>
                   <td colSpan={5} className="px-1.5 py-1.5 text-slate-800">TOTALES GENERALES</td>
                   <td className="px-1.5 py-1.5 text-center">{totalDias}</td>
-                  <td className="px-1.5 py-1.5 text-right">{sorted.reduce((s,{payslip:p}) => s+(p.base_salary||0),0).toFixed(2)}</td>
-                  <td className="px-1.5 py-1.5 text-right">{sorted.reduce((s,{payslip:p}) => s+((p.total_income||0)-(p.base_salary||0)),0).toFixed(2)}</td>
-                  <td className="px-1.5 py-1.5 text-right" style={{ color: "#15803d" }}>{totalIncome.toFixed(2)}</td>
-                  <td className="px-1.5 py-1.5 text-right">{sorted.reduce((s,{payslip:p}) => s+(p.pension_deduction||0),0).toFixed(2)}</td>
-                  <td className="px-1.5 py-1.5 text-right">{sorted.reduce((s,{payslip:p}) => s+((p.total_deductions||0)-(p.pension_deduction||0)),0).toFixed(2)}</td>
-                  <td className="px-1.5 py-1.5 text-right" style={{ color: "#dc2626" }}>{totalDesc.toFixed(2)}</td>
-                  <td className="px-1.5 py-1.5 text-right" style={{ color: "#4338ca", fontSize: "9pt" }}>{totalNeto.toFixed(2)}</td>
+                  <td className="px-1.5 py-1.5 text-right">{Number(sorted.reduce((s,{payslip:p}) => s+(p.base_salary||0),0) || 0).toFixed(2)}</td>
+                  <td className="px-1.5 py-1.5 text-right">{Number(sorted.reduce((s,{payslip:p}) => s+((p.total_income||0)-(p.base_salary||0)),0) || 0).toFixed(2)}</td>
+                  <td className="px-1.5 py-1.5 text-right" style={{ color: "#15803d" }}>{Number(totalIncome || 0).toFixed(2)}</td>
+                  <td className="px-1.5 py-1.5 text-right">{Number(sorted.reduce((s,{payslip:p}) => s+(p.pension_deduction||0),0) || 0).toFixed(2)}</td>
+                  <td className="px-1.5 py-1.5 text-right">{Number(sorted.reduce((s,{payslip:p}) => s+((p.total_deductions||0)-(p.pension_deduction||0)),0) || 0).toFixed(2)}</td>
+                  <td className="px-1.5 py-1.5 text-right" style={{ color: "#dc2626" }}>{Number(totalDesc || 0).toFixed(2)}</td>
+                  <td className="px-1.5 py-1.5 text-right" style={{ color: "#4338ca", fontSize: "9pt" }}>{Number(totalNeto || 0).toFixed(2)}</td>
                   <td />
                 </tr>
               </tfoot>
