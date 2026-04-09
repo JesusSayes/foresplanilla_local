@@ -913,7 +913,7 @@ export default function AttendanceManagement() {
                               <div className="w-24 shrink-0 text-center">
                                 <p className="text-xs text-slate-500 mb-0.5">Fecha</p>
                                 <p className="text-xs font-semibold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">
-                                  {format(new Date(rowDate + "T00:00:00"), "dd MMM yyyy", { locale: es })}
+                                  {(() => { try { const d = new Date(rowDate + "T00:00:00"); return isNaN(d?.getTime()) ? rowDate : format(d, "dd MMM yyyy", { locale: es }); } catch { return rowDate; } })()}
                                 </p>
                               </div>
                               <div className="grid grid-cols-6 gap-3 text-sm">
@@ -1182,7 +1182,15 @@ export default function AttendanceManagement() {
                                     <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm">
                                       <Badge className="bg-orange-100 text-orange-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es })}</span>
+                                      <span className="text-slate-600">📅 {incident.incident_date ? (() => {
+                                        try {
+                                          const dateStr = incident.incident_date.split('T')[0];
+                                          const d = new Date(dateStr + "T12:00:00-05:00");
+                                          return isNaN(d.getTime()) ? "Fecha inválida" : format(d, "dd MMM yyyy", { locale: es });
+                                        } catch {
+                                          return "Fecha inválida";
+                                        }
+                                      })() : "Sin fecha"}</span>
                                       </div>
                                       </div>
                                       </div>
@@ -1240,7 +1248,15 @@ export default function AttendanceManagement() {
                                     <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm flex-wrap">
                                       <Badge className="bg-green-100 text-green-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es })}</span>
+                                      <span className="text-slate-600">📅 {incident.incident_date ? (() => {
+                                        try {
+                                          const dateStr = incident.incident_date.split('T')[0];
+                                          const d = new Date(dateStr + "T12:00:00-05:00");
+                                          return isNaN(d.getTime()) ? "Fecha inválida" : format(d, "dd MMM yyyy", { locale: es });
+                                        } catch {
+                                          return "Fecha inválida";
+                                        }
+                                      })() : "Sin fecha"}</span>
                                       <Badge className="bg-green-600 text-white">Aprobada</Badge>
                                     </div>
                                   </div>
@@ -1257,7 +1273,7 @@ export default function AttendanceManagement() {
                                 )}
                                 <div className="flex items-center gap-4 text-xs text-slate-600">
                                   <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
-                                  <span>Fecha: {incident.review_date ? format(new Date(incident.review_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
+                                  <span>Fecha: {incident.review_date ? (() => { try { const dateStr = incident.review_date.split('T')[0]; const d = new Date(dateStr + "T12:00:00-05:00"); return isNaN(d?.getTime()) ? "N/A" : format(d, "dd MMM yyyy", { locale: es }); } catch { return "N/A"; } })() : "N/A"}</span>
                                   </div>
                                   </div>
                                   );
@@ -1292,7 +1308,15 @@ export default function AttendanceManagement() {
                                     <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm flex-wrap">
                                       <Badge className="bg-red-100 text-red-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es })}</span>
+                                      <span className="text-slate-600">📅 {incident.incident_date ? (() => {
+                                        try {
+                                          const dateStr = incident.incident_date.split('T')[0];
+                                          const d = new Date(dateStr + "T12:00:00-05:00");
+                                          return isNaN(d.getTime()) ? "Fecha inválida" : format(d, "dd MMM yyyy", { locale: es });
+                                        } catch {
+                                          return "Fecha inválida";
+                                        }
+                                      })() : "Sin fecha"}</span>
                                       <Badge className="bg-red-600 text-white">Rechazada</Badge>
                                     </div>
                                   </div>
@@ -1309,7 +1333,14 @@ export default function AttendanceManagement() {
                                 )}
                                 <div className="flex items-center gap-4 text-xs text-slate-600">
                                   <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
-                                  <span>Fecha: {incident.review_date ? format(new Date(incident.review_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
+                                  <span>Fecha: {incident.review_date ? (() => {
+                                    try {
+                                      const d = new Date(incident.review_date + "T12:00:00-05:00");
+                                      return isNaN(d.getTime()) ? "N/A" : format(d, "dd MMM yyyy", { locale: es });
+                                    } catch {
+                                      return "N/A";
+                                    }
+                                  })() : "N/A"}</span>
                                   </div>
                                   </div>
                                   );
@@ -1414,7 +1445,14 @@ export default function AttendanceManagement() {
                 <div className="space-y-6">
                   <div className="p-4 bg-slate-50 rounded-lg">
                     <p className="text-sm text-slate-600 mb-2"><strong>Tipo:</strong> {reviewingIncident.incident_type}</p>
-                    <p className="text-sm text-slate-600 mb-2"><strong>Fecha:</strong> {format(new Date(reviewingIncident.incident_date + "T12:00:00-05:00"), "dd 'de' MMMM, yyyy", { locale: es })}</p>
+                    <p className="text-sm text-slate-600 mb-2"><strong>Fecha:</strong> {reviewingIncident.incident_date ? (() => {
+                      try {
+                        const d = new Date(reviewingIncident.incident_date + "T12:00:00-05:00");
+                        return isNaN(d.getTime()) ? "Fecha inválida" : format(d, "dd 'de' MMMM, yyyy", { locale: es });
+                      } catch {
+                        return "Fecha inválida";
+                      }
+                    })() : "Sin fecha"}</p>
                     {reviewingIncident.full_day_justification ? (
                       <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> <Badge className="bg-blue-100 text-blue-700">Día completo (8 horas)</Badge></p>
                     ) : (

@@ -329,9 +329,15 @@ export default function HolidayManagement() {
   };
 
   const holidaysByMonth = holidays.reduce((acc, holiday) => {
-    const month = format(parseDateLima(holiday.date), "MMMM", { locale: es });
-    if (!acc[month]) acc[month] = [];
-    acc[month].push(holiday);
+    try {
+      const dateStr = holiday.date.split('T')[0];
+      const d = parseDateLima(dateStr);
+      const month = format(d, "MMMM", { locale: es });
+      if (!acc[month]) acc[month] = [];
+      acc[month].push(holiday);
+    } catch (error) {
+      console.warn("Error parsing holiday date:", holiday.date, error);
+    }
     return acc;
   }, {});
 
@@ -468,6 +474,8 @@ export default function HolidayManagement() {
                         {monthHolidays.map(holiday => {
                           const typeConfig = getTypeConfig(holiday.type);
                           const TypeIcon = typeConfig.icon;
+                          const dateStr = holiday.date.split('T')[0];
+                          const holidayDate = parseDateLima(dateStr);
 
                           return (
                             <div
@@ -478,10 +486,10 @@ export default function HolidayManagement() {
                                 <div className="flex items-start gap-4 flex-1">
                                   <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl text-white text-center min-w-16">
                                     <div className="text-2xl font-bold">
-                                      {format(parseDateLima(holiday.date), "dd")}
+                                      {format(holidayDate, "dd")}
                                     </div>
                                     <div className="text-xs uppercase">
-                                      {format(parseDateLima(holiday.date), "MMM", { locale: es })}
+                                      {format(holidayDate, "MMM", { locale: es })}
                                     </div>
                                   </div>
 
@@ -500,7 +508,7 @@ export default function HolidayManagement() {
                                         </Badge>
                                       )}
                                       <span className="text-sm text-slate-600">
-                                        {format(parseDateLima(holiday.date), "EEEE", { locale: es })}
+                                        {format(holidayDate, "EEEE", { locale: es })}
                                       </span>
                                     </div>
                                     {holiday.description && (

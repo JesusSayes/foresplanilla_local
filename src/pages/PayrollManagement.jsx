@@ -476,8 +476,14 @@ export default function PayrollManagement() {
     const grouped = {};
     allPayslips.forEach(p => {
       const key = `${p.year}-${p.month}-${p.payroll_type}`;
-      if (!grouped[key] || new Date(p.created_date) > new Date(grouped[key].created_date)) {
-        grouped[key] = p;
+      try {
+        const currentDate = p.created_date ? new Date(p.created_date) : new Date(0);
+        const groupedDate = grouped[key]?.created_date ? new Date(grouped[key].created_date) : new Date(0);
+        if (!grouped[key] || (isNaN(currentDate.getTime()) ? false : isNaN(groupedDate.getTime()) ? true : currentDate > groupedDate)) {
+          grouped[key] = p;
+        }
+      } catch {
+        if (!grouped[key]) grouped[key] = p;
       }
     });
     return Object.values(grouped);

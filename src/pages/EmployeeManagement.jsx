@@ -1134,7 +1134,14 @@ export default function EmployeeManagement() {
                   <div className="space-y-2 text-sm">
                     <p><strong>Código:</strong> {selectedEmployee.employee_code}</p>
                     <p><strong>Documento:</strong> {selectedEmployee.document_type} {selectedEmployee.document_number}</p>
-                    <p><strong>Fecha Nacimiento:</strong> {selectedEmployee.birth_date ? format(new Date(selectedEmployee.birth_date), "dd/MM/yyyy") : "N/A"}</p>
+                    <p><strong>Fecha Nacimiento:</strong> {selectedEmployee.birth_date ? (() => {
+                      try {
+                        const d = new Date(selectedEmployee.birth_date);
+                        return isNaN(d.getTime()) ? "N/A" : format(d, "dd/MM/yyyy");
+                      } catch {
+                        return "N/A";
+                      }
+                    })() : "N/A"}</p>
                     <p><strong>Género:</strong> {selectedEmployee.gender === "M" ? "Masculino" : "Femenino"}</p>
                   </div>
                 </div>
@@ -1154,7 +1161,14 @@ export default function EmployeeManagement() {
                   <div className="space-y-2 text-sm">
                     <p><strong>Departamento:</strong> {selectedEmployee.department_name}</p>
                     <p><strong>Sede:</strong> {selectedEmployee.site || "N/A"}</p>
-                    <p><strong>Fecha Ingreso:</strong> {selectedEmployee.hire_date ? format(new Date(selectedEmployee.hire_date), "dd/MM/yyyy") : "N/A"}</p>
+                    <p><strong>Fecha Ingreso:</strong> {selectedEmployee.hire_date ? (() => {
+                      try {
+                        const d = new Date(selectedEmployee.hire_date);
+                        return isNaN(d.getTime()) ? "N/A" : format(d, "dd/MM/yyyy");
+                      } catch {
+                        return "N/A";
+                      }
+                    })() : "N/A"}</p>
                     <p><strong>Contrato:</strong> {selectedEmployee.contract_type}</p>
                     <p><strong>Sistema Pensión:</strong> {selectedEmployee.pension_system || "N/A"}</p>
                     {selectedEmployee.cuspp && <p><strong>CUSPP:</strong> {selectedEmployee.cuspp}</p>}

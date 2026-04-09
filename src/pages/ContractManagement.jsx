@@ -541,11 +541,19 @@ export default function ContractManagement() {
                               <Badge className="bg-blue-100 text-blue-700 border-blue-200">
                                 <PenLine className="w-3 h-3 mr-1" />
                                 Firmado digitalmente
-                                {contract.digital_signature_date && (
-                                  <span className="ml-1 opacity-75">
-                                    · {format(new Date(contract.digital_signature_date), "dd/MM/yy HH:mm")}
-                                  </span>
-                                )}
+                                {contract.digital_signature_date && (() => {
+                                  try {
+                                    const d = new Date(contract.digital_signature_date);
+                                    if (isNaN(d.getTime())) return null;
+                                    return (
+                                      <span className="ml-1 opacity-75">
+                                        · {format(d, "dd/MM/yy HH:mm")}
+                                      </span>
+                                    );
+                                  } catch {
+                                    return null;
+                                  }
+                                })()}
                               </Badge>
                             ) : (
                               <Badge className="bg-amber-100 text-amber-700 border-amber-200">
@@ -557,8 +565,8 @@ export default function ContractManagement() {
                           {/* Info del contrato */}
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                             <div><p className="text-slate-500 text-xs">Cargo</p><p className="font-semibold text-slate-900 truncate">{contract.position}</p></div>
-                            <div><p className="text-slate-500 text-xs">Inicio</p><p className="font-semibold text-slate-900">{format(parseDateLima(contract.start_date), "dd/MM/yyyy")}</p></div>
-                            {contract.end_date && <div><p className="text-slate-500 text-xs">Fin</p><p className="font-semibold text-slate-900">{format(parseDateLima(contract.end_date), "dd/MM/yyyy")}</p></div>}
+                            <div><p className="text-slate-500 text-xs">Inicio</p><p className="font-semibold text-slate-900">{(() => { try { const dateStr = contract.start_date.split('T')[0]; const d = parseDateLima(dateStr); return isNaN(d?.getTime()) ? "Fecha inválida" : format(d, "dd/MM/yyyy"); } catch { return "Fecha inválida"; } })()}</p></div>
+                            {contract.end_date && <div><p className="text-slate-500 text-xs">Fin</p><p className="font-semibold text-slate-900">{(() => { try { const dateStr = contract.end_date.split('T')[0]; const d = parseDateLima(dateStr); return isNaN(d?.getTime()) ? "Fecha inválida" : format(d, "dd/MM/yyyy"); } catch { return "Fecha inválida"; } })()}</p></div>}
                             <div><p className="text-slate-500 text-xs">Remuneración</p><p className="font-semibold text-indigo-600">S/ {contract.salary?.toFixed(2)}</p></div>
                           </div>
 
@@ -855,7 +863,7 @@ export default function ContractManagement() {
               <div className="mb-6 p-4 bg-slate-50 rounded-lg">
                 <p className="text-sm text-slate-600 mb-2">Contrato actual:</p>
                 <p className="font-semibold">{conflictingContract.position} - {conflictingContract.contract_type}</p>
-                <p className="text-sm text-slate-600">Inicio: {format(parseDateLima(conflictingContract.start_date), "dd/MM/yyyy")}</p>
+                <p className="text-sm text-slate-600">Inicio: {(() => { try { const dateStr = conflictingContract.start_date.split('T')[0]; const d = parseDateLima(dateStr); return isNaN(d?.getTime()) ? "Fecha inválida" : format(d, "dd/MM/yyyy"); } catch { return "Fecha inválida"; } })()}</p>
                 <p className="text-sm text-slate-600">Remuneración: S/ {conflictingContract.salary?.toFixed(2)}</p>
               </div>
               <p className="text-sm text-slate-700 mb-4">Para registrar el nuevo contrato, primero cambia el estado del contrato actual:</p>
