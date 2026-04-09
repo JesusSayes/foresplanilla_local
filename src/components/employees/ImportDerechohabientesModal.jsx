@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -104,7 +105,7 @@ export default function ImportDerechohabientesModal({ employees, onClose, onSucc
     });
 
     // Cargar derechohabientes existentes para evitar duplicados
-    const existingDH = await base44.entities.Derechohabiente.list("-created_date", 2000);
+    const existingDH = await entitiesAPI.Derechohabiente.list("-created_date", 2000);
     const existingSet = new Set(existingDH.map(d => `${d.employee_id}|${d.document_number}`));
 
     const imported = [];
@@ -155,7 +156,7 @@ export default function ImportDerechohabientesModal({ employees, onClose, onSucc
         is_active:               true,
       };
 
-      await base44.entities.Derechohabiente.create(payload);
+      await entitiesAPI.Derechohabiente.create(payload);
       existingSet.add(key);
       imported.push(row);
     }

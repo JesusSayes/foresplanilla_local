@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PenTool, Upload, User, Loader2, Trash2, Settings } from "lucide-react";
 import { toast } from "sonner";
+import { uploadFile } from "@/services/uploadService";
 
 const EMPTY_FIRMANTE = { nombre: "", cargo: "", dni: "", firma_url: "" };
 
@@ -45,7 +47,7 @@ export default function ConfigFirmantesModal({ companyInfo, onClose, onSave }) {
   // Buscar empleados para autocompletar
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployeesConfig"],
-    queryFn: () => base44.entities.Employee.list("-created_date"),
+    queryFn: () => entitiesAPI.Employee.list("-created_date"),
   });
 
   const [empSearch1, setEmpSearch1] = useState("");
@@ -94,7 +96,8 @@ export default function ConfigFirmantesModal({ companyInfo, onClose, onSave }) {
       if (!file) return;
       setUploading(true);
       try {
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        // const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        uploadFile(file),
         setFn(prev => ({ ...prev, firma_url: file_url }));
         toast.success("Firma subida correctamente");
       } catch {
@@ -111,7 +114,7 @@ export default function ConfigFirmantesModal({ companyInfo, onClose, onSave }) {
     try {
       // Guardar en CompanyInfo como campos JSON
       if (companyInfo?.id) {
-        await base44.entities.CompanyInfo.update(companyInfo.id, {
+        await entitiesAPI.CompanyInfo.update(companyInfo.id, {
           firmante_gg: JSON.stringify(firmante1),
           firmante_delegado: JSON.stringify(firmante2),
         });
