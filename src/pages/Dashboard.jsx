@@ -210,7 +210,7 @@ export default function Dashboard() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1">
                     <span className="text-xl font-bold text-slate-900 truncate">
-                      S/ {latestPayslip?.net_pay?.toFixed(2) || "0.00"}
+                      S/ {Number(latestPayslip?.net_pay || 0).toFixed(2)}
                     </span>
                     <Badge className="bg-blue-100 text-blue-700 text-xs px-1 py-0 border-0 shrink-0">Último</Badge>
                   </div>
@@ -328,20 +328,20 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Total Ingresos</span>
                     <span className="font-semibold text-green-600">
-                      S/ {latestPayslip.total_income?.toFixed(2)}
+                      S/ {Number(latestPayslip.total_income || 0).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-600">Total Descuentos</span>
                     <span className="font-semibold text-red-600">
-                      S/ {latestPayslip.total_deductions?.toFixed(2)}
+                      S/ {Number(latestPayslip.total_deductions || 0).toFixed(2)}
                     </span>
                   </div>
                   <div className="pt-4 border-t">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-slate-900">Neto a Pagar</span>
                       <span className="text-2xl font-bold text-indigo-600">
-                        S/ {latestPayslip.net_pay?.toFixed(2)}
+                        S/ {Number(latestPayslip.net_pay || 0).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -398,7 +398,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-slate-600">Progreso</span>
                       <span className="text-sm font-semibold text-slate-900">
-                        {((vacationBalance.days_taken / vacationBalance.total_entitled_days) * 100).toFixed(0)}%
+                        {((Number(vacationBalance.days_taken) / Number(vacationBalance.total_entitled_days)) * 100).toFixed(0)}%
                       </span>
                     </div>
                     <div className="w-full bg-slate-200 rounded-full h-3">

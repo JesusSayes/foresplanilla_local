@@ -268,7 +268,9 @@ export default function VacationRequest() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-slate-600">Progreso de uso</span>
                       <span className="text-sm font-semibold text-slate-900">
-                        {((vacationBalance.days_taken / vacationBalance.total_entitled_days) * 100).toFixed(0)}%
+                        {Number(vacationBalance?.total_entitled_days || 0) > 0
+                          ? ((Number(vacationBalance.days_taken || 0) / Number(vacationBalance.total_entitled_days)) * 100).toFixed(0)
+                          : "0"}%
                       </span>
                     </div>
                     <div className="w-full bg-slate-200 rounded-full h-3">

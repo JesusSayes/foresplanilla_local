@@ -386,18 +386,18 @@ export default function PayrollManagement() {
       doc.text(`${payslip.employee_code} - ${payslip.employee_name}`, 14, yPos);
       doc.setFont(undefined, 'normal');
 
-      doc.text(`Salario Base: S/ ${payslip.base_salary.toFixed(2)}`, 14, yPos + 6);
-      doc.text(`Total Descuentos: S/ ${payslip.total_deductions.toFixed(2)}`, 100, yPos + 6);
-      doc.text(`Neto a Pagar: S/ ${payslip.net_pay.toFixed(2)}`, 14, yPos + 12);
+      doc.text(`Salario Base: S/ ${Number(payslip.base_salary || 0).toFixed(2)}`, 14, yPos + 6);
+      doc.text(`Total Descuentos: S/ ${Number(payslip.total_deductions || 0).toFixed(2)}`, 100, yPos + 6);
+      doc.text(`Neto a Pagar: S/ ${Number(payslip.net_pay || 0).toFixed(2)}`, 14, yPos + 12);
 
       doc.line(14, yPos + 16, pageWidth - 14, yPos + 16);
       yPos += 22;
     });
 
-    const totalNeto = previewData.reduce((sum, p) => sum + p.net_pay, 0);
+    const totalNeto = previewData.reduce((sum, p) => sum + Number(p.net_pay || 0), 0);
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
-    doc.text(`Total General: S/ ${totalNeto.toFixed(2)}`, 14, yPos + 5);
+    doc.text(`Total General: S/ ${Number(totalNeto).toFixed(2)}`, 14, yPos + 5);
 
     doc.save(`Planilla_${payrollType}_${selectedMonth}_${selectedYear}.pdf`);
     toast.success("PDF generado exitosamente");
@@ -469,7 +469,7 @@ export default function PayrollManagement() {
     mensual: existingPayslips.filter(p => p.payroll_type === "Mensual").length,
     adicional: existingPayslips.filter(p => p.payroll_type === "Adicional").length,
     snp: existingPayslips.filter(p => p.payroll_type === "SNP").length,
-    total: existingPayslips.reduce((sum, p) => sum + (p.net_pay || 0), 0),
+    total: Number(existingPayslips.reduce((sum, p) => sum + (Number(p.net_pay) || 0), 0)),
   };
 
   const getLatestPayslipsByMonth = () => {
@@ -532,11 +532,11 @@ export default function PayrollManagement() {
     doc.setFont(undefined, 'normal');
     yPos += 7;
     doc.text(`Salario Base:`, 14, yPos);
-    doc.text(`S/ ${payslip.base_salary.toFixed(2)}`, 160, yPos, { align: "right" });
+    doc.text(`S/ ${Number(payslip.base_salary || 0).toFixed(2)}`, 160, yPos, { align: "right" });
     yPos += 7;
     doc.text(`Total Ingresos:`, 14, yPos);
     doc.setFont(undefined, 'bold');
-    doc.text(`S/ ${payslip.total_income.toFixed(2)}`, 160, yPos, { align: "right" });
+    doc.text(`S/ ${Number(payslip.total_income || 0).toFixed(2)}`, 160, yPos, { align: "right" });
 
     // Deductions
     yPos += 15;
@@ -544,26 +544,26 @@ export default function PayrollManagement() {
     doc.text("DESCUENTOS", 14, yPos);
     doc.setFont(undefined, 'normal');
     yPos += 7;
-    if (payslip.pension_deduction > 0) {
+    if (Number(payslip.pension_deduction || 0) > 0) {
       doc.text(`Pensiones:`, 14, yPos);
-      doc.text(`S/ ${payslip.pension_deduction.toFixed(2)}`, 160, yPos, { align: "right" });
+      doc.text(`S/ ${Number(payslip.pension_deduction || 0).toFixed(2)}`, 160, yPos, { align: "right" });
       yPos += 7;
     }
-    if (payslip.income_tax > 0) {
+    if (Number(payslip.income_tax || 0) > 0) {
       doc.text(`Renta 5ta:`, 14, yPos);
-      doc.text(`S/ ${payslip.income_tax.toFixed(2)}`, 160, yPos, { align: "right" });
+      doc.text(`S/ ${Number(payslip.income_tax || 0).toFixed(2)}`, 160, yPos, { align: "right" });
       yPos += 7;
     }
     doc.text(`Total Descuentos:`, 14, yPos);
     doc.setFont(undefined, 'bold');
-    doc.text(`S/ ${payslip.total_deductions.toFixed(2)}`, 160, yPos, { align: "right" });
+    doc.text(`S/ ${Number(payslip.total_deductions || 0).toFixed(2)}`, 160, yPos, { align: "right" });
 
     // Net Pay
     yPos += 15;
     doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
     doc.text("NETO A PAGAR:", 14, yPos);
-    doc.text(`S/ ${payslip.net_pay.toFixed(2)}`, 160, yPos, { align: "right" });
+    doc.text(`S/ ${Number(payslip.net_pay || 0).toFixed(2)}`, 160, yPos, { align: "right" });
 
     doc.save(`Boleta_${employee.employee_code}_${payslip.period}.pdf`);
     toast.success("Boleta generada");
@@ -655,7 +655,7 @@ export default function PayrollManagement() {
           <div className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-lg border border-indigo-200 shadow-sm">
             <DollarSign className="w-5 h-5 text-indigo-600" />
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-slate-900">{canViewAmounts ? `S/ ${stats.total.toFixed(2)}` : '🔒'}</span>
+              <span className="text-xl font-bold text-slate-900">{canViewAmounts ? `S/ ${Number(stats.total || 0).toFixed(2)}` : '🔒'}</span>
               <span className="text-sm text-slate-600">Total Planillas</span>
             </div>
           </div>
@@ -884,25 +884,25 @@ export default function PayrollManagement() {
                               <div>
                                 <p className="text-slate-600">Salario Base</p>
                                 <p className="font-semibold text-slate-900">
-                                  S/ {payslip.base_salary.toFixed(2)}
+                                  S/ {Number(payslip.base_salary || 0).toFixed(2)}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-slate-600">Total Ingresos</p>
                                 <p className="font-semibold text-green-600">
-                                  S/ {payslip.total_income.toFixed(2)}
+                                  S/ {Number(payslip.total_income || 0).toFixed(2)}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-slate-600">Descuentos</p>
                                 <p className="font-semibold text-red-600">
-                                  -S/ {payslip.total_deductions.toFixed(2)}
+                                  -S/ {Number(payslip.total_deductions || 0).toFixed(2)}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-slate-600 font-bold">Neto a Pagar</p>
                                 <p className="font-bold text-indigo-600 text-lg">
-                                  S/ {payslip.net_pay.toFixed(2)}
+                                  S/ {Number(payslip.net_pay || 0).toFixed(2)}
                                 </p>
                               </div>
                             </div>
@@ -914,9 +914,9 @@ export default function PayrollManagement() {
                             </div>
                           )}
 
-                          {payslip.advance_deduction > 0 && (
+                          {Number(payslip.advance_deduction || 0) > 0 && (
                             <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
-                              Adelanto descontado: S/ {payslip.advance_deduction.toFixed(2)}
+                              Adelanto descontado: S/ {Number(payslip.advance_deduction || 0).toFixed(2)}
                             </div>
                           )}
 
@@ -950,7 +950,7 @@ export default function PayrollManagement() {
                                   {payslip.calculation_summary.breakdown.incomes.items.map((item, idx) => (
                                     <div key={idx} className="flex justify-between text-slate-700 ml-2">
                                       <span>{item.name} {item.formula && `(${item.formula})`}</span>
-                                      <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                                      <span className="font-semibold">S/ {Number(item.amount || 0).toFixed(2)}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -959,7 +959,7 @@ export default function PayrollManagement() {
                                   {payslip.calculation_summary.breakdown.deductions.items.map((item, idx) => (
                                     <div key={idx} className="flex justify-between text-slate-700 ml-2">
                                       <span>{item.name} {item.formula && `(${item.formula})`}</span>
-                                      <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                                      <span className="font-semibold">S/ {Number(item.amount || 0).toFixed(2)}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -969,7 +969,7 @@ export default function PayrollManagement() {
                                     {payslip.calculation_summary.breakdown.contributions.items.map((item, idx) => (
                                       <div key={idx} className="flex justify-between text-slate-700 ml-2">
                                         <span>{item.name} {item.formula && `(${item.formula})`}</span>
-                                        <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                                        <span className="font-semibold">S/ {Number(item.amount || 0).toFixed(2)}</span>
                                       </div>
                                     ))}
                                   </div>
@@ -987,7 +987,7 @@ export default function PayrollManagement() {
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-slate-900 text-lg">Total General:</span>
                         <span className="font-bold text-indigo-600 text-2xl">
-                          S/ {previewData.reduce((sum, p) => sum + p.net_pay, 0).toFixed(2)}
+                          S/ {previewData.reduce((sum, p) => sum + Number(p.net_pay || 0), 0).toFixed(2)}
                         </span>
                       </div>
                       <p className="text-sm text-slate-600 mt-1">
@@ -1054,9 +1054,9 @@ export default function PayrollManagement() {
                         {tipos.map(tipo => {
                           const planillasDelTipo = filteredPayslips.filter(p => p.payroll_type === tipo);
                           const statusGroup = planillasDelTipo[0]?.status || "Generada";
-                          const totalNeto = planillasDelTipo.reduce((s, p) => s + (p.net_pay || 0), 0);
-                          const totalIngresos = planillasDelTipo.reduce((s, p) => s + (p.total_income || 0), 0);
-                          const totalDesc = planillasDelTipo.reduce((s, p) => s + (p.total_deductions || 0), 0);
+                          const totalNeto = Number(planillasDelTipo.reduce((s, p) => s + (Number(p.net_pay) || 0), 0));
+                          const totalIngresos = Number(planillasDelTipo.reduce((s, p) => s + (Number(p.total_income) || 0), 0));
+                          const totalDesc = Number(planillasDelTipo.reduce((s, p) => s + (Number(p.total_deductions) || 0), 0));
                           const allPagada   = planillasDelTipo.every(p => p.status === "Pagada");
                           const allAprobada = !allPagada && planillasDelTipo.every(p => p.status === "Aprobada");
                           const puedeAprobar = !allPagada && !allAprobada;
@@ -1146,15 +1146,15 @@ export default function PayrollManagement() {
                                   <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-200">
                                     <div className="text-center">
                                       <p className="text-xs text-slate-500 mb-0.5">Total Ingresos</p>
-                                      <p className="font-bold text-green-700">S/ {totalIngresos.toFixed(2)}</p>
+                                      <p className="font-bold text-green-700">S/ {Number(totalIngresos || 0).toFixed(2)}</p>
                                     </div>
                                     <div className="text-center">
                                       <p className="text-xs text-slate-500 mb-0.5">Total Descuentos</p>
-                                      <p className="font-bold text-red-600">S/ {totalDesc.toFixed(2)}</p>
+                                      <p className="font-bold text-red-600">S/ {Number(totalDesc || 0).toFixed(2)}</p>
                                     </div>
                                     <div className="text-center">
                                       <p className="text-xs text-slate-500 mb-0.5">NETO TOTAL A PAGAR</p>
-                                      <p className="font-bold text-indigo-700 text-lg">S/ {totalNeto.toFixed(2)}</p>
+                                      <p className="font-bold text-indigo-700 text-lg">S/ {Number(totalNeto || 0).toFixed(2)}</p>
                                     </div>
                                   </div>
                                 )}
@@ -1187,15 +1187,15 @@ export default function PayrollManagement() {
                                             <>
                                               <div className="text-center hidden md:block">
                                                 <p className="text-xs text-slate-400">Ingresos</p>
-                                                <p className="font-medium text-green-700">S/ {(payslip.total_income || 0).toFixed(2)}</p>
+                                                <p className="font-medium text-green-700">S/ {Number(payslip.total_income || 0).toFixed(2)}</p>
                                               </div>
                                               <div className="text-center hidden md:block">
                                                 <p className="text-xs text-slate-400">Descuentos</p>
-                                                <p className="font-medium text-red-500">S/ {(payslip.total_deductions || 0).toFixed(2)}</p>
+                                                <p className="font-medium text-red-500">S/ {Number(payslip.total_deductions || 0).toFixed(2)}</p>
                                               </div>
                                               <div className="text-center">
                                                 <p className="text-xs text-slate-400">Neto</p>
-                                                <p className="font-bold text-indigo-700">S/ {(payslip.net_pay || 0).toFixed(2)}</p>
+                                                <p className="font-bold text-indigo-700">S/ {Number(payslip.net_pay || 0).toFixed(2)}</p>
                                               </div>
                                             </>
                                           )}
@@ -1356,7 +1356,7 @@ export default function PayrollManagement() {
                                       </h3>
                                       <p className="text-sm text-slate-600">
                                         {allGroupPayslips.length} empleado(s)
-                                        {canViewAmounts && ` • Total: S/ ${total.toFixed(2)}`}
+                                        {canViewAmounts && ` • Total: S/ ${Number(total || 0).toFixed(2)}`}
                                       </p>
                                     </div>
                                   </div>
@@ -1392,7 +1392,7 @@ export default function PayrollManagement() {
                                           const emp = allEmployees.find(e => e.id === p.employee_id);
                                           if (emp) {
                                             doc.text(`${emp.employee_code} - ${emp.first_name} ${emp.last_name}`, 14, y);
-                                            doc.text(`S/ ${p.net_pay.toFixed(2)}`, 160, y, { align: "right" });
+                                            doc.text(`S/ ${Number(p.net_pay || 0).toFixed(2)}`, 160, y, { align: "right" });
                                             y += 7;
                                           }
                                         });
@@ -1412,7 +1412,7 @@ export default function PayrollManagement() {
                                       <div key={p.id} className="flex items-center justify-between text-sm p-2 bg-slate-50 rounded">
                                         <span>{emp.employee_code} - {emp.first_name} {emp.last_name}</span>
                                         {canViewAmounts ? (
-                                          <span className="font-semibold">S/ {p.net_pay.toFixed(2)}</span>
+                                          <span className="font-semibold">S/ {Number(p.net_pay || 0).toFixed(2)}</span>
                                         ) : (
                                           <span className="text-slate-400">🔒</span>
                                         )}

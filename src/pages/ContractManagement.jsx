@@ -567,7 +567,7 @@ export default function ContractManagement() {
                             <div><p className="text-slate-500 text-xs">Cargo</p><p className="font-semibold text-slate-900 truncate">{contract.position}</p></div>
                             <div><p className="text-slate-500 text-xs">Inicio</p><p className="font-semibold text-slate-900">{(() => { try { const dateStr = contract.start_date.split('T')[0]; const d = parseDateLima(dateStr); return isNaN(d?.getTime()) ? "Fecha inválida" : format(d, "dd/MM/yyyy"); } catch { return "Fecha inválida"; } })()}</p></div>
                             {contract.end_date && <div><p className="text-slate-500 text-xs">Fin</p><p className="font-semibold text-slate-900">{(() => { try { const dateStr = contract.end_date.split('T')[0]; const d = parseDateLima(dateStr); return isNaN(d?.getTime()) ? "Fecha inválida" : format(d, "dd/MM/yyyy"); } catch { return "Fecha inválida"; } })()}</p></div>}
-                            <div><p className="text-slate-500 text-xs">Remuneración</p><p className="font-semibold text-indigo-600">S/ {contract.salary?.toFixed(2)}</p></div>
+                            <div><p className="text-slate-500 text-xs">Remuneración</p><p className="font-semibold text-indigo-600">S/ {Number(contract.salary || 0).toFixed(2)}</p></div>
                           </div>
 
                           {/* Firmante */}
@@ -864,7 +864,7 @@ export default function ContractManagement() {
                 <p className="text-sm text-slate-600 mb-2">Contrato actual:</p>
                 <p className="font-semibold">{conflictingContract.position} - {conflictingContract.contract_type}</p>
                 <p className="text-sm text-slate-600">Inicio: {(() => { try { const dateStr = conflictingContract.start_date.split('T')[0]; const d = parseDateLima(dateStr); return isNaN(d?.getTime()) ? "Fecha inválida" : format(d, "dd/MM/yyyy"); } catch { return "Fecha inválida"; } })()}</p>
-                <p className="text-sm text-slate-600">Remuneración: S/ {conflictingContract.salary?.toFixed(2)}</p>
+                <p className="text-sm text-slate-600">Remuneración: S/ {Number((conflictingContract.salary || 0)).toFixed(2)}</p>
               </div>
               <p className="text-sm text-slate-700 mb-4">Para registrar el nuevo contrato, primero cambia el estado del contrato actual:</p>
               <div className="space-y-3">

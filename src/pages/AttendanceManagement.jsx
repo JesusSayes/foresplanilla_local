@@ -578,11 +578,11 @@ export default function AttendanceManagement() {
           const [sh, sm] = ts.split(':').map(Number);
           const [eh, em] = te.split(':').map(Number);
           const hrs = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
-          tiempoPapeleta = `${hrs.toFixed(2)} h`;
+          tiempoPapeleta = `${Number(hrs).toFixed(2)} h`;
         } else if (incident.justified_time_start && incident.justified_time_end) {
           const [sh, sm] = incident.justified_time_start.split(':').map(Number);
           const [eh, em] = incident.justified_time_end.split(':').map(Number);
-          tiempoPapeleta = `${Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60).toFixed(2)} h`;
+          tiempoPapeleta = `${Number(Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60)).toFixed(2)} h`;
         }
       }
 
@@ -598,8 +598,8 @@ export default function AttendanceManagement() {
         'Salida': emp.record?.clock_out || '--:--',
         'Horas Trabajadas': Number(workedHours || 0).toFixed(2),
         'Tardanza (min)': emp.record?.late_minutes || 0,
-        'HE 25%': (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
-        'HE 35%': (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
+        'HE 25%': Number(emp.record?.overtime_hours_25 ?? 0).toFixed(2),
+        'HE 35%': Number(emp.record?.overtime_hours_35 ?? 0).toFixed(2),
         'Estado Asistencia': emp.record?.status || 'Sin marcar',
         'Tipo Incidente': incident ? incident.incident_type : '',
         'Estado Papeleta': incident ? incident.status : '',
@@ -1458,7 +1458,7 @@ export default function AttendanceManagement() {
                     ) : (
                       <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> {reviewingIncident.justified_time_start} - {reviewingIncident.justified_time_end}</p>
                     )}
-                    <p className="text-sm text-slate-600 mb-2"><strong>Ajuste:</strong> +{reviewingIncident.hours_to_adjust?.toFixed(2) || 0}h trabajadas{reviewingIncident.late_minutes_to_adjust > 0 && `, -${reviewingIncident.late_minutes_to_adjust} min tardanza`}</p>
+                    <p className="text-sm text-slate-600 mb-2"><strong>Ajuste:</strong> +{Number(reviewingIncident.hours_to_adjust || 0).toFixed(2)}h trabajadas{reviewingIncident.late_minutes_to_adjust > 0 && `, -${reviewingIncident.late_minutes_to_adjust} min tardanza`}</p>
                     <p className="text-sm text-slate-700"><strong>Jusificación:</strong><br />{reviewingIncident.justification}</p>
                   </div>
                   <div>
