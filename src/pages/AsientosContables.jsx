@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,8 +37,8 @@ const ORIGEN_COLORS = {
 
 export default function AsientosContables() {
   const queryClient = useQueryClient();
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -53,31 +54,32 @@ export default function AsientosContables() {
   const [migratingIds, setMigratingIds] = useState(new Set());
 
   useEffect(() => {
-    base44.auth.me().then(user => {
-      setCurrentUser(user);
-      base44.entities.Employee.filter({ work_email: user.email }).then(emps => {
-        if (emps?.length > 0) setEmployee(emps[0]);
+    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+      updateEmployeeStatuses().then(result => {
+        if (result.success && result.updatedCount > 0) {
+          console.log(`${result.updatedCount} empleado(s) actualizado(s) a estado Cesado automáticamente`);
+        }
       });
-    });
-  }, []);
+    }
+  }, [currentUser]);
 
   const { data: asientos = [], isLoading } = useQuery({
     queryKey: ["asientosContables"],
-    queryFn: () => base44.entities.AsientoContable.list("-fecha_registro", 1000),
+    queryFn: () => entitiesAPI.AsientoContable.list("-fecha_registro", 1000),
   });
 
   const { data: employees = [] } = useQuery({
     queryKey: ["allEmployees"],
-    queryFn: () => base44.entities.Employee.list("-created_date"),
+    queryFn: () => entitiesAPI.Employee.list("-created_date"),
   });
 
   const { data: cuentas = [] } = useQuery({
     queryKey: ["accountingAccounts"],
-    queryFn: () => base44.entities.AccountingAccount.list("cuenta"),
+    queryFn: () => entitiesAPI.AccountingAccount.list("cuenta"),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.AsientoContable.update(id, data),
+    mutationFn: ({ id, data }) => entitiesAPI.AsientoContable.update(id, data),
     onSuccess: () => queryClient.invalidateQueries(["asientosContables"]),
   });
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,33 +66,36 @@ export default function ConsultaPlanillas() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    base44.auth.me().then(user => {
-      base44.entities.Employee.filter({ work_email: user.email }).then(emps => {
+    if (currentUser?.email) {
+      entitiesAPI.Employee.filter({ work_email: currentUser.email }).then(emps => {
         if (emps?.length > 0) setEmployee(emps[0]);
       });
-    });
-    base44.entities.CompanyInfo.filter({ is_active: true }).then(res => {
-      if (res?.length > 0) {
-        const ci = res[0];
-        setCompanyInfo(ci);
-        // Cargar firmantes guardados en CompanyInfo
-        try {
-          const gg = ci.firmante_gg ? JSON.parse(ci.firmante_gg) : null;
-          const del = ci.firmante_delegado ? JSON.parse(ci.firmante_delegado) : null;
-          if (gg || del) setFirmantes({ firmante_gg: gg, firmante_delegado: del });
-        } catch (e) { /* noop */ }
-      }
-    });
-  }, []);
+
+      entitiesAPI.CompanyInfo.filter({ is_active: true }).then(res => {
+        if (res?.length > 0) {
+          const ci = res[0];
+          setCompanyInfo(ci);
+          try {
+            const gg = ci.firmante_gg ? JSON.parse(ci.firmante_gg) : null;
+            const del = ci.firmante_delegado ? JSON.parse(ci.firmante_delegado) : null;
+
+            if (gg || del) { setFirmantes({ firmante_gg: gg, firmante_delegado: del }); }
+          } catch (e) {
+            console.log("Error parseando firmantes");
+          }
+        }
+      });
+    }
+  }, [currentUser]);
 
   const { data: allPayslips = [], isLoading } = useQuery({
     queryKey: ["allPayslipsConsulta"],
-    queryFn: () => base44.entities.Payslip.list("-created_date", 5000),
+    queryFn: () => entitiesAPI.Payslip.list("-created_date", 5000),
   });
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployeesConsulta"],
-    queryFn: () => base44.entities.Employee.list("-created_date"),
+    queryFn: () => entitiesAPI.Employee.list("-created_date"),
   });
 
   // Agrupar boletas en cabeceras de planilla
@@ -534,7 +538,7 @@ export default function ConsultaPlanillas() {
             toast.success("Firmantes configurados correctamente");
             // Persistir en CompanyInfo para que se recarguen automáticamente
             if (companyInfo?.id) {
-              await base44.entities.CompanyInfo.update(companyInfo.id, {
+              await entitiesAPI.CompanyInfo.update(companyInfo.id, {
                 firmante_gg: JSON.stringify(data.firmante_gg || {}),
                 firmante_delegado: JSON.stringify(data.firmante_delegado || {}),
               });

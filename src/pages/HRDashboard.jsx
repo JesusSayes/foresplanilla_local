@@ -69,7 +69,6 @@ export default function HRDashboard() {
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      // return await base44.entities.Employee.list("-created_date");
       return await entitiesAPI.Employee.list("-created_date");
     },
   });
@@ -77,7 +76,6 @@ export default function HRDashboard() {
   const { data: attendanceRecords = [] } = useQuery({
     queryKey: ["allAttendanceRecords"],
     queryFn: async () => {
-      // return await base44.entities.AttendanceRecord.list("-date", 1000);
       return await entitiesAPI.AttendanceRecord.list("-date", 1000);
     },
   });
@@ -85,7 +83,6 @@ export default function HRDashboard() {
   const { data: pendingIncidents = [] } = useQuery({
     queryKey: ["pendingIncidents"],
     queryFn: async () => {
-      // return await base44.entities.AttendanceIncident.filter(
       return await entitiesAPI.AttendanceIncident.filter(
         { status: "Pendiente" },
         "-created_date"
@@ -96,7 +93,6 @@ export default function HRDashboard() {
   const { data: vacationRequests = [] } = useQuery({
     queryKey: ["allVacationRequests"],
     queryFn: async () => {
-      // return await base44.entities.VacationRequest.list("-created_date", 200);
       return await entitiesAPI.VacationRequest.list("-created_date", 200);
     },
   });
@@ -104,7 +100,6 @@ export default function HRDashboard() {
   const { data: payslips = [] } = useQuery({
     queryKey: ["allPayslips"],
     queryFn: async () => {
-      // return await base44.entities.Payslip.list("-created_date", 500);
       return await entitiesAPI.Payslip.list("-created_date", 500);
     },
   });
@@ -112,7 +107,6 @@ export default function HRDashboard() {
   const { data: contracts = [] } = useQuery({
     queryKey: ["allContracts"],
     queryFn: async () => {
-      // return await base44.entities.Contract.list("-created_date");
       return await entitiesAPI.Contract.list("-created_date");
     },
   });

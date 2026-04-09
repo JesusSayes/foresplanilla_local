@@ -188,9 +188,9 @@ export default function PayrollManagement() {
   const approveFullPayrollMutation = useMutation({
     mutationFn: async ({ year, month, payrollType }) => {
       // Re-fetch para asegurar datos frescos
-      const fresh = await base44.entities.Payslip.filter({ month, year, payroll_type: payrollType });
+      const fresh = await entitiesAPI.Payslip.filter({ month, year, payroll_type: payrollType });
       const toApprove = fresh.filter(p => p.status !== "Aprobada" && p.status !== "Pagada");
-      await Promise.all(toApprove.map(p => base44.entities.Payslip.update(p.id, { status: "Aprobada" })));
+      await Promise.all(toApprove.map(p => entitiesAPI.Payslip.update(p.id, { status: "Aprobada" })));
       return toApprove.length;
     },
     onSuccess: (count) => {
@@ -204,9 +204,9 @@ export default function PayrollManagement() {
   // Aprobar y marcar como pagada planilla completa
   const payFullPayrollMutation = useMutation({
     mutationFn: async ({ year, month, payrollType }) => {
-      const fresh = await base44.entities.Payslip.filter({ month, year, payroll_type: payrollType });
+      const fresh = await entitiesAPI.Payslip.filter({ month, year, payroll_type: payrollType });
       const toPay = fresh.filter(p => p.status === "Aprobada");
-      await Promise.all(toPay.map(p => base44.entities.Payslip.update(p.id, { status: "Pagada" })));
+      await Promise.all(toPay.map(p => entitiesAPI.Payslip.update(p.id, { status: "Pagada" })));
       return toPay.length;
     },
     onSuccess: (count) => {
@@ -220,7 +220,7 @@ export default function PayrollManagement() {
   // Eliminar un trabajador individual de una planilla ya generada
   const removeOnePayslipMutation = useMutation({
     mutationFn: async (payslipId) => {
-      await base44.entities.Payslip.delete(payslipId);
+      await entitiesAPI.Payslip.delete(payslipId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["payslips"]);

@@ -22,7 +22,7 @@ export default function BackfillAsistencia() {
       const all = [];
       let skip = 0;
       while (true) {
-        const raw = await base44.entities.Employee.filter({}, "-created_date", PAGE, skip);
+        const raw = await entitiesAPI.Employee.filter({}, "-created_date", PAGE, skip);
         const items = Array.isArray(raw) ? raw : [];
         all.push(...items);
         if (items.length < PAGE) break;

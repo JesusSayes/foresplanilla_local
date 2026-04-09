@@ -482,7 +482,7 @@ export default function DataExport() {
         const entityName = selectedList[i];
         setProgress({ current: i + 1, total: selectedList.length, entity: entityName });
         try {
-          const data = await base44.entities[entityName].list();
+          const data = await entitiesAPI[entityName].list();
           sqlScript += `-- ====================================\n-- Table: ${entityName}\n-- ====================================\n\n`;
           if (data.length > 0) {
             sqlScript += buildCreateTableFromRecord(entityName, data[0]);
