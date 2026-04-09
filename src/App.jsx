@@ -45,6 +45,7 @@ import DataExport from "./pages/DataExport";
 import SystemRoleInitializer from "./pages/SystemRoleInitializer";
 import LoanManagement from "./pages/LoanManagement";
 import ConsultaPlanillas from "./pages/ConsultaPlanillas";
+import AsientosContables from "./pages/AsientosContables";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -274,6 +275,11 @@ const AuthenticatedApp = () => {
       <Route path="/ConsultaPlanillas" element={
         <ProtectedRoute>
           <Layout currentPageName="ConsultaPlanillas"><ConsultaPlanillas /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/AsientosContables" element={
+        <ProtectedRoute>
+          <Layout currentPageName="AsientosContables"><AsientosContables /></Layout>
         </ProtectedRoute>
       } />
     </Routes>

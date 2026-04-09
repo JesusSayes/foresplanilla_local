@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 const ESTADO_CONFIG = {
   Pendiente: { color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: Clock },
