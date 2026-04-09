@@ -81,7 +81,7 @@ export default function PayrollManagement() {
   const { data: allPayslips = [] } = useQuery({
     queryKey: ["allPayslips"],
     queryFn: async () => {
-      return await entitiesAPI.Payslip.list("-created_date", 500);
+      return await entitiesAPI.Payslip.list("-created_date");
     },
   });
 
@@ -156,8 +156,8 @@ export default function PayrollManagement() {
       return createdPayslips;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["payrollConcepts"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["payrollConcepts"] });
       toast.success("Planilla generada exitosamente");
       setShowPreview(false);
       setPreviewData([]);
@@ -174,8 +174,8 @@ export default function PayrollManagement() {
       return await entitiesAPI.Payslip.update(id, { status });
     },
     onSuccess: (_, { status }) => {
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["allPayslips"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
       toast.success(`Planilla ${status === "Aprobada" ? "aprobada" : "marcada como pagada"}`);
       setSelectedPayslipForClose(null);
     },
@@ -194,8 +194,8 @@ export default function PayrollManagement() {
       return toApprove.length;
     },
     onSuccess: (count) => {
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["allPayslips"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
       toast.success(`✓ Planilla aprobada — ${count} boleta(s) actualizadas`);
     },
     onError: () => toast.error("Error al aprobar la planilla"),
@@ -210,8 +210,8 @@ export default function PayrollManagement() {
       return toPay.length;
     },
     onSuccess: (count) => {
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["allPayslips"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
       toast.success(`✓ Planilla marcada como pagada — ${count} boleta(s)`);
     },
     onError: () => toast.error("Error al marcar como pagada"),
@@ -223,8 +223,8 @@ export default function PayrollManagement() {
       await entitiesAPI.Payslip.delete(payslipId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["allPayslips"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
       toast.success("Trabajador eliminado de la planilla");
     },
     onError: () => toast.error("Error al eliminar el trabajador"),
@@ -235,8 +235,8 @@ export default function PayrollManagement() {
       return await entitiesAPI.Payslip.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["allPayslips"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
       toast.success("Planilla eliminada exitosamente");
     },
     onError: () => {
@@ -500,8 +500,8 @@ export default function PayrollManagement() {
 
     try {
       await Promise.all(toDelete.map(p => entitiesAPI.Payslip.delete(p.id)));
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["allPayslips"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
       toast.success(`${toDelete.length} planilla(s) eliminada(s)`);
       setSelectedPayrollToDelete(null);
     } catch (error) {
@@ -987,7 +987,9 @@ export default function PayrollManagement() {
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-slate-900 text-lg">Total General:</span>
                         <span className="font-bold text-indigo-600 text-2xl">
-                          S/ {previewData.reduce((sum, p) => sum + Number(p.net_pay || 0), 0).toFixed(2)}
+                          S/ {Number(
+                                previewData.reduce((sum, p) => sum + Number(p.net_pay || 0), 0)
+                              ).toFixed(2)}
                         </span>
                       </div>
                       <p className="text-sm text-slate-600 mt-1">
