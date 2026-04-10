@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Users, Plus, Edit, Eye, UserX, UserCheck, Search,
-  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History, Loader2, Trash2
+  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History, Loader2, Trash2, Upload
 } from "lucide-react";
 import { createPageUrl } from "../utils";
 import { format } from "date-fns";
@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import EmployeeHistory from "../components/employees/EmployeeHistory";
 import EmployeeForm from "../components/employees/EmployeeForm";
+import ImportDerechohabientesModal from "../components/employees/ImportDerechohabientesModal";
 
 export default function EmployeeManagement() {
   const { user, isLoadingAuth } = useAuth();
@@ -43,6 +44,7 @@ export default function EmployeeManagement() {
   const [editingDerechohabiente, setEditingDerechohabiente] = useState(null);
   const [derechohabienteFormData, setDerechohabienteFormData] = useState({});
   const [formErrors, setFormErrors] = useState([]);
+  const [showImportDH, setShowImportDH] = useState(false);
 
   const { hasPermission, getAccessibleSites, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -815,6 +817,14 @@ export default function EmployeeManagement() {
                 Importar Empleados
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={() => setShowImportDH(true)}
+              className="border-teal-300 text-teal-700 hover:bg-teal-50"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Importar Derechohabientes
+            </Button>
           </div>
         </div>
 
@@ -1049,6 +1059,17 @@ export default function EmployeeManagement() {
         />
       )}
 
+      {/* Import Derechohabientes Modal */}
+      {showImportDH && (
+        <ImportDerechohabientesModal
+          employees={allEmployees}
+          onClose={() => setShowImportDH(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries(["derechohabientes"]);
+          }}
+        />
+      )}
+
       {/* History Modal */}
       {showHistory && (
         <div
@@ -1112,7 +1133,14 @@ export default function EmployeeManagement() {
                   <div className="space-y-2 text-sm">
                     <p><strong>Código:</strong> {selectedEmployee.employee_code}</p>
                     <p><strong>Documento:</strong> {selectedEmployee.document_type} {selectedEmployee.document_number}</p>
-                    <p><strong>Fecha Nacimiento:</strong> {selectedEmployee.birth_date ? format(new Date(selectedEmployee.birth_date), "dd/MM/yyyy") : "N/A"}</p>
+                    <p><strong>Fecha Nacimiento:</strong> {selectedEmployee.birth_date ? (() => {
+                      try {
+                        const d = new Date(selectedEmployee.birth_date);
+                        return isNaN(d.getTime()) ? "N/A" : format(d, "dd/MM/yyyy");
+                      } catch {
+                        return "N/A";
+                      }
+                    })() : "N/A"}</p>
                     <p><strong>Género:</strong> {selectedEmployee.gender === "M" ? "Masculino" : "Femenino"}</p>
                   </div>
                 </div>
@@ -1132,7 +1160,14 @@ export default function EmployeeManagement() {
                   <div className="space-y-2 text-sm">
                     <p><strong>Departamento:</strong> {selectedEmployee.department_name}</p>
                     <p><strong>Sede:</strong> {selectedEmployee.site || "N/A"}</p>
-                    <p><strong>Fecha Ingreso:</strong> {selectedEmployee.hire_date ? format(new Date(selectedEmployee.hire_date), "dd/MM/yyyy") : "N/A"}</p>
+                    <p><strong>Fecha Ingreso:</strong> {selectedEmployee.hire_date ? (() => {
+                      try {
+                        const d = new Date(selectedEmployee.hire_date);
+                        return isNaN(d.getTime()) ? "N/A" : format(d, "dd/MM/yyyy");
+                      } catch {
+                        return "N/A";
+                      }
+                    })() : "N/A"}</p>
                     <p><strong>Contrato:</strong> {selectedEmployee.contract_type}</p>
                     <p><strong>Sistema Pensión:</strong> {selectedEmployee.pension_system || "N/A"}</p>
                     {selectedEmployee.cuspp && <p><strong>CUSPP:</strong> {selectedEmployee.cuspp}</p>}

@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FileText, AlertCircle, CalendarIcon, Plus, X } from "lucide-react";
-import { format, eachDayOfInterval, parseISO } from "date-fns";
+import { format, eachDayOfInterval } from "date-fns";
 import { es } from "date-fns/locale";
+import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { uploadFile } from "@/services/uploadService";
 
@@ -159,7 +160,7 @@ export default function JustifyModal({
           late_minutes_to_adjust: lateMinutesToAdjust,
           status: "Aprobada",
           reviewed_by: `${employee.first_name} ${employee.last_name}`,
-          review_date: format(new Date(), "yyyy-MM-dd"),
+          review_date: todayLima(),
           review_comments: "Aprobada automáticamente al crear la justificación",
         };
 
@@ -383,7 +384,7 @@ export default function JustifyModal({
                     <div className="flex flex-wrap gap-1">
                       {targetDates.map(d => (
                         <span key={d} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-800 text-xs rounded-full">
-                          {format(parseISO(d), "dd MMM", { locale: es })}
+                          {format(parseDateLima(d), "dd MMM", { locale: es })}
                         </span>
                       ))}
                     </div>

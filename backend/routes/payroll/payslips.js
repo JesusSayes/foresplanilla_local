@@ -12,5 +12,6 @@ router.put('/:id', controller.update);
 router.delete('/:id', controller.delete);
 
 router.post('/filter', controller.filter);
+router.post('/bulk', controller.bulkCreate);
 
 export default router

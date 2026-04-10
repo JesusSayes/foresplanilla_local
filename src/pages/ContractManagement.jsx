@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { generateContractPDF } from "../components/contracts/ContractTemplate";
 import { usePermissions } from "../components/hooks/usePermissions";
@@ -107,17 +108,10 @@ export default function ContractManagement() {
   const createContractMutation = useMutation({
     mutationFn: async (data) => {
       if (!data.contract_number) {
-        const year = new Date().getFullYear();
-        const existingContracts = await entitiesAPI.Contract.list("-created_date");
-        const contractsThisYear = existingContracts.filter(c =>
-          c.contract_number?.startsWith(`CTR-${year}`)
-        );
-        const nextNumber = contractsThisYear.length + 1;
-        data.contract_number = `CTR-${year}-${String(nextNumber).padStart(3, '0')}`;
-
-        // const existing = await base44.entities.Contract.list("-created_date");
-        // const thisYear = existing.filter(c => c.contract_number?.startsWith(`CTR-${year}`));
-        // data.contract_number = `CTR-${year}-${String(thisYear.length + 1).padStart(3, '0')}`;
+        const year = parseInt(todayLima().substring(0, 4));
+        const existing = await entitiesAPI.Contract.list("-created_date");
+        const thisYear = existing.filter(c => c.contract_number?.startsWith(`CTR-${year}`));
+        data.contract_number = `CTR-${year}-${String(thisYear.length + 1).padStart(3, '0')}`;
       }
 
       return await entitiesAPI.Contract.create(data);
@@ -153,13 +147,12 @@ export default function ContractManagement() {
   });
 
   const signContractMutation = useMutation({
-    mutationFn: async ({ id }) =>
-      await entitiesAPI.Contract.update(id, {
-        is_digitally_signed: true,
-        digital_signature_date: new Date().toISOString(),
-        digital_signature_by: currentUser?.email || "",
-        digital_signature_name: companyInfo?.legal_representative || (employee ? `${employee.first_name} ${employee.last_name}` : ""),
-        digital_signature_image_url: companyInfo?.legal_representative_signature_url || signatureImageUrl || "",
+    mutationFn: ({ id }) => entitiesAPI.Contract.update(id, {
+      is_digitally_signed: true,
+      digital_signature_date: new Date(new Date().toLocaleString("en-US", { timeZone: "America/Lima" })).toISOString(),
+      digital_signature_by: currentUser?.email || "",
+      digital_signature_name: companyInfo?.legal_representative || (employee ? `${employee.first_name} ${employee.last_name}` : ""),
+      digital_signature_image_url: companyInfo?.legal_representative_signature_url || signatureImageUrl || "",
     }),
     onSuccess: () => queryClient.invalidateQueries(["contracts"]),
   });
@@ -167,9 +160,11 @@ export default function ContractManagement() {
   const initializeForm = (contract = null, emp = null) => {
     const normalizeDate = (d) => {
       if (!d) return "";
-      const dt = new Date(d);
-      if (isNaN(dt.getTime())) return "";
-      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+      // Si ya es string "yyyy-MM-dd", devolver tal cual (se guardó en Lima)
+      if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+      // Si es Date object o ISO string, convertir a Lima
+      const dt = parseDateLima(typeof d === "string" ? d.substring(0, 10) : new Date(d).toLocaleDateString("en-CA", { timeZone: "America/Lima" }));
+      return dt ? dt.toLocaleDateString("en-CA", { timeZone: "America/Lima" }) : "";
     };
     const contractType = contract?.contract_type || "Indeterminado";
     let selectedTemplateId = contract?.template_id || "";
@@ -204,7 +199,7 @@ export default function ContractManagement() {
       trial_period_days: contract?.trial_period_days || 90,
       renewable: contract?.renewable || false,
       status: contract?.status || "Vigente",
-      signed_date: normalizeDate(contract?.signed_date) || new Date().toISOString().split('T')[0],
+      signed_date: normalizeDate(contract?.signed_date) || todayLima(),
       notes: contract?.notes || "",
     });
   };
@@ -546,11 +541,19 @@ export default function ContractManagement() {
                               <Badge className="bg-blue-100 text-blue-700 border-blue-200">
                                 <PenLine className="w-3 h-3 mr-1" />
                                 Firmado digitalmente
-                                {contract.digital_signature_date && (
-                                  <span className="ml-1 opacity-75">
-                                    · {format(new Date(contract.digital_signature_date), "dd/MM/yy HH:mm")}
-                                  </span>
-                                )}
+                                {contract.digital_signature_date && (() => {
+                                  try {
+                                    const d = new Date(contract.digital_signature_date);
+                                    if (isNaN(d.getTime())) return null;
+                                    return (
+                                      <span className="ml-1 opacity-75">
+                                        · {format(d, "dd/MM/yy HH:mm")}
+                                      </span>
+                                    );
+                                  } catch {
+                                    return null;
+                                  }
+                                })()}
                               </Badge>
                             ) : (
                               <Badge className="bg-amber-100 text-amber-700 border-amber-200">
@@ -562,9 +565,9 @@ export default function ContractManagement() {
                           {/* Info del contrato */}
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                             <div><p className="text-slate-500 text-xs">Cargo</p><p className="font-semibold text-slate-900 truncate">{contract.position}</p></div>
-                            <div><p className="text-slate-500 text-xs">Inicio</p><p className="font-semibold text-slate-900">{format(new Date(contract.start_date), "dd/MM/yyyy")}</p></div>
-                            {contract.end_date && <div><p className="text-slate-500 text-xs">Fin</p><p className="font-semibold text-slate-900">{format(new Date(contract.end_date), "dd/MM/yyyy")}</p></div>}
-                            <div><p className="text-slate-500 text-xs">Remuneración</p><p className="font-semibold text-indigo-600">S/ {contract.salary?.toFixed(2)}</p></div>
+                            <div><p className="text-slate-500 text-xs">Inicio</p><p className="font-semibold text-slate-900">{(() => { try { const dateStr = contract.start_date.split('T')[0]; const d = parseDateLima(dateStr); return isNaN(d?.getTime()) ? "Fecha inválida" : format(d, "dd/MM/yyyy"); } catch { return "Fecha inválida"; } })()}</p></div>
+                            {contract.end_date && <div><p className="text-slate-500 text-xs">Fin</p><p className="font-semibold text-slate-900">{(() => { try { const dateStr = contract.end_date.split('T')[0]; const d = parseDateLima(dateStr); return isNaN(d?.getTime()) ? "Fecha inválida" : format(d, "dd/MM/yyyy"); } catch { return "Fecha inválida"; } })()}</p></div>}
+                            <div><p className="text-slate-500 text-xs">Remuneración</p><p className="font-semibold text-indigo-600">S/ {Number(contract.salary || 0).toFixed(2)}</p></div>
                           </div>
 
                           {/* Firmante */}
@@ -860,8 +863,8 @@ export default function ContractManagement() {
               <div className="mb-6 p-4 bg-slate-50 rounded-lg">
                 <p className="text-sm text-slate-600 mb-2">Contrato actual:</p>
                 <p className="font-semibold">{conflictingContract.position} - {conflictingContract.contract_type}</p>
-                <p className="text-sm text-slate-600">Inicio: {format(new Date(conflictingContract.start_date), "dd/MM/yyyy")}</p>
-                <p className="text-sm text-slate-600">Remuneración: S/ {conflictingContract.salary?.toFixed(2)}</p>
+                <p className="text-sm text-slate-600">Inicio: {(() => { try { const dateStr = conflictingContract.start_date.split('T')[0]; const d = parseDateLima(dateStr); return isNaN(d?.getTime()) ? "Fecha inválida" : format(d, "dd/MM/yyyy"); } catch { return "Fecha inválida"; } })()}</p>
+                <p className="text-sm text-slate-600">Remuneración: S/ {Number((conflictingContract.salary || 0)).toFixed(2)}</p>
               </div>
               <p className="text-sm text-slate-700 mb-4">Para registrar el nuevo contrato, primero cambia el estado del contrato actual:</p>
               <div className="space-y-3">
@@ -899,7 +902,7 @@ export default function ContractManagement() {
                 <p className="text-sm text-blue-900 font-medium mb-1">Representante Legal (Firmante):</p>
                 <p className="text-sm text-blue-800">{companyInfo?.legal_representative || "No configurado"}</p>
                 <p className="text-xs text-blue-700">DNI: {companyInfo?.legal_representative_dni || "-"} · {companyInfo?.legal_representative_position || ""}</p>
-                <p className="text-xs text-blue-600 mt-1">Fecha y hora: {format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
+                <p className="text-xs text-blue-600 mt-1">Fecha y hora: {new Date().toLocaleString("es-PE", { timeZone: "America/Lima" })}</p>
               </div>
 
               {/* Firma del Representante Legal */}

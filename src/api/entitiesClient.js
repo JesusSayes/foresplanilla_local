@@ -57,7 +57,15 @@ export const entitiesAPI = {
   WorkSchedule: createEntityAPI('/api/attendance/schedules'),
   VacationRequest: createEntityAPI('/api/vacations/requests'),
   VacationBalance: createEntityAPI('/api/vacations/balances'),
-  Payslip: createEntityAPI('/api/payroll/payslips'),
+  // Payslip: createEntityAPI('/api/payroll/payslips'),
+  Payslip: {
+    ...createEntityAPI('/api/payroll/payslips'),
+
+    bulkCreate: async (data) => {
+      const response = await localClient.post('/api/payroll/payslips/bulk', data);
+      return response.data;
+    }
+  },
   PayslipTemplate: createEntityAPI('/api/payroll/templates'),
   PayrollConcept: createEntityAPI('/api/payroll/concepts'),
   Certificate: createEntityAPI('/api/certificates'),

@@ -1,0 +1,67 @@
+{
+  "name": "CompanyInfo",
+  "type": "object",
+  "properties": {
+    "company_name": {
+      "type": "string",
+      "description": "Nombre de la empresa"
+    },
+    "ruc": {
+      "type": "string",
+      "description": "RUC de la empresa"
+    },
+    "address": {
+      "type": "string",
+      "description": "Direcci\u00f3n de la empresa"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono de la empresa"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email corporativo"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "URL del logo de la empresa"
+    },
+    "legal_representative": {
+      "type": "string",
+      "description": "Nombre del representante legal"
+    },
+    "legal_representative_dni": {
+      "type": "string",
+      "description": "DNI del representante legal"
+    },
+    "legal_representative_position": {
+      "type": "string",
+      "description": "Cargo del representante legal"
+    },
+    "legal_representative_signature_url": {
+      "type": "string",
+      "description": "URL de la imagen de firma del representante legal"
+    },
+    "website": {
+      "type": "string",
+      "description": "Sitio web de la empresa"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Registro activo"
+    },
+    "firmante_gg": {
+      "type": "string",
+      "description": "JSON con datos del firmante principal (Gerente General): nombre, cargo, dni, firma_url"
+    },
+    "firmante_delegado": {
+      "type": "string",
+      "description": "JSON con datos del firmante delegado (Gerente Central o Jefe RRHH): nombre, cargo, dni, firma_url"
+    }
+  },
+  "required": [
+    "company_name",
+    "ruc"
+  ]
+}

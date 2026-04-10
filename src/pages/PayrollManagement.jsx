@@ -16,6 +16,7 @@ import {
 import { usePermissions } from "../components/hooks/usePermissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import ConceptsManager from "../components/payroll/ConceptsManager";
@@ -80,7 +81,7 @@ export default function PayrollManagement() {
   const { data: allPayslips = [] } = useQuery({
     queryKey: ["allPayslips"],
     queryFn: async () => {
-      return await entitiesAPI.Payslip.list("-created_date", 500);
+      return await entitiesAPI.Payslip.list("-created_date");
     },
   });
 
@@ -155,8 +156,8 @@ export default function PayrollManagement() {
       return createdPayslips;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["payrollConcepts"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["payrollConcepts"] });
       toast.success("Planilla generada exitosamente");
       setShowPreview(false);
       setPreviewData([]);
@@ -173,8 +174,8 @@ export default function PayrollManagement() {
       return await entitiesAPI.Payslip.update(id, { status });
     },
     onSuccess: (_, { status }) => {
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["allPayslips"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
       toast.success(`Planilla ${status === "Aprobada" ? "aprobada" : "marcada como pagada"}`);
       setSelectedPayslipForClose(null);
     },
@@ -183,13 +184,59 @@ export default function PayrollManagement() {
     },
   });
 
+  // Aprobar planilla completa (todas las boletas de un tipo/periodo)
+  const approveFullPayrollMutation = useMutation({
+    mutationFn: async ({ year, month, payrollType }) => {
+      // Re-fetch para asegurar datos frescos
+      const fresh = await entitiesAPI.Payslip.filter({ month, year, payroll_type: payrollType });
+      const toApprove = fresh.filter(p => p.status !== "Aprobada" && p.status !== "Pagada");
+      await Promise.all(toApprove.map(p => entitiesAPI.Payslip.update(p.id, { status: "Aprobada" })));
+      return toApprove.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
+      toast.success(`✓ Planilla aprobada — ${count} boleta(s) actualizadas`);
+    },
+    onError: () => toast.error("Error al aprobar la planilla"),
+  });
+
+  // Aprobar y marcar como pagada planilla completa
+  const payFullPayrollMutation = useMutation({
+    mutationFn: async ({ year, month, payrollType }) => {
+      const fresh = await entitiesAPI.Payslip.filter({ month, year, payroll_type: payrollType });
+      const toPay = fresh.filter(p => p.status === "Aprobada");
+      await Promise.all(toPay.map(p => entitiesAPI.Payslip.update(p.id, { status: "Pagada" })));
+      return toPay.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
+      toast.success(`✓ Planilla marcada como pagada — ${count} boleta(s)`);
+    },
+    onError: () => toast.error("Error al marcar como pagada"),
+  });
+
+  // Eliminar un trabajador individual de una planilla ya generada
+  const removeOnePayslipMutation = useMutation({
+    mutationFn: async (payslipId) => {
+      await entitiesAPI.Payslip.delete(payslipId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
+      toast.success("Trabajador eliminado de la planilla");
+    },
+    onError: () => toast.error("Error al eliminar el trabajador"),
+  });
+
   const deletePayslipMutation = useMutation({
     mutationFn: async (id) => {
       return await entitiesAPI.Payslip.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["allPayslips"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
       toast.success("Planilla eliminada exitosamente");
     },
     onError: () => {
@@ -303,8 +350,8 @@ export default function PayrollManagement() {
         other_deductions: result.totals.totalDeductions,
         total_deductions: adjustedDeductions,
         net_pay: adjustedNetPay,
-        payment_date: format(new Date(selectedYear, selectedMonth - 1, payrollType === "Quincenal" ? 15 : 30), "yyyy-MM-dd"),
-        status: "Calculada",
+        payment_date: `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-${payrollType === "Quincenal" ? "15" : "30"}`,
+        status: "Generada",
         calculation_summary: result.summary,
         calculation_log: result.calculationLog,
         has_errors: result.errors.length > 0,
@@ -339,18 +386,18 @@ export default function PayrollManagement() {
       doc.text(`${payslip.employee_code} - ${payslip.employee_name}`, 14, yPos);
       doc.setFont(undefined, 'normal');
 
-      doc.text(`Salario Base: S/ ${payslip.base_salary.toFixed(2)}`, 14, yPos + 6);
-      doc.text(`Total Descuentos: S/ ${payslip.total_deductions.toFixed(2)}`, 100, yPos + 6);
-      doc.text(`Neto a Pagar: S/ ${payslip.net_pay.toFixed(2)}`, 14, yPos + 12);
+      doc.text(`Salario Base: S/ ${Number(payslip.base_salary || 0).toFixed(2)}`, 14, yPos + 6);
+      doc.text(`Total Descuentos: S/ ${Number(payslip.total_deductions || 0).toFixed(2)}`, 100, yPos + 6);
+      doc.text(`Neto a Pagar: S/ ${Number(payslip.net_pay || 0).toFixed(2)}`, 14, yPos + 12);
 
       doc.line(14, yPos + 16, pageWidth - 14, yPos + 16);
       yPos += 22;
     });
 
-    const totalNeto = previewData.reduce((sum, p) => sum + p.net_pay, 0);
+    const totalNeto = previewData.reduce((sum, p) => sum + Number(p.net_pay || 0), 0);
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
-    doc.text(`Total General: S/ ${totalNeto.toFixed(2)}`, 14, yPos + 5);
+    doc.text(`Total General: S/ ${Number(totalNeto).toFixed(2)}`, 14, yPos + 5);
 
     doc.save(`Planilla_${payrollType}_${selectedMonth}_${selectedYear}.pdf`);
     toast.success("PDF generado exitosamente");
@@ -422,15 +469,21 @@ export default function PayrollManagement() {
     mensual: existingPayslips.filter(p => p.payroll_type === "Mensual").length,
     adicional: existingPayslips.filter(p => p.payroll_type === "Adicional").length,
     snp: existingPayslips.filter(p => p.payroll_type === "SNP").length,
-    total: existingPayslips.reduce((sum, p) => sum + (p.net_pay || 0), 0),
+    total: Number(existingPayslips.reduce((sum, p) => sum + (Number(p.net_pay) || 0), 0)),
   };
 
   const getLatestPayslipsByMonth = () => {
     const grouped = {};
     allPayslips.forEach(p => {
       const key = `${p.year}-${p.month}-${p.payroll_type}`;
-      if (!grouped[key] || new Date(p.created_date) > new Date(grouped[key].created_date)) {
-        grouped[key] = p;
+      try {
+        const currentDate = p.created_date ? new Date(p.created_date) : new Date(0);
+        const groupedDate = grouped[key]?.created_date ? new Date(grouped[key].created_date) : new Date(0);
+        if (!grouped[key] || (isNaN(currentDate.getTime()) ? false : isNaN(groupedDate.getTime()) ? true : currentDate > groupedDate)) {
+          grouped[key] = p;
+        }
+      } catch {
+        if (!grouped[key]) grouped[key] = p;
       }
     });
     return Object.values(grouped);
@@ -447,8 +500,8 @@ export default function PayrollManagement() {
 
     try {
       await Promise.all(toDelete.map(p => entitiesAPI.Payslip.delete(p.id)));
-      queryClient.invalidateQueries(["payslips"]);
-      queryClient.invalidateQueries(["allPayslips"]);
+      queryClient.invalidateQueries({ queryKey: ["payslips"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
       toast.success(`${toDelete.length} planilla(s) eliminada(s)`);
       setSelectedPayrollToDelete(null);
     } catch (error) {
@@ -479,11 +532,11 @@ export default function PayrollManagement() {
     doc.setFont(undefined, 'normal');
     yPos += 7;
     doc.text(`Salario Base:`, 14, yPos);
-    doc.text(`S/ ${payslip.base_salary.toFixed(2)}`, 160, yPos, { align: "right" });
+    doc.text(`S/ ${Number(payslip.base_salary || 0).toFixed(2)}`, 160, yPos, { align: "right" });
     yPos += 7;
     doc.text(`Total Ingresos:`, 14, yPos);
     doc.setFont(undefined, 'bold');
-    doc.text(`S/ ${payslip.total_income.toFixed(2)}`, 160, yPos, { align: "right" });
+    doc.text(`S/ ${Number(payslip.total_income || 0).toFixed(2)}`, 160, yPos, { align: "right" });
 
     // Deductions
     yPos += 15;
@@ -491,26 +544,26 @@ export default function PayrollManagement() {
     doc.text("DESCUENTOS", 14, yPos);
     doc.setFont(undefined, 'normal');
     yPos += 7;
-    if (payslip.pension_deduction > 0) {
+    if (Number(payslip.pension_deduction || 0) > 0) {
       doc.text(`Pensiones:`, 14, yPos);
-      doc.text(`S/ ${payslip.pension_deduction.toFixed(2)}`, 160, yPos, { align: "right" });
+      doc.text(`S/ ${Number(payslip.pension_deduction || 0).toFixed(2)}`, 160, yPos, { align: "right" });
       yPos += 7;
     }
-    if (payslip.income_tax > 0) {
+    if (Number(payslip.income_tax || 0) > 0) {
       doc.text(`Renta 5ta:`, 14, yPos);
-      doc.text(`S/ ${payslip.income_tax.toFixed(2)}`, 160, yPos, { align: "right" });
+      doc.text(`S/ ${Number(payslip.income_tax || 0).toFixed(2)}`, 160, yPos, { align: "right" });
       yPos += 7;
     }
     doc.text(`Total Descuentos:`, 14, yPos);
     doc.setFont(undefined, 'bold');
-    doc.text(`S/ ${payslip.total_deductions.toFixed(2)}`, 160, yPos, { align: "right" });
+    doc.text(`S/ ${Number(payslip.total_deductions || 0).toFixed(2)}`, 160, yPos, { align: "right" });
 
     // Net Pay
     yPos += 15;
     doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
     doc.text("NETO A PAGAR:", 14, yPos);
-    doc.text(`S/ ${payslip.net_pay.toFixed(2)}`, 160, yPos, { align: "right" });
+    doc.text(`S/ ${Number(payslip.net_pay || 0).toFixed(2)}`, 160, yPos, { align: "right" });
 
     doc.save(`Boleta_${employee.employee_code}_${payslip.period}.pdf`);
     toast.success("Boleta generada");
@@ -602,7 +655,7 @@ export default function PayrollManagement() {
           <div className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-lg border border-indigo-200 shadow-sm">
             <DollarSign className="w-5 h-5 text-indigo-600" />
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-slate-900">{canViewAmounts ? `S/ ${stats.total.toFixed(2)}` : '🔒'}</span>
+              <span className="text-xl font-bold text-slate-900">{canViewAmounts ? `S/ ${Number(stats.total || 0).toFixed(2)}` : '🔒'}</span>
               <span className="text-sm text-slate-600">Total Planillas</span>
             </div>
           </div>
@@ -831,25 +884,25 @@ export default function PayrollManagement() {
                               <div>
                                 <p className="text-slate-600">Salario Base</p>
                                 <p className="font-semibold text-slate-900">
-                                  S/ {payslip.base_salary.toFixed(2)}
+                                  S/ {Number(payslip.base_salary || 0).toFixed(2)}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-slate-600">Total Ingresos</p>
                                 <p className="font-semibold text-green-600">
-                                  S/ {payslip.total_income.toFixed(2)}
+                                  S/ {Number(payslip.total_income || 0).toFixed(2)}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-slate-600">Descuentos</p>
                                 <p className="font-semibold text-red-600">
-                                  -S/ {payslip.total_deductions.toFixed(2)}
+                                  -S/ {Number(payslip.total_deductions || 0).toFixed(2)}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-slate-600 font-bold">Neto a Pagar</p>
                                 <p className="font-bold text-indigo-600 text-lg">
-                                  S/ {payslip.net_pay.toFixed(2)}
+                                  S/ {Number(payslip.net_pay || 0).toFixed(2)}
                                 </p>
                               </div>
                             </div>
@@ -861,9 +914,9 @@ export default function PayrollManagement() {
                             </div>
                           )}
 
-                          {payslip.advance_deduction > 0 && (
+                          {Number(payslip.advance_deduction || 0) > 0 && (
                             <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
-                              Adelanto descontado: S/ {payslip.advance_deduction.toFixed(2)}
+                              Adelanto descontado: S/ {Number(payslip.advance_deduction || 0).toFixed(2)}
                             </div>
                           )}
 
@@ -897,7 +950,7 @@ export default function PayrollManagement() {
                                   {payslip.calculation_summary.breakdown.incomes.items.map((item, idx) => (
                                     <div key={idx} className="flex justify-between text-slate-700 ml-2">
                                       <span>{item.name} {item.formula && `(${item.formula})`}</span>
-                                      <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                                      <span className="font-semibold">S/ {Number(item.amount || 0).toFixed(2)}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -906,7 +959,7 @@ export default function PayrollManagement() {
                                   {payslip.calculation_summary.breakdown.deductions.items.map((item, idx) => (
                                     <div key={idx} className="flex justify-between text-slate-700 ml-2">
                                       <span>{item.name} {item.formula && `(${item.formula})`}</span>
-                                      <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                                      <span className="font-semibold">S/ {Number(item.amount || 0).toFixed(2)}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -916,7 +969,7 @@ export default function PayrollManagement() {
                                     {payslip.calculation_summary.breakdown.contributions.items.map((item, idx) => (
                                       <div key={idx} className="flex justify-between text-slate-700 ml-2">
                                         <span>{item.name} {item.formula && `(${item.formula})`}</span>
-                                        <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                                        <span className="font-semibold">S/ {Number(item.amount || 0).toFixed(2)}</span>
                                       </div>
                                     ))}
                                   </div>
@@ -934,7 +987,9 @@ export default function PayrollManagement() {
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-slate-900 text-lg">Total General:</span>
                         <span className="font-bold text-indigo-600 text-2xl">
-                          S/ {previewData.reduce((sum, p) => sum + p.net_pay, 0).toFixed(2)}
+                          S/ {Number(
+                                previewData.reduce((sum, p) => sum + Number(p.net_pay || 0), 0)
+                              ).toFixed(2)}
                         </span>
                       </div>
                       <p className="text-sm text-slate-600 mt-1">
@@ -985,125 +1040,194 @@ export default function PayrollManagement() {
                 </TabsList>
 
                 <TabsContent value="current">
-                  <Card className="border-0 shadow-lg">
-                    <CardHeader className="border-b">
-                      <CardTitle className="text-xl font-bold">
-                        Planillas del Periodo
-                      </CardTitle>
-                      <p className="text-sm text-slate-600 mt-1">
-                        {format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}
-                      </p>
-                    </CardHeader>
-                    <CardContent className="p-6">
                   {filteredPayslips.length === 0 ? (
-                    <div className="text-center py-12">
-                      <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                      <p className="text-slate-600">No hay planillas generadas para este periodo</p>
-                    </div>
-                  ) : (
-                    <Tabs defaultValue="all" className="space-y-4">
-                      <TabsList>
-                        <TabsTrigger value="all">Todas</TabsTrigger>
-                        <TabsTrigger value="Quincenal">Quincenales</TabsTrigger>
-                        <TabsTrigger value="Mensual">Mensuales</TabsTrigger>
-                        <TabsTrigger value="Adicional">Adicionales</TabsTrigger>
-                        <TabsTrigger value="SNP">SNP</TabsTrigger>
-                      </TabsList>
+                    <Card className="border-0 shadow-lg">
+                      <CardContent className="py-16 text-center">
+                        <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                        <p className="text-slate-600">No hay planillas generadas para este periodo</p>
+                        <p className="text-sm text-slate-400 mt-1">{format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}</p>
+                      </CardContent>
+                    </Card>
+                  ) : (() => {
+                    // Agrupar por tipo de planilla
+                    const tipos = [...new Set(filteredPayslips.map(p => p.payroll_type))];
+                    return (
+                      <div className="space-y-6">
+                        {tipos.map(tipo => {
+                          const planillasDelTipo = filteredPayslips.filter(p => p.payroll_type === tipo);
+                          const statusGroup = planillasDelTipo[0]?.status || "Generada";
+                          const totalNeto = Number(planillasDelTipo.reduce((s, p) => s + (Number(p.net_pay) || 0), 0));
+                          const totalIngresos = Number(planillasDelTipo.reduce((s, p) => s + (Number(p.total_income) || 0), 0));
+                          const totalDesc = Number(planillasDelTipo.reduce((s, p) => s + (Number(p.total_deductions) || 0), 0));
+                          const allPagada   = planillasDelTipo.every(p => p.status === "Pagada");
+                          const allAprobada = !allPagada && planillasDelTipo.every(p => p.status === "Aprobada");
+                          const puedeAprobar = !allPagada && !allAprobada;
+                          const hayMixto = !allPagada && !allAprobada && planillasDelTipo.some(p => p.status === "Aprobada");
 
-                      {["all", "Quincenal", "Mensual", "Adicional", "SNP"].map(type => (
-                        <TabsContent key={type} value={type}>
-                          <div className="space-y-3">
-                            {filteredPayslips
-                              .filter(p => type === "all" || p.payroll_type === type)
-                              .map(payslip => {
-                                const emp = allEmployees.find(e => e.id === payslip.employee_id);
-                                if (!emp) return null;
+                          const statusBadgeColor =
+                            allPagada   ? "bg-green-100 text-green-700 border-green-200" :
+                            allAprobada ? "bg-blue-100 text-blue-700 border-blue-200" :
+                            "bg-yellow-100 text-yellow-700 border-yellow-200";
+                          const statusLabel =
+                            allPagada ? "✓ Pagada" : allAprobada ? "✓ Aprobada" : "Generada";
 
-                                return (
-                                  <div key={payslip.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
-                                    <div className="flex items-start justify-between">
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-2">
-                                          <h4 className="font-bold text-slate-900">
-                                            {emp.employee_code} - {emp.first_name} {emp.last_name}
-                                          </h4>
-                                          <Badge className={
-                                           payslip.payroll_type === "Quincenal" ? "bg-blue-100 text-blue-700" :
-                                           payslip.payroll_type === "Mensual" ? "bg-green-100 text-green-700" :
-                                           payslip.payroll_type === "SNP" ? "bg-orange-100 text-orange-700" :
-                                           "bg-purple-100 text-purple-700"
-                                          }>
-                                            {payslip.payroll_type}
-                                          </Badge>
-                                          <Badge className={
-                                            payslip.status === "Calculada" ? "bg-yellow-100 text-yellow-700" :
-                                            payslip.status === "Aprobada" ? "bg-blue-100 text-blue-700" :
-                                            "bg-green-100 text-green-700"
-                                          }>
-                                            {payslip.status}
-                                          </Badge>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-4 text-sm">
-                                         {canViewAmounts ? (
-                                           <div>
-                                             <p className="text-slate-600">Neto a Pagar</p>
-                                             <p className="font-bold text-indigo-600">
-                                               S/ {payslip.net_pay.toFixed(2)}
-                                             </p>
-                                           </div>
-                                         ) : (
-                                           <div>
-                                             <p className="text-slate-600">Neto a Pagar</p>
-                                             <p className="font-bold text-slate-400">🔒</p>
-                                           </div>
-                                         )}
-                                         <div>
-                                           <p className="text-slate-600">Días Trabajados</p>
-                                           <p className="font-semibold text-slate-900">{payslip.worked_days}</p>
-                                         </div>
-                                         <div>
-                                           <p className="text-slate-600">Fecha de Pago</p>
-                                           <p className="font-semibold text-slate-900">
-                                             {format(new Date(payslip.payment_date), 'dd/MM/yyyy')}
-                                           </p>
-                                         </div>
-                                        </div>
-                                        </div>
-                                        {payslip.status === "Calculada" && (
-                                        <div className="mt-3 flex gap-2">
-                                         <Button
-                                           size="sm"
-                                           onClick={() => updatePayslipStatusMutation.mutate({ id: payslip.id, status: "Aprobada" })}
-                                           className="flex-1 bg-blue-600 hover:bg-blue-700"
-                                         >
-                                           <CheckCircle className="w-3 h-3 mr-1" />
-                                           Aprobar
-                                         </Button>
-                                        </div>
-                                        )}
-                                        {payslip.status === "Aprobada" && (
-                                        <div className="mt-3 flex gap-2">
-                                         <Button
-                                           size="sm"
-                                           onClick={() => updatePayslipStatusMutation.mutate({ id: payslip.id, status: "Pagada" })}
-                                           className="flex-1 bg-green-600 hover:bg-green-700"
-                                         >
-                                           <Lock className="w-3 h-3 mr-1" />
-                                           Marcar como Pagada
-                                         </Button>
-                                        </div>
-                                        )}
-                                        </div>
+                          return (
+                            <Card key={tipo} className={`border-2 shadow-lg ${allAprobada ? "border-blue-300" : allPagada ? "border-green-300" : "border-transparent"}`}>
+                              {/* Cabecera de la planilla */}
+                              <CardHeader className={`border-b pb-4 ${allAprobada ? "bg-blue-50" : allPagada ? "bg-green-50" : "bg-slate-50/60"}`}>
+                                <div className="flex items-start justify-between gap-4">
+                                  <div>
+                                    <div className="flex items-center gap-3 mb-1">
+                                      <CardTitle className="text-xl font-bold">
+                                        Planilla {tipo}
+                                      </CardTitle>
+                                      <Badge className={
+                                        tipo === "Quincenal" ? "bg-blue-100 text-blue-700" :
+                                        tipo === "Mensual"   ? "bg-green-100 text-green-700" :
+                                        tipo === "SNP"       ? "bg-orange-100 text-orange-700" :
+                                        "bg-purple-100 text-purple-700"
+                                      }>{tipo}</Badge>
+                                      <Badge className={statusBadgeColor}>{statusLabel}</Badge>
+                                    </div>
+                                    <p className="text-sm text-slate-500 capitalize">
+                                      {format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })} • {planillasDelTipo.length} trabajador(es)
+                                    </p>
                                   </div>
-                                );
-                              })}
-                          </div>
-                        </TabsContent>
-                      ))}
-                    </Tabs>
-                  )}
-                </CardContent>
-              </Card>
+                                  {/* Acciones a nivel de planilla completa */}
+                                  <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                                    {puedeAprobar && (
+                                      <Button
+                                        size="sm"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow"
+                                        onClick={() => approveFullPayrollMutation.mutate({ year: selectedYear, month: selectedMonth, payrollType: tipo })}
+                                        disabled={approveFullPayrollMutation.isPending}
+                                      >
+                                        <CheckCircle className="w-4 h-4 mr-2" />
+                                        {approveFullPayrollMutation.isPending ? "Aprobando..." : "✓ Aprobar Planilla Completa"}
+                                      </Button>
+                                    )}
+                                    {allAprobada && (
+                                      <Button
+                                        size="sm"
+                                        className="bg-green-600 hover:bg-green-700 text-white font-semibold shadow"
+                                        onClick={() => payFullPayrollMutation.mutate({ year: selectedYear, month: selectedMonth, payrollType: tipo })}
+                                        disabled={payFullPayrollMutation.isPending}
+                                      >
+                                        <Lock className="w-4 h-4 mr-2" />
+                                        {payFullPayrollMutation.isPending ? "Procesando..." : "Marcar como Pagada"}
+                                      </Button>
+                                    )}
+                                    {allPagada && (
+                                      <Badge className="bg-green-100 text-green-700 border border-green-300 px-3 py-1.5 text-sm">
+                                        ✓ Planilla Pagada
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                {/* Banner de estado aprobada/pagada */}
+                                {allAprobada && (
+                                  <div className="mt-4 flex items-center gap-3 p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                                    <CheckCircle className="w-5 h-5 text-blue-600 shrink-0" />
+                                    <div>
+                                      <p className="font-bold text-blue-800 text-sm">Planilla Aprobada</p>
+                                      <p className="text-xs text-blue-600">Esta planilla ha sido aprobada y está lista para pago.</p>
+                                    </div>
+                                  </div>
+                                )}
+                                {allPagada && (
+                                  <div className="mt-4 flex items-center gap-3 p-3 bg-green-100 border border-green-300 rounded-lg">
+                                    <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+                                    <div>
+                                      <p className="font-bold text-green-800 text-sm">Planilla Pagada</p>
+                                      <p className="text-xs text-green-600">El pago de esta planilla ha sido procesado.</p>
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Totales cabecera */}
+                                {canViewAmounts && (
+                                  <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-200">
+                                    <div className="text-center">
+                                      <p className="text-xs text-slate-500 mb-0.5">Total Ingresos</p>
+                                      <p className="font-bold text-green-700">S/ {Number(totalIngresos || 0).toFixed(2)}</p>
+                                    </div>
+                                    <div className="text-center">
+                                      <p className="text-xs text-slate-500 mb-0.5">Total Descuentos</p>
+                                      <p className="font-bold text-red-600">S/ {Number(totalDesc || 0).toFixed(2)}</p>
+                                    </div>
+                                    <div className="text-center">
+                                      <p className="text-xs text-slate-500 mb-0.5">NETO TOTAL A PAGAR</p>
+                                      <p className="font-bold text-indigo-700 text-lg">S/ {Number(totalNeto || 0).toFixed(2)}</p>
+                                    </div>
+                                  </div>
+                                )}
+                              </CardHeader>
+
+                              {/* Detalle de trabajadores */}
+                              <CardContent className="p-0">
+                                <div className="divide-y divide-slate-100">
+                                  {planillasDelTipo.map((payslip, idx) => {
+                                    const emp = allEmployees.find(e => e.id === payslip.employee_id);
+                                    if (!emp) return null;
+                                    return (
+                                      <div key={payslip.id} className="flex items-center gap-4 px-6 py-3 hover:bg-slate-50/70">
+                                        <span className="text-xs text-slate-400 w-6 shrink-0">{idx + 1}</span>
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                          {emp.first_name[0]}{emp.last_name[0]}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="font-semibold text-slate-900 text-sm truncate">
+                                            {emp.employee_code} — {emp.first_name} {emp.last_name}
+                                          </p>
+                                          <p className="text-xs text-slate-500">{emp.position} · {emp.department_name}</p>
+                                        </div>
+                                        <div className="flex items-center gap-6 text-sm shrink-0">
+                                          <div className="text-center hidden sm:block">
+                                            <p className="text-xs text-slate-400">Días</p>
+                                            <p className="font-medium">{payslip.worked_days}</p>
+                                          </div>
+                                          {canViewAmounts && (
+                                            <>
+                                              <div className="text-center hidden md:block">
+                                                <p className="text-xs text-slate-400">Ingresos</p>
+                                                <p className="font-medium text-green-700">S/ {Number(payslip.total_income || 0).toFixed(2)}</p>
+                                              </div>
+                                              <div className="text-center hidden md:block">
+                                                <p className="text-xs text-slate-400">Descuentos</p>
+                                                <p className="font-medium text-red-500">S/ {Number(payslip.total_deductions || 0).toFixed(2)}</p>
+                                              </div>
+                                              <div className="text-center">
+                                                <p className="text-xs text-slate-400">Neto</p>
+                                                <p className="font-bold text-indigo-700">S/ {Number(payslip.net_pay || 0).toFixed(2)}</p>
+                                              </div>
+                                            </>
+                                          )}
+                                        </div>
+                                        {/* Botón eliminar del trabajador de la planilla */}
+                                        {!allPagada && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-red-500 border-red-200 hover:bg-red-50 shrink-0 text-xs"
+                                            onClick={() => {
+                                              if (window.confirm(`¿Eliminar a ${emp.first_name} ${emp.last_name} de esta planilla?`)) {
+                                                removeOnePayslipMutation.mutate(payslip.id);
+                                              }
+                                            }}
+                                          >
+                                            ✕ Quitar
+                                          </Button>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
             </TabsContent>
 
             <TabsContent value="history">
@@ -1234,7 +1358,7 @@ export default function PayrollManagement() {
                                       </h3>
                                       <p className="text-sm text-slate-600">
                                         {allGroupPayslips.length} empleado(s)
-                                        {canViewAmounts && ` • Total: S/ ${total.toFixed(2)}`}
+                                        {canViewAmounts && ` • Total: S/ ${Number(total || 0).toFixed(2)}`}
                                       </p>
                                     </div>
                                   </div>
@@ -1270,7 +1394,7 @@ export default function PayrollManagement() {
                                           const emp = allEmployees.find(e => e.id === p.employee_id);
                                           if (emp) {
                                             doc.text(`${emp.employee_code} - ${emp.first_name} ${emp.last_name}`, 14, y);
-                                            doc.text(`S/ ${p.net_pay.toFixed(2)}`, 160, y, { align: "right" });
+                                            doc.text(`S/ ${Number(p.net_pay || 0).toFixed(2)}`, 160, y, { align: "right" });
                                             y += 7;
                                           }
                                         });
@@ -1290,7 +1414,7 @@ export default function PayrollManagement() {
                                       <div key={p.id} className="flex items-center justify-between text-sm p-2 bg-slate-50 rounded">
                                         <span>{emp.employee_code} - {emp.first_name} {emp.last_name}</span>
                                         {canViewAmounts ? (
-                                          <span className="font-semibold">S/ {p.net_pay.toFixed(2)}</span>
+                                          <span className="font-semibold">S/ {Number(p.net_pay || 0).toFixed(2)}</span>
                                         ) : (
                                           <span className="text-slate-400">🔒</span>
                                         )}

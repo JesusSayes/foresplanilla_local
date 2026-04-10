@@ -18,6 +18,7 @@ import {
 import * as XLSX from 'xlsx';
 import { format, parse, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { todayLima, todayDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
 import { usePermissions } from "../components/hooks/usePermissions";
@@ -31,7 +32,7 @@ import recalcularAsistenciaService from '@/services/recalcularAsistenciaService'
 export default function AttendanceManagement() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(todayDateLima());
   const [dateFrom, setDateFrom] = useState(null);
   const [dateTo, setDateTo] = useState(null);
   const [isRangeMode, setIsRangeMode] = useState(false);
@@ -372,7 +373,7 @@ export default function AttendanceManagement() {
       data: {
         status: "Aprobada",
         reviewed_by: `${employee.first_name} ${employee.last_name}`,
-        review_date: format(new Date(), "yyyy-MM-dd"),
+        review_date: todayLima(),
         review_comments: reviewComments || "Aprobada",
       }
     });
@@ -388,7 +389,7 @@ export default function AttendanceManagement() {
       data: {
         status: "Rechazada",
         reviewed_by: `${employee.first_name} ${employee.last_name}`,
-        review_date: format(new Date(), "yyyy-MM-dd"),
+        review_date: todayLima(),
         review_comments: reviewComments,
       }
     });
@@ -477,7 +478,7 @@ export default function AttendanceManagement() {
   // En modo fecha única: comportamiento original (todos los empleados para esa fecha)
   let employeesWithRecords = [];
 
-  const todayDateStr = format(new Date(), "yyyy-MM-dd");
+  const todayDateStr = todayLima();
 
   if (isRangeMode && dateFrom && dateTo) {
     // Generar todas las fechas del rango, solo hasta hoy
@@ -577,11 +578,11 @@ export default function AttendanceManagement() {
           const [sh, sm] = ts.split(':').map(Number);
           const [eh, em] = te.split(':').map(Number);
           const hrs = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
-          tiempoPapeleta = `${hrs.toFixed(2)} h`;
+          tiempoPapeleta = `${Number(hrs).toFixed(2)} h`;
         } else if (incident.justified_time_start && incident.justified_time_end) {
           const [sh, sm] = incident.justified_time_start.split(':').map(Number);
           const [eh, em] = incident.justified_time_end.split(':').map(Number);
-          tiempoPapeleta = `${Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60).toFixed(2)} h`;
+          tiempoPapeleta = `${Number(Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60)).toFixed(2)} h`;
         }
       }
 
@@ -597,8 +598,8 @@ export default function AttendanceManagement() {
         'Salida': emp.record?.clock_out || '--:--',
         'Horas Trabajadas': Number(workedHours || 0).toFixed(2),
         'Tardanza (min)': emp.record?.late_minutes || 0,
-        'HE 25%': (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
-        'HE 35%': (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
+        'HE 25%': Number(emp.record?.overtime_hours_25 ?? 0).toFixed(2),
+        'HE 35%': Number(emp.record?.overtime_hours_35 ?? 0).toFixed(2),
         'Estado Asistencia': emp.record?.status || 'Sin marcar',
         'Tipo Incidente': incident ? incident.incident_type : '',
         'Estado Papeleta': incident ? incident.status : '',
@@ -912,7 +913,7 @@ export default function AttendanceManagement() {
                               <div className="w-24 shrink-0 text-center">
                                 <p className="text-xs text-slate-500 mb-0.5">Fecha</p>
                                 <p className="text-xs font-semibold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">
-                                  {format(new Date(rowDate + "T00:00:00"), "dd MMM yyyy", { locale: es })}
+                                  {(() => { try { const d = new Date(rowDate + "T00:00:00"); return isNaN(d?.getTime()) ? rowDate : format(d, "dd MMM yyyy", { locale: es }); } catch { return rowDate; } })()}
                                 </p>
                               </div>
                               <div className="grid grid-cols-6 gap-3 text-sm">
@@ -1181,11 +1182,19 @@ export default function AttendanceManagement() {
                                     <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm">
                                       <Badge className="bg-orange-100 text-orange-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="p-3 bg-slate-50 rounded-lg mb-4">
+                                      <span className="text-slate-600">📅 {incident.incident_date ? (() => {
+                                        try {
+                                          const dateStr = incident.incident_date.split('T')[0];
+                                          const d = new Date(dateStr + "T12:00:00-05:00");
+                                          return isNaN(d.getTime()) ? "Fecha inválida" : format(d, "dd MMM yyyy", { locale: es });
+                                        } catch {
+                                          return "Fecha inválida";
+                                        }
+                                      })() : "Sin fecha"}</span>
+                                      </div>
+                                      </div>
+                                      </div>
+                                      <div className="p-3 bg-slate-50 rounded-lg mb-4">
                                   <p className="text-sm font-semibold text-slate-900 mb-1">Justificación:</p>
                                   <p className="text-sm text-slate-700">{incident.justification}</p>
                                 </div>
@@ -1239,7 +1248,15 @@ export default function AttendanceManagement() {
                                     <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm flex-wrap">
                                       <Badge className="bg-green-100 text-green-700">{incident.incident_type}</Badge>
-                                    <span className="text-slate-600">📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
+                                      <span className="text-slate-600">📅 {incident.incident_date ? (() => {
+                                        try {
+                                          const dateStr = incident.incident_date.split('T')[0];
+                                          const d = new Date(dateStr + "T12:00:00-05:00");
+                                          return isNaN(d.getTime()) ? "Fecha inválida" : format(d, "dd MMM yyyy", { locale: es });
+                                        } catch {
+                                          return "Fecha inválida";
+                                        }
+                                      })() : "Sin fecha"}</span>
                                       <Badge className="bg-green-600 text-white">Aprobada</Badge>
                                     </div>
                                   </div>
@@ -1256,18 +1273,18 @@ export default function AttendanceManagement() {
                                 )}
                                 <div className="flex items-center gap-4 text-xs text-slate-600">
                                   <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
-                                  <span>Fecha: {incident.review_date ? format(new Date(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
-                              </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                                  <span>Fecha: {incident.review_date ? (() => { try { const dateStr = incident.review_date.split('T')[0]; const d = new Date(dateStr + "T12:00:00-05:00"); return isNaN(d?.getTime()) ? "N/A" : format(d, "dd MMM yyyy", { locale: es }); } catch { return "N/A"; } })() : "N/A"}</span>
+                                  </div>
+                                  </div>
+                                  );
+                                  })}
+                                  </div>
+                                  )}
+                                  </CardContent>
+                                  </Card>
+                                  </TabsContent>
 
-                <TabsContent value="rejected">
+                                  <TabsContent value="rejected">
                   <Card className="border-0 shadow-lg">
                     <CardHeader className="border-b bg-red-50/50"><CardTitle className="text-xl font-bold flex items-center gap-2"><XCircle className="w-5 h-5 text-red-600" />Justificaciones Rechazadas</CardTitle></CardHeader>
                     <CardContent className="p-6">
@@ -1291,7 +1308,15 @@ export default function AttendanceManagement() {
                                     <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm flex-wrap">
                                       <Badge className="bg-red-100 text-red-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
+                                      <span className="text-slate-600">📅 {incident.incident_date ? (() => {
+                                        try {
+                                          const dateStr = incident.incident_date.split('T')[0];
+                                          const d = new Date(dateStr + "T12:00:00-05:00");
+                                          return isNaN(d.getTime()) ? "Fecha inválida" : format(d, "dd MMM yyyy", { locale: es });
+                                        } catch {
+                                          return "Fecha inválida";
+                                        }
+                                      })() : "Sin fecha"}</span>
                                       <Badge className="bg-red-600 text-white">Rechazada</Badge>
                                     </div>
                                   </div>
@@ -1308,17 +1333,24 @@ export default function AttendanceManagement() {
                                 )}
                                 <div className="flex items-center gap-4 text-xs text-slate-600">
                                   <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
-                                  <span>Fecha: {incident.review_date ? format(new Date(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
-                                </div>
-                              </div>
-                            );
-                        })}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+                                  <span>Fecha: {incident.review_date ? (() => {
+                                    try {
+                                      const d = new Date(incident.review_date + "T12:00:00-05:00");
+                                      return isNaN(d.getTime()) ? "N/A" : format(d, "dd MMM yyyy", { locale: es });
+                                    } catch {
+                                      return "N/A";
+                                    }
+                                  })() : "N/A"}</span>
+                                  </div>
+                                  </div>
+                                  );
+                                  })}
+                                  </div>
+                                  )}
+                                  </CardContent>
+                                  </Card>
+                                  </TabsContent>
+                                  </Tabs>
             </TabsContent>
           </Tabs>
         </div>
@@ -1413,13 +1445,20 @@ export default function AttendanceManagement() {
                 <div className="space-y-6">
                   <div className="p-4 bg-slate-50 rounded-lg">
                     <p className="text-sm text-slate-600 mb-2"><strong>Tipo:</strong> {reviewingIncident.incident_type}</p>
-                    <p className="text-sm text-slate-600 mb-2"><strong>Fecha:</strong> {format(new Date(reviewingIncident.incident_date), "dd 'de' MMMM, yyyy", { locale: es })}</p>
+                    <p className="text-sm text-slate-600 mb-2"><strong>Fecha:</strong> {reviewingIncident.incident_date ? (() => {
+                      try {
+                        const d = new Date(reviewingIncident.incident_date + "T12:00:00-05:00");
+                        return isNaN(d.getTime()) ? "Fecha inválida" : format(d, "dd 'de' MMMM, yyyy", { locale: es });
+                      } catch {
+                        return "Fecha inválida";
+                      }
+                    })() : "Sin fecha"}</p>
                     {reviewingIncident.full_day_justification ? (
                       <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> <Badge className="bg-blue-100 text-blue-700">Día completo (8 horas)</Badge></p>
                     ) : (
                       <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> {reviewingIncident.justified_time_start} - {reviewingIncident.justified_time_end}</p>
                     )}
-                    <p className="text-sm text-slate-600 mb-2"><strong>Ajuste:</strong> +{reviewingIncident.hours_to_adjust?.toFixed(2) || 0}h trabajadas{reviewingIncident.late_minutes_to_adjust > 0 && `, -${reviewingIncident.late_minutes_to_adjust} min tardanza`}</p>
+                    <p className="text-sm text-slate-600 mb-2"><strong>Ajuste:</strong> +{Number(reviewingIncident.hours_to_adjust || 0).toFixed(2)}h trabajadas{reviewingIncident.late_minutes_to_adjust > 0 && `, -${reviewingIncident.late_minutes_to_adjust} min tardanza`}</p>
                     <p className="text-sm text-slate-700"><strong>Jusificación:</strong><br />{reviewingIncident.justification}</p>
                   </div>
                   <div>
