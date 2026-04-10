@@ -55,6 +55,7 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import derechohabientesRoutes from './routes/derechohabientes.js';
 import recalcularAsistenciaRoutes from './routes/attendance/recalcularAsistencia.js';
 import { generarAsistenciaDiaria } from './scripts/generarAsistenciaDiaria.js';
+import externalAttendanceRoutes from './routes/attendance/externalAttendanceRoutes.js';
 
 dotenv.config();
 
@@ -146,6 +147,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/uploads", express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api/derechohabientes', derechohabientesRoutes);
 app.use('/api/attendance/recalcular', recalcularAsistenciaRoutes);
+app.use('/api/attendance/external', externalAttendanceRoutes);
 
 // Cron: sincronización biotime cada hora
 cron.schedule('0 * * * *', () => {
