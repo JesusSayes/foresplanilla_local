@@ -201,10 +201,19 @@ export default function JustifyModal({
         }
       }
 
+      // Recalcular métricas (tardanza, HE 25%, HE 35%) para todas las fechas justificadas
+      const minDate = targetDates[0];
+      const maxDate = targetDates[targetDates.length - 1];
+      await base44.functions.invoke("recalcularAsistencia", {
+        employee_id: justifyingEmployee.id,
+        date_from: minDate,
+        date_to: maxDate,
+      });
+
       toast.success(
         targetDates.length === 1
-          ? "Justificación creada y aprobada correctamente"
-          : `${targetDates.length} justificaciones creadas y aprobadas correctamente`
+          ? "Justificación creada y métricas recalculadas"
+          : `${targetDates.length} justificaciones creadas y métricas recalculadas`
       );
       onSuccess();
     } catch (error) {
