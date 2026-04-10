@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from "../../config/prisma.js";
+
 import { generate24HexId } from '../../utils/idGenerator.js';
-const prisma = new PrismaClient()
 
 export const getAll = async (req, res) => {
   try {

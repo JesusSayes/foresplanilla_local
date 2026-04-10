@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import prisma from "../config/prisma.js";
 
-const prisma = new PrismaClient();
+import { v4 as uuidv4 } from 'uuid';
 
 export const getAll = async (req, res) => {
   try {

@@ -77,6 +77,11 @@ model attendance_record {
   overtime_hours_25   Decimal?  @db.Decimal(18, 2)
   overtime_hours_35   Decimal?  @db.Decimal(18, 2)
   overtime_authorized Boolean?
+
+  @@unique([employee_id, date], map: "attendance_record_employee_date_unique")
+  @@index([date], map: "idx_attendance_date")
+  @@index([employee_id], map: "idx_attendance_employee")
+  @@index([status], map: "idx_attendance_status")
 }
 
 model bank {
@@ -854,4 +859,32 @@ model reportconfiguration {
   created_date DateTime? @db.Timestamp(6)
   updated_date DateTime? @db.Timestamp(6)
   created_by   String?
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model attendance_record_backup {
+  employee_id         String?
+  date                DateTime? @db.Date
+  clock_in            String?
+  clock_out           String?
+  scheduled_start     String?
+  scheduled_end       String?
+  worked_hours        Decimal?  @db.Decimal(18, 2)
+  is_late             Boolean?
+  late_minutes        Int?
+  is_absent           Boolean?
+  status              String?
+  notes               String?
+  id                  String?   @db.VarChar(255)
+  created_date        DateTime? @db.Timestamp(6)
+  updated_date        DateTime? @db.Timestamp(6)
+  created_by_id       String?
+  created_by          String?
+  is_sample           Boolean?
+  regular_hours       Decimal?  @db.Decimal(18, 2)
+  overtime_hours_25   Decimal?  @db.Decimal(18, 2)
+  overtime_hours_35   Decimal?  @db.Decimal(18, 2)
+  overtime_authorized Boolean?
+
+  @@ignore
 }
