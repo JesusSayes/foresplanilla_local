@@ -439,8 +439,13 @@ export default function EmployeeForm({
                 </div>
               </div>
 
+            </TabsContent>
+
+            {/* FINANCIAL */}
+            <TabsContent value="financial" className="space-y-4">
+
               {/* Información del Contrato Vigente */}
-              <div className="mt-4">
+              <div className="mb-4">
                 <div className="flex items-center gap-2 mb-3">
                   <FileText className="w-4 h-4 text-indigo-600" />
                   <h4 className="font-semibold text-slate-900 text-sm">Información del Contrato Vigente</h4>
@@ -468,60 +473,33 @@ export default function EmployeeForm({
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label className="text-xs text-slate-500">Remuneración (S/)</Label>
-                    <Input
-                      value={vigentContract ? (vigentContract.salary || 0).toFixed(2) : "—"}
-                      disabled
-                      className="bg-slate-100 text-slate-600 cursor-not-allowed"
-                    />
+                    <Input value={vigentContract ? (vigentContract.salary || 0).toFixed(2) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
                   </div>
                   <div>
                     <Label className="text-xs text-slate-500">Horas Semanales</Label>
-                    <Input
-                      value={vigentContract ? (vigentContract.weekly_hours ?? 48) : "—"}
-                      disabled
-                      className="bg-slate-100 text-slate-600 cursor-not-allowed"
-                    />
+                    <Input value={vigentContract ? (vigentContract.weekly_hours ?? 48) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
                   </div>
                   <div>
                     <Label className="text-xs text-slate-500">Período de Prueba (días)</Label>
-                    <Input
-                      value={vigentContract ? (vigentContract.trial_period_days ?? 90) : "—"}
-                      disabled
-                      className="bg-slate-100 text-slate-600 cursor-not-allowed"
-                    />
+                    <Input value={vigentContract ? (vigentContract.trial_period_days ?? 90) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4 mt-3">
                   <div>
                     <Label className="text-xs text-slate-500">Costo Actividad (S/)</Label>
-                    <Input
-                      value={vigentContract ? (vigentContract.activity_cost || 0).toFixed(2) : "—"}
-                      disabled
-                      className="bg-slate-100 text-slate-600 cursor-not-allowed"
-                    />
+                    <Input value={vigentContract ? (vigentContract.activity_cost || 0).toFixed(2) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
                   </div>
                   <div>
                     <Label className="text-xs text-slate-500">Costo Alimento (S/)</Label>
-                    <Input
-                      value={vigentContract ? (vigentContract.food_cost || 0).toFixed(2) : "—"}
-                      disabled
-                      className="bg-slate-100 text-slate-600 cursor-not-allowed"
-                    />
+                    <Input value={vigentContract ? (vigentContract.food_cost || 0).toFixed(2) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
                   </div>
                   <div>
                     <Label className="text-xs text-slate-500">Costo Movilidad (S/)</Label>
-                    <Input
-                      value={vigentContract ? (vigentContract.transport_cost || 0).toFixed(2) : "—"}
-                      disabled
-                      className="bg-slate-100 text-slate-600 cursor-not-allowed"
-                    />
+                    <Input value={vigentContract ? (vigentContract.transport_cost || 0).toFixed(2) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
                   </div>
                 </div>
               </div>
-            </TabsContent>
-
-            {/* FINANCIAL */}
-            <TabsContent value="financial" className="space-y-4">
+              <hr className="border-slate-200" />
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label>Sistema de Pensiones</Label>
