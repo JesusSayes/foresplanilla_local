@@ -213,9 +213,20 @@ export default function AttendanceManagement() {
         setTimeout(() => resolve({ success: true, imported: 45, errors: 2 }), 2000);
       });
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
+      // Recalcular métricas para todos los empleados con registros en la fecha seleccionada
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const recordsForDate = await base44.entities.AttendanceRecord.filter({ date: dateStr });
+      const affectedEmployeeIds = [...new Set(recordsForDate.map(r => r.employee_id))];
+      for (const empId of affectedEmployeeIds) {
+        await base44.functions.invoke("recalcularAsistencia", {
+          employee_id: empId,
+          date_from: dateStr,
+          date_to: dateStr,
+        });
+      }
       queryClient.invalidateQueries(["todayAttendance"]);
-      toast.success(`✓ ${result.imported} marcaciones importadas. ${result.errors} errores.`);
+      toast.success(`✓ ${result.imported} marcaciones importadas y métricas recalculadas. ${result.errors} errores.`);
     },
     onError: () => toast.error("Error al importar marcaciones"),
   });

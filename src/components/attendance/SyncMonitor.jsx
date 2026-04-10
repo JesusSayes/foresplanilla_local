@@ -71,7 +71,34 @@ export default function SyncMonitor({ connectionId, connectionName }) {
         await base44.entities.DatabaseConnection.update(connectionId, {
           last_sync: new Date().toISOString()
         });
-        
+
+        // Recalcular métricas (tardanza, HE 25%, HE 35%) para todos los empleados
+        // que tengan registros de asistencia del día de hoy y ayer
+        if (success && recordsImported > 0) {
+          const today = new Date();
+          const yesterday = new Date(today);
+          yesterday.setDate(today.getDate() - 1);
+          const todayStr = today.toISOString().split('T')[0];
+          const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+          // Obtener registros recientes para identificar empleados afectados
+          const recentRecords = await base44.entities.AttendanceRecord.list("-date", 500);
+          const affectedEmployees = [...new Set(
+            recentRecords
+              .filter(r => r.date >= yesterdayStr && r.date <= todayStr)
+              .map(r => r.employee_id)
+          )];
+
+          // Recalcular por cada empleado afectado
+          for (const empId of affectedEmployees) {
+            await base44.functions.invoke("recalcularAsistencia", {
+              employee_id: empId,
+              date_from: yesterdayStr,
+              date_to: todayStr,
+            });
+          }
+        }
+
         return logData;
       } catch (error) {
         const executionTime = (Date.now() - startTime) / 1000;
