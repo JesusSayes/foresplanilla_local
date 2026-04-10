@@ -372,21 +372,6 @@ export default function EmployeeForm({
 
             {/* WORK */}
             <TabsContent value="work" className="space-y-4">
-              {vigentContract && (
-                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-                  <p className="text-xs font-semibold text-indigo-700 mb-2">📋 Contrato Vigente — los campos marcados se toman del contrato</p>
-                  <div className="grid grid-cols-3 gap-3 text-sm">
-                    <div><span className="text-slate-500">Tipo:</span> <span className="font-semibold">{vigentContract.contract_type}</span></div>
-                    <div><span className="text-slate-500">Inicio:</span> <span className="font-semibold">{vigentContract.start_date ? format(new Date(vigentContract.start_date), 'dd/MM/yyyy') : '—'}</span></div>
-                    <div><span className="text-slate-500">Fin:</span> <span className="font-semibold">{vigentContract.end_date ? format(new Date(vigentContract.end_date), 'dd/MM/yyyy') : 'Indeterminado'}</span></div>
-                  </div>
-                </div>
-              )}
-              {!vigentContract && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-xs text-amber-700">⚠️ Este empleado no tiene un contrato vigente. El sueldo base y tipo de contrato deben ingresarse manualmente.</p>
-                </div>
-              )}
               <div className="grid grid-cols-2 gap-4">
                 <div><Label>Empresa</Label><Input value={formData.company} onChange={(e) => setFormData({ ...formData, company: e.target.value })} /></div>
                 <div>
@@ -410,9 +395,9 @@ export default function EmployeeForm({
                 </div>
                 <div><Label>Nivel</Label><Input value={formData.position_level} onChange={(e) => setFormData({ ...formData, position_level: e.target.value })} /></div>
                 <div>
-                  <Label>Tipo de Contrato {vigentContract && <span className="text-indigo-500 text-xs">(del contrato)</span>}</Label>
-                  <Select value={formData.contract_type} onValueChange={(v) => setFormData({ ...formData, contract_type: v })} disabled={!!vigentContract}>
-                    <SelectTrigger className={vigentContract ? "bg-slate-100 cursor-not-allowed" : ""}><SelectValue /></SelectTrigger>
+                  <Label>Tipo de Contrato</Label>
+                  <Select value={formData.contract_type} onValueChange={(v) => setFormData({ ...formData, contract_type: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Indeterminado">Indeterminado</SelectItem>
                       <SelectItem value="Plazo Fijo">Plazo Fijo</SelectItem>
@@ -421,43 +406,7 @@ export default function EmployeeForm({
                       <SelectItem value="SNP">SNP</SelectItem>
                     </SelectContent>
                   </Select>
-                  {!vigentContract && <p className="text-xs text-amber-600 mt-1">Sin contrato vigente</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label>Sueldo Base {vigentContract && <span className="text-indigo-500 text-xs">(del contrato)</span>}</Label>
-                  <Input
-                    type="number"
-                    value={vigentContract ? (vigentContract.salary || formData.base_salary || "") : (formData.base_salary || "")}
-                    onChange={(e) => setFormData({ ...formData, base_salary: parseFloat(e.target.value) || 0 })}
-                    disabled={!!vigentContract}
-                    className={vigentContract ? "bg-slate-100 cursor-not-allowed font-semibold" : ""}
-                    placeholder="0.00"
-                  />
-                  {vigentContract && <p className="text-xs text-indigo-600 mt-1">Tomado del contrato vigente</p>}
-                </div>
-                <div>
-                  <Label>Tipo de Trabajador</Label>
-                  <Select value={formData.worker_type || "Empleado"} onValueChange={(v) => setFormData({ ...formData, worker_type: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Empleado">Empleado</SelectItem>
-                      <SelectItem value="Obrero">Obrero</SelectItem>
-                      <SelectItem value="Practicante">Practicante</SelectItem>
-                      <SelectItem value="Directivo">Directivo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Condición Tributaria</Label>
-                  <Select value={formData.tax_residence || "Domiciliado"} onValueChange={(v) => setFormData({ ...formData, tax_residence: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Domiciliado">Domiciliado</SelectItem>
-                      <SelectItem value="No Domiciliado">No Domiciliado</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {vigentContract ? <p className="text-xs text-indigo-600 mt-1">Contrato vigente: {vigentContract.contract_type}</p> : <p className="text-xs text-amber-600 mt-1">Sin contrato vigente</p>}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
