@@ -1,8 +1,6 @@
-// backend/controllers/userController.js
-import { PrismaClient } from '@prisma/client';
-import { generate24HexId } from '../utils/idGenerator.js';
+import prisma from "../config/prisma.js";
 
-const prisma = new PrismaClient();
+import { generate24HexId } from '../utils/idGenerator.js';
 
 export const getAllUsers = async (req, res) => {
   try {
