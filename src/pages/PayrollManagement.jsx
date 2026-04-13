@@ -19,6 +19,7 @@ import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import ConceptsManager from "../components/payroll/ConceptsManager";
+import AttendancePeriodModal from "../components/payroll/AttendancePeriodModal";
 import { createPageUrl } from "../utils";
 import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
@@ -44,6 +45,8 @@ export default function PayrollManagement() {
   const [historyMonthFilter, setHistoryMonthFilter] = useState("all");
   const [historyTypeFilter, setHistoryTypeFilter] = useState("all");
   const [selectedPayrollToDelete, setSelectedPayrollToDelete] = useState(null);
+  const [showPeriodModal, setShowPeriodModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // 'preview' | 'generate'
 
   const queryClient = useQueryClient();
 
@@ -250,7 +253,29 @@ export default function PayrollManagement() {
     },
   });
 
-  const calculatePayroll = async () => {
+  const getDefaultPeriod = () => {
+    const firstDay = `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-01`;
+    const lastDay = new Date(selectedYear, selectedMonth, 0);
+    const lastDayStr = `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-${String(lastDay.getDate()).padStart(2,'0')}`;
+    return { dateFrom: firstDay, dateTo: lastDayStr };
+  };
+
+  const handleOpenPeriodModal = (action) => {
+    setPendingAction(action);
+    setShowPeriodModal(true);
+  };
+
+  const handlePeriodConfirm = async ({ dateFrom, dateTo }) => {
+    setShowPeriodModal(false);
+    if (pendingAction === 'preview') {
+      await calculatePayroll(dateFrom, dateTo);
+    } else if (pendingAction === 'generate') {
+      await calculatePayroll(dateFrom, dateTo, true);
+    }
+    setPendingAction(null);
+  };
+
+  const calculatePayroll = async (periodFrom, periodTo, autoGenerate = false) => {
     const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
     
     // Filtrar empleados según búsqueda y departamento
@@ -278,7 +303,12 @@ export default function PayrollManagement() {
 
     const payslipsData = await Promise.all(filteredEmployees.map(async (emp) => {
       // Preparar datos de asistencia
-      const empAttendance = attendanceRecords.filter(r => r.employee_id === emp.id);
+      const empAttendance = attendanceRecords.filter(r => {
+        if (r.employee_id !== emp.id) return false;
+        if (periodFrom && r.date < periodFrom) return false;
+        if (periodTo && r.date > periodTo) return false;
+        return true;
+      });
       const workedDays = payrollType === "Quincenal" ? 15 : empAttendance.filter(r => r.status === "Completo" || r.status === "Incompleto").length;
       
       const attendanceData = {
@@ -366,6 +396,13 @@ export default function PayrollManagement() {
 
     setPreviewData(payslipsData);
     setShowPreview(true);
+    if (autoGenerate) {
+      const payslipsToCreate = payslipsData.map(p => {
+        const { employee_name, employee_code, department, ...rest } = p;
+        return rest;
+      });
+      createPayslipsMutation.mutate(payslipsToCreate);
+    }
   };
 
   const generatePDF = () => {
@@ -754,7 +791,7 @@ export default function PayrollManagement() {
 
                 {canCreate && (
                   <Button
-                    onClick={calculatePayroll}
+                    onClick={() => handleOpenPeriodModal('preview')}
                     className="w-full bg-indigo-600 hover:bg-indigo-700"
                   >
                     <Eye className="w-4 h-4 mr-2" />
@@ -804,7 +841,7 @@ export default function PayrollManagement() {
                       Descargar PDF
                     </Button>
                     <Button
-                      onClick={handleGeneratePayroll}
+                      onClick={() => handleOpenPeriodModal('generate')}
                       className="flex-1 bg-green-600 hover:bg-green-700"
                       disabled={createPayslipsMutation.isPending}
                     >
@@ -1468,6 +1505,20 @@ export default function PayrollManagement() {
             )}
           </div>
         </div>
+
+        {/* Modal de Período de Asistencias */}
+        {showPeriodModal && (() => {
+          const { dateFrom, dateTo } = getDefaultPeriod();
+          return (
+            <AttendancePeriodModal
+              defaultDateFrom={dateFrom}
+              defaultDateTo={dateTo}
+              actionLabel={pendingAction === 'generate' ? 'Generar Planilla' : 'Ver Vista Previa'}
+              onConfirm={handlePeriodConfirm}
+              onCancel={() => { setShowPeriodModal(false); setPendingAction(null); }}
+            />
+          );
+        })()}
 
         {/* Modal de Vista Previa de Boleta */}
         {previewPayslip && (
