@@ -39,6 +39,31 @@ export default function JustifyModal({
   const [uploadingFile, setUploadingFile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState("");
+  const [incidentSearch, setIncidentSearch] = useState("");
+
+  const INCIDENT_TYPES = [
+    "Comisión de Servicio",
+    "Capacitación",
+    "Descanso Médico",
+    "Omisión de Marcación",
+    "Cita Médica",
+    "Confirmación de Asistencia (Limitación de Sistema)",
+    "Licencia por Maternidad",
+    "Licencia por Paternidad",
+    "Otro",
+    "Onomástico",
+    "Descanso Vacacional",
+    "Licencia sin Goce de Haber",
+    "Feriado",
+    "Justificación de Tardanza",
+    "Tardanza",
+    "Falta",
+    "Salida Temprana",
+  ];
+
+  const filteredIncidentTypes = INCIDENT_TYPES.filter(t =>
+    t.toLowerCase().includes(incidentSearch.toLowerCase())
+  );
 
   // Multi-date mode
   const [multiDateMode, setMultiDateMode] = useState(false);
@@ -356,29 +381,29 @@ export default function JustifyModal({
               onValueChange={(value) => {
                 setJustificationData({ ...justificationData, incident_type: value });
                 setValidationError("");
+                setIncidentSearch("");
               }}
               >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Seleccionar tipo..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Comisión de Servicio">Comisión de Servicio</SelectItem>
-                <SelectItem value="Capacitación">Capacitación</SelectItem>
-                <SelectItem value="Descanso Médico">Descanso Médico</SelectItem>
-                <SelectItem value="Omisión de Marcación">Omisión de Marcación</SelectItem>
-                <SelectItem value="Cita Médica">Cita Médica</SelectItem>
-                <SelectItem value="Confirmación de Asistencia (Limitación de Sistema)">Confirmación de Asistencia (Limitación de Sistema)</SelectItem>
-                <SelectItem value="Licencia por Maternidad">Licencia por Maternidad</SelectItem>
-                <SelectItem value="Licencia por Paternidad">Licencia por Paternidad</SelectItem>
-                <SelectItem value="Otro">Otro</SelectItem>
-                <SelectItem value="Onomástico">Onomástico</SelectItem>
-                <SelectItem value="Descanso Vacacional">Descanso Vacacional</SelectItem>
-                <SelectItem value="Licencia sin Goce de Haber">Licencia sin Goce de Haber</SelectItem>
-                <SelectItem value="Feriado">Feriado</SelectItem>
-                <SelectItem value="Justificación de Tardanza">Justificación de Tardanza</SelectItem>
-                <SelectItem value="Tardanza">Tardanza</SelectItem>
-                <SelectItem value="Falta">Falta</SelectItem>
-                <SelectItem value="Salida Temprana">Salida Temprana</SelectItem>
+                <div className="p-2 border-b sticky top-0 bg-white z-10">
+                  <Input
+                    placeholder="Buscar tipo de incidente..."
+                    value={incidentSearch}
+                    onChange={(e) => setIncidentSearch(e.target.value)}
+                    className="h-8 text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
+                </div>
+                {filteredIncidentTypes.length > 0
+                  ? filteredIncidentTypes.map(t => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))
+                  : <div className="px-3 py-2 text-sm text-slate-400">Sin resultados</div>
+                }
               </SelectContent>
               </Select>
             </div>
