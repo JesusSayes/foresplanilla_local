@@ -320,10 +320,22 @@ export default function PayrollManagement() {
         horas_nocturnas: 0,
       };
 
-      // Obtener conceptos del empleado (generales + específicos)
+      // Conceptos fijos del empleado (actividad, alimento, movilidad)
+      const employeeFixedConcepts = [];
+      if (emp.activity_cost > 0) {
+        employeeFixedConcepts.push({ employee_id: emp.id, concept_type: "Ingreso", concept_category: "Bonificaciones", concept_name: "Costo Actividad", amount: emp.activity_cost, is_dynamic: false, applies_to_payroll_types: ["Quincenal", "Mensual", "Adicional", "SNP"] });
+      }
+      if (emp.food_cost > 0) {
+        employeeFixedConcepts.push({ employee_id: emp.id, concept_type: "Ingreso", concept_category: "Bonificaciones", concept_name: "Costo Alimento", amount: emp.food_cost, is_dynamic: false, applies_to_payroll_types: ["Quincenal", "Mensual", "Adicional", "SNP"] });
+      }
+      if (emp.transport_cost > 0) {
+        employeeFixedConcepts.push({ employee_id: emp.id, concept_type: "Ingreso", concept_category: "Asignaciones", concept_name: "Costo Movilidad", amount: emp.transport_cost, is_dynamic: false, applies_to_payroll_types: ["Quincenal", "Mensual", "Adicional", "SNP"] });
+      }
+
+      // Obtener conceptos del empleado (generales + específicos + fijos del empleado)
       const generalConcepts = payrollConcepts.filter(c => c.employee_id === "general");
       const specificConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
-      const allEmpConcepts = [...generalConcepts, ...specificConcepts];
+      const allEmpConcepts = [...generalConcepts, ...specificConcepts, ...employeeFixedConcepts];
 
       // Usar el calculador automático
       const calculator = new PayrollCalculator(emp, selectedMonth, selectedYear, payrollType);

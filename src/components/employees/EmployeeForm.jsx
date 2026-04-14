@@ -484,20 +484,51 @@ export default function EmployeeForm({
                     <Input value={vigentContract ? (vigentContract.trial_period_days ?? 90) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-3">
+              </div>
+              <hr className="border-slate-200" />
+
+              {/* Conceptos Adicionales Fijos */}
+              <div className="mb-4">
+                <h4 className="font-semibold text-slate-900 text-sm mb-3 flex items-center gap-2">
+                  <span className="w-1.5 h-5 bg-indigo-500 rounded inline-block"></span>
+                  Conceptos Adicionales (se incluyen en planilla)
+                </h4>
+                <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <Label className="text-xs text-slate-500">Costo Actividad (S/)</Label>
-                    <Input value={vigentContract ? (vigentContract.activity_cost || 0).toFixed(2) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
+                    <Label className="text-xs font-medium text-slate-700">Costo Actividad (S/)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.activity_cost ?? ""}
+                      onChange={(e) => setFormData({ ...formData, activity_cost: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                    />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500">Costo Alimento (S/)</Label>
-                    <Input value={vigentContract ? (vigentContract.food_cost || 0).toFixed(2) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
+                    <Label className="text-xs font-medium text-slate-700">Costo Alimento (S/)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.food_cost ?? ""}
+                      onChange={(e) => setFormData({ ...formData, food_cost: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                    />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500">Costo Movilidad (S/)</Label>
-                    <Input value={vigentContract ? (vigentContract.transport_cost || 0).toFixed(2) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
+                    <Label className="text-xs font-medium text-slate-700">Costo Movilidad (S/)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.transport_cost ?? ""}
+                      onChange={(e) => setFormData({ ...formData, transport_cost: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                    />
                   </div>
                 </div>
+                <p className="text-xs text-slate-500 mt-2">Estos montos se añaden automáticamente como ingresos adicionales al calcular la planilla.</p>
               </div>
               <hr className="border-slate-200" />
               <div className="grid grid-cols-3 gap-4">

@@ -724,11 +724,7 @@ export default function ContractManagement() {
                     <div><Label>Horas Semanales</Label><Input type="number" value={formData.weekly_hours} onChange={(e) => setFormData({ ...formData, weekly_hours: parseInt(e.target.value) })} /></div>
                     <div><Label>Período de Prueba (días)</Label><Input type="number" value={formData.trial_period_days} onChange={(e) => setFormData({ ...formData, trial_period_days: parseInt(e.target.value) })} /></div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div><Label>Costo Actividad (S/)</Label><Input type="number" step="0.01" value={formData.activity_cost} onChange={(e) => setFormData({ ...formData, activity_cost: e.target.value })} placeholder="0.00" /></div>
-                    <div><Label>Costo Alimento (S/)</Label><Input type="number" step="0.01" value={formData.food_cost} onChange={(e) => setFormData({ ...formData, food_cost: e.target.value })} placeholder="0.00" /></div>
-                    <div><Label>Costo Movilidad (S/)</Label><Input type="number" step="0.01" value={formData.transport_cost} onChange={(e) => setFormData({ ...formData, transport_cost: e.target.value })} placeholder="0.00" /></div>
-                  </div>
+
                   <div><Label>Horario de Trabajo</Label><Input value={formData.work_schedule} onChange={(e) => setFormData({ ...formData, work_schedule: e.target.value })} placeholder="Ej: Lunes a Viernes de 9:00 AM a 6:00 PM" /></div>
                   {formData.contract_type !== "Indeterminado" && (
                     <div className="flex items-center gap-2">
