@@ -40,3 +40,6 @@ $ node scripts/recalcularAsistencia.js --employee_id=<ID> --date_from=2025-01-01
 backfillAsistenciaEmpleado:
 $ node scripts/backfillAsistenciaEmpleado.js --employee_id=<ID> --date_from=2025-01-01
 
+syncAttendanceCLI (external):
+$ node backend/syncAttendanceCLI.js --help
+$ node backend/syncAttendanceCLI.js --dry-run --limit 50

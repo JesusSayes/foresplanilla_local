@@ -8,4 +8,9 @@ router.get(
   externalAttendanceController.getExternalAsistencias
 );
 
+router.post(
+  "/sync",
+  externalAttendanceController.syncExternalAttendance
+);
+
 export default router;

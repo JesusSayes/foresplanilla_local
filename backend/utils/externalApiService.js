@@ -43,7 +43,7 @@ async function getToken() {
   return await login();
 }
 
-export async function getAsistenciasExternal() {
+export async function getAsistenciasExternal(limit = null) {
 
   try {
 
@@ -55,7 +55,13 @@ export async function getAsistenciasExternal() {
       }
     });
 
-    return response.data;
+    const data = response.data?.data || response.data;
+
+    if (limit && Array.isArray(data)) {
+      return data.slice(0, limit);
+    }
+
+    return data;
 
   } catch (error) {
 
@@ -70,5 +76,33 @@ export async function getAsistenciasExternal() {
   console.error("URL:", process.env.EXTERNAL_API_BASE_URL);
 
     throw new Error("Error al obtener asistencias del API externo");
+  }
+}
+
+export async function confirmarAsistenciasExternal(ids) {
+
+  try {
+
+    const token = await getToken();
+
+    const response = await apiClient.post("/asistencias/confirmar",
+      { ids: ids },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
+    return response.data;
+
+  } catch (error) {
+
+    console.error("Error confirmando asistencias:");
+    console.error("Status:", error.response?.status);
+    console.error("Data:", error.response?.data);
+    console.error("Message:", error.message);
+
+    throw new Error("Error al confirmar asistencias en API externo");
   }
 }
