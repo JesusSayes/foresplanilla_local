@@ -45,9 +45,9 @@ async function main() {
       console.log(`Límite: ${limit} registros`);
     }
     console.log('');
-    
+
     const result = await syncExternalAttendance({ updateExisting, limit, dryRun });
-    
+
     console.log('');
     console.log('='.repeat(60));
     console.log('RESULTADO DE LA SINCRONIZACIÓN');
@@ -63,21 +63,21 @@ async function main() {
     console.log(`  - Actualizados: ${result.totalUpdated}`);
     console.log(`  - Omitidos: ${result.totalSkipped}`);
     console.log('');
-    
+
     if (result.dryRun) {
       console.log('REGISTROS QUE SE GUARDARÍAN:');
       console.log(`  - Nuevos: ${result.recordsToSave?.length || 0}`);
       console.log(`  - Actualizaciones: ${result.recordsToUpdate?.length || 0}`);
       console.log('');
     }
-    
+
     if (result.totalSkipped > 0 && result.skipReasons) {
       console.log('Razones de registros omitidos:');
       console.log(`  - Datos faltantes: ${result.skipReasons.missingData || 0}`);
       console.log(`  - Empleado no encontrado: ${result.skipReasons.employeeNotFound || 0}`);
       console.log(`  - Ya existe (duplicado): ${result.skipReasons.alreadyExists || 0}`);
       console.log('');
-      
+
       if (result.skipReasons.employeesNotFound && result.skipReasons.employeesNotFound.length > 0) {
         console.log(`Documentos de empleados no encontrados (${result.skipReasons.employeesNotFound.length}):`);
         const docs = result.skipReasons.employeesNotFound.slice(0, 20);
@@ -87,7 +87,7 @@ async function main() {
         }
         console.log('');
       }
-      
+
       if (result.skipReasons.duplicateDates && result.skipReasons.duplicateDates.length > 0) {
         console.log(`Registros duplicados (primeros 10):`);
         result.skipReasons.duplicateDates.slice(0, 10).forEach(dup => {
@@ -99,19 +99,19 @@ async function main() {
         console.log('');
       }
     }
-    
+
     if (result.savedRecordIds && result.savedRecordIds.length > 0) {
       console.log(`IDs de registros guardados/actualizados: ${result.savedRecordIds.length}`);
       console.log(`  Primeros 5: ${result.savedRecordIds.slice(0, 5).join(', ')}`);
       console.log('');
     }
-    
+
     if (result.externalIdsConfirmed && result.externalIdsConfirmed.length > 0) {
       console.log(`IDs externos confirmados: ${result.externalIdsConfirmed.length}`);
       console.log(`  IDs: [${result.externalIdsConfirmed.join(', ')}]`);
       console.log('');
     }
-    
+
     if (result.errors && result.errors.length > 0) {
       console.log(`⚠ Errores encontrados: ${result.errors.length}`);
       result.errors.slice(0, 10).forEach((err, idx) => {
@@ -122,13 +122,13 @@ async function main() {
       }
       console.log('');
     }
-    
+
     console.log('='.repeat(60));
     console.log(`Ver detalles completos en: ${result.logFile}`);
     console.log('='.repeat(60));
-    
+
     process.exit(result.success ? 0 : 1);
-    
+
   } catch (error) {
     console.error('');
     console.error('='.repeat(60));
@@ -142,3 +142,17 @@ async function main() {
 }
 
 main();
+
+// # Simulación con 10 registros
+// node backend/syncAttendanceCLI.js --dry-run --limit 10
+
+// # Ejecución real
+// node backend/syncAttendanceCLI.js
+
+// # Actualizar existentes
+// node backend/syncAttendanceCLI.js --update
+
+// # API - Dry run
+// curl -X POST http://localhost:3000/api/attendance/sync \
+  // -H "Content-Type: application/json" \
+  // -d '{"dryRun": true, "limit": 5}'
