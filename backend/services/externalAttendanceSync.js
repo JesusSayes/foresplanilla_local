@@ -238,11 +238,11 @@ export async function syncExternalAttendance(options = {}) {
 
             if (missingClockIn) {
               updateFields.clock_in = newClockIn;
-              updatedFields.push(`Entrada: ${newClockIn}`);
+              updatedFields.push(`Entrada: ${existingClockIn || 'N/A'} → ${newClockIn}`);
             }
             if (missingClockOut) {
               updateFields.clock_out = newClockOut;
-              updatedFields.push(`Salida: ${newClockOut}`);
+              updatedFields.push(`Salida: ${existingClockOut || 'N/A'} → ${newClockOut}`);
             }
 
             updateFields.worked_hours = workedHours;
@@ -256,7 +256,7 @@ export async function syncExternalAttendance(options = {}) {
             updateFields.notes = `${existingRecord.notes || ''}\nActualizado desde duplicado (ID externo: ${record.id}) - ${updatedFields.join(', ')}`.trim();
             updateFields.updated_date = new Date();
 
-            log(`[ACTUALIZAR DUPLICADO] ID ${record.id} - ${employee.first_name} ${employee.last_name} (${record.numero_documento}) - ${record.fecha} - Campos actualizados: ${updatedFields.join(', ')} - Horas recalculadas: ${workedHours.toFixed(2)}, Estado: ${status}`);
+            log(`[ACTUALIZAR DUPLICADO] ID ${record.id} - ${employee.first_name} ${employee.last_name} (${record.numero_documento}) - ${record.fecha} - Campos actualizados: ${updatedFields.join(', ')} - Horas trabajadas: ${existingRecord.worked_hours?.toFixed(2) || '0.00'} → ${workedHours.toFixed(2)}, Estado: ${existingRecord.status || 'N/A'} → ${status}`);
 
             if (!dryRun) {
               await prisma.attendance_record.update({
