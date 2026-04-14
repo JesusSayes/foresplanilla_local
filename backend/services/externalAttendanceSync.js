@@ -185,16 +185,106 @@ export async function syncExternalAttendance(options = {}) {
         });
 
         if (existingRecord && !updateExisting) {
+          const existingClockIn = existingRecord.clock_in;
+          const existingClockOut = existingRecord.clock_out;
+          const newClockIn = record.hora_entrada;
+          const newClockOut = record.hora_salida;
+
+          const missingClockIn = (!existingClockIn || (typeof existingClockIn === 'string' && existingClockIn.trim() === '')) && newClockIn && (typeof newClockIn === 'string' && newClockIn.trim() !== '');
+          const missingClockOut = (!existingClockOut || (typeof existingClockOut === 'string' && existingClockOut.trim() === '')) && newClockOut && (typeof newClockOut === 'string' && newClockOut.trim() !== '');
+
+          if (missingClockIn || missingClockOut) {
+            const workSchedule = await prisma.work_schedule.findFirst({
+              where: {
+                employee_id: employee.id,
+                is_active: true,
+                OR: [
+                  { effective_from: null },
+                  { effective_from: { lte: recordDate } }
+                ]
+              },
+              orderBy: {
+                effective_from: 'desc'
+              }
+            });
+
+            const scheduleInfo = getScheduleForDate(workSchedule, recordDate);
+
+            const updatedClockIn = existingClockIn || newClockIn;
+            const updatedClockOut = existingClockOut || newClockOut;
+            const scheduledStart = scheduleInfo?.scheduledStart || '08:00';
+            const scheduledEnd = scheduleInfo?.scheduledEnd || '17:00';
+            const breakMinutes = scheduleInfo?.breakMinutes || 60;
+
+            const workedHours = (updatedClockIn && updatedClockOut)
+              ? calcWorkedHours(updatedClockIn, updatedClockOut, breakMinutes)
+              : 0;
+
+            const lateMinutes = updatedClockIn ? calcLateMinutes(scheduledStart, updatedClockIn) : 0;
+            const isLate = lateMinutes > 0;
+            const isAbsent = !updatedClockIn || !updatedClockOut;
+
+            const overtime = calcOvertimeHours(workedHours);
+
+            let status = 'Completo';
+            if (isAbsent) {
+              status = 'Ausente';
+            } else if (isLate) {
+              status = 'Tardanza';
+            }
+
+            const updateFields = {};
+            const updatedFields = [];
+
+            if (missingClockIn) {
+              updateFields.clock_in = newClockIn;
+              updatedFields.push(`Entrada: ${newClockIn}`);
+            }
+            if (missingClockOut) {
+              updateFields.clock_out = newClockOut;
+              updatedFields.push(`Salida: ${newClockOut}`);
+            }
+
+            updateFields.worked_hours = workedHours;
+            updateFields.regular_hours = overtime.regular;
+            updateFields.overtime_hours_25 = overtime.overtime_25;
+            updateFields.overtime_hours_35 = overtime.overtime_35;
+            updateFields.is_late = isLate;
+            updateFields.late_minutes = lateMinutes;
+            updateFields.is_absent = isAbsent;
+            updateFields.status = status;
+            updateFields.notes = `${existingRecord.notes || ''}\nActualizado desde duplicado (ID externo: ${record.id}) - ${updatedFields.join(', ')}`.trim();
+            updateFields.updated_date = new Date();
+
+            log(`[ACTUALIZAR DUPLICADO] ID ${record.id} - ${employee.first_name} ${employee.last_name} (${record.numero_documento}) - ${record.fecha} - Campos actualizados: ${updatedFields.join(', ')} - Horas recalculadas: ${workedHours.toFixed(2)}, Estado: ${status}`);
+
+            if (!dryRun) {
+              await prisma.attendance_record.update({
+                where: { id: existingRecord.id },
+                data: updateFields
+              });
+              savedRecordIds.push(existingRecord.id);
+            }
+
+            totalUpdated++;
+            externalIdsToConfirm.push(record.id);
+            continue;
+          }
+
           totalSkipped++;
           skipReasons.alreadyExists++;
           const dupInfo = {
             external_id: record.id,
             document_number: record.numero_documento,
             employee_name: `${employee.first_name} ${employee.last_name}`,
-            date: record.fecha
+            date: record.fecha,
+            existing_clock_in: existingClockIn || 'N/A',
+            existing_clock_out: existingClockOut || 'N/A',
+            new_clock_in: newClockIn || 'N/A',
+            new_clock_out: newClockOut || 'N/A'
           };
           skipReasons.duplicateDates.push(dupInfo);
-          log(`[OMITIDO] ID ${record.id} - ${dupInfo.employee_name} (${record.numero_documento}): Ya existe registro para ${record.fecha}`);
+          log(`[OMITIDO] ID ${record.id} - ${dupInfo.employee_name} (${record.numero_documento}): Ya existe registro para ${record.fecha} - Existente: Entrada=${existingClockIn || 'N/A'}, Salida=${existingClockOut || 'N/A'} | Nuevo: Entrada=${newClockIn || 'N/A'}, Salida=${newClockOut || 'N/A'}`);
           continue;
         }
 
