@@ -99,7 +99,7 @@ export default function JustifyModal({
     }
 
     if (!justificationData.full_day_justification) {
-      const isOlvidoMarcacion = justificationData.incident_type === "Olvido de Marcación";
+      const isOlvidoMarcacion = justificationData.incident_type === "Omisión de Marcación" || justificationData.incident_type === "Olvido de Marcación";
       if (!isOlvidoMarcacion) {
         if (!justificationData.justified_time_start) {
           setValidationError("El campo 'Hora de Inicio' es obligatorio cuando no se justifica el día completo.");
@@ -352,21 +352,34 @@ export default function JustifyModal({
                 Tipo de Incidente <span className="text-red-500">*</span>
               </label>
               <Select
-                value={justificationData.incident_type}
-                onValueChange={(value) => {
-                  setJustificationData({ ...justificationData, incident_type: value });
-                  setValidationError("");
-                }}
+              value={justificationData.incident_type}
+              onValueChange={(value) => {
+                setJustificationData({ ...justificationData, incident_type: value });
+                setValidationError("");
+              }}
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Tardanza">Tardanza</SelectItem>
-                  <SelectItem value="Falta">Falta</SelectItem>
-                  <SelectItem value="Salida Temprana">Salida Temprana</SelectItem>
-                  <SelectItem value="Olvido de Marcación">Olvido de Marcación</SelectItem>
-                </SelectContent>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Comisión de Servicio">Comisión de Servicio</SelectItem>
+                <SelectItem value="Capacitación">Capacitación</SelectItem>
+                <SelectItem value="Descanso Médico">Descanso Médico</SelectItem>
+                <SelectItem value="Omisión de Marcación">Omisión de Marcación</SelectItem>
+                <SelectItem value="Cita Médica">Cita Médica</SelectItem>
+                <SelectItem value="Confirmación de Asistencia (Limitación de Sistema)">Confirmación de Asistencia (Limitación de Sistema)</SelectItem>
+                <SelectItem value="Licencia por Maternidad">Licencia por Maternidad</SelectItem>
+                <SelectItem value="Licencia por Paternidad">Licencia por Paternidad</SelectItem>
+                <SelectItem value="Otro">Otro</SelectItem>
+                <SelectItem value="Onomástico">Onomástico</SelectItem>
+                <SelectItem value="Descanso Vacacional">Descanso Vacacional</SelectItem>
+                <SelectItem value="Licencia sin Goce de Haber">Licencia sin Goce de Haber</SelectItem>
+                <SelectItem value="Feriado">Feriado</SelectItem>
+                <SelectItem value="Justificación de Tardanza">Justificación de Tardanza</SelectItem>
+                <SelectItem value="Tardanza">Tardanza</SelectItem>
+                <SelectItem value="Falta">Falta</SelectItem>
+                <SelectItem value="Salida Temprana">Salida Temprana</SelectItem>
+              </SelectContent>
               </Select>
             </div>
 

@@ -54,7 +54,7 @@ export default function AttendanceManagement() {
   const [pageSize, setPageSize] = useState(300);
   const [currentPage, setCurrentPage] = useState(1);
   const [justificationData, setJustificationData] = useState({
-    incident_type: "Olvido de Marcación",
+    incident_type: "Omisión de Marcación",
     justification: "",
     supporting_document_url: "",
     justified_time_start: "09:00",
@@ -481,7 +481,7 @@ export default function AttendanceManagement() {
         }
       }
       setJustificationData({
-        incident_type: incidentType,
+        incident_type: incidentType === "Olvido de Marcación" ? "Omisión de Marcación" : incidentType,
         justification: "",
         supporting_document_url: "",
         justified_time_start: startTime,
