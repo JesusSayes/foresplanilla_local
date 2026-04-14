@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from "../../config/prisma.js";
+
 import { generate24HexId } from '../../utils/idGenerator.js'
 import { parseDate, pick } from '../../utils/date.util.js';
-
-const prisma = new PrismaClient();
 
 const MODEL = prisma.vacation_request;
 

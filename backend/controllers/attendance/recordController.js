@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client'
-import crypto from 'crypto';
+import prisma from "../../config/prisma.js";
 
-const prisma = new PrismaClient()
+import crypto from 'crypto';
 
 const serializeRecord = (r) => ({
   ...r,

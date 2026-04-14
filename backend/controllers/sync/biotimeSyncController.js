@@ -1,9 +1,8 @@
-import pg from 'pg';
-import { PrismaClient } from '@prisma/client';
-import { generate24HexId } from '../../utils/idGenerator.js';
+import pg from "pg";
+import prisma from "../../config/prisma.js";
+import { generate24HexId } from "../../utils/idGenerator.js";
 
 const { Pool } = pg;
-const prisma = new PrismaClient();
 
 let biotimePool = null;
 
@@ -11,6 +10,9 @@ function getBiotimePool() {
   if (!biotimePool) {
     biotimePool = new Pool({
       connectionString: process.env.BIOTIME_DATABASE_URL,
+      max: 5,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
     });
   }
   return biotimePool;
@@ -18,20 +20,31 @@ function getBiotimePool() {
 
 export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
   const startedAt = new Date();
+
   let inserted = 0;
   let updated = 0;
   let errors = 0;
-  let errorDetails = [];
+  const errorDetails = [];
 
-  const dateFrom = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const dateFrom = startDate
+    ? new Date(startDate)
+    : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
   const dateTo = endDate ? new Date(endDate) : new Date();
 
   if (isNaN(dateFrom.getTime()) || isNaN(dateTo.getTime())) {
-    return { success: false, error: 'Fechas inválidas. Use formato YYYY-MM-DD.' };
+    return {
+      success: false,
+      error: "Fechas inválidas. Use formato YYYY-MM-DD.",
+    };
   }
 
-  console.log(`[BiotimeSync] Iniciando sincronización: ${startedAt.toISOString()}`);
-  console.log(`[BiotimeSync] Rango: ${dateFrom.toISOString()} → ${dateTo.toISOString()}`);
+  console.log(
+    `[BiotimeSync] Iniciando sincronización: ${startedAt.toISOString()}`
+  );
+  console.log(
+    `[BiotimeSync] Rango: ${dateFrom.toISOString()} → ${dateTo.toISOString()}`
+  );
 
   const pool = getBiotimePool();
   const client = await pool.connect();
@@ -52,17 +65,31 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
         e.last_name
       FROM iclock_transaction t
       LEFT JOIN personnel_employee e ON e.emp_code = t.emp_code
-      WHERE t.punch_time >= $1 AND t.punch_time <= $2
+      WHERE t.punch_time >= $1
+      AND t.punch_time <= $2
       ORDER BY t.emp_code, t.punch_time ASC
       `,
       [dateFrom, dateTo]
     );
 
-    console.log(`[BiotimeSync] ${transactions.length} marcaciones obtenidas de biotime`);
+    console.log(
+      `[BiotimeSync] ${transactions.length} marcaciones obtenidas de Biotime`
+    );
+
+    if (!transactions.length) {
+      return {
+        success: true,
+        inserted: 0,
+        updated: 0,
+        errors: 0,
+        message: "No hay marcaciones en el rango indicado",
+      };
+    }
 
     const grouped = {};
+
     for (const tx of transactions) {
-      const empCode = tx.emp_code?.padStart(8, '0');
+      const empCode = tx.emp_code?.padStart(8, "0");
       if (!empCode) continue;
 
       const punchTime = new Date(tx.punch_time);
@@ -76,16 +103,26 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
           punches: [],
         };
       }
+
       grouped[key].punches.push(punchTime);
     }
 
+    console.log(
+      `[BiotimeSync] ${Object.keys(grouped).length} registros agrupados`
+    );
+
     const employees = await prisma.employee.findMany({
-      select: { id: true, document_number: true },
+      select: {
+        id: true,
+        document_number: true,
+      },
     });
+
     const employeeMap = {};
+
     for (const emp of employees) {
       if (emp.document_number) {
-        employeeMap[emp.document_number.padStart(8, '0')] = emp.id;
+        employeeMap[emp.document_number.padStart(8, "0")] = emp.id;
       }
     }
 
@@ -96,13 +133,18 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
       if (!employeeId) continue;
 
       punches.sort((a, b) => a - b);
+
       const clockIn = punches[0];
-      const clockOut = punches.length > 1 ? punches[punches.length - 1] : null;
+      const clockOut =
+        punches.length > 1 ? punches[punches.length - 1] : null;
 
       const clockInStr = clockIn.toTimeString().slice(0, 5);
-      const clockOutStr = clockOut ? clockOut.toTimeString().slice(0, 5) : null;
+      const clockOutStr = clockOut
+        ? clockOut.toTimeString().slice(0, 5)
+        : null;
 
       let workedHours = null;
+
       if (clockOut) {
         const diffMs = clockOut - clockIn;
         workedHours = parseFloat((diffMs / 3600000).toFixed(2));
@@ -111,41 +153,41 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
       const recordDate = new Date(dateKey);
 
       try {
-        const existing = await prisma.attendance_record.findFirst({
-          where: { employee_id: employeeId, date: recordDate },
-        });
-
-        if (existing) {
-          await prisma.attendance_record.update({
-            where: { id: existing.id },
-            data: {
-              clock_in: clockInStr,
-              clock_out: clockOutStr,
-              worked_hours: workedHours,
-              updated_date: new Date(),
-              status: 'present',
-              is_absent: false,
-            },
-          });
-          updated++;
-        } else {
-          await prisma.attendance_record.create({
-            data: {
-              id: generate24HexId(),
+        const result = await prisma.attendance_record.upsert({
+          where: {
+            employee_id_date: {
               employee_id: employeeId,
               date: recordDate,
-              clock_in: clockInStr,
-              clock_out: clockOutStr,
-              worked_hours: workedHours,
-              status: 'present',
-              is_absent: false,
-              created_date: new Date(),
-              updated_date: new Date(),
-              created_by: 'biotime_sync',
-              is_sample: false,
             },
-          });
+          },
+          update: {
+            clock_in: clockInStr,
+            clock_out: clockOutStr,
+            worked_hours: workedHours,
+            updated_date: new Date(),
+            status: "present",
+            is_absent: false,
+          },
+          create: {
+            id: generate24HexId(),
+            employee_id: employeeId,
+            date: recordDate,
+            clock_in: clockInStr,
+            clock_out: clockOutStr,
+            worked_hours: workedHours,
+            status: "present",
+            is_absent: false,
+            created_date: new Date(),
+            updated_date: new Date(),
+            created_by: "biotime_sync",
+            is_sample: false,
+          },
+        });
+
+        if (result.created_date.getTime() === result.updated_date.getTime()) {
           inserted++;
+        } else {
+          updated++;
         }
       } catch (err) {
         errors++;
@@ -156,12 +198,29 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
     const finishedAt = new Date();
     const durationMs = finishedAt - startedAt;
 
-    console.log(`[BiotimeSync] Finalizado: ${inserted} insertados, ${updated} actualizados, ${errors} errores. Duración: ${durationMs}ms`);
+    console.log(
+      `[BiotimeSync] Finalizado: ${inserted} insertados, ${updated} actualizados, ${errors} errores`
+    );
+    console.log(`[BiotimeSync] Duración: ${durationMs} ms`);
 
-    return { success: true, inserted, updated, errors, errorDetails, durationMs };
+    return {
+      success: true,
+      inserted,
+      updated,
+      errors,
+      errorDetails,
+      durationMs,
+    };
   } catch (err) {
-    console.error('[BiotimeSync] Error general:', err.message);
-    return { success: false, error: err.message, inserted, updated, errors };
+    console.error("[BiotimeSync] Error general:", err.message);
+
+    return {
+      success: false,
+      error: err.message,
+      inserted,
+      updated,
+      errors,
+    };
   } finally {
     client.release();
   }
@@ -172,12 +231,24 @@ export async function triggerSync(req, res) {
     const startDate = req.body?.startDate || req.query?.startDate;
     const endDate = req.body?.endDate || req.query?.endDate;
 
-    const result = await syncBiotimeAttendance({ startDate, endDate });
+    const result = await syncBiotimeAttendance({
+      startDate,
+      endDate,
+    });
+
     res.json(result);
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error("[BiotimeSync] trigger error:", err.message);
+
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 }
 
-const controller = { triggerSync };
+const controller = {
+  triggerSync,
+};
+
 export default controller;
