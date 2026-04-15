@@ -143,6 +143,8 @@ export async function syncExternalAttendance(options = {}) {
       totalProcessed++;
 
       try {
+        externalIdsToConfirm.push(record.id);
+
         if (!record.numero_documento || !record.fecha) {
           totalSkipped++;
           skipReasons.missingData++;
@@ -267,7 +269,6 @@ export async function syncExternalAttendance(options = {}) {
             }
 
             totalUpdated++;
-            externalIdsToConfirm.push(record.id);
             continue;
           }
 
@@ -414,8 +415,6 @@ export async function syncExternalAttendance(options = {}) {
           }
           totalSaved++;
         }
-
-        externalIdsToConfirm.push(record.id);
 
       } catch (recordError) {
         const error = {
