@@ -204,7 +204,7 @@ export default function JustifyModal({
           worked_hours: Math.min(newWorkedHours, 8),
           late_minutes: newLateMinutes,
           is_late: newLateMinutes > 0,
-          status: newLateMinutes === 0 && newWorkedHours >= 8 ? "Completo" : "Justificado",
+          status: "Justificado",
         };
         if (timeStart) recordUpdate.clock_in = timeStart;
         if (timeEnd) recordUpdate.clock_out = timeEnd;
