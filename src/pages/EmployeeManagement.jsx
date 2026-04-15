@@ -518,6 +518,24 @@ export default function EmployeeManagement() {
       return;
     }
 
+    // Validar duplicado por tipo + número de documento (solo al crear o si cambia el documento)
+    if (!editingDerechohabiente || 
+        editingDerechohabiente.document_type !== derechohabienteFormData.document_type ||
+        editingDerechohabiente.document_number !== derechohabienteFormData.document_number) {
+      const duplicate = derechohabientes.find(dh =>
+        dh.document_type === derechohabienteFormData.document_type &&
+        dh.document_number === derechohabienteFormData.document_number &&
+        (!editingDerechohabiente || dh.id !== editingDerechohabiente.id)
+      );
+      if (duplicate) {
+        toast.error(
+          `⚠️ Ya existe un derechohabiente registrado con ${derechohabienteFormData.document_type} N° ${derechohabienteFormData.document_number}: ${duplicate.first_name} ${duplicate.last_name || ""} (${duplicate.relationship || ""})`,
+          { duration: 6000 }
+        );
+        return;
+      }
+    }
+
     if (editingDerechohabiente) {
       updateDerechohabienteMutation.mutate({
         id: editingDerechohabiente.id,
