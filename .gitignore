@@ -34,3 +34,4 @@ backend/node_modules
 backend/.env
 .env.production
 backend/uploads
+backend/logs

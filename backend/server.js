@@ -55,6 +55,8 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import derechohabientesRoutes from './routes/derechohabientes.js';
 import recalcularAsistenciaRoutes from './routes/attendance/recalcularAsistencia.js';
 import { generarAsistenciaDiaria } from './scripts/generarAsistenciaDiaria.js';
+import externalAttendanceRoutes from './routes/attendance/externalAttendanceRoutes.js';
+import { syncExternalAttendance } from './services/externalAttendanceSync.js';
 
 dotenv.config();
 
@@ -146,6 +148,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/uploads", express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api/derechohabientes', derechohabientesRoutes);
 app.use('/api/attendance/recalcular', recalcularAsistenciaRoutes);
+app.use('/api/attendance/external', externalAttendanceRoutes);
 
 // Cron: sincronización biotime cada hora
 cron.schedule('0 * * * *', () => {
@@ -157,6 +160,12 @@ cron.schedule('0 * * * *', () => {
 cron.schedule('1 5 * * *', () => {
   console.log('[Cron] Ejecutando generarAsistenciaDiaria...');
   generarAsistenciaDiaria({ mode: 'cron' }).catch(err => console.error('[Cron] Error en generarAsistenciaDiaria:', err.message));
+});
+
+// Cron: sincronización de asistencias externas cada hora
+cron.schedule('0 * * * *', () => {
+  console.log('[Cron] Ejecutando sincronización de asistencias externas...');
+  syncExternalAttendance().catch(err => console.error('[Cron] Error en sync asistencias externas:', err.message));
 });
 
 // 404 handler
@@ -192,6 +201,7 @@ app.listen(PORT, () => {
   console.log(`Logs: ${logsDir}`);
   console.log('[Cron] Sync biotime programado cada hora (0 * * * *)');
   console.log('[Cron] Generar asistencia diaria programado a las 05:01 UTC (1 5 * * *)');
+  console.log('[Cron] Sync asistencias externas programado cada hora (0 * * * *)');
 });
 app.use("/uploads", (req, res, next) => {
   console.log('Static request:', req.path, 'from', process.cwd());
