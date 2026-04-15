@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Users, Trash2, Plus, Edit, Loader2, Search } from "lucide-react";
+import { Users, Trash2, Plus, Edit, Loader2, Search, AlertTriangle, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 // import { base44 } from "@/api/base44Client";
@@ -440,10 +440,99 @@ export default function EmployeeForm({
                   </Select>
                 </div>
               </div>
+
             </TabsContent>
 
             {/* FINANCIAL */}
             <TabsContent value="financial" className="space-y-4">
+
+              {/* Información del Contrato Vigente */}
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText className="w-4 h-4 text-indigo-600" />
+                  <h4 className="font-semibold text-slate-900 text-sm">Información del Contrato Vigente</h4>
+                  {vigentContract ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">
+                      ✓ {vigentContract.contract_type}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700 font-medium">
+                      Sin contrato vigente
+                    </span>
+                  )}
+                </div>
+
+                {!vigentContract && editingEmployee && (
+                  <div className="flex items-start gap-3 p-3 mb-3 bg-amber-50 border border-amber-300 rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800">Sin contrato vigente</p>
+                      <p className="text-xs text-amber-700 mt-0.5">Este empleado no tiene un contrato activo. La información de remuneración y condiciones laborales no está disponible. Registre un contrato vigente en la sección de Gestión de Contratos.</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-xs text-slate-500">Remuneración (S/)</Label>
+                    <Input value={vigentContract ? (vigentContract.salary || 0).toFixed(2) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-slate-500">Horas Semanales</Label>
+                    <Input value={vigentContract ? (vigentContract.weekly_hours ?? 48) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-slate-500">Período de Prueba (días)</Label>
+                    <Input value={vigentContract ? (vigentContract.trial_period_days ?? 90) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
+                  </div>
+                </div>
+              </div>
+              <hr className="border-slate-200" />
+
+              {/* Conceptos Adicionales Fijos */}
+              <div className="mb-4">
+                <h4 className="font-semibold text-slate-900 text-sm mb-3 flex items-center gap-2">
+                  <span className="w-1.5 h-5 bg-indigo-500 rounded inline-block"></span>
+                  Conceptos Adicionales (se incluyen en planilla)
+                </h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-xs font-medium text-slate-700">Costo Actividad (S/)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.activity_cost ?? ""}
+                      onChange={(e) => setFormData({ ...formData, activity_cost: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-slate-700">Costo Alimento (S/)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.food_cost ?? ""}
+                      onChange={(e) => setFormData({ ...formData, food_cost: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-slate-700">Costo Movilidad (S/)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.transport_cost ?? ""}
+                      onChange={(e) => setFormData({ ...formData, transport_cost: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">Estos montos se añaden automáticamente como ingresos adicionales al calcular la planilla.</p>
+              </div>
+              <hr className="border-slate-200" />
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label>Sistema de Pensiones</Label>

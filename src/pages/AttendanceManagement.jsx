@@ -57,7 +57,7 @@ export default function AttendanceManagement() {
   const [pageSize, setPageSize] = useState(300);
   const [currentPage, setCurrentPage] = useState(1);
   const [justificationData, setJustificationData] = useState({
-    incident_type: "Olvido de Marcación",
+    incident_type: "Omisión de Marcación",
     justification: "",
     supporting_document_url: "",
     justified_time_start: "09:00",
@@ -227,9 +227,16 @@ export default function AttendanceManagement() {
         setTimeout(() => resolve({ success: true, imported: 45, errors: 2 }), 2000);
       });
     },
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
-      toast.success(`✓ ${result.imported} marcaciones importadas. ${result.errors} errores.`);
+    onSuccess: async (result) => {
+      // Recalcular métricas para todos los empleados con registros en la fecha seleccionada
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const recordsForDate = await entitiesAPI.AttendanceRecord.filter({ date: dateStr });
+      const affectedEmployeeIds = [...new Set(recordsForDate.map(r => r.employee_id))];
+      for (const empId of affectedEmployeeIds) {
+        await recalcularAsistenciaService.recalculate(empId, dateStr, dateStr);
+      }
+      queryClient.invalidateQueries(["todayAttendance"]);
+      toast.success(`✓ ${result.imported} marcaciones importadas y métricas recalculadas. ${result.errors} errores.`);
     },
     onError: () => toast.error("Error al importar marcaciones"),
   });
@@ -279,6 +286,51 @@ export default function AttendanceManagement() {
   };
 
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Calcular preview de métricas en tiempo real para el modal de edición
+  const calcEditPreview = (clockIn, clockOut, recordDate, employeeId) => {
+    if (!clockIn) return null;
+    const schedule = getEmployeeScheduleForDate(employeeId, recordDate);
+    const dow = new Date(recordDate + "T00:00:00").getDay();
+    const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+    const dayEndMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+    const scheduledStart  = schedule ? (schedule[dayStartMap[dow]] || "09:00") : "09:00";
+    const scheduledEnd    = schedule ? (schedule[dayEndMap[dow]]   || "18:00") : "18:00";
+    const breakMinutes    = schedule?.break_duration_minutes ?? 60;
+    const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
+    const overtimeAuthorized = schedule?.overtime_authorized ?? false;
+
+    const [inH, inM]   = clockIn.split(":").map(Number);
+    const inTotal      = inH * 60 + inM;
+    const [schedH, schedM] = scheduledStart.split(":").map(Number);
+    const schedTotal   = schedH * 60 + schedM;
+    const [endH, endM] = scheduledEnd.split(":").map(Number);
+    const schedEndTotal = endH * 60 + endM;
+
+    const rawLate = inTotal - schedTotal;
+    const lateMinutes = rawLate > toleranceMinutes ? rawLate : 0;
+
+    let workedHours = 0, regularHours = 0, overtimeHours25 = 0, overtimeHours35 = 0;
+    if (clockOut) {
+      const [outH, outM] = clockOut.split(":").map(Number);
+      const outTotal = outH * 60 + outM;
+      const totalMinutes = outTotal - inTotal - breakMinutes;
+      workedHours = Math.max(0, totalMinutes / 60);
+      const regularMinutes = Math.max(0, schedEndTotal - Math.max(inTotal, schedTotal) - breakMinutes);
+      const normalHoursMax = regularMinutes / 60;
+      if (workedHours <= normalHoursMax) {
+        regularHours = workedHours;
+      } else {
+        regularHours = normalHoursMax;
+        const extraHours = workedHours - normalHoursMax;
+        if (overtimeAuthorized) {
+          overtimeHours25 = Math.min(extraHours, 2);
+          overtimeHours35 = Math.max(0, extraHours - 2);
+        }
+      }
+    }
+    return { scheduledStart, scheduledEnd, lateMinutes, isLate: lateMinutes > 0, workedHours, regularHours, overtimeHours25, overtimeHours35, overtimeAuthorized };
+  };
 
   const handleSaveEdit = async () => {
     if (!editingRecord || isSavingEdit) return;
@@ -444,7 +496,7 @@ export default function AttendanceManagement() {
         }
       }
       setJustificationData({
-        incident_type: incidentType,
+        incident_type: incidentType === "Olvido de Marcación" ? "Omisión de Marcación" : incidentType,
         justification: "",
         supporting_document_url: "",
         justified_time_start: startTime,
@@ -1104,12 +1156,7 @@ export default function AttendanceManagement() {
                                     notes: `HE aceptadas solo para el día ${alert.alert_date}`
                                   });
                                   // 3. Recalcular asistencia del día (tardanza + HE 25% + HE 35%)
-                                  // await base44.functions.invoke("recalcularAsistencia", {
-                                  //   employee_id: alert.employee_id,
-                                  //   date_from: alert.alert_date,
-                                  //   date_to: alert.alert_date,
-                                  // });
-                                  await recalcularAsistenciaService.invoke(
+                                  await recalcularAsistenciaService.recalculate(
                                     alert.employee_id,
                                     alert.alert_date,
                                     alert.alert_date
@@ -1420,6 +1467,48 @@ export default function AttendanceManagement() {
                     <label className="block text-sm font-semibold text-slate-900 mb-2">Notas <span className="text-xs font-normal text-slate-400">(opcional)</span></label>
                     <Textarea value={editingRecord.notes} onChange={(e) => setEditingRecord({ ...editingRecord, notes: e.target.value })} placeholder="Observaciones adicionales..." rows={3} />
                   </div>
+                  {/* Preview de métricas calculadas en tiempo real */}
+                  {editingRecord.clock_in && (() => {
+                    const preview = calcEditPreview(editingRecord.clock_in, editingRecord.clock_out, editingRecord.date, editingRecord.employee_id);
+                    if (!preview) return null;
+                    return (
+                      <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                        <p className="text-xs font-semibold text-indigo-900 mb-3">📊 Vista previa del cálculo (horario {preview.scheduledStart}–{preview.scheduledEnd})</p>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Horas trabajadas:</span>
+                            <span className="font-bold text-slate-900">{preview.workedHours.toFixed(2)}h</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Horas regulares:</span>
+                            <span className="font-bold text-slate-900">{preview.regularHours.toFixed(2)}h</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">Tardanza:</span>
+                            <span className={`font-bold ${preview.isLate ? 'text-orange-600' : 'text-green-600'}`}>
+                              {preview.lateMinutes} min {preview.isLate ? '⚠️' : '✓'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">HE 25%:</span>
+                            <span className={`font-bold ${preview.overtimeHours25 > 0 ? 'text-blue-600' : 'text-slate-400'}`}>
+                              {preview.overtimeHours25.toFixed(2)}h {!preview.overtimeAuthorized && preview.overtimeHours25 > 0 ? '🔒' : ''}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">HE 35%:</span>
+                            <span className={`font-bold ${preview.overtimeHours35 > 0 ? 'text-purple-600' : 'text-slate-400'}`}>
+                              {preview.overtimeHours35.toFixed(2)}h {!preview.overtimeAuthorized && preview.overtimeHours35 > 0 ? '🔒' : ''}
+                            </span>
+                          </div>
+                        </div>
+                        {!preview.overtimeAuthorized && (preview.overtimeHours25 > 0 || preview.overtimeHours35 > 0) && (
+                          <p className="text-xs text-orange-700 mt-2">🔒 Las horas extras no se contabilizarán para pago porque el empleado no tiene HE autorizadas (se generará alerta).</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   <div className="flex gap-3">
                     <Button variant="outline" className="flex-1" onClick={() => setShowEditModal(false)}>Cancelar</Button>
                     <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleSaveEdit} disabled={isSavingEdit}>

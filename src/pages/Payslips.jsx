@@ -11,6 +11,7 @@ import {
   FileText, Download, Search, Calendar as CalendarIcon,
   TrendingUp, TrendingDown, Filter, Eye, Settings
 } from "lucide-react";
+import PayslipPreview from "../components/payroll/PayslipPreview";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { createPageUrl } from "../utils";
@@ -287,6 +288,7 @@ export default function Payslips() {
 
         {/* Detail Modal */}
         {selectedPayslip && (
+<<<<<<< HEAD
           <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             onClick={() => setSelectedPayslip(null)}
@@ -412,6 +414,27 @@ export default function Payslips() {
                 </div>
               </CardContent>
             </Card>
+=======
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
+            onClick={() => setSelectedPayslip(null)}
+          >
+            <div 
+              className="max-w-2xl w-full my-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-3">
+                <Button variant="outline" className="bg-white" onClick={() => setSelectedPayslip(null)}>
+                  ← Volver al Detalle
+                </Button>
+              </div>
+              <PayslipPreview
+                payslip={selectedPayslip}
+                employee={employee}
+                showPrintButton={true}
+              />
+            </div>
+>>>>>>> main
           </div>
         )}
       </div>

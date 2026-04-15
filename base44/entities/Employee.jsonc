@@ -1,0 +1,277 @@
+{
+  "name": "Employee",
+  "type": "object",
+  "properties": {
+    "employee_code": {
+      "type": "string",
+      "description": "C\u00f3digo \u00fanico del empleado"
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "DNI",
+        "CE",
+        "Pasaporte",
+        "CPP"
+      ],
+      "description": "Tipo de documento"
+    },
+    "document_number": {
+      "type": "string",
+      "description": "N\u00famero de documento"
+    },
+    "first_name": {
+      "type": "string",
+      "description": "Nombres"
+    },
+    "last_name": {
+      "type": "string",
+      "description": "Apellidos"
+    },
+    "birth_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de nacimiento"
+    },
+    "gender": {
+      "type": "string",
+      "enum": [
+        "M",
+        "F"
+      ],
+      "description": "G\u00e9nero"
+    },
+    "personal_email": {
+      "type": "string",
+      "description": "Email personal"
+    },
+    "work_email": {
+      "type": "string",
+      "description": "Email corporativo"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono fijo"
+    },
+    "mobile": {
+      "type": "string",
+      "description": "Celular"
+    },
+    "address": {
+      "type": "string",
+      "description": "Direcci\u00f3n actual"
+    },
+    "district": {
+      "type": "string",
+      "description": "Distrito"
+    },
+    "province": {
+      "type": "string",
+      "description": "Provincia"
+    },
+    "department": {
+      "type": "string",
+      "description": "Departamento"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa del grupo"
+    },
+    "position": {
+      "type": "string",
+      "description": "Cargo actual"
+    },
+    "position_level": {
+      "type": "string",
+      "description": "Nivel del cargo"
+    },
+    "profession": {
+      "type": "string",
+      "description": "Profesi\u00f3n"
+    },
+    "department_name": {
+      "type": "string",
+      "description": "\u00c1rea/Departamento"
+    },
+    "work_unit": {
+      "type": "string",
+      "description": "Unidad de trabajo"
+    },
+    "site": {
+      "type": "string",
+      "description": "Sede de trabajo"
+    },
+    "hire_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de ingreso"
+    },
+    "termination_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de cese"
+    },
+    "contract_type": {
+      "type": "string",
+      "enum": [
+        "Indeterminado",
+        "Plazo Fijo",
+        "Part-Time",
+        "Pr\u00e1cticas",
+        "SNP"
+      ],
+      "default": "Plazo Fijo",
+      "description": "Tipo de contrato"
+    },
+    "base_salary": {
+      "type": "number",
+      "description": "Salario base mensual"
+    },
+    "activity_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "Costo de Actividad mensual"
+    },
+    "food_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "Costo de Alimento mensual"
+    },
+    "transport_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "Costo de Movilidad mensual"
+    },
+    "bank_name": {
+      "type": "string",
+      "description": "Banco para pagos de sueldo"
+    },
+    "bank_account": {
+      "type": "string",
+      "description": "N\u00famero de cuenta sueldo"
+    },
+    "cci_account": {
+      "type": "string",
+      "description": "C\u00f3digo de Cuenta Interbancario (CCI) para sueldo"
+    },
+    "cts_bank": {
+      "type": "string",
+      "description": "Banco para CTS"
+    },
+    "cts_account_number": {
+      "type": "string",
+      "description": "N\u00famero de cuenta CTS"
+    },
+    "cts_currency": {
+      "type": "string",
+      "enum": [
+        "Soles",
+        "D\u00f3lares"
+      ],
+      "default": "Soles",
+      "description": "Moneda de cuenta CTS"
+    },
+    "pension_system": {
+      "type": "string",
+      "enum": [
+        "AFP",
+        "ONP",
+        "Ninguno"
+      ],
+      "default": "Ninguno",
+      "description": "Sistema de pensiones al que est\u00e1 afiliado"
+    },
+    "afp_id": {
+      "type": "string",
+      "description": "ID de la AFP a la que est\u00e1 afiliado"
+    },
+    "afp_affiliation_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de afiliaci\u00f3n a AFP"
+    },
+    "cuspp": {
+      "type": "string",
+      "description": "C\u00f3digo \u00danico de Identificaci\u00f3n del Sistema Privado de Pensiones"
+    },
+    "worker_type": {
+      "type": "string",
+      "enum": [
+        "Empleado",
+        "Obrero",
+        "Practicante",
+        "Directivo"
+      ],
+      "default": "Empleado",
+      "description": "Tipo de trabajador"
+    },
+    "tax_residence": {
+      "type": "string",
+      "enum": [
+        "Domiciliado",
+        "No Domiciliado"
+      ],
+      "default": "Domiciliado",
+      "description": "Condici\u00f3n tributaria"
+    },
+    "photo_url": {
+      "type": "string",
+      "description": "URL de foto del empleado"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Activo",
+        "Suspendido",
+        "Cesado"
+      ],
+      "default": "Activo",
+      "description": "Estado del empleado"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "empleado",
+        "manager",
+        "admin",
+        "super_admin",
+        "hr_readonly"
+      ],
+      "default": "empleado",
+      "description": "Rol del empleado en el sistema"
+    },
+    "managed_team_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de empleados que este manager supervisa"
+    },
+    "supervisor_id": {
+      "type": "string",
+      "description": "ID del supervisor directo"
+    },
+    "supervisor_name": {
+      "type": "string",
+      "description": "Nombre del supervisor directo"
+    },
+    "emergency_contact_name": {
+      "type": "string",
+      "description": "Contacto de emergencia"
+    },
+    "emergency_contact_phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono de emergencia"
+    },
+    "emergency_contact_relationship": {
+      "type": "string",
+      "description": "Relaci\u00f3n con contacto de emergencia"
+    }
+  },
+  "required": [
+    "employee_code",
+    "document_number",
+    "first_name",
+    "last_name"
+  ]
+}
