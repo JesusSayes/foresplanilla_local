@@ -103,8 +103,8 @@ function InlineDatePickerOptional({ value, onChange, label }) {
   );
 }
 
-export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
-  const [effectiveFrom, setEffectiveFrom] = useState(new Date());
+export default function AssignScheduleModal({ employee, onClose, onSuccess, initialDate }) {
+  const [effectiveFrom, setEffectiveFrom] = useState(initialDate || new Date());
   const [effectiveTo, setEffectiveTo] = useState(null);
   const [selectedScheduleId, setSelectedScheduleId] = useState("");
   const [recalcRange, setRecalcRange] = useState(true);

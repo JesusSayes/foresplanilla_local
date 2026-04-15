@@ -1028,7 +1028,7 @@ export default function AttendanceManagement() {
                                   size="sm"
                                   variant="outline"
                                   className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                                  onClick={() => { setSchedulingEmployee(emp); setShowScheduleModal(true); }}
+                                  onClick={() => { setSchedulingEmployee({ ...emp, _rowDate: rowDate }); setShowScheduleModal(true); }}
                                   title="Asignar/cambiar horario"
                                 >
                                   <CalendarClock className="w-4 h-4" />
@@ -1511,6 +1511,7 @@ export default function AttendanceManagement() {
         {showScheduleModal && schedulingEmployee && (
           <AssignScheduleModal
             employee={schedulingEmployee}
+            initialDate={schedulingEmployee._rowDate ? new Date(schedulingEmployee._rowDate + "T00:00:00") : new Date()}
             onClose={() => { setShowScheduleModal(false); setSchedulingEmployee(null); }}
             onSuccess={() => {
               queryClient.invalidateQueries(["workSchedules"]);
