@@ -1,4 +1,34 @@
-import { syncExternalAttendance } from './services/externalAttendanceSync.js';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const possibleEnvPaths = [
+  path.join(__dirname, '.env'),
+  path.join(process.cwd(), 'backend', '.env'),
+  path.join(process.cwd(), '.env'),
+  '/var/www/html/foresplanilla/backend/.env',
+];
+
+let envFileFound = false;
+let envFilePath = null;
+
+for (const envPath of possibleEnvPaths) {
+  const exists = fs.existsSync(envPath);
+  if (exists && !envFileFound) {
+    envFileFound = true;
+    envFilePath = envPath;
+  }
+}
+
+if (envFileFound) {
+  dotenv.config({ path: envFilePath });
+} else {
+  console.error('⚠️  No se encontró archivo .env');
+}
 
 const args = process.argv.slice(2);
 const updateExisting = args.includes('--update') || args.includes('-u');
@@ -20,123 +50,99 @@ console.log('='.repeat(60));
 console.log('');
 
 if (args.includes('--help') || args.includes('-h')) {
-  console.log('Uso: node backend/syncAttendanceCLI.js [opciones]');
+  console.log('Uso: node syncAttendanceCLI.js [opciones]');
   console.log('');
   console.log('Opciones:');
-  console.log('  --dry-run, -d        Modo simulación (no guarda en BD)');
-  console.log('  --update, -u         Actualizar registros existentes');
-  console.log('  --limit, -l <num>    Limitar a N registros (útil para pruebas)');
-  console.log('  --help, -h           Mostrar esta ayuda');
+  console.log('  --update, -u       Actualizar registros existentes');
+  console.log('  --dry-run, -d      Modo de prueba (no guarda cambios)');
+  console.log('  --limit N, -l N    Limitar a N registros');
+  console.log('  --help, -h         Mostrar esta ayuda');
   console.log('');
   console.log('Ejemplos:');
-  console.log('  node backend/syncAttendanceCLI.js --dry-run');
-  console.log('  node backend/syncAttendanceCLI.js --dry-run --limit 10');
-  console.log('  node backend/syncAttendanceCLI.js --update');
-  console.log('  node backend/syncAttendanceCLI.js --update --limit 10');
+  console.log('  node syncAttendanceCLI.js --dry-run');
+  console.log('  node syncAttendanceCLI.js --update --limit 100');
+  console.log('  node syncAttendanceCLI.js -u -l 50');
   console.log('');
   process.exit(0);
 }
 
+console.log('Configuración:');
+console.log('  Actualizar existentes:', updateExisting ? 'Sí' : 'No');
+console.log('  Modo de prueba:', dryRun ? 'Sí' : 'No');
+console.log('  Límite de registros:', limit || 'Sin límite');
+console.log('');
+
+if (!process.env.EXTERNAL_API_BASE_URL || !process.env.EXTERNAL_API_EMAIL || !process.env.EXTERNAL_API_PASSWORD) {
+  console.error('❌ ERROR: Faltan variables de entorno requeridas');
+  console.log('');
+  console.log('Variables requeridas:');
+  console.log('  EXTERNAL_API_BASE_URL:', process.env.EXTERNAL_API_BASE_URL || '❌ NO CONFIGURADO');
+  console.log('  EXTERNAL_API_EMAIL:', process.env.EXTERNAL_API_EMAIL || '❌ NO CONFIGURADO');
+  console.log('  EXTERNAL_API_PASSWORD:', process.env.EXTERNAL_API_PASSWORD ? '✓ Configurado' : '❌ NO CONFIGURADO');
+  console.log('');
+  console.log('Solución: Crear archivo .env en backend/ con estas variables');
+  console.log('');
+  process.exit(1);
+}
+
 async function main() {
+  const { syncExternalAttendance } = await import('./services/externalAttendanceSync.js');
+
   try {
-    console.log(`Modo: ${dryRun ? 'DRY RUN (Simulación)' : 'REAL (Guardará en BD)'}`);
-    console.log(`Actualizar existentes: ${updateExisting ? 'SÍ' : 'NO'}`);
-    if (limit) {
-      console.log(`Límite: ${limit} registros`);
-    }
+    console.log('Iniciando sincronización...');
     console.log('');
 
-    const result = await syncExternalAttendance({ updateExisting, limit, dryRun });
+    const startTime = Date.now();
+
+    const result = await syncExternalAttendance({
+      updateExisting,
+      dryRun,
+      limit
+    });
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
     console.log('');
     console.log('='.repeat(60));
-    console.log('RESULTADO DE LA SINCRONIZACIÓN');
+    console.log('RESUMEN DE SINCRONIZACIÓN');
     console.log('='.repeat(60));
-    console.log(`Estado: ${result.success ? '✓ EXITOSO' : '✗ FALLIDO'}`);
-    console.log(`Modo: ${result.dryRun ? 'DRY RUN (No se guardó nada)' : 'REAL'}`);
-    console.log(`Duración: ${result.duration}ms`);
-    console.log(`Archivo de log: ${result.logFile}`);
     console.log('');
     console.log('Estadísticas:');
-    console.log(`  - Total procesados: ${result.totalProcessed}`);
-    console.log(`  - Nuevos guardados: ${result.totalSaved}`);
-    console.log(`  - Actualizados: ${result.totalUpdated}`);
-    console.log(`  - Omitidos: ${result.totalSkipped}`);
+    console.log('  Total procesados:', result.totalProcessed);
+    console.log('  Nuevos creados:', result.created);
+    console.log('  Actualizados:', result.updated);
+    console.log('  Omitidos:', result.skipped);
+    console.log('  Errores:', result.errors);
+    console.log('  Duración:', duration, 'segundos');
     console.log('');
 
-    if (result.dryRun) {
-      console.log('REGISTROS QUE SE GUARDARÍAN:');
-      console.log(`  - Nuevos: ${result.recordsToSave?.length || 0}`);
-      console.log(`  - Actualizaciones: ${result.recordsToUpdate?.length || 0}`);
+    if (dryRun) {
+      console.log('⚠️  MODO DE PRUEBA - No se guardaron cambios en la base de datos');
       console.log('');
     }
 
-    if (result.totalSkipped > 0 && result.skipReasons) {
-      console.log('Razones de registros omitidos:');
-      console.log(`  - Datos faltantes: ${result.skipReasons.missingData || 0}`);
-      console.log(`  - Empleado no encontrado: ${result.skipReasons.employeeNotFound || 0}`);
-      console.log(`  - Ya existe (duplicado): ${result.skipReasons.alreadyExists || 0}`);
-      console.log('');
-
-      if (result.skipReasons.employeesNotFound && result.skipReasons.employeesNotFound.length > 0) {
-        console.log(`Documentos de empleados no encontrados (${result.skipReasons.employeesNotFound.length}):`);
-        const docs = result.skipReasons.employeesNotFound.slice(0, 20);
-        docs.forEach(doc => console.log(`  - ${doc}`));
-        if (result.skipReasons.employeesNotFound.length > 20) {
-          console.log(`  ... y ${result.skipReasons.employeesNotFound.length - 20} más`);
-        }
-        console.log('');
-      }
-
-      if (result.skipReasons.duplicateDates && result.skipReasons.duplicateDates.length > 0) {
-        console.log(`Registros duplicados (primeros 10):`);
-        result.skipReasons.duplicateDates.slice(0, 10).forEach(dup => {
-          console.log(`  - ${dup.employee_name} (${dup.document_number}) - ${dup.date} [ID: ${dup.external_id}]`);
-        });
-        if (result.skipReasons.duplicateDates.length > 10) {
-          console.log(`  ... y ${result.skipReasons.duplicateDates.length - 10} más`);
-        }
-        console.log('');
-      }
-    }
-
-    if (result.savedRecordIds && result.savedRecordIds.length > 0) {
-      console.log(`IDs de registros guardados/actualizados: ${result.savedRecordIds.length}`);
-      console.log(`  Primeros 5: ${result.savedRecordIds.slice(0, 5).join(', ')}`);
-      console.log('');
-    }
-
-    if (result.externalIdsConfirmed && result.externalIdsConfirmed.length > 0) {
-      console.log(`IDs externos confirmados: ${result.externalIdsConfirmed.length}`);
-      console.log(`  IDs: [${result.externalIdsConfirmed.join(', ')}]`);
-      console.log('');
-    }
-
-    if (result.errors && result.errors.length > 0) {
-      console.log(`⚠ Errores encontrados: ${result.errors.length}`);
-      result.errors.slice(0, 10).forEach((err, idx) => {
-        console.log(`  ${idx + 1}. ${err.error} ${err.external_id ? `(ID externo: ${err.external_id})` : ''} ${err.document_number ? `(Doc: ${err.document_number})` : ''}`);
+    if (result.errorDetails && result.errorDetails.length > 0) {
+      console.log('Detalles de errores:');
+      result.errorDetails.forEach((error, index) => {
+        console.log(`  ${index + 1}. ${error}`);
       });
-      if (result.errors.length > 10) {
-        console.log(`  ... y ${result.errors.length - 10} más (ver log completo)`);
-      }
       console.log('');
     }
 
-    console.log('='.repeat(60));
-    console.log(`Ver detalles completos en: ${result.logFile}`);
-    console.log('='.repeat(60));
+    console.log('✓ Sincronización completada');
+    console.log('');
 
-    process.exit(result.success ? 0 : 1);
+    process.exit(0);
 
   } catch (error) {
     console.error('');
     console.error('='.repeat(60));
     console.error('ERROR FATAL');
     console.error('='.repeat(60));
-    console.error(error.message);
-    console.error(error.stack);
-    console.error('='.repeat(60));
+    console.error('');
+    console.error('Mensaje:', error.message);
+    console.error('Stack:', error.stack);
+    console.error('');
     process.exit(1);
   }
 }
