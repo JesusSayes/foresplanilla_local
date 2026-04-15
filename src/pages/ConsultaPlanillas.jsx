@@ -238,20 +238,24 @@ export default function ConsultaPlanillas() {
           </div>
 
           {/* Resumen */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[
               { label: "Empleados incluidos", value: stats.empleados, icon: Users, color: "blue" },
               { label: "Total Ingresos", value: `S/ ${stats.totalIncome.toFixed(2)}`, icon: DollarSign, color: "green" },
               { label: "Total Descuentos", value: `S/ ${stats.totalDesc.toFixed(2)}`, icon: DollarSign, color: "red" },
-              { label: "Total Neto a Pagar", value: `S/ ${stats.totalNeto.toFixed(2)}`, icon: DollarSign, color: "indigo", big: true },
-            ].map(({ label, value, icon: Icon, color, big }) => (
+              { label: "Total Neto a Pagar", value: `S/ ${stats.totalNeto.toFixed(2)}`, icon: DollarSign, color: "indigo" },
+            ].map(({ label, value, icon: Icon, color }) => (
               <Card key={label} className="border-0 shadow-lg">
-                <CardContent className="p-5">
-                  <div className={`inline-flex p-2 rounded-lg bg-${color}-100 mb-3`}>
-                    <Icon className={`w-5 h-5 text-${color}-600`} />
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`p-2 bg-${color}-100 rounded-lg shrink-0`}>
+                      <Icon className={`w-4 h-4 text-${color}-600`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xl font-bold text-slate-900 leading-tight">{value}</div>
+                      <p className="text-slate-600 text-xs truncate">{label}</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500 mb-1">{label}</p>
-                  <p className={`font-bold text-slate-900 ${big ? "text-2xl text-indigo-600" : "text-lg"}`}>{value}</p>
                 </CardContent>
               </Card>
             ))}
