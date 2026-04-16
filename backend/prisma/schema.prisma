@@ -888,3 +888,49 @@ model attendance_record_backup {
 
   @@ignore
 }
+
+model asiento_contable {
+  id                String    @id(map: "asientocontable_pkey") @db.VarChar(255)
+  created_date      DateTime? @db.Timestamp(6)
+  updated_date      DateTime? @db.Timestamp(6)
+  created_by        String?
+  annomes           String?
+  subdiario         String?
+  comprobante       String?
+  cuenta            String?
+  cuenta_id         String?
+  fecha_doc         DateTime? @db.Date
+  tipo_anexo        String?
+  cod_anexo         String?
+  tipo_doc          String?
+  nro_doc           String?
+  fecha_vencimiento DateTime? @db.Date
+  moneda            String?
+  importe           Decimal?  @db.Decimal(18, 2)
+  conversion_tc     String?
+  tc                Decimal?  @db.Decimal(18, 6)
+  importe_soles     Decimal?  @db.Decimal(18, 2)
+  glosa             String?
+  glosa_mov         String?
+  debe_haber        String?
+  centro_costos     String?
+  centro_costos_id  String?
+  medio_pago        String?
+  fecha_registro    DateTime? @db.Date
+  anulado           Boolean?
+  motivo_anulacion  String?
+  origen            String?
+  payslip_id        String?
+  employee_id       String?
+  payroll_period    String?
+  payroll_type      String?
+  migrado           Boolean?
+  fecha_migracion   DateTime? @db.Timestamp(6)
+  sistema_destino   String?
+  codigo_migracion  String?
+  migrado_por       String?
+  error_migracion   String?
+  estado_migracion  String?
+  created_by_id     String?
+  is_sample         Boolean?
+}

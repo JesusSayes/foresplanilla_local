@@ -57,6 +57,7 @@ import recalcularAsistenciaRoutes from './routes/attendance/recalcularAsistencia
 import { generarAsistenciaDiaria } from './scripts/generarAsistenciaDiaria.js';
 import externalAttendanceRoutes from './routes/attendance/externalAttendanceRoutes.js';
 import { syncExternalAttendance } from './services/externalAttendanceSync.js';
+import asientosContablesRoutes from './routes/asientosContables.js';
 
 dotenv.config();
 
@@ -149,6 +150,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api/derechohabientes', derechohabientesRoutes);
 app.use('/api/attendance/recalcular', recalcularAsistenciaRoutes);
 app.use('/api/attendance/external', externalAttendanceRoutes);
+app.use('/api/asientos-contables', asientosContablesRoutes);
 
 // Cron: sincronización biotime cada hora
 cron.schedule('0 * * * *', () => {
