@@ -626,9 +626,9 @@ export default function ContractManagement() {
                       }}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {["Indeterminado","Plazo Fijo","Part-Time","Prácticas","Obra o Servicio","Intermitente","Temporal"].map(t => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
+                           {["Indeterminado","Plazo Fijo","Part-Time","Prácticas","SNP"].map(t => (
+                             <SelectItem key={t} value={t}>{t}</SelectItem>
+                           ))}
                         </SelectContent>
                       </Select>
                     </div>
