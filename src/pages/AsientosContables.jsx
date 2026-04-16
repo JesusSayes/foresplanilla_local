@@ -47,6 +47,7 @@ export default function AsientosContables() {
   const [filterMigracion, setFilterMigracion] = useState("all");
   const [filterDH, setFilterDH] = useState("all");
   const [filterAnulado, setFilterAnulado] = useState("all");
+  const [filterTipoPlanilla, setFilterTipoPlanilla] = useState("all");
 
   // Detail modal
   const [selectedAsiento, setSelectedAsiento] = useState(null);
@@ -99,7 +100,8 @@ export default function AsientosContables() {
     const matchMigracion = filterMigracion === "all" || a.estado_migracion === filterMigracion;
     const matchDH = filterDH === "all" || a.debe_haber === filterDH;
     const matchAnulado = filterAnulado === "all" || (filterAnulado === "si" ? a.anulado : !a.anulado);
-    return matchSearch && matchPeriodo && matchSubdiario && matchOrigen && matchMigracion && matchDH && matchAnulado;
+    const matchTipoPlanilla = filterTipoPlanilla === "all" || a.payroll_type === filterTipoPlanilla;
+    return matchSearch && matchPeriodo && matchSubdiario && matchOrigen && matchMigracion && matchDH && matchAnulado && matchTipoPlanilla;
   });
 
   // Estadísticas
@@ -184,46 +186,79 @@ export default function AsientosContables() {
     toast.success(`${pendientes.length} asientos marcados como migrados`);
   };
 
+  // Exporta con la cadena de conexión exacta que requiere el sistema contable externo
   const handleExportExcel = () => {
-    const data = filtered.map(a => {
+    // Hoja 1: Cadena de conexión del sistema contable (campos exactos requeridos)
+    const dataConexion = filtered.map(a => ({
+      "cuenta":           a.cuenta || "",
+      "annomes":          a.annomes || "",
+      "subdiario":        a.subdiario || "",
+      "comprobante":      a.comprobante || "",
+      "fecha_Documento":  a.fecha_doc || "",
+      "tipo_Anexo":       a.tipo_anexo || "",
+      "cod_Proveedor":    a.cod_anexo || "",
+      "tipo_Doc":         a.tipo_doc || "",
+      "nro_Doc":          a.nro_doc || "",
+      "fecha_Vencimiento": a.fecha_vencimiento || a.fecha_doc || "",
+      "importe_Doc":      a.importe ?? 0,
+      "conversion_Tc":    a.conversion_tc || "M",
+      "fecha_Registro":   a.fecha_registro || "",
+      "tc":               a.tc ?? 1,
+      "glosa":            a.glosa || "",
+      "destino_Compra":   a.centro_costos || "",
+      "centro_Costos":    a.centro_costos || "",
+      "glosa_Mov":        a.glosa_mov || "",
+      "anulado":          a.anulado ? "1" : "0",
+      "debe_Haber":       a.debe_haber || "",
+    }));
+
+    // Hoja 2: Detalle interno con información adicional
+    const dataDetalle = filtered.map(a => {
       const emp = employees.find(e => e.id === a.employee_id);
       return {
-        "Período": a.annomes,
-        "Subdiario": a.subdiario,
-        "Comprobante": a.comprobante,
-        "Cuenta": a.cuenta,
-        "Fecha Doc.": a.fecha_doc,
-        "Tipo Anexo": a.tipo_anexo,
-        "Cód. Anexo": a.cod_anexo,
-        "Tipo Doc.": a.tipo_doc,
-        "N° Doc.": a.nro_doc,
-        "Moneda": a.moneda,
-        "D/H": a.debe_haber,
-        "Importe": a.importe,
-        "TC": a.tc,
-        "Importe Soles": a.importe_soles,
-        "Glosa": a.glosa,
+        "Período":          a.annomes,
+        "Subdiario":        a.subdiario,
+        "Comprobante":      a.comprobante,
+        "Cuenta":           a.cuenta,
+        "Fecha Doc.":       a.fecha_doc,
+        "Tipo Anexo":       a.tipo_anexo,
+        "Cód. Anexo":       a.cod_anexo,
+        "Tipo Doc.":        a.tipo_doc,
+        "N° Doc.":          a.nro_doc,
+        "Fecha Vencimiento": a.fecha_vencimiento || "",
+        "Moneda":           a.moneda,
+        "D/H":              a.debe_haber,
+        "Importe":          a.importe,
+        "TC":               a.tc,
+        "Importe Soles":    a.importe_soles,
+        "Conv. TC":         a.conversion_tc || "M",
+        "Glosa":            a.glosa,
         "Glosa Movimiento": a.glosa_mov,
-        "Centro Costos": a.centro_costos,
-        "Medio Pago": a.medio_pago,
-        "Origen": a.origen,
-        "Planilla": a.payroll_period,
-        "Tipo Planilla": a.payroll_type,
-        "Empleado": emp ? `${emp.first_name} ${emp.last_name}` : "",
-        "Anulado": a.anulado ? "SÍ" : "NO",
+        "Centro Costos":    a.centro_costos,
+        "Origen":           a.origen,
+        "Tipo Planilla":    a.payroll_type,
+        "Período Planilla": a.payroll_period,
+        "Trabajador/Proveedor": emp ? `${emp.first_name} ${emp.last_name}` : (a.cod_anexo || ""),
+        "Anulado":          a.anulado ? "SÍ" : "NO",
         "Estado Migración": a.estado_migracion,
-        "Fecha Migración": a.fecha_migracion ? format(new Date(a.fecha_migracion), "dd/MM/yyyy HH:mm") : "",
-        "Migrado por": a.migrado_por,
-        "Sistema Destino": a.sistema_destino,
-        "Cód. Migración": a.codigo_migracion,
-        "Error Migración": a.error_migracion,
+        "Fecha Migración":  a.fecha_migracion ? format(new Date(a.fecha_migracion), "dd/MM/yyyy HH:mm") : "",
+        "Migrado por":      a.migrado_por,
+        "Error Migración":  a.error_migracion,
       };
     });
-    const ws = XLSX.utils.json_to_sheet(data);
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Asientos");
+    const wsConexion = XLSX.utils.json_to_sheet(dataConexion);
+    const wsDetalle  = XLSX.utils.json_to_sheet(dataDetalle);
+    // Anchos de columna para la hoja de conexión
+    wsConexion["!cols"] = [
+      {wch:10},{wch:8},{wch:10},{wch:14},{wch:14},{wch:10},{wch:14},{wch:8},
+      {wch:22},{wch:14},{wch:12},{wch:10},{wch:14},{wch:6},{wch:40},{wch:14},{wch:14},{wch:50},{wch:6},{wch:8}
+    ];
+    XLSX.utils.book_append_sheet(wb, wsConexion, "Cadena_Conexion");
+    XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle_Interno");
     XLSX.writeFile(wb, `AsientosContables_${filterPeriodo || "todos"}.xlsx`);
-    toast.success("Excel exportado correctamente");
+    toast.success("Excel exportado: Hoja 'Cadena_Conexion' lista para importar al sistema contable");
   };
 
   const formatMoney = (n) => n == null ? "--" : new Intl.NumberFormat("es-PE", { minimumFractionDigits: 2 }).format(n);
@@ -329,6 +364,18 @@ export default function AsientosContables() {
                   <SelectItem value="Migrado">Migrado</SelectItem>
                   <SelectItem value="Error">Error</SelectItem>
                   <SelectItem value="Excluido">Excluido</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterTipoPlanilla} onValueChange={setFilterTipoPlanilla}>
+                <SelectTrigger className="w-36"><SelectValue placeholder="Tipo Planilla" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  <SelectItem value="SNP">SNP (Honorarios)</SelectItem>
+                  <SelectItem value="Mensual">Mensual</SelectItem>
+                  <SelectItem value="Quincenal">Quincenal</SelectItem>
+                  <SelectItem value="Adicional">Adicional</SelectItem>
+                  <SelectItem value="CTS">CTS</SelectItem>
+                  <SelectItem value="Gratificacion">Gratificación</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={filterAnulado} onValueChange={setFilterAnulado}>

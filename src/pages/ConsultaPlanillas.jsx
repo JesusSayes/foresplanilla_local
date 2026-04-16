@@ -172,144 +172,210 @@ export default function ConsultaPlanillas() {
   };
 
   // Genera o actualiza asientos contables agrupados por centro de costo
+  // Para SNP: genera un asiento individual por cada trabajador (Recibo de Honorarios)
   const handleGenerarAsiento = async (grupo) => {
     setGeneratingAsiento(grupo.key);
     try {
       const period = grupo.period;
       const payrollType = grupo.payroll_type;
+      const isSNP = payrollType === "SNP";
       const annomes = `${grupo.year}${String(grupo.month).padStart(2, "0")}`;
       const fechaDoc = format(new Date(grupo.year, grupo.month - 1, 1), "yyyy-MM-dd");
-      const comprobante = grupo.payroll_number || `PL-${annomes}`;
+      const fechaRegistro = format(new Date(), "yyyy-MM-dd");
+      const comprobante = grupo.payroll_number || `${isSNP ? "RH" : "PL"}-${annomes}`;
 
       // Eliminar asientos anteriores de esta planilla para actualizar
       const existing = allAsientos.filter(
-        a => a.payroll_period === period && a.payroll_type === payrollType && a.origen === "Planilla"
+        a => a.payroll_period === period && a.payroll_type === payrollType &&
+          (a.origen === "Planilla" || (isSNP && a.origen === "Otro"))
       );
       for (const a of existing) {
         await base44.entities.AsientoContable.delete(a.id);
       }
 
-      // Agrupar boletas por centro de costo
-      const ccMap = {}; // cc_id -> { cc, totalIncome, totalDeductions, totalNeto, payslips }
-
-      for (const p of grupo.payslips) {
-        const emp = allEmployees.find(e => e.id === p.employee_id);
-        if (!emp) continue;
-
-        // Buscar asignación individual o departamental activa
-        let assignment = costCenterAssignments.find(
-          a => a.assignment_type === "Empleado" && a.employee_id === emp.id && a.is_active
-        );
-        if (!assignment && emp.department_name) {
-          assignment = costCenterAssignments.find(
-            a => a.assignment_type === "Departamento" && a.department_name === emp.department_name && a.is_active
-          );
-        }
-
-        const ccId = assignment?.cost_center_id || "sin_cc";
-        const cc = ccId !== "sin_cc" ? costCenters.find(c => c.id === ccId) : null;
-
-        if (!ccMap[ccId]) {
-          ccMap[ccId] = { cc, totalIncome: 0, totalDeductions: 0, totalNeto: 0, employeeCount: 0 };
-        }
-        ccMap[ccId].totalIncome += p.total_income || 0;
-        ccMap[ccId].totalDeductions += p.total_deductions || 0;
-        ccMap[ccId].totalNeto += p.net_pay || 0;
-        ccMap[ccId].employeeCount += 1;
-      }
-
-      // Crear asientos agrupados por CC
       const asientosToCreate = [];
-      for (const [ccId, data] of Object.entries(ccMap)) {
-        const ccCode = data.cc?.code || "S/CC";
-        const ccName = data.cc?.name || "Sin Centro de Costo";
-        const glosa = `${payrollType} - ${period}`;
-        const glosaCC = `${glosa} | ${ccCode} - ${ccName} (${data.employeeCount} emp.)`;
 
-        // DEBE: Gasto de planilla (cuenta 621 o similar)
-        asientosToCreate.push({
-          annomes,
-          subdiario: "08",
-          comprobante,
-          cuenta: "6210000",
-          fecha_doc: fechaDoc,
-          fecha_registro: format(new Date(), "yyyy-MM-dd"),
-          tipo_doc: "PL",
-          nro_doc: comprobante,
-          moneda: "PEN",
-          importe: Math.round(data.totalIncome * 100) / 100,
-          importe_soles: Math.round(data.totalIncome * 100) / 100,
-          tc: 1,
-          glosa,
-          glosa_mov: glosaCC,
-          debe_haber: "D",
-          centro_costos: ccCode,
-          centro_costos_id: ccId !== "sin_cc" ? ccId : "",
-          origen: "Planilla",
-          payroll_period: period,
-          payroll_type: payrollType,
-          estado_migracion: "Pendiente",
-          anulado: false,
-        });
+      if (isSNP) {
+        // ── SNP: un asiento por persona (Recibo de Honorarios) ──────────────
+        // Estructura de cadena de conexión del sistema contable externo
+        for (const p of grupo.payslips) {
+          const emp = allEmployees.find(e => e.id === p.employee_id);
+          if (!emp) continue;
 
-        // HABER: Remuneraciones por pagar (cuenta 411 o similar)
-        asientosToCreate.push({
-          annomes,
-          subdiario: "08",
-          comprobante,
-          cuenta: "4110000",
-          fecha_doc: fechaDoc,
-          fecha_registro: format(new Date(), "yyyy-MM-dd"),
-          tipo_doc: "PL",
-          nro_doc: comprobante,
-          moneda: "PEN",
-          importe: Math.round(data.totalNeto * 100) / 100,
-          importe_soles: Math.round(data.totalNeto * 100) / 100,
-          tc: 1,
-          glosa,
-          glosa_mov: `${glosaCC} - Neto a pagar`,
-          debe_haber: "H",
-          centro_costos: ccCode,
-          centro_costos_id: ccId !== "sin_cc" ? ccId : "",
-          origen: "Planilla",
-          payroll_period: period,
-          payroll_type: payrollType,
-          estado_migracion: "Pendiente",
-          anulado: false,
-        });
+          // Centro de costo del trabajador
+          let assignment = costCenterAssignments.find(
+            a => a.assignment_type === "Empleado" && a.employee_id === emp.id && a.is_active
+          );
+          if (!assignment && emp.department_name) {
+            assignment = costCenterAssignments.find(
+              a => a.assignment_type === "Departamento" && a.department_name === emp.department_name && a.is_active
+            );
+          }
+          const cc = assignment?.cost_center_id
+            ? costCenters.find(c => c.id === assignment.cost_center_id)
+            : null;
+          const ccCode = cc?.code || "";
+          const codAnexo = emp.document_number || "";
+          const empName = `${emp.first_name} ${emp.last_name}`;
+          const importeBruto = Math.round((p.total_income || 0) * 100) / 100;
+          const importeRet   = Math.round((p.total_deductions || 0) * 100) / 100;
+          const importeNeto  = Math.round((p.net_pay || 0) * 100) / 100;
+          const glosa    = `SNP ${period}`;
+          const glosaEmp = `RH ${empName} - ${period}`;
+          const nroDoc   = `RH-${annomes}-${emp.document_number || emp.employee_code}`;
 
-        // HABER: Descuentos (tributos/retenciones) cuenta 403
-        if (data.totalDeductions > 0) {
+          // Campos comunes a todos los movimientos de este trabajador
+          const base = {
+            annomes,
+            subdiario: "07",           // Subdiario Honorarios
+            comprobante,
+            fecha_doc: fechaDoc,
+            fecha_vencimiento: fechaDoc,
+            fecha_registro: fechaRegistro,
+            tipo_doc: "RH",            // Recibo de Honorarios
+            nro_doc: nroDoc,
+            tipo_anexo: "P",           // Proveedor (contratista)
+            cod_anexo: codAnexo,
+            conversion_tc: "M",
+            moneda: "PEN",
+            tc: 1,
+            glosa,
+            centro_costos: ccCode,
+            centro_costos_id: assignment?.cost_center_id || "",
+            employee_id: emp.id,
+            payroll_period: period,
+            payroll_type: payrollType,
+            payslip_id: p.id,
+            origen: "Otro",            // Distingue de planilla regular
+            estado_migracion: "Pendiente",
+            anulado: false,
+          };
+
+          // DEBE: 6320000 Servicios de Terceros (honorarios brutos)
           asientosToCreate.push({
+            ...base,
+            cuenta: "6320000",
+            importe: importeBruto,
+            importe_soles: importeBruto,
+            debe_haber: "D",
+            glosa_mov: `${glosaEmp} - Honorario bruto`,
+          });
+
+          // HABER: 4212100 Honorarios por pagar (neto)
+          asientosToCreate.push({
+            ...base,
+            cuenta: "4212100",
+            importe: importeNeto,
+            importe_soles: importeNeto,
+            debe_haber: "H",
+            glosa_mov: `${glosaEmp} - Neto a pagar`,
+          });
+
+          // HABER: 4017100 Retención de 4ta categoría (si hay descuentos)
+          if (importeRet > 0) {
+            asientosToCreate.push({
+              ...base,
+              cuenta: "4017100",
+              importe: importeRet,
+              importe_soles: importeRet,
+              debe_haber: "H",
+              glosa_mov: `${glosaEmp} - Retención 4ta categoría`,
+            });
+          }
+        }
+
+      } else {
+        // ── PLANILLA REGULAR: agrupado por centro de costo ──────────────────
+        const ccMap = {};
+
+        for (const p of grupo.payslips) {
+          const emp = allEmployees.find(e => e.id === p.employee_id);
+          if (!emp) continue;
+
+          let assignment = costCenterAssignments.find(
+            a => a.assignment_type === "Empleado" && a.employee_id === emp.id && a.is_active
+          );
+          if (!assignment && emp.department_name) {
+            assignment = costCenterAssignments.find(
+              a => a.assignment_type === "Departamento" && a.department_name === emp.department_name && a.is_active
+            );
+          }
+
+          const ccId = assignment?.cost_center_id || "sin_cc";
+          const cc = ccId !== "sin_cc" ? costCenters.find(c => c.id === ccId) : null;
+
+          if (!ccMap[ccId]) {
+            ccMap[ccId] = { cc, ccId, totalIncome: 0, totalDeductions: 0, totalNeto: 0, employeeCount: 0 };
+          }
+          ccMap[ccId].totalIncome += p.total_income || 0;
+          ccMap[ccId].totalDeductions += p.total_deductions || 0;
+          ccMap[ccId].totalNeto += p.net_pay || 0;
+          ccMap[ccId].employeeCount += 1;
+        }
+
+        for (const data of Object.values(ccMap)) {
+          const ccCode = data.cc?.code || "S/CC";
+          const ccName = data.cc?.name || "Sin Centro de Costo";
+          const glosa  = `${payrollType} - ${period}`;
+          const glosaCC = `${glosa} | ${ccCode} - ${ccName} (${data.employeeCount} emp.)`;
+
+          const base = {
             annomes,
             subdiario: "08",
             comprobante,
-            cuenta: "4030000",
             fecha_doc: fechaDoc,
-            fecha_registro: format(new Date(), "yyyy-MM-dd"),
+            fecha_registro: fechaRegistro,
             tipo_doc: "PL",
             nro_doc: comprobante,
+            tipo_anexo: "T",           // Trabajador
+            conversion_tc: "M",
             moneda: "PEN",
-            importe: Math.round(data.totalDeductions * 100) / 100,
-            importe_soles: Math.round(data.totalDeductions * 100) / 100,
             tc: 1,
             glosa,
-            glosa_mov: `${glosaCC} - Descuentos/Tributos`,
-            debe_haber: "H",
             centro_costos: ccCode,
-            centro_costos_id: ccId !== "sin_cc" ? ccId : "",
+            centro_costos_id: data.ccId !== "sin_cc" ? data.ccId : "",
             origen: "Planilla",
             payroll_period: period,
             payroll_type: payrollType,
             estado_migracion: "Pendiente",
             anulado: false,
+          };
+
+          asientosToCreate.push({
+            ...base,
+            cuenta: "6210000",
+            importe: Math.round(data.totalIncome * 100) / 100,
+            importe_soles: Math.round(data.totalIncome * 100) / 100,
+            debe_haber: "D",
+            glosa_mov: glosaCC,
           });
+
+          asientosToCreate.push({
+            ...base,
+            cuenta: "4110000",
+            importe: Math.round(data.totalNeto * 100) / 100,
+            importe_soles: Math.round(data.totalNeto * 100) / 100,
+            debe_haber: "H",
+            glosa_mov: `${glosaCC} - Neto a pagar`,
+          });
+
+          if (data.totalDeductions > 0) {
+            asientosToCreate.push({
+              ...base,
+              cuenta: "4030000",
+              importe: Math.round(data.totalDeductions * 100) / 100,
+              importe_soles: Math.round(data.totalDeductions * 100) / 100,
+              debe_haber: "H",
+              glosa_mov: `${glosaCC} - Descuentos/Tributos`,
+            });
+          }
         }
       }
 
       await base44.entities.AsientoContable.bulkCreate(asientosToCreate);
       queryClient.invalidateQueries(["asientosContablesConsulta"]);
-      toast.success(`${existing.length > 0 ? "Asientos actualizados" : "Asientos generados"}: ${asientosToCreate.length} líneas en ${Object.keys(ccMap).length} centro(s) de costo`);
+      const label = existing.length > 0 ? "Asientos actualizados" : "Asientos generados";
+      toast.success(`${label}: ${asientosToCreate.length} líneas${isSNP ? ` (${grupo.payslips.length} Recibos de Honorarios)` : ""}`);
     } catch (error) {
       toast.error("Error al generar asientos contables");
       console.error(error);
