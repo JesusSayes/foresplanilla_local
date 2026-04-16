@@ -184,72 +184,46 @@ export default function AsientosContables() {
     toast.success(`${pendientes.length} asientos marcados como migrados`);
   };
 
-  // Export en formato nativo del sistema contable externo
   const handleExportExcel = () => {
-    // Hoja 1: Formato sistema contable externo (campos exactos para importación)
-    const dataIntegracion = filtered
-      .filter(a => !a.anulado && a.estado_migracion !== "Excluido")
-      .map(a => ({
-        cuenta:          a.cuenta || "",
-        annomes:         a.annomes || "",
-        subdiario:       a.subdiario || "",
-        comprobante:     a.comprobante || "",
-        fecha_Documento: a.fecha_doc || "",
-        tipo_Anexo:      a.tipo_anexo || "",
-        cod_Proveedor:   a.cod_anexo || "",
-        tipo_Doc:        a.tipo_doc || "",
-        nro_Doc:         a.nro_doc || "",
-        fecha_Vencimiento: a.fecha_vencimiento || "",
-        importe_Doc:     a.importe ?? 0,
-        conversion_Tc:   a.conversion_tc || "",
-        fecha_Registro:  a.fecha_registro || "",
-        tc:              a.tc ?? 1,
-        glosa:           a.glosa || "",
-        destino_Compra:  a.medio_pago || "",
-        centro_Costos:   a.centro_costos || "",
-        glosa_Mov:       a.glosa_mov || "",
-        anulado:         a.anulado ?? false,
-        debe_Haber:      a.debe_haber || "",
-      }));
-
-    // Hoja 2: Reporte completo con todos los campos internos
-    const dataCompleto = filtered.map(a => {
+    const data = filtered.map(a => {
       const emp = employees.find(e => e.id === a.employee_id);
       return {
-        "Período":          a.annomes,
-        "Subdiario":        a.subdiario,
-        "Comprobante":      a.comprobante,
-        "Cuenta":           a.cuenta,
-        "Fecha Doc.":       a.fecha_doc,
-        "Tipo Anexo":       a.tipo_anexo,
-        "Cód. Anexo":       a.cod_anexo,
-        "Tipo Doc.":        a.tipo_doc,
-        "N° Doc.":          a.nro_doc,
-        "Moneda":           a.moneda,
-        "D/H":              a.debe_haber,
-        "Importe":          a.importe,
-        "TC":               a.tc,
-        "Importe Soles":    a.importe_soles,
-        "Glosa":            a.glosa,
+        "Período": a.annomes,
+        "Subdiario": a.subdiario,
+        "Comprobante": a.comprobante,
+        "Cuenta": a.cuenta,
+        "Fecha Doc.": a.fecha_doc,
+        "Tipo Anexo": a.tipo_anexo,
+        "Cód. Anexo": a.cod_anexo,
+        "Tipo Doc.": a.tipo_doc,
+        "N° Doc.": a.nro_doc,
+        "Moneda": a.moneda,
+        "D/H": a.debe_haber,
+        "Importe": a.importe,
+        "TC": a.tc,
+        "Importe Soles": a.importe_soles,
+        "Glosa": a.glosa,
         "Glosa Movimiento": a.glosa_mov,
-        "Centro Costos":    a.centro_costos,
-        "Origen":           a.origen,
-        "Planilla":         a.payroll_period,
-        "Tipo Planilla":    a.payroll_type,
-        "Empleado":         emp ? `${emp.first_name} ${emp.last_name}` : "",
-        "Anulado":          a.anulado ? "SÍ" : "NO",
+        "Centro Costos": a.centro_costos,
+        "Medio Pago": a.medio_pago,
+        "Origen": a.origen,
+        "Planilla": a.payroll_period,
+        "Tipo Planilla": a.payroll_type,
+        "Empleado": emp ? `${emp.first_name} ${emp.last_name}` : "",
+        "Anulado": a.anulado ? "SÍ" : "NO",
         "Estado Migración": a.estado_migracion,
-        "Fecha Migración":  a.fecha_migracion ? format(new Date(a.fecha_migracion), "dd/MM/yyyy HH:mm") : "",
-        "Migrado por":      a.migrado_por,
-        "Error Migración":  a.error_migracion,
+        "Fecha Migración": a.fecha_migracion ? format(new Date(a.fecha_migracion), "dd/MM/yyyy HH:mm") : "",
+        "Migrado por": a.migrado_por,
+        "Sistema Destino": a.sistema_destino,
+        "Cód. Migración": a.codigo_migracion,
+        "Error Migración": a.error_migracion,
       };
     });
-
+    const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataIntegracion), "Importacion_Sistema");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataCompleto), "Reporte_Completo");
+    XLSX.utils.book_append_sheet(wb, ws, "Asientos");
     XLSX.writeFile(wb, `AsientosContables_${filterPeriodo || "todos"}.xlsx`);
-    toast.success(`Excel exportado: ${dataIntegracion.length} líneas listas para importar`);
+    toast.success("Excel exportado correctamente");
   };
 
   const formatMoney = (n) => n == null ? "--" : new Intl.NumberFormat("es-PE", { minimumFractionDigits: 2 }).format(n);
