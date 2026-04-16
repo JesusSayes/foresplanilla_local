@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   FileText, Users, DollarSign, Eye, Printer, ChevronRight,
   CheckCircle, Search, Calendar, ArrowLeft, Settings, PenTool,
-  Loader2, Download
+  Loader2, Download, BookOpen, RefreshCw
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -59,10 +59,11 @@ export default function ConsultaPlanillas() {
   const [searchTerm, setSearchTerm]   = useState("");
 
   // Vista activa
-  const [selectedGroup, setSelectedGroup] = useState(null); // cabecera seleccionada
-  const [previewPayslip, setPreviewPayslip] = useState(null); // boleta individual
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [previewPayslip, setPreviewPayslip] = useState(null);
   const [showPlanillaCompleta, setShowPlanillaCompleta] = useState(false);
   const [showConfigFirmantes, setShowConfigFirmantes] = useState(false);
+  const [generatingAsiento, setGeneratingAsiento] = useState(null); // payroll_number en proceso
 
   const queryClient = useQueryClient();
 
@@ -97,6 +98,21 @@ export default function ConsultaPlanillas() {
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployeesConsulta"],
     queryFn: () => entitiesAPI.Employee.list("-created_date"),
+  });
+
+  const { data: allAsientos = [] } = useQuery({
+    queryKey: ["asientosContablesConsulta"],
+    queryFn: () => base44.entities.AsientoContable.list("-fecha_registro", 5000),
+  });
+
+  const { data: costCenterAssignments = [] } = useQuery({
+    queryKey: ["ccAssignmentsConsulta"],
+    queryFn: () => base44.entities.CostCenterAssignment.list("-created_date"),
+  });
+
+  const { data: costCenters = [] } = useQuery({
+    queryKey: ["costCentersConsulta"],
+    queryFn: () => base44.entities.CostCenter.list("code"),
   });
 
   // Agrupar boletas en cabeceras de planilla
@@ -150,6 +166,162 @@ export default function ConsultaPlanillas() {
     totalDesc:   g.payslips.reduce((s, p) => s + (p.total_deductions || 0), 0),
     totalNeto:   g.payslips.reduce((s, p) => s + (p.net_pay || 0), 0),
   });
+
+  // Verifica si un grupo ya tiene asientos generados
+  const getGrupoAsientoStatus = (grupo) => {
+    const existing = allAsientos.filter(
+      a => a.payroll_period === grupo.period && a.payroll_type === grupo.payroll_type && a.origen === "Planilla"
+    );
+    if (existing.length > 0) return "Generado";
+    return null;
+  };
+
+  // Genera o actualiza asientos contables agrupados por centro de costo
+  const handleGenerarAsiento = async (grupo) => {
+    setGeneratingAsiento(grupo.key);
+    try {
+      const period = grupo.period;
+      const payrollType = grupo.payroll_type;
+      const annomes = `${grupo.year}${String(grupo.month).padStart(2, "0")}`;
+      const fechaDoc = format(new Date(grupo.year, grupo.month - 1, 1), "yyyy-MM-dd");
+      const comprobante = grupo.payroll_number || `PL-${annomes}`;
+
+      // Eliminar asientos anteriores de esta planilla para actualizar
+      const existing = allAsientos.filter(
+        a => a.payroll_period === period && a.payroll_type === payrollType && a.origen === "Planilla"
+      );
+      for (const a of existing) {
+        await base44.entities.AsientoContable.delete(a.id);
+      }
+
+      // Agrupar boletas por centro de costo
+      const ccMap = {}; // cc_id -> { cc, totalIncome, totalDeductions, totalNeto, payslips }
+
+      for (const p of grupo.payslips) {
+        const emp = allEmployees.find(e => e.id === p.employee_id);
+        if (!emp) continue;
+
+        // Buscar asignación individual o departamental activa
+        let assignment = costCenterAssignments.find(
+          a => a.assignment_type === "Empleado" && a.employee_id === emp.id && a.is_active
+        );
+        if (!assignment && emp.department_name) {
+          assignment = costCenterAssignments.find(
+            a => a.assignment_type === "Departamento" && a.department_name === emp.department_name && a.is_active
+          );
+        }
+
+        const ccId = assignment?.cost_center_id || "sin_cc";
+        const cc = ccId !== "sin_cc" ? costCenters.find(c => c.id === ccId) : null;
+
+        if (!ccMap[ccId]) {
+          ccMap[ccId] = { cc, totalIncome: 0, totalDeductions: 0, totalNeto: 0, employeeCount: 0 };
+        }
+        ccMap[ccId].totalIncome += p.total_income || 0;
+        ccMap[ccId].totalDeductions += p.total_deductions || 0;
+        ccMap[ccId].totalNeto += p.net_pay || 0;
+        ccMap[ccId].employeeCount += 1;
+      }
+
+      // Crear asientos agrupados por CC
+      const asientosToCreate = [];
+      for (const [ccId, data] of Object.entries(ccMap)) {
+        const ccCode = data.cc?.code || "S/CC";
+        const ccName = data.cc?.name || "Sin Centro de Costo";
+        const glosa = `${payrollType} - ${period}`;
+        const glosaCC = `${glosa} | ${ccCode} - ${ccName} (${data.employeeCount} emp.)`;
+
+        // DEBE: Gasto de planilla (cuenta 621 o similar)
+        asientosToCreate.push({
+          annomes,
+          subdiario: "08",
+          comprobante,
+          cuenta: "6210000",
+          fecha_doc: fechaDoc,
+          fecha_registro: format(new Date(), "yyyy-MM-dd"),
+          tipo_doc: "PL",
+          nro_doc: comprobante,
+          moneda: "PEN",
+          importe: Math.round(data.totalIncome * 100) / 100,
+          importe_soles: Math.round(data.totalIncome * 100) / 100,
+          tc: 1,
+          glosa,
+          glosa_mov: glosaCC,
+          debe_haber: "D",
+          centro_costos: ccCode,
+          centro_costos_id: ccId !== "sin_cc" ? ccId : "",
+          origen: "Planilla",
+          payroll_period: period,
+          payroll_type: payrollType,
+          estado_migracion: "Pendiente",
+          anulado: false,
+        });
+
+        // HABER: Remuneraciones por pagar (cuenta 411 o similar)
+        asientosToCreate.push({
+          annomes,
+          subdiario: "08",
+          comprobante,
+          cuenta: "4110000",
+          fecha_doc: fechaDoc,
+          fecha_registro: format(new Date(), "yyyy-MM-dd"),
+          tipo_doc: "PL",
+          nro_doc: comprobante,
+          moneda: "PEN",
+          importe: Math.round(data.totalNeto * 100) / 100,
+          importe_soles: Math.round(data.totalNeto * 100) / 100,
+          tc: 1,
+          glosa,
+          glosa_mov: `${glosaCC} - Neto a pagar`,
+          debe_haber: "H",
+          centro_costos: ccCode,
+          centro_costos_id: ccId !== "sin_cc" ? ccId : "",
+          origen: "Planilla",
+          payroll_period: period,
+          payroll_type: payrollType,
+          estado_migracion: "Pendiente",
+          anulado: false,
+        });
+
+        // HABER: Descuentos (tributos/retenciones) cuenta 403
+        if (data.totalDeductions > 0) {
+          asientosToCreate.push({
+            annomes,
+            subdiario: "08",
+            comprobante,
+            cuenta: "4030000",
+            fecha_doc: fechaDoc,
+            fecha_registro: format(new Date(), "yyyy-MM-dd"),
+            tipo_doc: "PL",
+            nro_doc: comprobante,
+            moneda: "PEN",
+            importe: Math.round(data.totalDeductions * 100) / 100,
+            importe_soles: Math.round(data.totalDeductions * 100) / 100,
+            tc: 1,
+            glosa,
+            glosa_mov: `${glosaCC} - Descuentos/Tributos`,
+            debe_haber: "H",
+            centro_costos: ccCode,
+            centro_costos_id: ccId !== "sin_cc" ? ccId : "",
+            origen: "Planilla",
+            payroll_period: period,
+            payroll_type: payrollType,
+            estado_migracion: "Pendiente",
+            anulado: false,
+          });
+        }
+      }
+
+      await base44.entities.AsientoContable.bulkCreate(asientosToCreate);
+      queryClient.invalidateQueries(["asientosContablesConsulta"]);
+      toast.success(`${existing.length > 0 ? "Asientos actualizados" : "Asientos generados"}: ${asientosToCreate.length} líneas en ${Object.keys(ccMap).length} centro(s) de costo`);
+    } catch (error) {
+      toast.error("Error al generar asientos contables");
+      console.error(error);
+    } finally {
+      setGeneratingAsiento(null);
+    }
+  };
 
   // --- Si hay boleta individual seleccionada ---
   if (previewPayslip) {
@@ -243,7 +415,7 @@ export default function ConsultaPlanillas() {
           </div>
 
           {/* Resumen */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[
               { label: "Empleados incluidos", value: stats.empleados, icon: Users, color: "blue" },
               { label: "Total Ingresos", value: `S/ ${Number(stats.totalIncome || 0).toFixed(2)}`, icon: DollarSign, color: "green" },
@@ -251,12 +423,16 @@ export default function ConsultaPlanillas() {
               { label: "Total Neto a Pagar", value: `S/ ${Number(stats.totalNeto || 0).toFixed(2)}`, icon: DollarSign, color: "indigo", big: true },
             ].map(({ label, value, icon: Icon, color, big }) => (
               <Card key={label} className="border-0 shadow-lg">
-                <CardContent className="p-5">
-                  <div className={`inline-flex p-2 rounded-lg bg-${color}-100 mb-3`}>
-                    <Icon className={`w-5 h-5 text-${color}-600`} />
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`p-2 bg-${color}-100 rounded-lg shrink-0`}>
+                      <Icon className={`w-4 h-4 text-${color}-600`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xl font-bold text-slate-900 leading-tight">{value}</div>
+                      <p className="text-slate-600 text-xs truncate">{label}</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500 mb-1">{label}</p>
-                  <p className={`font-bold text-slate-900 ${big ? "text-2xl text-indigo-600" : "text-lg"}`}>{value}</p>
                 </CardContent>
               </Card>
             ))}
@@ -501,6 +677,15 @@ export default function ConsultaPlanillas() {
 
                       {/* Acciones rápidas */}
                       <div className="flex items-center gap-2 shrink-0">
+                        {/* Badge estado asiento */}
+                        {(() => {
+                          const asientoStatus = getGrupoAsientoStatus(g);
+                          return asientoStatus ? (
+                            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
+                              <CheckCircle className="w-3 h-3" />Asiento generado
+                            </span>
+                          ) : null;
+                        })()}
                         <Button
                           size="sm"
                           variant="outline"
@@ -516,6 +701,18 @@ export default function ConsultaPlanillas() {
                           onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); setTimeout(() => window.print(), 800); }}
                         >
                           <Printer className="w-4 h-4 mr-1" />Imprimir
+                        </Button>
+                        <Button
+                          size="sm"
+                          className={`hidden sm:flex ${getGrupoAsientoStatus(g) ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                          disabled={generatingAsiento === g.key}
+                          onClick={e => { e.stopPropagation(); handleGenerarAsiento(g); }}
+                        >
+                          {generatingAsiento === g.key
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                            : <BookOpen className="w-3.5 h-3.5 mr-1" />
+                          }
+                          {getGrupoAsientoStatus(g) ? "Actualizar Asiento" : "Generar Asiento"}
                         </Button>
                         <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
                       </div>

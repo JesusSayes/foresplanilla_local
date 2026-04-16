@@ -254,8 +254,14 @@ export default function CostCenterManagement() {
   };
 
   const handleSubmitCC = () => {
-    if (!ccFormData.code || !ccFormData.name) {
-      toast.error("Completa los campos obligatorios");
+    const missing = [];
+    if (!ccFormData.code?.trim()) missing.push("Código");
+    if (!ccFormData.category_id) missing.push("Categoría Operacional");
+    if (!ccFormData.name?.trim()) missing.push("Nombre");
+
+    if (missing.length > 0) {
+      setCCFormData(prev => ({ ...prev, _validated: true }));
+      toast.error(`Campos requeridos sin completar: ${missing.join(", ")}`, { duration: 5000 });
       return;
     }
 
@@ -1036,17 +1042,20 @@ export default function CostCenterManagement() {
             <CardContent className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Código *</Label>
+                  <Label>Código <span className="text-red-500">*</span></Label>
                   <Input
-                    value={ccFormData.code}
+                    value={ccFormData.code || ""}
                     onChange={(e) => setCCFormData({ ...ccFormData, code: e.target.value })}
                     placeholder="Ej: CC-001"
+                    className={!ccFormData.code?.trim() && ccFormData._validated ? "border-red-400 focus-visible:ring-red-400" : ""}
                   />
                 </div>
                 <div>
-                  <Label>Categoría Operacional *</Label>
-                  <Select value={ccFormData.category} onValueChange={(v) => setCCFormData({ ...ccFormData, category: v })}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
+                  <Label>Categoría Operacional <span className="text-red-500">*</span></Label>
+                  <Select value={ccFormData.category_id || ""} onValueChange={(v) => setCCFormData({ ...ccFormData, category_id: v })}>
+                    <SelectTrigger className={!ccFormData.category_id && ccFormData._validated ? "border-red-400 ring-red-400" : ""}>
+                      <SelectValue placeholder="Seleccionar categoría" />
+                    </SelectTrigger>
                     <SelectContent>
                       {categories.map(cat => (
                         <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
@@ -1056,11 +1065,12 @@ export default function CostCenterManagement() {
                 </div>
               </div>
               <div>
-                <Label>Nombre *</Label>
+                <Label>Nombre <span className="text-red-500">*</span></Label>
                 <Input
-                  value={ccFormData.name}
+                  value={ccFormData.name || ""}
                   onChange={(e) => setCCFormData({ ...ccFormData, name: e.target.value })}
                   placeholder="Nombre descriptivo del centro de costo"
+                  className={!ccFormData.name?.trim() && ccFormData._validated ? "border-red-400 focus-visible:ring-red-400" : ""}
                 />
               </div>
               <div className="flex items-center gap-2">

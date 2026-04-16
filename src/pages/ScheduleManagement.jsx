@@ -215,7 +215,11 @@ export default function ScheduleManagement() {
     });
 
     // Buscar la plantilla que corresponde a esta asignación por nombre
-    const currentTemplate = templates.find(t => t.schedule_name === assignment.schedule_name);
+    // Los horarios individuales tienen formato "{plantilla} - {nombre empleado}", se usa startsWith
+    const currentTemplate = templates.find(t =>
+      assignment.schedule_name === t.schedule_name ||
+      assignment.schedule_name?.startsWith(t.schedule_name)
+    );
     if (currentTemplate) {
       setSelectedTemplateId(currentTemplate.id);
       setTemplateSearch(`${currentTemplate.schedule_name} (${currentTemplate.monday_start} - ${currentTemplate.monday_end})`);
@@ -388,8 +392,9 @@ export default function ScheduleManagement() {
            s.schedule_name.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  // Filtrar empleados SIN horario para el modal de asignación
-  const filteredEmployeesWithoutSchedule = employeesWithoutSchedule.filter(emp => {
+  // En modo edición mostrar todos los empleados; en creación solo los sin horario
+  const employeePoolForAssign = editingAssignment ? allEmployees : employeesWithoutSchedule;
+  const filteredEmployeesWithoutSchedule = employeePoolForAssign.filter(emp => {
     const searchLower = employeeSearch.toLowerCase();
     return emp.first_name.toLowerCase().includes(searchLower) ||
            emp.last_name.toLowerCase().includes(searchLower) ||
@@ -668,16 +673,6 @@ export default function ScheduleManagement() {
                                 onClick={() => handleEditAssignment(schedule)}
                               >
                                 <Edit className="w-4 h-4" />
-                              </Button>
-                            )}
-                            {hasAnyPermission(["schedules.delete", "schedules.manage", "system.admin"]) && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600"
-                                onClick={() => handleDeleteSchedule(schedule)}
-                              >
-                                <Trash2 className="w-4 h-4" />
                               </Button>
                             )}
                           </div>
@@ -1316,7 +1311,7 @@ export default function ScheduleManagement() {
                          ))
                        ) : (
                          <div className="px-3 py-4 text-sm text-slate-500 text-center">
-                           {employeeSearch ? "No se encontraron empleados" : "Todos los empleados tienen horario asignado"}
+                          No se encontraron empleados
                          </div>
                        )}
                       </div>
@@ -1341,7 +1336,7 @@ export default function ScheduleManagement() {
                   )}
                 </div>
                 <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
-                  {departmentsWithoutSchedule.map(dept => (
+                  {(editingAssignment ? departments : departmentsWithoutSchedule).map(dept => (
                     <label key={dept} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
                       <input
                         type="checkbox"
@@ -1357,10 +1352,10 @@ export default function ScheduleManagement() {
                       <span className="text-sm">{dept}</span>
                     </label>
                   ))}
-                  {departmentsWithoutSchedule.length === 0 && (
-                    <p className="text-sm text-slate-500 text-center py-2">
-                      Todos los departamentos ya tienen horario asignado
-                    </p>
+                  {(editingAssignment ? departments : departmentsWithoutSchedule).length === 0 && (
+                   <p className="text-sm text-slate-500 text-center py-2">
+                     Todos los departamentos ya tienen horario asignado
+                   </p>
                   )}
                 </div>
                 {assignFormData.departments?.length > 0 && (

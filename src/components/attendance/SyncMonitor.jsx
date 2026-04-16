@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import recalcularAsistenciaService from '@/services/recalcularAsistenciaService';
 
 export default function SyncMonitor({ connectionId, connectionName }) {
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -88,7 +89,7 @@ export default function SyncMonitor({ connectionId, connectionName }) {
           const yesterdayStr = yesterday.toISOString().split('T')[0];
 
           // Obtener registros recientes para identificar empleados afectados
-          const recentRecords = await base44.entities.AttendanceRecord.list("-date", 500);
+          const recentRecords = await entitiesAPI.AttendanceRecord.list("-date", 500);
           const affectedEmployees = [...new Set(
             recentRecords
               .filter(r => r.date >= yesterdayStr && r.date <= todayStr)
@@ -97,11 +98,15 @@ export default function SyncMonitor({ connectionId, connectionName }) {
 
           // Recalcular por cada empleado afectado
           for (const empId of affectedEmployees) {
-            await base44.functions.invoke("recalcularAsistencia", {
-              employee_id: empId,
-              date_from: yesterdayStr,
-              date_to: todayStr,
-            });
+            try {
+              await recalcularAsistenciaService.invoke(
+                empId,
+                yesterdayStr,
+                todayStr
+              );
+            } catch (err) {
+              console.error(`Error recalculando asistencia para empleado ${empId}:`, err);
+            }
           }
         }
 

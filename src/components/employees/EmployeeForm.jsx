@@ -7,9 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Users, Trash2, Plus, Edit, Loader2, Search, AlertTriangle, FileText } from "lucide-react";
+import UbigeoSelect from "./UbigeoSelect";
 import { format } from "date-fns";
 import { toast } from "sonner";
-// import { base44 } from "@/api/base44Client";
 import { usePermissions } from "../hooks/usePermissions";
 import { uploadFile } from "@/services/uploadService";
 
@@ -729,7 +729,7 @@ export default function EmployeeForm({
                               <div><Label>Descripción</Label><Input value={dhFormData.address || ""} onChange={(e) => setDhFormData({...dhFormData, address: e.target.value})} /></div>
                               <div className="grid grid-cols-2 gap-4">
                                 <div><Label>Referencia</Label><Input value={dhFormData.address_reference || ""} onChange={(e) => setDhFormData({...dhFormData, address_reference: e.target.value})} /></div>
-                                <div><Label>Ubigeo (Dept-Prov-Dist)</Label><Input value={dhFormData.ubigeo || ""} onChange={(e) => setDhFormData({...dhFormData, ubigeo: e.target.value})} placeholder="LIMA-LIMA-MIRAFLORES" /></div>
+                                <UbigeoSelect label="Ubigeo (Dept-Prov-Dist)" value={dhFormData.ubigeo || ""} onChange={(v) => setDhFormData({...dhFormData, ubigeo: v})} placeholder="Buscar ubigeo SUNAT..." />
                               </div>
                             </div>
                           </div>
@@ -741,7 +741,7 @@ export default function EmployeeForm({
                               <div><Label>Descripción</Label><Input value={dhFormData.address2 || ""} onChange={(e) => setDhFormData({...dhFormData, address2: e.target.value})} /></div>
                               <div className="grid grid-cols-2 gap-4">
                                 <div><Label>Referencia</Label><Input value={dhFormData.address_reference2 || ""} onChange={(e) => setDhFormData({...dhFormData, address_reference2: e.target.value})} /></div>
-                                <div><Label>Ubigeo</Label><Input value={dhFormData.ubigeo2 || ""} onChange={(e) => setDhFormData({...dhFormData, ubigeo2: e.target.value})} /></div>
+                                <UbigeoSelect label="Ubigeo" value={dhFormData.ubigeo2 || ""} onChange={(v) => setDhFormData({...dhFormData, ubigeo2: v})} placeholder="Buscar ubigeo SUNAT..." />
                               </div>
                             </div>
                           </div>

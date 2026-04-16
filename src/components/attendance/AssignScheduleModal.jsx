@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-//import { base44 } from "@/api/base44Client";
+import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -104,8 +104,8 @@ function InlineDatePickerOptional({ value, onChange, label }) {
   );
 }
 
-export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
-  const [effectiveFrom, setEffectiveFrom] = useState(new Date());
+export default function AssignScheduleModal({ employee, onClose, onSuccess, initialDate }) {
+  const [effectiveFrom, setEffectiveFrom] = useState(initialDate || new Date());
   const [effectiveTo, setEffectiveTo] = useState(null);
   const [selectedScheduleId, setSelectedScheduleId] = useState("");
   const [recalcRange, setRecalcRange] = useState(true);
@@ -132,6 +132,20 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
     empCandidates.sort((a, b) => (b.effective_from || "0000-01-01").localeCompare(a.effective_from || "0000-01-01"));
     return empCandidates[0] || null;
   })();
+
+  // Pre-seleccionar la plantilla que corresponde al horario actual del empleado
+  useEffect(() => {
+    if (!currentSchedule || !templateSchedules.length || selectedScheduleId) return;
+
+    // Buscar la plantilla cuyo nombre base coincide con el horario actual del empleado
+    // El nombre del horario individual tiene formato: "{plantilla} - {nombre empleado}"
+    const matchByName = templateSchedules.find(t =>
+      currentSchedule.schedule_name.startsWith(t.schedule_name)
+    );
+    if (matchByName) {
+      setSelectedScheduleId(matchByName.id);
+    }
+  }, [currentSchedule, templateSchedules]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -241,7 +255,7 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
             effectiveFromStr,
             dateTo
           );
-          toast.success(`Horario asignado y ${res.data?.updated || 0} registros recalculados`);
+          toast.success(`Horario asignado y ${res.updated || 0} registros recalculados`);
         } else {
           toast.success("Horario asignado correctamente");
         }
@@ -268,7 +282,7 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
         <CardHeader className="border-b bg-indigo-50">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-xl font-bold text-indigo-900">Asignar Horario</CardTitle>
+              <CardTitle className="text-xl font-bold text-indigo-900">{currentSchedule ? "Reasignar Horario" : "Asignar Horario"}</CardTitle>
               <p className="text-sm text-indigo-700 mt-1">
                 {employee.first_name} {employee.last_name} · {employee.employee_code}
               </p>
@@ -279,30 +293,49 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess }) {
         <CardContent className="p-6 space-y-5 overflow-visible">
 
           {/* Horario actual vigente */}
-          {currentSchedule && (
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-              <p className="text-xs text-slate-500 mb-1">Horario actual vigente:</p>
+          {currentSchedule ? (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-xs font-semibold text-amber-700 mb-1">⚠️ Horario actualmente asignado:</p>
               <p className="text-sm font-semibold text-slate-800">{currentSchedule.schedule_name}</p>
               <p className="text-xs text-slate-600">
-                Desde: {currentSchedule.effective_from || "siempre"}
+                Vigente desde: {currentSchedule.effective_from || "siempre"}
                 {currentSchedule.effective_to ? ` · Hasta: ${currentSchedule.effective_to}` : " · Sin fecha de fin"}
               </p>
+              <p className="text-xs text-amber-600 mt-1">La plantilla seleccionada abajo reemplazará este horario desde la fecha que indiques.</p>
+            </div>
+          ) : (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs text-blue-700">Este empleado no tiene un horario individual asignado actualmente.</p>
             </div>
           )}
 
           {/* Selector de horario con búsqueda */}
           <div>
-            <Label className="font-semibold text-slate-800 mb-2 block">Nuevo Horario *</Label>
+            <Label className="font-semibold text-slate-800 mb-2 block">
+              {currentSchedule ? "Plantilla de Horario a Asignar *" : "Nuevo Horario *"}
+            </Label>
             <div className="relative" ref={dropdownRef}>
               <button
                 type="button"
                 className="w-full flex items-center justify-between border border-input rounded-md px-3 py-2 text-sm bg-white shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-1 focus:ring-ring"
                 onClick={() => setDropdownOpen(o => !o)}
               >
-                <span className={selectedScheduleObj ? "text-slate-900" : "text-slate-400"}>
-                  {selectedScheduleObj ? selectedScheduleObj.schedule_name : "Seleccionar horario..."}
+                <span className={selectedScheduleObj ? "text-slate-900 font-medium" : "text-slate-400"}>
+                  {selectedScheduleObj ? selectedScheduleObj.schedule_name : "Buscar y seleccionar plantilla..."}
                 </span>
-                <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                <div className="flex items-center gap-1 shrink-0">
+                  {selectedScheduleId && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="p-0.5 rounded hover:bg-slate-200 text-slate-400 hover:text-red-500"
+                      onClick={e => { e.stopPropagation(); setSelectedScheduleId(""); setScheduleSearchTerm(""); }}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </span>
+                  )}
+                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                </div>
               </button>
               {dropdownOpen && (
                 <div className="absolute z-[150] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-64 flex flex-col">

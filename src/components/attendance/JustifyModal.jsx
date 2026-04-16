@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-// import { base44 } from "@/api/base44Client";
 import { entitiesAPI } from '@/api/entitiesClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,7 @@ import { es } from "date-fns/locale";
 import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { uploadFile } from "@/services/uploadService";
+import recalcularAsistenciaService from '@/services/recalcularAsistenciaService';
 
 export default function JustifyModal({
   justifyingEmployee,
@@ -208,7 +208,7 @@ export default function JustifyModal({
           worked_hours: Math.min(newWorkedHours, 8),
           late_minutes: newLateMinutes,
           is_late: newLateMinutes > 0,
-          status: newLateMinutes === 0 && newWorkedHours >= 8 ? "Completo" : "Justificado",
+          status: "Justificado",
         };
 
         // Preserve original clock_in/clock_out if they already exist — don't overwrite with justified times
@@ -284,11 +284,16 @@ export default function JustifyModal({
       // Recalcular métricas (tardanza, HE 25%, HE 35%) para todas las fechas justificadas
       const minDate = targetDates[0];
       const maxDate = targetDates[targetDates.length - 1];
-      await base44.functions.invoke("recalcularAsistencia", {
-        employee_id: justifyingEmployee.id,
-        date_from: minDate,
-        date_to: maxDate,
-      });
+      // await base44.functions.invoke("recalcularAsistencia", {
+        // employee_id: justifyingEmployee.id,
+        // date_from: minDate,
+        // date_to: maxDate,
+      // });
+      await recalcularAsistenciaService.invoke(
+        justifyingEmployee.id,
+        minDate,
+        maxDate
+      );
 
       toast.success(
         targetDates.length === 1

@@ -105,20 +105,6 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
 const recalcularAsistenciaService = {
   invoke: async (employee_id, date_from, date_to) => {
     try {
-      const response = await localClient.post('/api/attendance/recalcular', {
-        employee_id,
-        date_from,
-        date_to,
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error en recalcularAsistenciaService:', error);
-      throw new Error(error.response?.data?.error || 'Error recalculando asistencia');
-    }
-  },
-
-  recalculate: async (employee_id, date_from, date_to) => {
-    try {
       const employee = await entitiesAPI.Employee.filter({ id: employee_id });
       const allSchedules = await entitiesAPI.WorkSchedule.list("-effective_from");
       const emp = employee[0];
@@ -138,12 +124,14 @@ const recalcularAsistenciaService = {
         const metrics = calcularMetricas(record, schedule, record.date, overtimeAuth);
 
         let status = record.status;
-        if (record.clock_in && record.clock_out) {
+        if (record.status === "Justificado") {
+          status = "Justificado";
+        } else if (record.clock_in && record.clock_out) {
           status = "Completo";
         } else if (record.clock_in && !record.clock_out) {
           status = "Incompleto";
         } else if (!record.clock_in) {
-          status = record.status === "Justificado" ? "Justificado" : "Ausente";
+          status = "Ausente";
         }
 
         await entitiesAPI.AttendanceRecord.update(record.id, {
@@ -163,9 +151,13 @@ const recalcularAsistenciaService = {
 
       return { success: true, updated, range: { date_from, date_to }, employee_id };
     } catch (error) {
-      console.error('Error en recalculate:', error);
+      console.error('Error en recalcularAsistenciaService.invoke:', error);
       throw new Error(error.message || 'Error recalculando asistencia');
     }
+  },
+
+  recalculate: async (employee_id, date_from, date_to) => {
+    return recalcularAsistenciaService.invoke(employee_id, date_from, date_to);
   },
 
   getScheduleForDate,
