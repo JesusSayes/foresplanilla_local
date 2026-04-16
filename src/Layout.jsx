@@ -238,13 +238,13 @@ export default function Layout({ children, currentPageName }) {
     if (hasAnyPermission(["payroll.view_all", "payroll.create", "payroll.calculate"])) {
       const submenu = [{ name: "Generar Planillas", path: "PayrollManagement" }];
       if (isAdmin) submenu.push({ name: "Conceptos de Planilla", path: "PayrollConcepts" });
+      submenu.push({ name: "Consulta de Planillas", path: "ConsultaPlanillas" });
       submenu.push({ name: "Préstamos", path: "LoanManagement" });
       if (hasPermission("cost_centers.view")) {
         submenu.push({ name: "Centros de Costo", path: "CostCenterManagement" });
         submenu.push({ name: "Consulta Valorizada", path: "CostCenterValuation" });
       }
       submenu.push({ name: "Asientos Contables", path: "AsientosContables" });
-      submenu.push({ name: "Consulta de Planillas", path: "ConsultaPlanillas" });
       items.push({ name: "Gestión Planillas", icon: FileText, path: "PayrollManagement", submenu });
     }
 
