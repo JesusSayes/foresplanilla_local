@@ -508,11 +508,7 @@ export default function PayrollManagement() {
 
     const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
     const matchesType = p.payroll_type === payrollType;
-<<<<<<< HEAD
 
-=======
-
->>>>>>> main
     return matchesSearch && matchesDept && matchesType;
   });
 
