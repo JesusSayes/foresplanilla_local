@@ -165,7 +165,8 @@ export default function ConsultaPlanillas() {
   // Verifica si un grupo ya tiene asientos generados
   const getGrupoAsientoStatus = (grupo) => {
     const existing = allAsientos.filter(
-      a => a.payroll_period === grupo.period && a.payroll_type === grupo.payroll_type && a.origen === "Planilla"
+      a => a.payroll_period === grupo.period && a.payroll_type === grupo.payroll_type &&
+        (a.origen === "Planilla" || a.origen === "Otro")
     );
     if (existing.length > 0) return "Generado";
     return null;
