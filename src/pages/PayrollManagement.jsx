@@ -190,12 +190,8 @@ export default function PayrollManagement() {
   // Aprobar planilla completa (todas las boletas de un tipo/periodo)
   const approveFullPayrollMutation = useMutation({
     mutationFn: async ({ year, month, payrollType }) => {
-<<<<<<< HEAD
       // Re-fetch para asegurar datos frescos
       const fresh = await entitiesAPI.Payslip.filter({ month, year, payroll_type: payrollType });
-=======
-      const fresh = await base44.entities.Payslip.filter({ month, year, payroll_type: payrollType });
->>>>>>> main
       const toApprove = fresh.filter(p => p.status !== "Aprobada" && p.status !== "Pagada");
       await Promise.all(toApprove.map(p => entitiesAPI.Payslip.update(p.id, { status: "Aprobada" })));
       return toApprove.length;
@@ -511,14 +507,9 @@ export default function PayrollManagement() {
     ) : true;
 
     const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
-<<<<<<< HEAD
-
-    return matchesSearch && matchesDept;
-=======
     const matchesType = p.payroll_type === payrollType;
-    
+
     return matchesSearch && matchesDept && matchesType;
->>>>>>> main
   });
 
   const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
@@ -1114,16 +1105,9 @@ export default function PayrollManagement() {
                       <div className="space-y-6">
                         {tipos.map(tipo => {
                           const planillasDelTipo = filteredPayslips.filter(p => p.payroll_type === tipo);
-<<<<<<< HEAD
-                          const statusGroup = planillasDelTipo[0]?.status || "Generada";
-                          const totalNeto = Number(planillasDelTipo.reduce((s, p) => s + (Number(p.net_pay) || 0), 0));
-                          const totalIngresos = Number(planillasDelTipo.reduce((s, p) => s + (Number(p.total_income) || 0), 0));
-                          const totalDesc = Number(planillasDelTipo.reduce((s, p) => s + (Number(p.total_deductions) || 0), 0));
-=======
                           const totalNeto = planillasDelTipo.reduce((s, p) => s + (p.net_pay || 0), 0);
                           const totalIngresos = planillasDelTipo.reduce((s, p) => s + (p.total_income || 0), 0);
                           const totalDesc = planillasDelTipo.reduce((s, p) => s + (p.total_deductions || 0), 0);
->>>>>>> main
                           const allPagada   = planillasDelTipo.every(p => p.status === "Pagada");
                           const allAprobada = !allPagada && planillasDelTipo.every(p => p.status === "Aprobada" || p.status === "Pagada") && planillasDelTipo.some(p => p.status === "Aprobada");
                           const puedeAprobar = !allPagada && !allAprobada;
