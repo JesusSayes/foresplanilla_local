@@ -122,6 +122,8 @@ model company_info {
   created_by                         String?
   is_sample                          Boolean?
   legal_representative_signature_url String?
+  firmante_gg                        String?
+  firmante_delegado                  String?
 }
 
 model contract {
