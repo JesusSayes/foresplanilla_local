@@ -142,6 +142,53 @@ export const filter = async (req, res) => {
   }
 };
 
+export const bulkCreate = async (req, res) => {
+  try {
+    const asientos = req.body;
+
+    if (!Array.isArray(asientos)) {
+      return res.status(400).json({ error: 'Request body must be an array of asientos' });
+    }
+
+    const currentUser = req.user;
+    const userId = currentUser?.userId || currentUser?.id || 'system';
+    const userEmail = currentUser?.email || 'system';
+
+    const asientosToCreate = asientos.map(({ id, created_date, updated_date, created_by_id, created_by, is_sample, ...rest }) => {
+      const data = {
+        id: generate24HexId(),
+        ...rest,
+        created_by_id: userId,
+        created_by: userEmail,
+        is_sample: false,
+      };
+
+      if (data.fecha_doc && typeof data.fecha_doc === 'string') {
+        data.fecha_doc = new Date(data.fecha_doc);
+      }
+      if (data.fecha_vencimiento && typeof data.fecha_vencimiento === 'string') {
+        data.fecha_vencimiento = new Date(data.fecha_vencimiento);
+      }
+      if (data.fecha_registro && typeof data.fecha_registro === 'string') {
+        data.fecha_registro = new Date(data.fecha_registro);
+      }
+
+      return data;
+    });
+
+    const result = await prisma.$transaction(
+      asientosToCreate.map(data =>
+        prisma.asiento_contable.create({ data })
+      )
+    );
+
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('Error bulk creating asientos contables:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const controller = {
   getAll,
   getById,
@@ -149,6 +196,7 @@ const controller = {
   update,
   delete: remove,
   filter,
+  bulkCreate,
 }
 
 export default controller;

@@ -86,7 +86,14 @@ export const entitiesAPI = {
   Loan: createEntityAPI('/api/payroll/loans'),
   LoanInstallment: createEntityAPI('/api/payroll/loan-installments'),
   Derechohabiente: createEntityAPI('/api/derechohabientes'),
-  AsientoContable: createEntityAPI('/api/asientos-contables'),
+  AsientoContable: {
+    ...createEntityAPI('/api/asientos-contables'),
+
+    bulkCreate: async (data) => {
+      const response = await localClient.post('/api/asientos-contables/bulk', data);
+      return response.data;
+    }
+  },
 };
 
 export default entitiesAPI;

@@ -9,6 +9,7 @@ router.use(authenticateToken);
 router.get('/', asientoContableController.getAll);
 router.get('/:id', asientoContableController.getById);
 router.post('/filter', asientoContableController.filter);
+router.post('/bulk', asientoContableController.bulkCreate);
 router.post('/', asientoContableController.create);
 router.put('/:id', asientoContableController.update);
 router.delete('/:id', asientoContableController.delete);
