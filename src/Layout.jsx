@@ -264,14 +264,14 @@ export default function Layout({ children, currentPageName }) {
     // Planillas - solo quien puede ver planillas de todos o del departamento
     if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department"])) {
       const submenu = [{ name: "Generar Planillas", path: "PayrollManagement" }];
-      if (hasPermission("payroll.manage_concepts")) submenu.push({ name: "Conceptos de Planilla", path: "PayrollConcepts" });
+      if (isAdmin) submenu.push({ name: "Conceptos de Planilla", path: "PayrollConcepts" });
+      submenu.push({ name: "Consulta de Planillas", path: "ConsultaPlanillas" });
       submenu.push({ name: "Préstamos", path: "LoanManagement" });
       if (hasPermission("cost_centers.view")) {
         submenu.push({ name: "Centros de Costo", path: "CostCenterManagement" });
         submenu.push({ name: "Consulta Valorizada", path: "CostCenterValuation" });
       }
       submenu.push({ name: "Asientos Contables", path: "AsientosContables" });
-      submenu.push({ name: "Consulta de Planillas", path: "ConsultaPlanillas" });
       items.push({ name: "Gestión Planillas", icon: FileText, path: "PayrollManagement", submenu });
     }
 

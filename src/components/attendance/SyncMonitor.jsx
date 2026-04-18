@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import recalcularAsistenciaService from '@/services/recalcularAsistenciaService';
 
 export default function SyncMonitor({ connectionId, connectionName }) {
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -77,6 +78,37 @@ export default function SyncMonitor({ connectionId, connectionName }) {
         await entitiesAPI.DatabaseConnection.update(connectionId, {
           last_sync: new Date().toISOString()
         });
+
+        // Recalcular métricas (tardanza, HE 25%, HE 35%) para todos los empleados
+        // que tengan registros de asistencia del día de hoy y ayer
+        if (success && recordsImported > 0) {
+          const today = new Date();
+          const yesterday = new Date(today);
+          yesterday.setDate(today.getDate() - 1);
+          const todayStr = today.toISOString().split('T')[0];
+          const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+          // Obtener registros recientes para identificar empleados afectados
+          const recentRecords = await entitiesAPI.AttendanceRecord.list("-date", 500);
+          const affectedEmployees = [...new Set(
+            recentRecords
+              .filter(r => r.date >= yesterdayStr && r.date <= todayStr)
+              .map(r => r.employee_id)
+          )];
+
+          // Recalcular por cada empleado afectado
+          for (const empId of affectedEmployees) {
+            try {
+              await recalcularAsistenciaService.invoke(
+                empId,
+                yesterdayStr,
+                todayStr
+              );
+            } catch (err) {
+              console.error(`Error recalculando asistencia para empleado ${empId}:`, err);
+            }
+          }
+        }
 
         return logData;
       } catch (error) {

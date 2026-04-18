@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-// import { base44 } from "@/api/base44Client";
 import { entitiesAPI } from '@/api/entitiesClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,7 @@ import { es } from "date-fns/locale";
 import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { uploadFile } from "@/services/uploadService";
+import recalcularAsistenciaService from '@/services/recalcularAsistenciaService';
 
 export default function JustifyModal({
   justifyingEmployee,
@@ -42,7 +42,31 @@ export default function JustifyModal({
   const [uploadingFile, setUploadingFile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState("");
-  const [overtimeAlert, setOvertimeAlert] = useState(null);
+  const [incidentSearch, setIncidentSearch] = useState("");
+
+  const INCIDENT_TYPES = [
+    "Comisión de Servicio",
+    "Capacitación",
+    "Descanso Médico",
+    "Omisión de Marcación",
+    "Cita Médica",
+    "Confirmación de Asistencia (Limitación de Sistema)",
+    "Licencia por Maternidad",
+    "Licencia por Paternidad",
+    "Otro",
+    "Onomástico",
+    "Descanso Vacacional",
+    "Licencia sin Goce de Haber",
+    "Feriado",
+    "Justificación de Tardanza",
+    "Tardanza",
+    "Falta",
+    "Salida Temprana",
+  ];
+
+  const filteredIncidentTypes = INCIDENT_TYPES.filter(t =>
+    t.toLowerCase().includes(incidentSearch.toLowerCase())
+  );
 
   // Multi-date mode
   const [multiDateMode, setMultiDateMode] = useState(false);
@@ -104,7 +128,7 @@ export default function JustifyModal({
     }
 
     if (!justificationData.full_day_justification) {
-      const isOlvidoMarcacion = justificationData.incident_type === "Olvido de Marcación";
+      const isOlvidoMarcacion = justificationData.incident_type === "Omisión de Marcación" || justificationData.incident_type === "Olvido de Marcación";
       if (!isOlvidoMarcacion) {
         if (!justificationData.justified_time_start) {
           setValidationError("El campo 'Hora de Inicio' es obligatorio cuando no se justifica el día completo.");
@@ -184,7 +208,7 @@ export default function JustifyModal({
           worked_hours: Math.min(newWorkedHours, 8),
           late_minutes: newLateMinutes,
           is_late: newLateMinutes > 0,
-          status: newLateMinutes === 0 && newWorkedHours >= 8 ? "Completo" : "Justificado",
+          status: "Justificado",
         };
 
         // Preserve original clock_in/clock_out if they already exist — don't overwrite with justified times
@@ -257,10 +281,24 @@ export default function JustifyModal({
         }
       }
 
+      // Recalcular métricas (tardanza, HE 25%, HE 35%) para todas las fechas justificadas
+      const minDate = targetDates[0];
+      const maxDate = targetDates[targetDates.length - 1];
+      // await base44.functions.invoke("recalcularAsistencia", {
+        // employee_id: justifyingEmployee.id,
+        // date_from: minDate,
+        // date_to: maxDate,
+      // });
+      await recalcularAsistenciaService.invoke(
+        justifyingEmployee.id,
+        minDate,
+        maxDate
+      );
+
       toast.success(
         targetDates.length === 1
-          ? "Justificación creada y aprobada correctamente"
-          : `${targetDates.length} justificaciones creadas y aprobadas correctamente`
+          ? "Justificación creada y métricas recalculadas"
+          : `${targetDates.length} justificaciones creadas y métricas recalculadas`
       );
       onSuccess();
     } catch (error) {
@@ -399,21 +437,34 @@ export default function JustifyModal({
                 Tipo de Incidente <span className="text-red-500">*</span>
               </label>
               <Select
-                value={justificationData.incident_type}
-                onValueChange={(value) => {
-                  setJustificationData({ ...justificationData, incident_type: value });
-                  setValidationError("");
-                }}
+              value={justificationData.incident_type}
+              onValueChange={(value) => {
+                setJustificationData({ ...justificationData, incident_type: value });
+                setValidationError("");
+                setIncidentSearch("");
+              }}
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Tardanza">Tardanza</SelectItem>
-                  <SelectItem value="Falta">Falta</SelectItem>
-                  <SelectItem value="Salida Temprana">Salida Temprana</SelectItem>
-                  <SelectItem value="Olvido de Marcación">Olvido de Marcación</SelectItem>
-                </SelectContent>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar tipo..." />
+              </SelectTrigger>
+              <SelectContent>
+                <div className="p-2 border-b sticky top-0 bg-white z-10">
+                  <Input
+                    placeholder="Buscar tipo de incidente..."
+                    value={incidentSearch}
+                    onChange={(e) => setIncidentSearch(e.target.value)}
+                    className="h-8 text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
+                </div>
+                {filteredIncidentTypes.length > 0
+                  ? filteredIncidentTypes.map(t => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))
+                  : <div className="px-3 py-2 text-sm text-slate-400">Sin resultados</div>
+                }
+              </SelectContent>
               </Select>
             </div>
 

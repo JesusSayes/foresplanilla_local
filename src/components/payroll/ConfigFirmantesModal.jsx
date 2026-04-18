@@ -36,10 +36,20 @@ export default function ConfigFirmantesModal({ companyInfo, onClose, onSave }) {
   useEffect(() => {
     if (companyInfo) {
       if (companyInfo.firmante_gg) {
-        try { setFirmante1(JSON.parse(companyInfo.firmante_gg)); } catch {}
+        try {
+          const parsed = JSON.parse(companyInfo.firmante_gg);
+          if (parsed && Object.keys(parsed).length > 0) {
+            setFirmante1(parsed);
+          }
+        } catch {}
       }
       if (companyInfo.firmante_delegado) {
-        try { setFirmante2(JSON.parse(companyInfo.firmante_delegado)); } catch {}
+        try {
+          const parsed = JSON.parse(companyInfo.firmante_delegado);
+          if (parsed && Object.keys(parsed).length > 0) {
+            setFirmante2(parsed);
+          }
+        } catch {}
       }
     }
   }, [companyInfo]);
@@ -96,8 +106,7 @@ export default function ConfigFirmantesModal({ companyInfo, onClose, onSave }) {
       if (!file) return;
       setUploading(true);
       try {
-        // const { file_url } = await base44.integrations.Core.UploadFile({ file });
-        uploadFile(file),
+        const { file_url } = await uploadFile(file);
         setFn(prev => ({ ...prev, firma_url: file_url }));
         toast.success("Firma subida correctamente");
       } catch {
@@ -110,20 +119,55 @@ export default function ConfigFirmantesModal({ companyInfo, onClose, onSave }) {
   };
 
   const handleSave = async () => {
+    console.log("=== SAVE PROCESS START ===");
+    console.log("firmante1:", firmante1);
+    console.log("firmante2:", firmante2);
+    console.log("firmante1 JSON:", JSON.stringify(firmante1));
+    console.log("firmante2 JSON:", JSON.stringify(firmante2));
+
+    if (!firmante1.nombre || !firmante1.cargo) {
+      toast.error("Por favor complete los datos del Firmante Principal");
+      return;
+    }
+
     setSaving(true);
     try {
-      // Guardar en CompanyInfo como campos JSON
       if (companyInfo?.id) {
-        await entitiesAPI.CompanyInfo.update(companyInfo.id, {
+        const payload = {
           firmante_gg: JSON.stringify(firmante1),
           firmante_delegado: JSON.stringify(firmante2),
-        });
+        };
+
+        console.log("Payload being sent:", payload);
+
+        const result = await entitiesAPI.CompanyInfo.update(companyInfo.id, payload);
+
+        console.log("API Response:", result);
+        console.log("firmante_gg from response:", result.firmante_gg);
+        console.log("firmante_delegado from response:", result.firmante_delegado);
+
+        await queryClient.invalidateQueries({ queryKey: ["companyInfo"] });
+
+        toast.success("Firmantes guardados correctamente");
+
+        if (onSave) {
+          onSave({ gerente_general: firmante1, delegado: firmante2 });
+        }
+
+        setTimeout(() => {
+          if (onClose) {
+            onClose();
+          }
+        }, 500);
+      } else {
+        toast.error("No se encontró información de la empresa");
       }
-      onSave({ gerente_general: firmante1, delegado: firmante2 });
     } catch (err) {
-      toast.error("Error al guardar los firmantes");
+      console.error("Error al guardar firmantes:", err);
+      toast.error(`Error al guardar los firmantes: ${err.message || 'Por favor intente nuevamente'}`);
     } finally {
       setSaving(false);
+      console.log("=== SAVE PROCESS END ===");
     }
   };
 
@@ -198,7 +242,7 @@ export default function ConfigFirmantesModal({ companyInfo, onClose, onSave }) {
         <div className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center">
           {data.firma_url ? (
             <div className="space-y-2">
-              <img src={data.firma_url} alt="firma" className="max-h-20 mx-auto object-contain" />
+              <img src={`${import.meta.env.VITE_API_URL}${data.firma_url}`} alt="firma" className="max-h-20 mx-auto object-contain" />
               <div className="flex gap-2 justify-center">
                 <Button
                   size="sm"
@@ -290,7 +334,17 @@ export default function ConfigFirmantesModal({ companyInfo, onClose, onSave }) {
 
           <div className="flex gap-3 mt-6 pt-6 border-t">
             <Button variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>
-            <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleSave} disabled={saving}>
+            <Button
+              type="button"
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("Button clicked!");
+                handleSave();
+              }}
+              disabled={saving}
+            >
               {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</> : "Guardar Firmantes"}
             </Button>
           </div>

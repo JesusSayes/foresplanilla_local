@@ -1,0 +1,102 @@
+{
+  "name": "AttendanceIncident",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "attendance_record_id": {
+      "type": "string",
+      "description": "ID del registro de asistencia"
+    },
+    "incident_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de la incidencia"
+    },
+    "incident_type": {
+      "type": "string",
+      "enum": [
+        "Comisi\u00f3n de Servicio",
+        "Capacitaci\u00f3n",
+        "Descanso M\u00e9dico",
+        "Omisi\u00f3n de Marcaci\u00f3n",
+        "Cita M\u00e9dica",
+        "Confirmaci\u00f3n de Asistencia (Limitaci\u00f3n de Sistema)",
+        "Licencia por Maternidad",
+        "Licencia por Paternidad",
+        "Otro",
+        "Onom\u00e1stico",
+        "Descanso Vacacional",
+        "Licencia sin Goce de Haber",
+        "Feriado",
+        "Justificaci\u00f3n de Tardanza",
+        "Tardanza",
+        "Falta",
+        "Salida Temprana"
+      ],
+      "description": "Tipo de incidencia"
+    },
+    "justification": {
+      "type": "string",
+      "description": "Justificaci\u00f3n de la incidencia"
+    },
+    "supporting_document_url": {
+      "type": "string",
+      "description": "URL del documento de sustento"
+    },
+    "justified_time_start": {
+      "type": "string",
+      "description": "Hora de inicio del per\u00edodo justificado (HH:mm)"
+    },
+    "justified_time_end": {
+      "type": "string",
+      "description": "Hora de fin del per\u00edodo justificado (HH:mm)"
+    },
+    "full_day_justification": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si es true, se justifica todo el d\u00eda"
+    },
+    "hours_to_adjust": {
+      "type": "number",
+      "default": 0,
+      "description": "Horas calculadas a ajustar (sin incluir extras)"
+    },
+    "late_minutes_to_adjust": {
+      "type": "integer",
+      "default": 0,
+      "description": "Minutos de tardanza a ajustar"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pendiente",
+        "Aprobada",
+        "Rechazada"
+      ],
+      "default": "Pendiente",
+      "description": "Estado de la justificaci\u00f3n"
+    },
+    "reviewed_by": {
+      "type": "string",
+      "description": "Nombre de quien revis\u00f3"
+    },
+    "review_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de revisi\u00f3n"
+    },
+    "review_comments": {
+      "type": "string",
+      "description": "Comentarios de la revisi\u00f3n"
+    }
+  },
+  "required": [
+    "employee_id",
+    "incident_date",
+    "incident_type",
+    "justification"
+  ]
+}

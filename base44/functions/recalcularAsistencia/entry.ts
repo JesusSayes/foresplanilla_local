@@ -160,12 +160,15 @@ Deno.serve(async (req) => {
       const metrics = calcularMetricas(record, schedule, record.date, overtimeAuth);
 
       let status = record.status;
-      if (record.clock_in && record.clock_out) {
+      if (record.status === "Justificado") {
+        // Preservar el estado Justificado: ya fue procesado por una justificación
+        status = "Justificado";
+      } else if (record.clock_in && record.clock_out) {
         status = "Completo";
       } else if (record.clock_in && !record.clock_out) {
         status = "Incompleto";
       } else if (!record.clock_in) {
-        status = record.status === "Justificado" ? "Justificado" : "Ausente";
+        status = "Ausente";
       }
 
       await base44.entities.AttendanceRecord.update(record.id, {

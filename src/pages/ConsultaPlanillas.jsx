@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   FileText, Users, DollarSign, Eye, Printer, ChevronRight,
   CheckCircle, Search, Calendar, ArrowLeft, Settings, PenTool,
-  Loader2, Download
+  Loader2, Download, BookOpen, RefreshCw
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -59,10 +59,11 @@ export default function ConsultaPlanillas() {
   const [searchTerm, setSearchTerm]   = useState("");
 
   // Vista activa
-  const [selectedGroup, setSelectedGroup] = useState(null); // cabecera seleccionada
-  const [previewPayslip, setPreviewPayslip] = useState(null); // boleta individual
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [previewPayslip, setPreviewPayslip] = useState(null);
   const [showPlanillaCompleta, setShowPlanillaCompleta] = useState(false);
   const [showConfigFirmantes, setShowConfigFirmantes] = useState(false);
+  const [generatingAsiento, setGeneratingAsiento] = useState(null); // payroll_number en proceso
 
   const queryClient = useQueryClient();
 
@@ -97,6 +98,21 @@ export default function ConsultaPlanillas() {
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployeesConsulta"],
     queryFn: () => entitiesAPI.Employee.list("-created_date"),
+  });
+
+  const { data: allAsientos = [] } = useQuery({
+    queryKey: ["asientosContablesConsulta"],
+    queryFn: () => entitiesAPI.AsientoContable.list("-fecha_registro", 5000),
+  });
+
+  const { data: costCenterAssignments = [] } = useQuery({
+    queryKey: ["ccAssignmentsConsulta"],
+    queryFn: () => entitiesAPI.CostCenterAssignment.list("-created_date"),
+  });
+
+  const { data: costCenters = [] } = useQuery({
+    queryKey: ["costCentersConsulta"],
+    queryFn: () => entitiesAPI.CostCenter.list("code"),
   });
 
   // Agrupar boletas en cabeceras de planilla
@@ -150,6 +166,229 @@ export default function ConsultaPlanillas() {
     totalDesc:   g.payslips.reduce((s, p) => s + (p.total_deductions || 0), 0),
     totalNeto:   g.payslips.reduce((s, p) => s + (p.net_pay || 0), 0),
   });
+
+  // Verifica si un grupo ya tiene asientos generados
+  const getGrupoAsientoStatus = (grupo) => {
+    const existing = allAsientos.filter(
+      a => a.payroll_period === grupo.period && a.payroll_type === grupo.payroll_type &&
+        (a.origen === "Planilla" || a.origen === "Otro")
+    );
+    if (existing.length > 0) return "Generado";
+    return null;
+  };
+
+  // Genera o actualiza asientos contables agrupados por centro de costo
+  // Para SNP: genera un asiento individual por cada trabajador (Recibo de Honorarios)
+  const handleGenerarAsiento = async (grupo) => {
+    setGeneratingAsiento(grupo.key);
+    try {
+      const period = grupo.period;
+      const payrollType = grupo.payroll_type;
+      const isSNP = payrollType === "SNP";
+      const annomes = `${grupo.year}${String(grupo.month).padStart(2, "0")}`;
+      const fechaDoc = format(new Date(grupo.year, grupo.month - 1, 1), "yyyy-MM-dd");
+      const fechaRegistro = format(new Date(), "yyyy-MM-dd");
+      const comprobante = grupo.payroll_number || `${isSNP ? "RH" : "PL"}-${annomes}`;
+
+      // Eliminar asientos anteriores de esta planilla para actualizar
+      const existing = allAsientos.filter(
+        a => a.payroll_period === period && a.payroll_type === payrollType &&
+          (a.origen === "Planilla" || (isSNP && a.origen === "Otro"))
+      );
+      for (const a of existing) {
+        await entitiesAPI.AsientoContable.delete(a.id);
+      }
+
+      const asientosToCreate = [];
+
+      if (isSNP) {
+        // ── SNP: un asiento por persona (Recibo de Honorarios) ──────────────
+        // Estructura de cadena de conexión del sistema contable externo
+        for (const p of grupo.payslips) {
+          const emp = allEmployees.find(e => e.id === p.employee_id);
+          if (!emp) continue;
+
+          // Centro de costo del trabajador
+          let assignment = costCenterAssignments.find(
+            a => a.assignment_type === "Empleado" && a.employee_id === emp.id && a.is_active
+          );
+          if (!assignment && emp.department_name) {
+            assignment = costCenterAssignments.find(
+              a => a.assignment_type === "Departamento" && a.department_name === emp.department_name && a.is_active
+            );
+          }
+          const cc = assignment?.cost_center_id
+            ? costCenters.find(c => c.id === assignment.cost_center_id)
+            : null;
+          const ccCode = cc?.code || "";
+          const codAnexo = emp.document_number || "";
+          const empName = `${emp.first_name} ${emp.last_name}`;
+          const importeBruto = Math.round((p.total_income || 0) * 100) / 100;
+          const importeRet   = Math.round((p.total_deductions || 0) * 100) / 100;
+          const importeNeto  = Math.round((p.net_pay || 0) * 100) / 100;
+          const glosa    = `SNP ${period}`;
+          const glosaEmp = `RH ${empName} - ${period}`;
+          const nroDoc   = `RH-${annomes}-${emp.document_number || emp.employee_code}`;
+
+          // Campos comunes a todos los movimientos de este trabajador
+          const base = {
+            annomes,
+            subdiario: "07",           // Subdiario Honorarios
+            comprobante,
+            fecha_doc: fechaDoc,
+            fecha_vencimiento: fechaDoc,
+            fecha_registro: fechaRegistro,
+            tipo_doc: "RH",            // Recibo de Honorarios
+            nro_doc: nroDoc,
+            tipo_anexo: "P",           // Proveedor (contratista)
+            cod_anexo: codAnexo,
+            conversion_tc: "M",
+            moneda: "PEN",
+            tc: 1,
+            glosa,
+            centro_costos: ccCode,
+            centro_costos_id: assignment?.cost_center_id || "",
+            employee_id: emp.id,
+            payroll_period: period,
+            payroll_type: payrollType,
+            payslip_id: p.id,
+            origen: "Otro",            // Distingue de planilla regular
+            estado_migracion: "Pendiente",
+            anulado: false,
+          };
+
+          // DEBE: 6320000 Servicios de Terceros (honorarios brutos)
+          asientosToCreate.push({
+            ...base,
+            cuenta: "6320000",
+            importe: importeBruto,
+            importe_soles: importeBruto,
+            debe_haber: "D",
+            glosa_mov: `${glosaEmp} - Honorario bruto`,
+          });
+
+          // HABER: 4212100 Honorarios por pagar (neto)
+          asientosToCreate.push({
+            ...base,
+            cuenta: "4212100",
+            importe: importeNeto,
+            importe_soles: importeNeto,
+            debe_haber: "H",
+            glosa_mov: `${glosaEmp} - Neto a pagar`,
+          });
+
+          // HABER: 4017100 Retención de 4ta categoría (si hay descuentos)
+          if (importeRet > 0) {
+            asientosToCreate.push({
+              ...base,
+              cuenta: "4017100",
+              importe: importeRet,
+              importe_soles: importeRet,
+              debe_haber: "H",
+              glosa_mov: `${glosaEmp} - Retención 4ta categoría`,
+            });
+          }
+        }
+
+      } else {
+        // ── PLANILLA REGULAR: agrupado por centro de costo ──────────────────
+        const ccMap = {};
+
+        for (const p of grupo.payslips) {
+          const emp = allEmployees.find(e => e.id === p.employee_id);
+          if (!emp) continue;
+
+          let assignment = costCenterAssignments.find(
+            a => a.assignment_type === "Empleado" && a.employee_id === emp.id && a.is_active
+          );
+          if (!assignment && emp.department_name) {
+            assignment = costCenterAssignments.find(
+              a => a.assignment_type === "Departamento" && a.department_name === emp.department_name && a.is_active
+            );
+          }
+
+          const ccId = assignment?.cost_center_id || "sin_cc";
+          const cc = ccId !== "sin_cc" ? costCenters.find(c => c.id === ccId) : null;
+
+          if (!ccMap[ccId]) {
+            ccMap[ccId] = { cc, ccId, totalIncome: 0, totalDeductions: 0, totalNeto: 0, employeeCount: 0 };
+          }
+          ccMap[ccId].totalIncome += p.total_income || 0;
+          ccMap[ccId].totalDeductions += p.total_deductions || 0;
+          ccMap[ccId].totalNeto += p.net_pay || 0;
+          ccMap[ccId].employeeCount += 1;
+        }
+
+        for (const data of Object.values(ccMap)) {
+          const ccCode = data.cc?.code || "S/CC";
+          const ccName = data.cc?.name || "Sin Centro de Costo";
+          const glosa  = `${payrollType} - ${period}`;
+          const glosaCC = `${glosa} | ${ccCode} - ${ccName} (${data.employeeCount} emp.)`;
+
+          const base = {
+            annomes,
+            subdiario: "08",
+            comprobante,
+            fecha_doc: fechaDoc,
+            fecha_registro: fechaRegistro,
+            tipo_doc: "PL",
+            nro_doc: comprobante,
+            tipo_anexo: "T",           // Trabajador
+            conversion_tc: "M",
+            moneda: "PEN",
+            tc: 1,
+            glosa,
+            centro_costos: ccCode,
+            centro_costos_id: data.ccId !== "sin_cc" ? data.ccId : "",
+            origen: "Planilla",
+            payroll_period: period,
+            payroll_type: payrollType,
+            estado_migracion: "Pendiente",
+            anulado: false,
+          };
+
+          asientosToCreate.push({
+            ...base,
+            cuenta: "6210000",
+            importe: Math.round(data.totalIncome * 100) / 100,
+            importe_soles: Math.round(data.totalIncome * 100) / 100,
+            debe_haber: "D",
+            glosa_mov: glosaCC,
+          });
+
+          asientosToCreate.push({
+            ...base,
+            cuenta: "4110000",
+            importe: Math.round(data.totalNeto * 100) / 100,
+            importe_soles: Math.round(data.totalNeto * 100) / 100,
+            debe_haber: "H",
+            glosa_mov: `${glosaCC} - Neto a pagar`,
+          });
+
+          if (data.totalDeductions > 0) {
+            asientosToCreate.push({
+              ...base,
+              cuenta: "4030000",
+              importe: Math.round(data.totalDeductions * 100) / 100,
+              importe_soles: Math.round(data.totalDeductions * 100) / 100,
+              debe_haber: "H",
+              glosa_mov: `${glosaCC} - Descuentos/Tributos`,
+            });
+          }
+        }
+      }
+
+      await entitiesAPI.AsientoContable.bulkCreate(asientosToCreate);
+      queryClient.invalidateQueries(["asientosContablesConsulta"]);
+      const label = existing.length > 0 ? "Asientos actualizados" : "Asientos generados";
+      toast.success(`${label}: ${asientosToCreate.length} líneas${isSNP ? ` (${grupo.payslips.length} Recibos de Honorarios)` : ""}`);
+    } catch (error) {
+      toast.error("Error al generar asientos contables");
+      console.error(error);
+    } finally {
+      setGeneratingAsiento(null);
+    }
+  };
 
   // --- Si hay boleta individual seleccionada ---
   if (previewPayslip) {
@@ -243,7 +482,7 @@ export default function ConsultaPlanillas() {
           </div>
 
           {/* Resumen */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[
               { label: "Empleados incluidos", value: stats.empleados, icon: Users, color: "blue" },
               { label: "Total Ingresos", value: `S/ ${Number(stats.totalIncome || 0).toFixed(2)}`, icon: DollarSign, color: "green" },
@@ -251,12 +490,16 @@ export default function ConsultaPlanillas() {
               { label: "Total Neto a Pagar", value: `S/ ${Number(stats.totalNeto || 0).toFixed(2)}`, icon: DollarSign, color: "indigo", big: true },
             ].map(({ label, value, icon: Icon, color, big }) => (
               <Card key={label} className="border-0 shadow-lg">
-                <CardContent className="p-5">
-                  <div className={`inline-flex p-2 rounded-lg bg-${color}-100 mb-3`}>
-                    <Icon className={`w-5 h-5 text-${color}-600`} />
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`p-2 bg-${color}-100 rounded-lg shrink-0`}>
+                      <Icon className={`w-4 h-4 text-${color}-600`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xl font-bold text-slate-900 leading-tight">{value}</div>
+                      <p className="text-slate-600 text-xs truncate">{label}</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500 mb-1">{label}</p>
-                  <p className={`font-bold text-slate-900 ${big ? "text-2xl text-indigo-600" : "text-lg"}`}>{value}</p>
                 </CardContent>
               </Card>
             ))}
@@ -501,6 +744,15 @@ export default function ConsultaPlanillas() {
 
                       {/* Acciones rápidas */}
                       <div className="flex items-center gap-2 shrink-0">
+                        {/* Badge estado asiento */}
+                        {(() => {
+                          const asientoStatus = getGrupoAsientoStatus(g);
+                          return asientoStatus ? (
+                            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
+                              <CheckCircle className="w-3 h-3" />Asiento generado
+                            </span>
+                          ) : null;
+                        })()}
                         <Button
                           size="sm"
                           variant="outline"
@@ -516,6 +768,18 @@ export default function ConsultaPlanillas() {
                           onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); setTimeout(() => window.print(), 800); }}
                         >
                           <Printer className="w-4 h-4 mr-1" />Imprimir
+                        </Button>
+                        <Button
+                          size="sm"
+                          className={`hidden sm:flex ${getGrupoAsientoStatus(g) ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                          disabled={generatingAsiento === g.key}
+                          onClick={e => { e.stopPropagation(); handleGenerarAsiento(g); }}
+                        >
+                          {generatingAsiento === g.key
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                            : <BookOpen className="w-3.5 h-3.5 mr-1" />
+                          }
+                          {getGrupoAsientoStatus(g) ? "Actualizar Asiento" : "Generar Asiento"}
                         </Button>
                         <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
                       </div>

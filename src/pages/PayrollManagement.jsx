@@ -20,6 +20,7 @@ import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import ConceptsManager from "../components/payroll/ConceptsManager";
+import AttendancePeriodModal from "../components/payroll/AttendancePeriodModal";
 import { createPageUrl } from "../utils";
 import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
@@ -48,6 +49,8 @@ export default function PayrollManagement() {
   const [historyMonthFilter, setHistoryMonthFilter] = useState("all");
   const [historyTypeFilter, setHistoryTypeFilter] = useState("all");
   const [selectedPayrollToDelete, setSelectedPayrollToDelete] = useState(null);
+  const [showPeriodModal, setShowPeriodModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // 'preview' | 'generate'
 
   const queryClient = useQueryClient();
 
@@ -244,7 +247,29 @@ export default function PayrollManagement() {
     },
   });
 
-  const calculatePayroll = async () => {
+  const getDefaultPeriod = () => {
+    const firstDay = `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-01`;
+    const lastDay = new Date(selectedYear, selectedMonth, 0);
+    const lastDayStr = `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-${String(lastDay.getDate()).padStart(2,'0')}`;
+    return { dateFrom: firstDay, dateTo: lastDayStr };
+  };
+
+  const handleOpenPeriodModal = (action) => {
+    setPendingAction(action);
+    setShowPeriodModal(true);
+  };
+
+  const handlePeriodConfirm = async ({ dateFrom, dateTo }) => {
+    setShowPeriodModal(false);
+    if (pendingAction === 'preview') {
+      await calculatePayroll(dateFrom, dateTo);
+    } else if (pendingAction === 'generate') {
+      await calculatePayroll(dateFrom, dateTo, true);
+    }
+    setPendingAction(null);
+  };
+
+  const calculatePayroll = async (periodFrom, periodTo, autoGenerate = false) => {
     const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
 
     // Filtrar empleados según búsqueda y departamento
@@ -273,7 +298,12 @@ export default function PayrollManagement() {
 
     const payslipsData = await Promise.all(filteredEmployees.map(async (emp) => {
       // Preparar datos de asistencia
-      const empAttendance = attendanceRecords.filter(r => r.employee_id === emp.id);
+      const empAttendance = attendanceRecords.filter(r => {
+        if (r.employee_id !== emp.id) return false;
+        if (periodFrom && r.date < periodFrom) return false;
+        if (periodTo && r.date > periodTo) return false;
+        return true;
+      });
       const workedDays = payrollType === "Quincenal" ? 15 : empAttendance.filter(r => r.status === "Completo" || r.status === "Incompleto").length;
 
       const attendanceData = {
@@ -285,10 +315,22 @@ export default function PayrollManagement() {
         horas_nocturnas: 0,
       };
 
-      // Obtener conceptos del empleado (generales + específicos)
+      // Conceptos fijos del empleado (actividad, alimento, movilidad)
+      const employeeFixedConcepts = [];
+      if (emp.activity_cost > 0) {
+        employeeFixedConcepts.push({ employee_id: emp.id, concept_type: "Ingreso", concept_category: "Bonificaciones", concept_name: "Costo Actividad", amount: emp.activity_cost, is_dynamic: false, applies_to_payroll_types: ["Quincenal", "Mensual", "Adicional", "SNP"] });
+      }
+      if (emp.food_cost > 0) {
+        employeeFixedConcepts.push({ employee_id: emp.id, concept_type: "Ingreso", concept_category: "Bonificaciones", concept_name: "Costo Alimento", amount: emp.food_cost, is_dynamic: false, applies_to_payroll_types: ["Quincenal", "Mensual", "Adicional", "SNP"] });
+      }
+      if (emp.transport_cost > 0) {
+        employeeFixedConcepts.push({ employee_id: emp.id, concept_type: "Ingreso", concept_category: "Asignaciones", concept_name: "Costo Movilidad", amount: emp.transport_cost, is_dynamic: false, applies_to_payroll_types: ["Quincenal", "Mensual", "Adicional", "SNP"] });
+      }
+
+      // Obtener conceptos del empleado (generales + específicos + fijos del empleado)
       const generalConcepts = payrollConcepts.filter(c => c.employee_id === "general");
       const specificConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
-      const allEmpConcepts = [...generalConcepts, ...specificConcepts];
+      const allEmpConcepts = [...generalConcepts, ...specificConcepts, ...employeeFixedConcepts];
 
       // Usar el calculador automático
       const calculator = new PayrollCalculator(emp, selectedMonth, selectedYear, payrollType);
@@ -351,7 +393,7 @@ export default function PayrollManagement() {
         total_deductions: adjustedDeductions,
         net_pay: adjustedNetPay,
         payment_date: `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-${payrollType === "Quincenal" ? "15" : "30"}`,
-        status: "Generada",
+        status: "Calculada",
         calculation_summary: result.summary,
         calculation_log: result.calculationLog,
         has_errors: result.errors.length > 0,
@@ -361,6 +403,13 @@ export default function PayrollManagement() {
 
     setPreviewData(payslipsData);
     setShowPreview(true);
+    if (autoGenerate) {
+      const payslipsToCreate = payslipsData.map(p => {
+        const { employee_name, employee_code, department, ...rest } = p;
+        return rest;
+      });
+      createPayslipsMutation.mutate(payslipsToCreate);
+    }
   };
 
   const generatePDF = () => {
@@ -458,8 +507,9 @@ export default function PayrollManagement() {
     ) : true;
 
     const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
+    const matchesType = p.payroll_type === payrollType;
 
-    return matchesSearch && matchesDept;
+    return matchesSearch && matchesDept && matchesType;
   });
 
   const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
@@ -754,7 +804,7 @@ export default function PayrollManagement() {
 
                 {canCreate && (
                   <Button
-                    onClick={calculatePayroll}
+                    onClick={() => handleOpenPeriodModal('preview')}
                     className="w-full bg-indigo-600 hover:bg-indigo-700"
                   >
                     <Eye className="w-4 h-4 mr-2" />
@@ -804,7 +854,7 @@ export default function PayrollManagement() {
                       Descargar PDF
                     </Button>
                     <Button
-                      onClick={handleGeneratePayroll}
+                      onClick={() => handleOpenPeriodModal('generate')}
                       className="flex-1 bg-green-600 hover:bg-green-700"
                       disabled={createPayslipsMutation.isPending}
                     >
@@ -1055,21 +1105,19 @@ export default function PayrollManagement() {
                       <div className="space-y-6">
                         {tipos.map(tipo => {
                           const planillasDelTipo = filteredPayslips.filter(p => p.payroll_type === tipo);
-                          const statusGroup = planillasDelTipo[0]?.status || "Generada";
-                          const totalNeto = Number(planillasDelTipo.reduce((s, p) => s + (Number(p.net_pay) || 0), 0));
-                          const totalIngresos = Number(planillasDelTipo.reduce((s, p) => s + (Number(p.total_income) || 0), 0));
-                          const totalDesc = Number(planillasDelTipo.reduce((s, p) => s + (Number(p.total_deductions) || 0), 0));
+                          const totalNeto = planillasDelTipo.reduce((s, p) => s + (p.net_pay || 0), 0);
+                          const totalIngresos = planillasDelTipo.reduce((s, p) => s + (p.total_income || 0), 0);
+                          const totalDesc = planillasDelTipo.reduce((s, p) => s + (p.total_deductions || 0), 0);
                           const allPagada   = planillasDelTipo.every(p => p.status === "Pagada");
-                          const allAprobada = !allPagada && planillasDelTipo.every(p => p.status === "Aprobada");
+                          const allAprobada = !allPagada && planillasDelTipo.every(p => p.status === "Aprobada" || p.status === "Pagada") && planillasDelTipo.some(p => p.status === "Aprobada");
                           const puedeAprobar = !allPagada && !allAprobada;
-                          const hayMixto = !allPagada && !allAprobada && planillasDelTipo.some(p => p.status === "Aprobada");
 
                           const statusBadgeColor =
                             allPagada   ? "bg-green-100 text-green-700 border-green-200" :
                             allAprobada ? "bg-blue-100 text-blue-700 border-blue-200" :
                             "bg-yellow-100 text-yellow-700 border-yellow-200";
                           const statusLabel =
-                            allPagada ? "✓ Pagada" : allAprobada ? "✓ Aprobada" : "Generada";
+                            allPagada ? "✓ Pagada" : allAprobada ? "✓ Aprobada" : "Calculada";
 
                           return (
                             <Card key={tipo} className={`border-2 shadow-lg ${allAprobada ? "border-blue-300" : allPagada ? "border-green-300" : "border-transparent"}`}>
@@ -1473,6 +1521,20 @@ export default function PayrollManagement() {
           </div>
         </div>
 
+        {/* Modal de Período de Asistencias */}
+        {showPeriodModal && (() => {
+          const { dateFrom, dateTo } = getDefaultPeriod();
+          return (
+            <AttendancePeriodModal
+              defaultDateFrom={dateFrom}
+              defaultDateTo={dateTo}
+              actionLabel={pendingAction === 'generate' ? 'Generar Planilla' : 'Ver Vista Previa'}
+              onConfirm={handlePeriodConfirm}
+              onCancel={() => { setShowPeriodModal(false); setPendingAction(null); }}
+            />
+          );
+        })()}
+
         {/* Modal de Vista Previa de Boleta */}
         {previewPayslip && (
           <div
@@ -1496,6 +1558,7 @@ export default function PayrollManagement() {
                 payslip={previewPayslip}
                 employee={allEmployees.find(e => e.id === previewPayslip.employee_id)}
                 companyInfo={companyInfo}
+                showPrintButton={true}
               />
             </div>
           </div>
