@@ -40,8 +40,13 @@ export default function ConfigFirmantesModal({ companyInfo, onClose, onSave }) {
           const parsed = JSON.parse(companyInfo.firmante_gg);
           if (parsed && Object.keys(parsed).length > 0) {
             setFirmante1(parsed);
+            console.log("=========> no parsed");
+            console.log(parsed);
           }
-        } catch {}
+        } catch (err){
+          console.log("=======> error: ");
+          console.log(err);
+        }
       }
       if (companyInfo.firmante_delegado) {
         try {
@@ -133,14 +138,54 @@ export default function ConfigFirmantesModal({ companyInfo, onClose, onSave }) {
     setSaving(true);
     try {
       if (companyInfo?.id) {
-        const payload = {
-          firmante_gg: JSON.stringify(firmante1),
-          firmante_delegado: JSON.stringify(firmante2),
+        // const payload = {
+          // firmante_gg: JSON.stringify(firmante1),
+          // firmante_delegado: JSON.stringify(firmante2),
+        // };
+        /* ====== CUSTOM VALIDATION BLOCK (NO BASE44) ====== */
+
+        // Función para validar si un firmante tiene datos reales
+        const isEmptyFirmante = (f) => {
+          return !f || (
+            (!f.nombre || f.nombre.trim() === "") &&
+            (!f.cargo || f.cargo.trim() === "") &&
+            (!f.dni || f.dni.trim() === "") &&
+            (!f.firma_url || f.firma_url.trim() === "")
+          );
         };
 
+        // Validar firmante principal (obligatorio)
+        if (isEmptyFirmante(firmante1)) {
+          toast.error("Debe completar al menos el nombre o cargo del Firmante Principal");
+          return;
+        }
+
+        // Validar firmante delegado (opcional pero si existe debe tener datos)
+        if (!isEmptyFirmante(firmante2) && !firmante2.nombre) {
+          toast.error("El Firmante Delegado debe tener al menos un nombre válido");
+          return;
+        }
+
+        // Construcción segura del payload
+        const payload = {
+          firmante_gg: isEmptyFirmante(firmante1) ? null : JSON.stringify(firmante1),
+          firmante_delegado: isEmptyFirmante(firmante2) ? null : JSON.stringify(firmante2),
+        };
+
+        /* ====== END CUSTOM BLOCK ====== */
+
+        console.log("firmante1=>>>>>>>>:", JSON.stringify(firmante1));
         console.log("Payload being sent:", payload);
 
         const result = await entitiesAPI.CompanyInfo.update(companyInfo.id, payload);
+
+        const fresh = await entitiesAPI.CompanyInfo.get(companyInfo.id);
+
+        if (fresh.firmante_gg !== payload.firmante_gg) {
+          console.error("❌ No persistió en DB");
+        } else {
+          console.log("✅ Persistencia confirmada");
+        }
 
         console.log("API Response:", result);
         console.log("firmante_gg from response:", result.firmante_gg);

@@ -36,10 +36,16 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
+    console.log("🔥 BEFORE UPDATE DB:", req.params);
+    console.log("🔥 BEFORE UPDATE DB:", req.body);
     const company = await prisma.company_info.update({
       where: { id: req.params.id },
       data: req.body
     });
+
+    const test = await prisma.company_info.findMany({ take: 1 });
+    console.log("🔥 AFTER UPDATE DB:", test);
+
     res.json(company);
   } catch (error) {
     res.status(500).json({ error: error.message });
