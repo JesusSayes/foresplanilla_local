@@ -153,41 +153,39 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
       const recordDate = new Date(dateKey);
 
       try {
-        const result = await prisma.attendance_record.upsert({
+        const existingRecord = await prisma.attendance_record.findUnique({
           where: {
             employee_id_date: {
               employee_id: employeeId,
               date: recordDate,
             },
           },
-          update: {
-            clock_in: clockInStr,
-            clock_out: clockOutStr,
-            worked_hours: workedHours,
-            updated_date: new Date(),
-            status: "present",
-            is_absent: false,
-          },
-          create: {
-            id: generate24HexId(),
-            employee_id: employeeId,
-            date: recordDate,
-            clock_in: clockInStr,
-            clock_out: clockOutStr,
-            worked_hours: workedHours,
-            status: "present",
-            is_absent: false,
-            created_date: new Date(),
-            updated_date: new Date(),
-            created_by: "biotime_sync",
-            is_sample: false,
+          select: {
+            id: true,
           },
         });
 
-        if (result.created_date.getTime() === result.updated_date.getTime()) {
-          inserted++;
-        } else {
+        if (existingRecord) {
           updated++;
+        } else {
+          await prisma.attendance_record.create({
+            data: {
+              id: generate24HexId(),
+              employee_id: employeeId,
+              date: recordDate,
+              clock_in: clockInStr,
+              clock_out: clockOutStr,
+              worked_hours: workedHours,
+              status: "present",
+              is_absent: false,
+              created_date: new Date(),
+              updated_date: new Date(),
+              created_by: "biotime_sync",
+              is_sample: false,
+            },
+          });
+
+          inserted++;
         }
       } catch (err) {
         errors++;
@@ -199,7 +197,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
     const durationMs = finishedAt - startedAt;
 
     console.log(
-      `[BiotimeSync] Finalizado: ${inserted} insertados, ${updated} actualizados, ${errors} errores`
+      `[BiotimeSync] Finalizado: ${inserted} insertados, ${updated} existentes omitidos, ${errors} errores`
     );
     console.log(`[BiotimeSync] Duración: ${durationMs} ms`);
 
