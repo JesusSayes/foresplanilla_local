@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DollarSign, FileText, Calendar, Users, Download,
-  Eye, CheckCircle, AlertCircle, Plus, Search, Lock, Edit2
+  Eye, CheckCircle, AlertCircle, Plus, Search, Lock, Edit2, Settings
 } from "lucide-react";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { format } from "date-fns";
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import ConceptsManager from "../components/payroll/ConceptsManager";
 import AttendancePeriodModal from "../components/payroll/AttendancePeriodModal";
+import PayrollConfigModal from "../components/payroll/PayrollConfigModal";
 import { createPageUrl } from "../utils";
 import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
@@ -51,6 +52,7 @@ export default function PayrollManagement() {
   const [selectedPayrollToDelete, setSelectedPayrollToDelete] = useState(null);
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null); // 'preview' | 'generate'
+  const [showPayrollConfig, setShowPayrollConfig] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -136,6 +138,14 @@ export default function PayrollManagement() {
     queryFn: async () => {
       const companies = await entitiesAPI.CompanyInfo.filter({ is_active: true });
       return companies.length > 0 ? companies[0] : null;
+    },
+  });
+
+  const { data: payrollConfig } = useQuery({
+    queryKey: ["payrollConfig"],
+    queryFn: async () => {
+      const configs = await entitiesAPI.PayrollConfig.filter({ config_type: "Quincenal", is_active: true });
+      return configs.length > 0 ? configs[0] : { quincenal_percentage: 40, quincenal_cutoff_day: 7 };
     },
   });
 
@@ -281,6 +291,23 @@ export default function PayrollManagement() {
       filteredEmployees = filteredEmployees.filter(emp => emp.contract_type === "SNP");
     }
 
+    // Regla quincenal: solo trabajadores que ingresaron hasta el día de corte configurado
+    if (payrollType === "Quincenal") {
+      const cutoffDay = payrollConfig?.quincenal_cutoff_day ?? 7;
+      filteredEmployees = filteredEmployees.filter(emp => {
+        if (!emp.hire_date) return true; // Si no tiene fecha de ingreso, se incluye
+        const hireDate = new Date(emp.hire_date);
+        // Si ingresó en un mes anterior, siempre se incluye
+        if (hireDate.getFullYear() < selectedYear) return true;
+        if (hireDate.getFullYear() === selectedYear && hireDate.getMonth() + 1 < selectedMonth) return true;
+        // Si ingresó en el mes en proceso, solo si fue antes del día de corte
+        if (hireDate.getFullYear() === selectedYear && hireDate.getMonth() + 1 === selectedMonth) {
+          return hireDate.getDate() <= cutoffDay;
+        }
+        return false; // Ingresó en mes futuro
+      });
+    }
+
     if (searchTerm) {
       filteredEmployees = filteredEmployees.filter(emp =>
         emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -332,16 +359,26 @@ export default function PayrollManagement() {
       const specificConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
       const allEmpConcepts = [...generalConcepts, ...specificConcepts, ...employeeFixedConcepts];
 
+      // Para quincenal: usar el porcentaje configurado en lugar del 50% fijo
+      let empForCalc = emp;
+      if (payrollType === "Quincenal") {
+        const quincenalPct = (payrollConfig?.quincenal_percentage ?? 40) / 100;
+        // Sobreescribimos temporalmente el base_salary para que el calculador use el porcentaje correcto
+        empForCalc = { ...emp, base_salary: (emp.base_salary || 0) * quincenalPct * 2 };
+        // (*2 porque buildContext divide por 2 para Quincenal: base_salary/2 = original * pct)
+      }
+
       // Usar el calculador automático
-      const calculator = new PayrollCalculator(emp, selectedMonth, selectedYear, payrollType);
+      const calculator = new PayrollCalculator(empForCalc, selectedMonth, selectedYear, payrollType);
       const result = await calculator.calculatePayroll(allEmpConcepts, attendanceData, rmvData?.amount || 1025);
 
-      // Calcular descuentos por asistencia (adicionales al sistema)
+      // Calcular descuentos por asistencia (solo para planillas NO quincenales)
       const lateRecords = empAttendance.filter(r => r.is_late && r.late_minutes > 10);
       const absentRecords = empAttendance.filter(r => r.is_absent);
       const baseSalaryForCalc = payrollType === "Quincenal" ? (emp.base_salary || 0) / 2 : (emp.base_salary || 0);
-      const tardinessDiscount = lateRecords.length * (baseSalaryForCalc / 30);
-      const absenceDiscount = absentRecords.length * (baseSalaryForCalc / 30);
+      // Regla quincenal: NO aplicar descuentos por inasistencias/tardanzas
+      const tardinessDiscount = payrollType === "Quincenal" ? 0 : lateRecords.length * (baseSalaryForCalc / 30);
+      const absenceDiscount = payrollType === "Quincenal" ? 0 : absentRecords.length * (baseSalaryForCalc / 30);
 
       // Buscar adelanto quincenal si es mensual
       let advanceDeduction = 0;
@@ -734,7 +771,7 @@ export default function PayrollManagement() {
                   </Select>
                   {payrollType === "Quincenal" && (
                     <p className="text-xs text-amber-600 mt-1">
-                      Se pagará el 50% del salario base
+                      Se pagará el {payrollConfig?.quincenal_percentage ?? 40}% del salario base · Solo trabajadores ingresados hasta el día {payrollConfig?.quincenal_cutoff_day ?? 7}
                     </p>
                   )}
                   {payrollType === "Mensual" && (
@@ -812,7 +849,7 @@ export default function PayrollManagement() {
                   </Button>
                 )}
 
-                <div className="pt-4 border-t">
+                <div className="pt-4 border-t space-y-2">
                   <Button
                     onClick={() => window.location.href = createPageUrl("PayrollConcepts")}
                     variant="outline"
@@ -820,6 +857,14 @@ export default function PayrollManagement() {
                   >
                     <Edit2 className="w-4 h-4 mr-2" />
                     Gestionar Conceptos
+                  </Button>
+                  <Button
+                    onClick={() => setShowPayrollConfig(true)}
+                    variant="outline"
+                    className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Configurar Planilla Quincenal
                   </Button>
                 </div>
               </CardContent>
@@ -1534,6 +1579,11 @@ export default function PayrollManagement() {
             />
           );
         })()}
+
+        {/* Modal Configuración Quincenal */}
+        {showPayrollConfig && (
+          <PayrollConfigModal onClose={() => setShowPayrollConfig(false)} />
+        )}
 
         {/* Modal de Vista Previa de Boleta */}
         {previewPayslip && (

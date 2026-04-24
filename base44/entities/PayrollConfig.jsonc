@@ -1,0 +1,37 @@
+{
+  "name": "PayrollConfig",
+  "type": "object",
+  "properties": {
+    "config_type": {
+      "type": "string",
+      "enum": [
+        "Quincenal",
+        "General"
+      ],
+      "default": "Quincenal",
+      "description": "Tipo de configuraci\u00f3n"
+    },
+    "quincenal_percentage": {
+      "type": "number",
+      "default": 40,
+      "description": "Porcentaje del sueldo base para planilla quincenal (ej: 40 para 40%)"
+    },
+    "quincenal_cutoff_day": {
+      "type": "integer",
+      "default": 7,
+      "description": "D\u00eda l\u00edmite de ingreso para incluir en planilla quincenal (trabajadores que ingresaron hasta este d\u00eda del mes)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Configuraci\u00f3n activa"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "config_type"
+  ]
+}

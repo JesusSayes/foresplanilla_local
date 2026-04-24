@@ -68,6 +68,7 @@ export const entitiesAPI = {
   },
   PayslipTemplate: createEntityAPI('/api/payroll/templates'),
   PayrollConcept: createEntityAPI('/api/payroll/concepts'),
+  PayrollConfig: createEntityAPI('/api/payroll/config'),
   Certificate: createEntityAPI('/api/certificates'),
   Notification: createEntityAPI('/api/notifications'),
   CompanyInfo: createEntityAPI('/api/company/info'),
