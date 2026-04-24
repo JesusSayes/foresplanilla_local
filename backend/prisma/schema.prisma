@@ -1023,3 +1023,16 @@ model attendance_record_backup_20260423 {
   @@index([employee_id])
   @@index([status])
 }
+
+model payroll_config {
+  id                   String    @id @db.VarChar(255)
+  created_date         DateTime? @default(now()) @db.Timestamp(6)
+  updated_date         DateTime? @default(now()) @db.Timestamp(6)
+  created_by           String?
+  updated_by           String?
+  config_type          String    @default("Quincenal") @db.VarChar(100)
+  quincenal_percentage Decimal?  @default(40) @db.Decimal(10, 2)
+  quincenal_cutoff_day Int?      @default(7)
+  is_active            Boolean?  @default(true)
+  notes                String?
+}

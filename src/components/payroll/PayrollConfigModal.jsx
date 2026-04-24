@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from '@/lib/AuthContext';
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ export default function PayrollConfigModal({ onClose }) {
 
   const { data: configs = [], isLoading } = useQuery({
     queryKey: ["payrollConfig"],
-    queryFn: () => base44.entities.PayrollConfig.filter({ config_type: "Quincenal", is_active: true }),
+    queryFn: () => entitiesAPI.PayrollConfig.filter({ config_type: "Quincenal", is_active: true }),
   });
 
   const existingConfig = configs[0] || null;
@@ -37,9 +38,9 @@ export default function PayrollConfigModal({ onClose }) {
         is_active: true,
       };
       if (existingConfig?.id) {
-        return base44.entities.PayrollConfig.update(existingConfig.id, data);
+        return entitiesAPI.PayrollConfig.update(existingConfig.id, data);
       } else {
-        return base44.entities.PayrollConfig.create(data);
+        return entitiesAPI.PayrollConfig.create(data);
       }
     },
     onSuccess: () => {
