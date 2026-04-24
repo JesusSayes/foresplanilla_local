@@ -55,6 +55,7 @@ export const entitiesAPI = {
   AttendanceIncident: createEntityAPI('/api/attendance/incidents'),
   OvertimeAlert: createEntityAPI('/api/attendance/overtime-alerts'),
   WorkSchedule: createEntityAPI('/api/attendance/schedules'),
+  AttendanceLog: createEntityAPI('/api/attendance/logs'),
   VacationRequest: createEntityAPI('/api/vacations/requests'),
   VacationBalance: createEntityAPI('/api/vacations/balances'),
   // Payslip: createEntityAPI('/api/payroll/payslips'),
