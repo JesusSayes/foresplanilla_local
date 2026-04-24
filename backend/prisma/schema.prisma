@@ -346,7 +346,7 @@ model employee {
   document_number                String?
   first_name                     String?
   last_name                      String?
-  birth_date                     DateTime? @db.Date
+  birth_date                     DateTime?         @db.Date
   gender                         String?
   personal_email                 String?
   work_email                     String?
@@ -363,7 +363,7 @@ model employee {
   department_name                String?
   work_unit                      String?
   site                           String?
-  hire_date                      DateTime? @db.Date
+  hire_date                      DateTime?         @db.Date
   termination_date               String?
   contract_type                  String?
   base_salary                    Int?
@@ -382,18 +382,19 @@ model employee {
   photo_url                      String?
   status                         String?
   role                           String?
-  managed_team_ids               Json?     @db.Json
+  managed_team_ids               Json?             @db.Json
   supervisor_id                  String?
   supervisor_name                String?
   emergency_contact_name         String?
   emergency_contact_phone        String?
   emergency_contact_relationship String?
-  id                             String    @id @db.VarChar(255)
-  created_date                   DateTime? @db.Timestamp(6)
-  updated_date                   DateTime? @db.Timestamp(6)
+  id                             String            @id @db.VarChar(255)
+  created_date                   DateTime?         @db.Timestamp(6)
+  updated_date                   DateTime?         @db.Timestamp(6)
   created_by_id                  String?
   created_by                     String?
   is_sample                      Boolean?
+  attendance_logs                attendance_logs[]
 }
 
 model employee_access_mapping {
@@ -935,4 +936,90 @@ model asiento_contable {
   estado_migracion  String?
   created_by_id     String?
   is_sample         Boolean?
+}
+
+model PayrollConfig {
+  id                   String    @id @db.VarChar(255)
+  created_date         DateTime? @default(now()) @db.Timestamp(6)
+  updated_date         DateTime? @default(now()) @db.Timestamp(6)
+  created_by           String?
+  updated_by           String?
+  config_type          String    @default("Quincenal") @db.VarChar(100)
+  quincenal_percentage Decimal?  @default(40) @db.Decimal(10, 2)
+  quincenal_cutoff_day Int?      @default(7)
+  is_active            Boolean?  @default(true)
+  notes                String?
+
+  @@index([is_active], map: "idx_payroll_config_active")
+  @@index([config_type], map: "idx_payroll_config_type")
+}
+
+model attendance_incident_backup_20260423 {
+  employee_id             String?
+  attendance_record_id    String?
+  incident_date           DateTime? @db.Date
+  incident_type           String?
+  justification           String?
+  supporting_document_url String?
+  justified_time_start    String?
+  justified_time_end      String?
+  full_day_justification  Boolean?
+  hours_to_adjust         Int?
+  late_minutes_to_adjust  Int?
+  status                  String?
+  reviewed_by             String?
+  review_date             DateTime? @db.Date
+  review_comments         String?
+  id                      String    @id @db.VarChar(255)
+  created_date            DateTime? @db.Timestamp(6)
+  updated_date            DateTime? @db.Timestamp(6)
+  created_by_id           String?
+  created_by              String?
+  is_sample               Boolean?
+}
+
+model attendance_logs {
+  id               String    @id @db.VarChar(24)
+  employee_id      String    @db.VarChar(255)
+  punch_time       DateTime  @db.Timestamp(6)
+  punch_date       DateTime? @default(dbgenerated("(punch_time)::date")) @db.Date
+  source           String?   @default("biotime") @db.VarChar(50)
+  raw_payload      Json?
+  is_within_window Boolean?
+  created_date     DateTime? @default(now()) @db.Timestamp(6)
+  updated_date     DateTime? @default(now()) @db.Timestamp(6)
+  employee         employee  @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attendance_logs_employee")
+
+  @@index([employee_id, punch_date], map: "idx_att_logs_employee_date")
+  @@index([punch_time], map: "idx_att_logs_time")
+}
+
+model attendance_record_backup_20260423 {
+  employee_id         String?
+  date                DateTime? @db.Date
+  clock_in            String?
+  clock_out           String?
+  scheduled_start     String?
+  scheduled_end       String?
+  worked_hours        Decimal?  @db.Decimal(18, 2)
+  is_late             Boolean?
+  late_minutes        Int?
+  is_absent           Boolean?
+  status              String?
+  notes               String?
+  id                  String    @id @db.VarChar(255)
+  created_date        DateTime? @db.Timestamp(6)
+  updated_date        DateTime? @db.Timestamp(6)
+  created_by_id       String?
+  created_by          String?
+  is_sample           Boolean?
+  regular_hours       Decimal?  @db.Decimal(18, 2)
+  overtime_hours_25   Decimal?  @db.Decimal(18, 2)
+  overtime_hours_35   Decimal?  @db.Decimal(18, 2)
+  overtime_authorized Boolean?
+
+  @@unique([employee_id, date])
+  @@index([date])
+  @@index([employee_id])
+  @@index([status])
 }
