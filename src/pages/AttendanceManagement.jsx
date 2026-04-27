@@ -27,6 +27,7 @@ import { generateAutoClockings } from "../components/attendance/AutoClockingJob"
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 import JustifyModal from "../components/attendance/JustifyModal";
 import AssignScheduleModal from "../components/attendance/AssignScheduleModal";
+import AttendanceValidationModal from "../components/attendance/AttendanceValidationModal";
 import recalcularAsistenciaService from '@/services/recalcularAsistenciaService';
 
 export default function AttendanceManagement() {
@@ -52,6 +53,10 @@ export default function AttendanceManagement() {
   const [justifyingDate, setJustifyingDate] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [schedulingEmployee, setSchedulingEmployee] = useState(null);
+  // === CUSTOM BLOCK: Validación manual RRHH ===
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validatingRecord, setValidatingRecord] = useState(null);
+  const [validationLogs, setValidationLogs] = useState([]);
   const [incidentSearchTerm, setIncidentSearchTerm] = useState("");
   const [overtimeSearchTerm, setOvertimeSearchTerm] = useState("");
   const [pageSize, setPageSize] = useState(300);
@@ -273,6 +278,29 @@ export default function AttendanceManagement() {
   // Compatibilidad: sin fecha usa la fecha seleccionada
   const getEmployeeSchedule = (empId) => getEmployeeScheduleForDate(empId, format(selectedDate, "yyyy-MM-dd"));
   const isOvertimeAuthorized = (empId) => getEmployeeSchedule(empId)?.overtime_authorized || false;
+
+  // === CUSTOM BLOCK: abrir validación manual ===
+  const handleOpenValidationModal = async (record) => {
+    try {
+      if (!record?.employee_id || !record?.date) {
+        toast.error("No se encontró información suficiente del registro");
+        return;
+      }
+
+      const logs = await entitiesAPI.AttendanceLog.getByEmployeeAndDate(
+        record.employee_id,
+        record.date
+      );
+
+      setValidationLogs(logs || []);
+      setValidatingRecord(record);
+      setShowValidationModal(true);
+
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al cargar marcaciones biométricas");
+    }
+  };
 
   const handleEditRecord = (record) => {
     setEditingRecord({
@@ -1035,6 +1063,21 @@ export default function AttendanceManagement() {
                                     <Edit className="w-4 h-4 mr-1" />Editar
                                   </Button>
                                 )}
+                                {/* === CUSTOM BLOCK: validación manual RRHH === */}
+                                {/* {emp.record?.status === "requires_review" && ( */}
+                                {(
+                                  [
+                                  "requires_review", "incomplete", "missing", "missing_checkin", "missing_checkout"
+                                  ].includes(emp.record?.status) || !emp.record?.clock_in || !emp.record?.clock_out) && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-indigo-700 border-indigo-300 hover:bg-indigo-50"
+                                    onClick={() => handleOpenValidationModal(emp.record)}
+                                  >
+                                    Validar Marcaciones
+                                  </Button>
+                                )}
                                 {!vacation && (
                                   <Button
                                     size="sm"
@@ -1591,6 +1634,27 @@ export default function AttendanceManagement() {
             onSuccess={() => {
               queryClient.invalidateQueries(["workSchedules"]);
               queryClient.invalidateQueries(["todayAttendance"]);
+            }}
+          />
+        )}
+
+        {/* === CUSTOM BLOCK: Modal validación RRHH === */}
+        {showValidationModal && validatingRecord && (
+          <AttendanceValidationModal
+            record={validatingRecord}
+            logs={validationLogs}
+            onClose={() => {
+              setShowValidationModal(false);
+              setValidatingRecord(null);
+              setValidationLogs([]);
+            }}
+            onSave={() => {
+              queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+              queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+
+              setShowValidationModal(false);
+              setValidatingRecord(null);
+              setValidationLogs([]);
             }}
           />
         )}

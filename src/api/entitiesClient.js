@@ -55,7 +55,15 @@ export const entitiesAPI = {
   AttendanceIncident: createEntityAPI('/api/attendance/incidents'),
   OvertimeAlert: createEntityAPI('/api/attendance/overtime-alerts'),
   WorkSchedule: createEntityAPI('/api/attendance/schedules'),
-  AttendanceLog: createEntityAPI('/api/attendance/logs'),
+  // AttendanceLog: createEntityAPI('/api/attendance/logs'),
+  AttendanceLog: {
+    getByEmployeeAndDate: async (employee_id, date) => {
+      const response = await localClient.get(
+        `/api/attendance/logs?employee_id=${employee_id}&date=${date}`
+      );
+      return response.data;
+    }
+  },
   VacationRequest: createEntityAPI('/api/vacations/requests'),
   VacationBalance: createEntityAPI('/api/vacations/balances'),
   // Payslip: createEntityAPI('/api/payroll/payslips'),

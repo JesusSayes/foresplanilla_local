@@ -10,7 +10,7 @@ export const getByEmployeeAndDate = async (req, res) => {
       });
     }
 
-    const logs = await prisma.attendance_log.findMany({
+    const logs = await prisma.attendance_logs.findMany({
       where: {
         employee_id,
         punch_date: new Date(date),
