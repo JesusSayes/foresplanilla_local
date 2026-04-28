@@ -17,15 +17,18 @@ function diffHours(a, b) {
 }
 
 function buildWindow(date, startTime, endTime) {
-  const base = new Date(date);
+  const baseDate =
+    typeof date === "string"
+      ? date.slice(0, 10)
+      : new Date(date).toISOString().slice(0, 10);
 
   const [sh, sm] = startTime.split(":").map(Number);
   const [eh, em] = endTime.split(":").map(Number);
 
-  const start = new Date(base);
-  start.setHours(sh - WINDOW_HOURS, sm, 0, 0);
+  const start = new Date(`${baseDate}T00:00:00`);
+  const end = new Date(`${baseDate}T00:00:00`);
 
-  const end = new Date(base);
+  start.setHours(sh - WINDOW_HOURS, sm, 0, 0);
   end.setHours(eh + WINDOW_HOURS, em, 0, 0);
 
   return { start, end };
@@ -34,7 +37,9 @@ function buildWindow(date, startTime, endTime) {
 /**
  * CORE LOGIC
  */
-function computeAttendance({ punches, record }) {
+function computeAttendance({ logs, record }) {
+  const punches = logs.map(l => l.punch_time);
+
   /**
    * 1. Sin marcaciones
    */
@@ -45,6 +50,7 @@ function computeAttendance({ punches, record }) {
       clock_out: null,
       worked_hours: 0,
       notes: "Sin marcaciones",
+      usedLogIds: [],
     };
   }
 
@@ -54,23 +60,59 @@ function computeAttendance({ punches, record }) {
   if (punches.length === 1) {
     return {
       status: "Incompleto",
-      clock_in: null,
+      clock_in: toHHMM(punches[0]),
       clock_out: null,
       worked_hours: 0,
       notes: "Solo una marcación",
+      usedLogIds: [logs[0].id],
     };
   }
 
   /**
-   * 3. Sin horario definido
+   * 3. SIN HORARIO DEFINIDO
    */
   if (!record.scheduled_start || !record.scheduled_end) {
+    const firstLog = logs[0];
+    const lastLog = logs[logs.length - 1];
+
+    const clockIn = firstLog.punch_time;
+    const clockOut = lastLog.punch_time;
+
+    const worked = diffHours(clockIn, clockOut);
+
+    /**
+     * EXACTAMENTE 2 marcaciones
+     */
+    if (logs.length === 2) {
+      const status =
+        worked >= 6
+          ? "Completo"
+          : "Revisar";
+
+      return {
+        status,
+        clock_in: toHHMM(clockIn),
+        clock_out: toHHMM(clockOut),
+        worked_hours: parseFloat(worked.toFixed(2)),
+        notes:
+          worked >= 6
+            ? "Calculado sin horario definido"
+            : "Sin horario definido con menos de 6 horas",
+        usedLogIds: [firstLog.id, lastLog.id],
+      };
+    }
+
+    /**
+     * MÁS DE 2 marcaciones
+     * siempre Revisar
+     */
     return {
       status: "Revisar",
-      clock_in: null,
-      clock_out: null,
-      worked_hours: 0,
-      notes: "Sin horario definido",
+      clock_in: toHHMM(clockIn),
+      clock_out: toHHMM(clockOut),
+      worked_hours: parseFloat(worked.toFixed(2)),
+      notes: "Sin horario definido con múltiples marcaciones",
+      usedLogIds: [firstLog.id, lastLog.id],
     };
   }
 
@@ -84,66 +126,87 @@ function computeAttendance({ punches, record }) {
   );
 
   /**
-   * 5. Separar marcaciones
+   * 5. Marcar ventana
    */
-  const inWindow = punches.filter(p => p >= start && p <= end);
-  const outWindow = punches.filter(p => p < start || p > end);
+  for (const log of logs) {
+    log._is_within_window =
+      log.punch_time >= start &&
+      log.punch_time <= end;
+  }
+
+  const inWindowLogs = logs.filter(
+    l => l._is_within_window
+  );
+
+  const outWindowLogs = logs.filter(
+    l => !l._is_within_window
+  );
 
   /**
-   * 6. Insuficientes marcaciones válidas
+   * 6. Exactamente 2 marcaciones dentro de ventana
    */
-  if (inWindow.length < 2) {
+  if (
+    logs.length === 2 &&
+    inWindowLogs.length === 2
+  ) {
+    const firstLog = inWindowLogs[0];
+    const lastLog = inWindowLogs[1];
+
+    const worked = diffHours(
+      firstLog.punch_time,
+      lastLog.punch_time
+    );
+
+    return {
+      status: "Completo",
+      clock_in: toHHMM(firstLog.punch_time),
+      clock_out: toHHMM(lastLog.punch_time),
+      worked_hours: parseFloat(worked.toFixed(2)),
+      notes: null,
+      usedLogIds: [firstLog.id, lastLog.id],
+    };
+  }
+
+  /**
+   * 7. Menos de 2 válidas
+   */
+  if (inWindowLogs.length < 2) {
     return {
       status: "Revisar",
       clock_in: null,
       clock_out: null,
       worked_hours: 0,
       notes: "Marcaciones insuficientes dentro de ventana",
+      usedLogIds: [],
     };
   }
 
   /**
-   * 7. Calcular extremos
+   * 8. Primera y última válida
    */
-  const clockIn = inWindow[0];
-  const clockOut = inWindow[inWindow.length - 1];
+  const firstLog = inWindowLogs[0];
+  const lastLog = inWindowLogs[inWindowLogs.length - 1];
 
-  /**
-   * 8. Validación de marcaciones completas
-   */
-  if (!clockIn || !clockOut) {
-    return {
-      status: "Incompleto",
-      clock_in: clockIn ? toHHMM(clockIn) : null,
-      clock_out: clockOut ? toHHMM(clockOut) : null,
-      worked_hours: 0,
-      notes: "Falta marcación de entrada o salida",
-    };
-  }
+  const clockIn = firstLog.punch_time;
+  const clockOut = lastLog.punch_time;
 
-  /**
-   * 9. Validaciones adicionales
-   */
-  let status = "Completo";
-
-  if (outWindow.length > 0) {
-    status = "Revisar";
-  }
-
-  /**
-   * 10. Horas trabajadas
-   */
   const worked = diffHours(clockIn, clockOut);
+
+  let status = "Completo";
+  let notes = null;
+
+  if (outWindowLogs.length > 0) {
+    status = "Revisar";
+    notes = "Marcaciones fuera de ventana";
+  }
 
   return {
     status,
     clock_in: toHHMM(clockIn),
     clock_out: toHHMM(clockOut),
     worked_hours: parseFloat(worked.toFixed(2)),
-    notes:
-      outWindow.length > 0
-        ? "Marcaciones fuera de ventana"
-        : null,
+    notes,
+    usedLogIds: [firstLog.id, lastLog.id],
   };
 }
 
@@ -184,7 +247,7 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
       grouped[key] = [];
     }
 
-    grouped[key].push(log.punch_time);
+    grouped[key].push(log);
   }
 
   /**
@@ -207,12 +270,52 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
     }
 
     const key = `${record.employee_id}__${dateStr}`;
-    const punches = grouped[key] || [];
+    const employeeLogs = grouped[key] || [];
 
     const result = computeAttendance({
-      punches,
+      logs: employeeLogs,
       record,
     });
+
+    /**
+     * Resetear logs del día
+     */
+    await prisma.attendance_logs.updateMany({
+      where: {
+        employee_id: record.employee_id,
+        punch_time: {
+          gte: new Date(dateStr + "T00:00:00"),
+          lte: new Date(dateStr + "T23:59:59"),
+        },
+      },
+      data: {
+        attendance_record_id: null,
+        is_used_for_calculation: false,
+        is_within_window: null,
+        updated_date: new Date(),
+      },
+    });
+
+    /**
+     * Persistir flags
+     */
+    for (const log of employeeLogs) {
+      await prisma.attendance_logs.update({
+        where: {
+          id: log.id,
+        },
+        data: {
+          attendance_record_id: record.id,
+          is_within_window:
+            typeof log._is_within_window === "boolean"
+              ? log._is_within_window
+              : null,
+          is_used_for_calculation:
+            result.usedLogIds.includes(log.id),
+          updated_date: new Date(),
+        },
+      });
+    }
 
     await prisma.attendance_record.update({
       where: { id: record.id },
