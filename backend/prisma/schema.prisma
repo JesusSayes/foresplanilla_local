@@ -979,18 +979,21 @@ model attendance_incident_backup_20260423 {
 }
 
 model attendance_logs {
-  id               String    @id @db.VarChar(24)
-  employee_id      String    @db.VarChar(255)
-  punch_time       DateTime  @db.Timestamp(6)
-  punch_date       DateTime? @default(dbgenerated("(punch_time)::date")) @db.Date
-  source           String?   @default("biotime") @db.VarChar(50)
-  raw_payload      Json?
-  is_within_window Boolean?
-  created_date     DateTime? @default(now()) @db.Timestamp(6)
-  updated_date     DateTime? @default(now()) @db.Timestamp(6)
-  employee         employee  @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attendance_logs_employee")
+  id                      String    @id @db.VarChar(24)
+  employee_id             String    @db.VarChar(255)
+  attendance_record_id    String?   @db.VarChar(255)
+  punch_time              DateTime  @db.Timestamp(6)
+  punch_date              DateTime? @default(dbgenerated("(punch_time)::date")) @db.Date
+  source                  String?   @default("biotime") @db.VarChar(50)
+  raw_payload             Json?
+  is_within_window        Boolean?
+  is_used_for_calculation Boolean?  @default(false)
+  created_date            DateTime? @default(now()) @db.Timestamp(6)
+  updated_date            DateTime? @default(now()) @db.Timestamp(6)
+  employee                employee  @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attendance_logs_employee")
 
   @@index([employee_id, punch_date], map: "idx_att_logs_employee_date")
+  @@index([attendance_record_id], map: "idx_att_logs_record")
   @@index([punch_time], map: "idx_att_logs_time")
 }
 
