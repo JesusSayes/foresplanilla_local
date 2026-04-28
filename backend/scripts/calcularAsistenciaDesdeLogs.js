@@ -40,7 +40,7 @@ function computeAttendance({ punches, record }) {
    */
   if (!punches.length) {
     return {
-      status: "missing",
+      status: "Sin marcar",
       clock_in: null,
       clock_out: null,
       worked_hours: 0,
@@ -53,7 +53,7 @@ function computeAttendance({ punches, record }) {
    */
   if (punches.length === 1) {
     return {
-      status: "incomplete",
+      status: "Incompleto",
       clock_in: null,
       clock_out: null,
       worked_hours: 0,
@@ -66,7 +66,7 @@ function computeAttendance({ punches, record }) {
    */
   if (!record.scheduled_start || !record.scheduled_end) {
     return {
-      status: "requires_review",
+      status: "Revisar",
       clock_in: null,
       clock_out: null,
       worked_hours: 0,
@@ -94,7 +94,7 @@ function computeAttendance({ punches, record }) {
    */
   if (inWindow.length < 2) {
     return {
-      status: "requires_review",
+      status: "Revisar",
       clock_in: null,
       clock_out: null,
       worked_hours: 0,
@@ -109,19 +109,29 @@ function computeAttendance({ punches, record }) {
   const clockOut = inWindow[inWindow.length - 1];
 
   /**
-   * 8. Validaciones adicionales
+   * 8. Validación de marcaciones completas
    */
-  let status = "calculated";
-
-  if (outWindow.length > 0) {
-    status = "requires_review";
+  if (!clockIn || !clockOut) {
+    return {
+      status: "Incompleto",
+      clock_in: clockIn ? toHHMM(clockIn) : null,
+      clock_out: clockOut ? toHHMM(clockOut) : null,
+      worked_hours: 0,
+      notes: "Falta marcación de entrada o salida",
+    };
   }
 
-  if (!clockIn) status = "missing_checkin";
-  if (!clockOut) status = "missing_checkout";
+  /**
+   * 9. Validaciones adicionales
+   */
+  let status = "Completo";
+
+  if (outWindow.length > 0) {
+    status = "Revisar";
+  }
 
   /**
-   * 9. Horas trabajadas
+   * 10. Horas trabajadas
    */
   const worked = diffHours(clockIn, clockOut);
 
@@ -152,7 +162,7 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
   /**
    * 1. Obtener logs del día
    */
-  const logs = await prisma.attendance_log.findMany({
+  const logs = await prisma.attendance_logs.findMany({
     where: {
       punch_time: {
         gte: new Date(dateStr + "T00:00:00"),
@@ -192,6 +202,10 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
    * 4. Procesar cada empleado
    */
   for (const record of records) {
+    if (record.status === "Aprobada") {
+      continue;
+    }
+
     const key = `${record.employee_id}__${dateStr}`;
     const punches = grouped[key] || [];
 
@@ -247,8 +261,8 @@ if (process.argv[1].includes("calcularAsistenciaDesdeLogs")) {
 }
 
 // Caso	                          Resultado
-// 0 marcaciones	                missing
-// 1 marcación	                  incomplete
-// sin horario	                  requires_review
-// marcaciones fuera de ventana	  requires_review
-// correcto	                      calculated
+// 0 marcaciones	                Sin marcar
+// 1 marcación	                  Incompleto
+// sin horario	                  Revisar
+// marcaciones fuera de ventana	  Revisar
+// correcto	                      Completo

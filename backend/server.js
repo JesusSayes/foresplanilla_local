@@ -57,6 +57,7 @@ import { syncBiotimeAttendance } from './controllers/sync/biotimeSyncController.
 import uploadRoutes from "./routes/uploadRoutes.js";
 import derechohabientesRoutes from './routes/derechohabientes.js';
 import { generarAsistenciaDiaria } from './scripts/generarAsistenciaDiaria.js';
+import { calcularAsistenciaDesdeLogs } from './scripts/calcularAsistenciaDesdeLogs.js';
 import { syncExternalAttendance } from './services/externalAttendanceSync.js';
 import asientosContablesRoutes from './routes/asientosContables.js';
 
@@ -160,6 +161,12 @@ cron.schedule('0 * * * *', () => {
   syncBiotimeAttendance().catch(err => console.error('[Cron] Error en sync biotime:', err.message));
 });
 
+// Cron: calcular asistencia desde logs cada hora (10 minutos después del sync biotime)
+cron.schedule('10 * * * *', () => {
+  console.log('[Cron] Ejecutando calcularAsistenciaDesdeLogs...');
+  calcularAsistenciaDesdeLogs().catch(err => console.error('[Cron] Error en calcularAsistenciaDesdeLogs:', err.message));
+});
+
 // Cron: generar asistencia diaria a las 05:01 UTC (00:01 hora Perú)
 cron.schedule('1 5 * * *', () => {
   console.log('[Cron] Ejecutando generarAsistenciaDiaria...');
@@ -204,6 +211,7 @@ app.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
   console.log(`Logs: ${logsDir}`);
   console.log('[Cron] Sync biotime programado cada hora (0 * * * *)');
+  console.log('[Cron] Calcular asistencia desde logs programado cada hora (10 * * * *)');
   console.log('[Cron] Generar asistencia diaria programado a las 05:01 UTC (1 5 * * *)');
   console.log('[Cron] Sync asistencias externas programado cada hora (0 * * * *)');
 });

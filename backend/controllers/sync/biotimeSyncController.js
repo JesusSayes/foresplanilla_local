@@ -104,7 +104,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
         const punchTime = new Date(tx.punch_time);
 
         // EVITAR DUPLICADOS (clave lógica)
-        const existing = await prisma.attendance_log.findFirst({
+        const existing = await prisma.attendance_logs.findFirst({
           where: {
             employee_id: employeeId,
             punch_time: punchTime,
@@ -118,7 +118,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
         }
 
         // INSERTAR LOG
-        await prisma.attendance_log.create({
+        await prisma.attendance_logs.create({
           data: {
             id: generate24HexId(),
             employee_id: employeeId,

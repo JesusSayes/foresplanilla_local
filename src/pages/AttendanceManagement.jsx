@@ -728,12 +728,15 @@ export default function AttendanceManagement() {
   };
 
   const getStatusConfig = (status, hasClockIn) => {
-    if (!hasClockIn) return { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle, text: "Sin marcar" };
+    if (!hasClockIn || status === "Sin marcar") return { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle, text: "Sin marcar" };
     const configs = {
+      "Sin marcar": { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle, text: "Sin marcar" },
+      "Incompleto": { color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: Clock, text: "Incompleto" },
+      "Revisar": { color: "bg-orange-100 text-orange-700 border-orange-200", icon: AlertCircle, text: "Revisar" },
       "Completo": { color: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle, text: "Completo" },
-      "Incompleto": { color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: Clock, text: "En curso" },
-      "Ausente": { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle, text: "Ausente" },
-      "Justificado": { color: "bg-blue-100 text-blue-700 border-blue-200", icon: FileText, text: "Justificado" },
+      "Aprobada": { color: "bg-blue-100 text-blue-700 border-blue-200", icon: FileText, text: "Aprobada" },
+      "Ausente": { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle, text: "Sin marcar" },
+      "Justificado": { color: "bg-blue-100 text-blue-700 border-blue-200", icon: FileText, text: "Aprobada" },
     };
     return configs[status] || configs["Incompleto"];
   };
@@ -1064,10 +1067,10 @@ export default function AttendanceManagement() {
                                   </Button>
                                 )}
                                 {/* === CUSTOM BLOCK: validación manual RRHH === */}
-                                {/* {emp.record?.status === "requires_review" && ( */}
+                                {/* {emp.record?.status === "Revisar" && ( */}
                                 {(
                                   [
-                                  "requires_review", "incomplete", "missing", "missing_checkin", "missing_checkout"
+                                  "Revisar", "Incompleto", "Sin marcar"
                                   ].includes(emp.record?.status) || !emp.record?.clock_in || !emp.record?.clock_out) && (
                                   <Button
                                     size="sm"
