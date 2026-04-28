@@ -29,6 +29,10 @@ import recordsRoutes from './routes/attendance/records.js';
 import incidentsRoutes from './routes/attendance/incidents.js';
 import overtimeAlertRoutes from './routes/attendance/overtimeAlerts.js';
 import schedulesRoutes from './routes/attendance/schedules.js';
+import attendanceIncidentsRoutes from './routes/attendance/incidents.js';
+import attendanceLogsRoutes from './routes/attendance/logs.js';
+import recalcularAsistenciaRoutes from './routes/attendance/recalcularAsistencia.js';
+import externalAttendanceRoutes from './routes/attendance/externalAttendanceRoutes.js';
 import requestsRoutes from './routes/vacations/requests.js';
 import balancesRoutes from './routes/vacations/balances.js';
 import payrollRoutes from './routes/payroll/payslips.js';
@@ -49,14 +53,12 @@ import connectionsRoutes from './routes/database/connections.js';
 import logsRoutes from './routes/sync/logs.js';
 import biotimeSyncRoutes from './routes/sync/biotime.js';
 import holidaysRoutes from './routes/holidays.js';
-import attendanceIncidentsRoutes from './routes/attendance/incidents.js';
 import mailerRoutes from './routes/mailer.js';
 import { syncBiotimeAttendance } from './controllers/sync/biotimeSyncController.js';
 import uploadRoutes from "./routes/uploadRoutes.js";
 import derechohabientesRoutes from './routes/derechohabientes.js';
-import recalcularAsistenciaRoutes from './routes/attendance/recalcularAsistencia.js';
 import { generarAsistenciaDiaria } from './scripts/generarAsistenciaDiaria.js';
-import externalAttendanceRoutes from './routes/attendance/externalAttendanceRoutes.js';
+import { calcularAsistenciaDesdeLogs } from './scripts/calcularAsistenciaDesdeLogs.js';
 import { syncExternalAttendance } from './services/externalAttendanceSync.js';
 import asientosContablesRoutes from './routes/asientosContables.js';
 
@@ -124,6 +126,10 @@ app.use('/api/attendance/records', recordsRoutes);
 app.use('/api/attendance/incidents', incidentsRoutes);
 app.use('/api/attendance/overtime-alerts', overtimeAlertRoutes);
 app.use('/api/attendance/schedules', schedulesRoutes);
+app.use('/api/attendance/incidents', attendanceIncidentsRoutes);
+app.use('/api/attendance/recalcular', recalcularAsistenciaRoutes);
+app.use('/api/attendance/external', externalAttendanceRoutes);
+app.use('/api/attendance/logs', attendanceLogsRoutes);
 app.use('/api/vacations/requests', requestsRoutes);
 app.use('/api/vacations/balances', balancesRoutes);
 app.use('/api/payroll/payslips', payrollRoutes);
@@ -144,20 +150,23 @@ app.use('/api/database/connections', connectionsRoutes);
 app.use('/api/sync/logs', logsRoutes);
 app.use('/api/sync/biotime', biotimeSyncRoutes);
 app.use('/api/holidays', holidaysRoutes);
-app.use('/api/attendance/incidents', attendanceIncidentsRoutes);
 app.use('/api/master-data', masterDataRoutes);
 app.use('/api/mailer', mailerRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/uploads", express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api/derechohabientes', derechohabientesRoutes);
-app.use('/api/attendance/recalcular', recalcularAsistenciaRoutes);
-app.use('/api/attendance/external', externalAttendanceRoutes);
 app.use('/api/asientos-contables', asientosContablesRoutes);
 
 // Cron: sincronización biotime cada hora
 cron.schedule('0 * * * *', () => {
   console.log('[Cron] Ejecutando sync biotime...');
   syncBiotimeAttendance().catch(err => console.error('[Cron] Error en sync biotime:', err.message));
+});
+
+// Cron: calcular asistencia desde logs cada hora (10 minutos después del sync biotime)
+cron.schedule('10 * * * *', () => {
+  console.log('[Cron] Ejecutando calcularAsistenciaDesdeLogs...');
+  calcularAsistenciaDesdeLogs().catch(err => console.error('[Cron] Error en calcularAsistenciaDesdeLogs:', err.message));
 });
 
 // Cron: generar asistencia diaria a las 05:01 UTC (00:01 hora Perú)
@@ -204,6 +213,7 @@ app.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
   console.log(`Logs: ${logsDir}`);
   console.log('[Cron] Sync biotime programado cada hora (0 * * * *)');
+  console.log('[Cron] Calcular asistencia desde logs programado cada hora (10 * * * *)');
   console.log('[Cron] Generar asistencia diaria programado a las 05:01 UTC (1 5 * * *)');
   console.log('[Cron] Sync asistencias externas programado cada hora (0 * * * *)');
 });
