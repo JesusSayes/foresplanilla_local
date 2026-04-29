@@ -1069,9 +1069,12 @@ export default function AttendanceManagement() {
                                 {/* === CUSTOM BLOCK: validación manual RRHH === */}
                                 {/* {emp.record?.status === "Revisar" && ( */}
                                 {(
-                                  [
-                                  "Revisar", "Incompleto", "Sin marcar"
-                                  ].includes(emp.record?.status) || !emp.record?.clock_in || !emp.record?.clock_out) && (
+                                  (
+                                    [
+                                    "Revisar", "Incompleto", "Sin marcar"
+                                    ].includes(emp.record?.status) || !emp.record?.clock_in || !emp.record?.clock_out
+                                  ) && emp.record?.created_by !== 'external_sync'
+                                ) && (
                                   <Button
                                     size="sm"
                                     variant="outline"

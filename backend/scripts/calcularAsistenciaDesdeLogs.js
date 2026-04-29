@@ -173,11 +173,11 @@ function computeAttendance({ logs, record }) {
   if (inWindowLogs.length < 2) {
     return {
       status: "Revisar",
-      clock_in: null,
+      clock_in: logs.length > 0 ? toHHMM(logs[0].punch_time) : null,
       clock_out: null,
       worked_hours: 0,
       notes: "Marcaciones insuficientes dentro de ventana",
-      usedLogIds: [],
+      usedLogIds: logs.length > 0 ? [logs[0].id] : [],
     };
   }
 
