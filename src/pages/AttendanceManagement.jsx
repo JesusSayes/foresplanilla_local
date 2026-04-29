@@ -12,7 +12,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle,
+  Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle, Edit2,
   AlertCircle, Users, Search, FileText, Download, Database, History, Printer, Palmtree, CalendarClock
 } from "lucide-react";
 import * as XLSX from 'xlsx';
@@ -1081,7 +1081,8 @@ export default function AttendanceManagement() {
                                     className="text-indigo-700 border-indigo-300 hover:bg-indigo-50"
                                     onClick={() => handleOpenValidationModal(emp.record)}
                                   >
-                                    Validar Marcaciones
+                                    <Edit2 className="w-4 h-4 mr-2" />
+                                    Validar
                                   </Button>
                                 )}
                                 {!vacation && (
