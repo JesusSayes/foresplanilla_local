@@ -249,7 +249,7 @@ export default function AttendanceValidationModal({ record, logs = [], onClose, 
           <div>
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <Clock className="w-5 h-5 text-indigo-600" />
-              Validación Manual de Asistencia
+              Validar Asistencia
             </h2>
             <p className="text-sm text-slate-500 mt-0.5">
               {record?.date

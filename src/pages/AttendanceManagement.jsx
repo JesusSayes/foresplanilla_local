@@ -752,7 +752,7 @@ export default function AttendanceManagement() {
   return (
     <PermissionGuard employee={employee} requiredRole={null} requiredPermission={null} requiredAnyPermissions={["attendance.view_all", "attendance.manage", "attendance.view_department", "system.admin"]}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="max-w-full mx-auto px-4 py-6">
           <div className="mb-8 flex justify-between items-start">
             <div>
               <h1 className="text-4xl font-bold text-slate-900 mb-2">Gestión de Asistencia</h1>
@@ -950,7 +950,21 @@ export default function AttendanceManagement() {
                     </div>
                   </div>
 
-                  <div className="space-y-3">
+                  {/* Cabecera de tabla */}
+                  <div className="grid items-center gap-2 px-3 py-2 mb-1 bg-slate-100 rounded-lg text-xs font-semibold text-slate-500 uppercase tracking-wide"
+                    style={{gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr auto"}}>
+                    <span>Empleado</span>
+                    <span className="text-center">Fecha</span>
+                    <span className="text-center">Entrada</span>
+                    <span className="text-center">Salida</span>
+                    <span className="text-center">Horas</span>
+                    <span className="text-center">Tardanza</span>
+                    <span className="text-center">HE 25%</span>
+                    <span className="text-center">HE 35%</span>
+                    <span className="text-center">Acciones</span>
+                  </div>
+
+                  <div className="space-y-1.5">
                     {employeesWithRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((emp, idx) => {
                       const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
                       const vacation = approvedVacations.find(v => v.employee_id === emp.id && v.start_date <= rowDate && v.end_date >= rowDate) || null;
@@ -961,154 +975,118 @@ export default function AttendanceManagement() {
                       const StatusIcon = statusConfig.icon;
                       const rowKey = `${emp.id}-${rowDate}-${idx}`;
 
+                      const sched = getEmployeeScheduleForDate(emp.id, rowDate);
+                      const dow2 = new Date(rowDate + "T00:00:00").getDay();
+                      const starts = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+                      const ends = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+                      const schedSt = sched ? sched[starts[dow2]] : null;
+                      const schedEn = sched ? sched[ends[dow2]] : null;
+                      const schedName = sched?.schedule_name?.replace(new RegExp(`\\s*-\\s*${emp.first_name}\\s+${emp.last_name}\\s*$`, 'i'), '') || null;
+
                       return (
-                        <div key={rowKey} className={`p-4 border rounded-lg hover:shadow-md transition-all ${vacation ? "border-amber-300 bg-amber-50/40" : "border-slate-200"}`}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4 flex-1">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold shrink-0 ${vacation ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-purple-600"}`}>
-                                {emp.first_name[0]}{emp.last_name[0]}
-                              </div>
-                              <div className="w-48 shrink-0">
-                                 <h4 className="font-bold text-slate-900 text-sm">{emp.first_name} {emp.last_name}</h4>
-                                 <p className="text-xs text-slate-600">{emp.employee_code} • {emp.department_name}</p>
-                                 {(() => {
-                                   const sched = getEmployeeScheduleForDate(emp.id, rowDate);
-                                   if (!sched) return <p className="text-xs text-red-500 mt-0.5">Sin horario</p>;
-                                   const dow2 = new Date(rowDate + "T00:00:00").getDay();
-                                   const starts = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
-                                   const ends = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-                                   const st = sched[starts[dow2]]; const en = sched[ends[dow2]];
-                                   if (!st) return <p className="text-xs text-slate-400 mt-0.5">Día libre</p>;
-                                   return (
-                                     <>
-                                       <p className="text-xs text-slate-500 mt-0.5 truncate" title={sched.schedule_name}>{sched.schedule_name.replace(new RegExp(`\\s*-\\s*${emp.first_name}\\s+${emp.last_name}\\s*$`, 'i'), '')}</p>
-                                       <p className="text-xs text-indigo-600">🕐 {st}–{en}</p>
-                                     </>
-                                   );
-                                 })()}
-                                 {vacation && (
-                                   <p className="text-xs text-amber-700 font-medium mt-0.5">
-                                     🌴 {vacation.request_type}
-                                   </p>
-                                 )}
-                               </div>
-                              {/* Columna fecha */}
-                              <div className="w-24 shrink-0 text-center">
-                                <p className="text-xs text-slate-500 mb-0.5">Fecha</p>
-                                <p className="text-xs font-semibold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">
-                                  {(() => { try { const d = new Date(rowDate + "T00:00:00"); return isNaN(d?.getTime()) ? rowDate : format(d, "dd MMM yyyy", { locale: es }); } catch { return rowDate; } })()}
-                                </p>
-                              </div>
-                              <div className="grid grid-cols-6 gap-3 text-sm">
-                                <div className="text-center">
-                                  <p className="text-xs text-slate-600 mb-1">Entrada</p>
-                                  {vacation ? (
-                                    <p className="font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded text-xs">
-                                      {scheduledTimes?.start}
-                                    </p>
-                                  ) : (
-                                    <p className={`font-semibold ${emp.record?.clock_in ? 'text-slate-900' : 'text-slate-400'}`}>
-                                      {emp.record?.clock_in || "--:--"}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="text-center">
-                                  <p className="text-xs text-slate-600 mb-1">Salida</p>
-                                  {vacation ? (
-                                    <p className="font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded text-xs">
-                                      {scheduledTimes?.end}
-                                    </p>
-                                  ) : (
-                                    <p className={`font-semibold ${emp.record?.clock_out ? 'text-slate-900' : 'text-slate-400'}`}>
-                                      {emp.record?.clock_out || "--:--"}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="text-center">
-                                  <p className="text-xs text-slate-600 mb-1">Horas</p>
-                                  <p className="font-semibold text-slate-900">
-                                    {vacation
-                                      ? "8.00"
-                                      : isNaN(Number(emp.record?.worked_hours))
-                                        ? "0.00"
-                                        : Number(emp.record?.worked_hours).toFixed(2)
-                                    }h
-                                  </p>
-                                </div>
-                                <div className="text-center">
-                                  <p className="text-xs text-slate-600 mb-1">Tardanza</p>
-                                  <p className={`font-semibold ${!vacation && emp.record?.late_minutes > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                                    {vacation ? "0" : (emp.record?.late_minutes || 0)} min
-                                  </p>
-                                </div>
-                                <div className="text-center">
-                                  <p className="text-xs text-slate-600 mb-1">HE 25%</p>
-                                  <p className={`font-semibold ${!vacation && (emp.record?.overtime_hours_25 > 0) ? 'text-blue-600' : 'text-slate-400'}`}>
-                                    {vacation ? "0.00" : Number(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h
-                                  </p>
-                                </div>
-                                <div className="text-center">
-                                  <p className="text-xs text-slate-600 mb-1">HE 35%</p>
-                                  <p className={`font-semibold ${!vacation && (emp.record?.overtime_hours_35 > 0) ? 'text-purple-600' : 'text-slate-400'}`}>
-                                    {vacation ? "0.00" : Number(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <Badge className={statusConfig.color}>
-                                  <StatusIcon className="w-3 h-3 mr-1" />{statusConfig.text}
-                                </Badge>
-                                {!vacation && emp.record?.is_late && (
-                                  <Badge className="bg-orange-100 text-orange-700">+{emp.record.late_minutes} min</Badge>
-                                )}
-                                {!vacation && emp.record && (
-                                  <Button size="sm" variant="outline" onClick={() => handleEditRecord(emp.record)}>
-                                    <Edit className="w-4 h-4 mr-1" />Editar
-                                  </Button>
-                                )}
-                                {/* === CUSTOM BLOCK: validación manual RRHH === */}
-                                {/* {emp.record?.status === "Revisar" && ( */}
-                                {(
-                                  (
-                                    [
-                                    "Revisar", "Incompleto", "Sin marcar"
-                                    ].includes(emp.record?.status) || !emp.record?.clock_in || !emp.record?.clock_out
-                                  ) && emp.record?.created_by !== 'external_sync'
-                                ) && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-indigo-700 border-indigo-300 hover:bg-indigo-50"
-                                    onClick={() => handleOpenValidationModal(emp.record)}
-                                  >
-                                    <Edit2 className="w-4 h-4 mr-2" />
-                                    Validar
-                                  </Button>
-                                )}
-                                {!vacation && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-orange-600 border-orange-200 hover:bg-orange-50"
-                                    onClick={() => handleJustifyClick(emp, emp.record, rowDate)}
-                                  >
-                                    <FileText className="w-4 h-4 mr-1" />Justificar
-                                  </Button>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                                  onClick={() => { setSchedulingEmployee({ ...emp, _rowDate: rowDate }); setShowScheduleModal(true); }}
-                                  title="Asignar/cambiar horario"
-                                >
-                                  <CalendarClock className="w-4 h-4" />
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => { setHistoryEmployeeId(emp.id); setShowHistory(true); }}>
-                                  <History className="w-4 h-4" />
-                                </Button>
-                              </div>
+                        <div key={rowKey}
+                          className={`grid items-center gap-2 px-3 py-2.5 border rounded-lg hover:shadow-sm transition-all ${vacation ? "border-amber-300 bg-amber-50/40" : "border-slate-200 bg-white"}`}
+                          style={{gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr auto"}}>
+
+                          {/* Empleado */}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${vacation ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-purple-600"}`}>
+                              {emp.first_name[0]}{emp.last_name[0]}
                             </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-900 text-sm truncate">{emp.first_name} {emp.last_name}</p>
+                              <p className="text-xs text-slate-500 truncate">{emp.employee_code} · {emp.department_name}</p>
+                              {!sched && <p className="text-xs text-red-500">Sin horario</p>}
+                              {sched && !schedSt && <p className="text-xs text-slate-400">Día libre</p>}
+                              {sched && schedSt && <p className="text-xs text-indigo-600">🕐 {schedSt}–{schedEn}</p>}
+                              {vacation && <p className="text-xs text-amber-700 font-medium">🌴 {vacation.request_type}</p>}
+                            </div>
+                          </div>
+
+                          {/* Fecha */}
+                          <div className="text-center">
+                            <p className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded inline-block">
+                              {format(new Date(rowDate + "T00:00:00"), "dd MMM", { locale: es })}
+                            </p>
+                          </div>
+
+                          {/* Entrada */}
+                          <div className="text-center">
+                            {vacation
+                              ? <p className="text-xs font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{scheduledTimes?.start}</p>
+                              : <p className={`text-sm font-bold ${emp.record?.clock_in ? 'text-slate-900' : 'text-slate-300'}`}>{emp.record?.clock_in || "--:--"}</p>
+                            }
+                          </div>
+
+                          {/* Salida */}
+                          <div className="text-center">
+                            {vacation
+                              ? <p className="text-xs font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{scheduledTimes?.end}</p>
+                              : <p className={`text-sm font-bold ${emp.record?.clock_out ? 'text-slate-900' : 'text-slate-300'}`}>{emp.record?.clock_out || "--:--"}</p>
+                            }
+                          </div>
+
+                          {/* Horas */}
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-slate-900">{vacation ? "8.00" : (emp.record?.worked_hours?.toFixed(2) || "0.00")}h</p>
+                          </div>
+
+                          {/* Tardanza */}
+                          <div className="text-center">
+                            <p className={`text-sm font-bold ${!vacation && emp.record?.late_minutes > 0 ? 'text-orange-600' : 'text-slate-400'}`}>
+                              {vacation ? "0" : (emp.record?.late_minutes || 0)}m
+                            </p>
+                          </div>
+
+                          {/* HE 25% */}
+                          <div className="text-center">
+                            <p className={`text-sm font-bold ${!vacation && (emp.record?.overtime_hours_25 > 0) ? 'text-blue-600' : 'text-slate-300'}`}>
+                              {vacation ? "0.00" : (emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h
+                            </p>
+                          </div>
+
+                          {/* HE 35% */}
+                          <div className="text-center">
+                            <p className={`text-sm font-bold ${!vacation && (emp.record?.overtime_hours_35 > 0) ? 'text-purple-600' : 'text-slate-300'}`}>
+                              {vacation ? "0.00" : (emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h
+                            </p>
+                          </div>
+
+                          {/* Acciones */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Badge className={`${statusConfig.color} text-xs shrink-0`}>
+                              <StatusIcon className="w-3 h-3 mr-1" />{statusConfig.text}
+                            </Badge>
+                            {!vacation && emp.record && (
+                              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => handleEditRecord(emp.record)}>
+                                <Edit className="w-3 h-3 mr-1" />Editar
+                              </Button>
+                            )}
+
+                            {/* === CUSTOM BLOCK: validación manual RRHH === */}
+                            {(
+                              (
+                                [
+                                "Revisar", "Incompleto", "Sin marcar"
+                                ].includes(emp.record?.status) || !emp.record?.clock_in || !emp.record?.clock_out
+                              ) && emp.record?.created_by !== 'external_sync'
+                            ) && (
+                              <Button size="sm" variant="outline" className="text-indigo-700 border-indigo-300 hover:bg-indigo-50"
+                                onClick={() => handleOpenValidationModal(emp.record)}
+                              >
+                                <Edit2 className="w-3 h-3 mr-1" />Validar
+                              </Button>
+                            )}
+
+                            {!vacation && (
+                              <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-orange-600 border-orange-200 hover:bg-orange-50" onClick={() => handleJustifyClick(emp, emp.record, rowDate)}>
+                                <FileText className="w-3 h-3 mr-1" />Justificar
+                              </Button>
+                            )}
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50" title="Asignar horario"
+                              onClick={() => { setSchedulingEmployee({ ...emp, _rowDate: rowDate }); setShowScheduleModal(true); }}>
+                              <CalendarClock className="w-3 h-3" />
+                            </Button>
                           </div>
                         </div>
                       );
