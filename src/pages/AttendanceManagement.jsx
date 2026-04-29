@@ -1033,9 +1033,7 @@ export default function AttendanceManagement() {
                                 >
                                   <CalendarClock className="w-4 h-4" />
                                 </Button>
-                                <Button size="sm" variant="outline" onClick={() => { setHistoryEmployeeId(emp.id); setShowHistory(true); }}>
-                                  <History className="w-4 h-4" />
-                                </Button>
+
                               </div>
                             </div>
                           </div>
