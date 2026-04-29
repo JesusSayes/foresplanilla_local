@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle, 
-  AlertCircle, Users, Search, FileText, Download, Database, History, Printer, Palmtree, CalendarClock
+  AlertCircle, Users, Search, FileText, Download, Database, History, Printer, Palmtree, CalendarClock, ScanLine
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
@@ -1012,6 +1012,17 @@ export default function AttendanceManagement() {
                                 {!vacation && emp.record && (
                                   <Button size="sm" variant="outline" onClick={() => handleEditRecord(emp.record)}>
                                     <Edit className="w-4 h-4 mr-1" />Editar
+                                  </Button>
+                                )}
+                                {!vacation && emp.record && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-violet-600 border-violet-200 hover:bg-violet-50"
+                                    title="Validar Marcaciones"
+                                    onClick={() => handleEditRecord(emp.record)}
+                                  >
+                                    <ScanLine className="w-4 h-4" />
                                   </Button>
                                 )}
                                 {!vacation && (
