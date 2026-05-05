@@ -1066,7 +1066,7 @@ export default function AttendanceManagement() {
                                   {(
                                     (
                                       [
-                                      "Revisar", "Incompleto", "Sin marcar"
+                                      "Revisar", "Incompleto"
                                       ].includes(emp.record?.status) || !emp.record?.clock_in || !emp.record?.clock_out
                                     ) && emp.record?.created_by !== 'external_sync'
                                   ) && (

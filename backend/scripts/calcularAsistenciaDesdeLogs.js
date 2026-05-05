@@ -157,12 +157,14 @@ function computeAttendance({ logs, record }) {
       lastLog.punch_time
     );
 
+    const status = worked >= 6 ? "Completo" : "Revisar";
+
     return {
-      status: "Completo",
+      status,
       clock_in: toHHMM(firstLog.punch_time),
       clock_out: toHHMM(lastLog.punch_time),
       worked_hours: parseFloat(worked.toFixed(2)),
-      notes: null,
+      notes: worked >= 6 ? null : "Jornada incompleta",
       usedLogIds: [firstLog.id, lastLog.id],
     };
   }
@@ -216,7 +218,7 @@ function computeAttendance({ logs, record }) {
 export async function calcularAsistenciaDesdeLogs({ date } = {}) {
   const targetDate = date
     ? new Date(date)
-    : new Date(Date.now() - 24 * 60 * 60 * 1000); // ayer
+    : new Date();
 
   const dateStr = targetDate.toISOString().slice(0, 10);
 
@@ -276,6 +278,13 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
       logs: employeeLogs,
       record,
     });
+
+    if (employeeLogs.length > 0) {
+      result.clock_in = toHHMM(employeeLogs[0].punch_time);
+      if (!result.usedLogIds.includes(employeeLogs[0].id)) {
+        result.usedLogIds = [employeeLogs[0].id, ...result.usedLogIds];
+      }
+    }
 
     /**
      * Resetear logs del día
