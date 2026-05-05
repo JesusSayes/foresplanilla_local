@@ -279,7 +279,7 @@ export default function AttendanceManagement() {
 
   // Calcular preview de métricas en tiempo real para el modal de edición
   const calcEditPreview = (clockIn, clockOut, recordDate, employeeId) => {
-    if (!clockIn) return null;
+    if (!clockIn || !clockOut) return null;
     const schedule = getEmployeeScheduleForDate(employeeId, recordDate);
     const dow = new Date(recordDate + "T00:00:00").getDay();
     const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];

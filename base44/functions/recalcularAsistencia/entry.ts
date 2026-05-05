@@ -32,7 +32,8 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
   const clockIn = record.clock_in;
   const clockOut = record.clock_out;
 
-  if (!clockIn) {
+  // Sin entrada O sin salida → todo en cero
+  if (!clockIn || !clockOut) {
     return {
       worked_hours: 0,
       regular_hours: 0,
@@ -40,7 +41,7 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
       overtime_hours_35: 0,
       is_late: false,
       late_minutes: 0,
-      is_absent: record.status === "Ausente",
+      is_absent: !clockIn ? (record.status === "Ausente") : false,
     };
   }
 
@@ -60,7 +61,7 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
   const [endH, endM]   = scheduledEnd.split(":").map(Number);
   const schedEndTotal  = endH * 60 + endM;
 
-  // Tardanza
+  // Tardanza (solo cuando hay ambos: entrada y salida)
   const rawLate    = inTotal - schedTotal;
   const lateMinutes = rawLate > toleranceMinutes ? rawLate : 0;
   const isLate     = lateMinutes > 0;
