@@ -1023,14 +1023,14 @@ export default function AttendanceManagement() {
                               <td className="px-2 py-2 text-center">
                                 {vacation
                                   ? <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{scheduledTimes?.start}</span>
-                                  : <span className={`text-sm font-bold ${emp.record?.clock_in ? 'text-slate-900' : 'text-slate-300'}`}>{emp.record?.clock_in || "--:--"}</span>
+                                  : <span className={`text-sm font-bold ${emp.record?.clock_in ? 'text-slate-900' : 'text-slate-300'}`}>{emp.record?.clock_in ? emp.record.clock_in.slice(0, 5) : "--:--"}</span>
                                 }
                               </td>
                               {/* Salida */}
                               <td className="px-2 py-2 text-center">
                                 {vacation
                                   ? <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{scheduledTimes?.end}</span>
-                                  : <span className={`text-sm font-bold ${emp.record?.clock_out ? 'text-slate-900' : 'text-slate-300'}`}>{emp.record?.clock_out || "--:--"}</span>
+                                  : <span className={`text-sm font-bold ${emp.record?.clock_out ? 'text-slate-900' : 'text-slate-300'}`}>{emp.record?.clock_out ? emp.record.clock_out.slice(0, 5) : "--:--"}</span>
                                 }
                               </td>
                               {/* Horas */}
@@ -1066,7 +1066,7 @@ export default function AttendanceManagement() {
                                   {(
                                     (
                                       [
-                                      "Revisar", "Incompleto", "Sin marcar"
+                                      "Revisar", "Incompleto"
                                       ].includes(emp.record?.status) || !emp.record?.clock_in || !emp.record?.clock_out
                                     ) && emp.record?.created_by !== 'external_sync'
                                   ) && (
