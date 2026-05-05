@@ -83,15 +83,15 @@ export async function recalcularAsistencia({ employee_id, date_from, date_to } =
     let scheduled_start = record.scheduled_start;
     let scheduled_end   = record.scheduled_end;
 
-    if (clockIn && schedule) {
+    if (clockIn) {
       const dow = new Date(dateStr + "T00:00:00").getDay();
       const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
       const dayEndMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
 
-      scheduled_start        = schedule[dayStartMap[dow]] || "09:00";
-      scheduled_end          = schedule[dayEndMap[dow]]   || "18:00";
-      const breakMinutes     = schedule.break_duration_minutes ?? 60;
-      const toleranceMinutes = schedule.tolerance_minutes ?? 10;
+      scheduled_start        = schedule ? (schedule[dayStartMap[dow]] || "09:00") : "09:00";
+      scheduled_end          = schedule ? (schedule[dayEndMap[dow]]   || "18:00") : "18:00";
+      const breakMinutes     = schedule?.break_duration_minutes ?? 60;
+      const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
 
       const [inH, inM]       = clockIn.split(":").map(Number);
       const inTotal          = inH * 60 + inM;
@@ -112,7 +112,7 @@ export async function recalcularAsistencia({ employee_id, date_from, date_to } =
         const regularMinutes = Math.max(0, schedEndTotal - Math.max(inTotal, schedTotal) - breakMinutes);
         const normalHoursMax = regularMinutes / 60;
 
-        const overtimeAuth = record.overtime_authorized ?? schedule.overtime_authorized ?? false;
+        const overtimeAuth = record.overtime_authorized ?? schedule?.overtime_authorized ?? false;
 
         if (worked_hours <= normalHoursMax) {
           regular_hours = worked_hours;
