@@ -77,6 +77,26 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
       };
     }
 
+    const existingBiotimeLogs = await prisma.attendance_logs.findMany({
+      where: {
+        source: "biotime",
+        punch_time: {
+          gte: dateFrom,
+          lte: dateTo,
+        },
+      },
+      select: {
+        raw_payload: true,
+      },
+    });
+
+    const seenBiotimeIds = new Set(
+      existingBiotimeLogs
+        .map((log) => log?.raw_payload?.biotime_id)
+        .filter((id) => id !== null && id !== undefined)
+        .map((id) => String(id))
+    );
+
     // 🔹 Mapear empleados
     const employees = await prisma.employee.findMany({
       select: {
@@ -95,29 +115,26 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
     // 🔹 Procesar transacciones UNA POR UNA (simple y seguro)
     for (const tx of transactions) {
       try {
-        const empCode = tx.emp_code?.padStart(8, "0");
-        if (!empCode) continue;
-
-        const employeeId = employeeMap[empCode];
-        if (!employeeId) continue;
-
-        const punchTime = new Date(tx.punch_time);
-
-        // EVITAR DUPLICADOS (clave lógica)
-        const existing = await prisma.attendance_logs.findFirst({
-          where: {
-            employee_id: employeeId,
-            punch_time: punchTime,
-          },
-          select: { id: true },
-        });
-
-        if (existing) {
+        const biotimeId = tx.id !== null && tx.id !== undefined ? String(tx.id) : null;
+        if (!biotimeId || seenBiotimeIds.has(biotimeId)) {
           skipped++;
           continue;
         }
 
-        // INSERTAR LOG
+        const empCode = tx.emp_code?.padStart(8, "0");
+        if (!empCode) {
+          skipped++;
+          continue;
+        }
+
+        const employeeId = employeeMap[empCode];
+        if (!employeeId) {
+          skipped++;
+          continue;
+        }
+
+        const punchTime = new Date(tx.punch_time);
+
         await prisma.attendance_logs.create({
           data: {
             id: generate24HexId(),
@@ -137,6 +154,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
           },
         });
 
+        seenBiotimeIds.add(biotimeId);
         inserted++;
       } catch (err) {
         errors++;
