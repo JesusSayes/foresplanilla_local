@@ -4,6 +4,7 @@ import prisma from "../config/prisma.js";
  * CONFIG
  */
 const WINDOW_HOURS = 2;
+const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
 /**
  * Utils
@@ -14,6 +15,37 @@ function toHHMM(date) {
 
 function diffHours(a, b) {
   return (b - a) / 3600000;
+}
+
+function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
+  const candidates = schedules.filter(s => {
+    const isForEmployee = s.employee_id === employeeId;
+    const isForDept = !s.employee_id && departmentName &&
+      (Array.isArray(s.departments)
+        ? s.departments.includes(departmentName)
+        : s.department_name === departmentName);
+    return isForEmployee || isForDept;
+  });
+
+  const findBest = (list) => {
+    const valid = list.filter(s => {
+      const from = s.effective_from ? s.effective_from.toISOString().slice(0, 10) : "0000-01-01";
+      const to = s.effective_to ? s.effective_to.toISOString().slice(0, 10) : "9999-12-31";
+      return from <= dateStr && dateStr <= to;
+    });
+
+    valid.sort((a, b) => {
+      const af = a.effective_from ? a.effective_from.toISOString().slice(0, 10) : "0000-01-01";
+      const bf = b.effective_from ? b.effective_from.toISOString().slice(0, 10) : "0000-01-01";
+      return bf.localeCompare(af);
+    });
+
+    return valid[0] || null;
+  };
+
+  return findBest(candidates.filter(s => s.employee_id === employeeId))
+    || findBest(candidates.filter(s => !s.employee_id))
+    || null;
 }
 
 function buildWindow(date, startTime, endTime) {
@@ -261,6 +293,23 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
     },
   });
 
+  const employeeIds = [
+    ...new Set(records.map(r => r.employee_id).filter(Boolean)),
+  ];
+
+  const [employees, schedulesRaw] = await Promise.all([
+    prisma.employee.findMany({
+      where: { id: { in: employeeIds } },
+      select: { id: true, department_name: true },
+    }),
+    prisma.work_schedule.findMany({
+      where: { is_active: true },
+      orderBy: { id: "asc" },
+    }),
+  ]);
+
+  const employeeMap = new Map(employees.map(emp => [emp.id, emp]));
+
   let updated = 0;
 
   /**
@@ -268,6 +317,18 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
    */
   for (const record of records) {
     if (record.status === "Aprobada") {
+      continue;
+    }
+
+    const employee = employeeMap.get(record.employee_id);
+    const schedule = getScheduleForDate(
+      record.employee_id,
+      employee?.department_name,
+      schedulesRaw,
+      dateStr
+    );
+
+    if (schedule?.exempt_from_clocking) {
       continue;
     }
 
