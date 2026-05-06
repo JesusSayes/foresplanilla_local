@@ -17,6 +17,17 @@ function diffHours(a, b) {
   return (b - a) / 3600000;
 }
 
+function deduplicateLogs(logs) {
+  const seen = new Set();
+
+  return logs.filter(log => {
+    const key = log.punch_time.getTime();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
   const candidates = schedules.filter(s => {
     const isForEmployee = s.employee_id === employeeId;
@@ -205,13 +216,19 @@ function computeAttendance({ logs, record }) {
    * 7. Menos de 2 válidas
    */
   if (inWindowLogs.length < 2) {
+    const bestLog = inWindowLogs.length > 0
+      ? inWindowLogs[0]
+      : logs[0];
+
     return {
       status: "Revisar",
-      clock_in: logs.length > 0 ? toHHMM(logs[0].punch_time) : null,
+      clock_in: bestLog ? toHHMM(bestLog.punch_time) : null,
       clock_out: null,
       worked_hours: 0,
-      notes: "Marcaciones insuficientes dentro de ventana",
-      usedLogIds: logs.length > 0 ? [logs[0].id] : [],
+      notes: inWindowLogs.length === 1
+        ? "Solo una marcación dentro de ventana"
+        : "Sin marcaciones dentro de ventana horaria",
+      usedLogIds: bestLog ? [bestLog.id] : [],
     };
   }
 
@@ -284,6 +301,10 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
     grouped[key].push(log);
   }
 
+  for (const key of Object.keys(grouped)) {
+    grouped[key] = deduplicateLogs(grouped[key]);
+  }
+
   /**
    * 3. Obtener registros base
    */
@@ -339,13 +360,6 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
       logs: employeeLogs,
       record,
     });
-
-    if (employeeLogs.length > 0) {
-      result.clock_in = toHHMM(employeeLogs[0].punch_time);
-      if (!result.usedLogIds.includes(employeeLogs[0].id)) {
-        result.usedLogIds = [employeeLogs[0].id, ...result.usedLogIds];
-      }
-    }
 
     /**
      * Resetear logs del día
