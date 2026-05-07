@@ -208,7 +208,6 @@ export default function JustifyModal({
         const existingIncidentForDate = incidentsByDate[dateStr];
         if (existingIncidentForDate) {
           await entitiesAPI.AttendanceIncident.update(existingIncidentForDate.id, incidentPayload);
-          await entitiesAPI.AttendanceIncident.update(existingIncident.id, incidentPayload);
         } else {
           await entitiesAPI.AttendanceIncident.create(incidentPayload);
         }
@@ -237,7 +236,7 @@ export default function JustifyModal({
         } else {
           // Create new record only if none exists for this date
           // await base44.entities.AttendanceRecord.create({
-          await entitiesAPI.AttendanceRecord.create({
+          const created = await entitiesAPI.AttendanceRecord.create({
             employee_id: justifyingEmployee.id,
             date: dateStr,
             clock_in: timeStart || null,
