@@ -17,6 +17,43 @@ function diffHours(a, b) {
   return (b - a) / 3600000;
 }
 
+function toMinutes(hhmm) {
+  if (!hhmm || typeof hhmm !== "string") return null;
+  const [h, m] = hhmm.slice(0, 5).split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+function computeLate(clockIn, scheduledStart) {
+  if (!clockIn) {
+    return { is_late: null, late_minutes: null };
+  }
+
+  const inMinutes = toMinutes(clockIn);
+  const startMinutes = toMinutes(scheduledStart);
+
+  if (inMinutes === null || startMinutes === null) {
+    return { is_late: false, late_minutes: 0 };
+  }
+
+  const lateMinutes = Math.max(0, inMinutes - startMinutes);
+  return { is_late: lateMinutes > 0, late_minutes: lateMinutes };
+}
+
+function computeOvertimeFields(clockIn, clockOut, record) {
+  if (!clockIn || !clockOut) {
+    return {
+      overtime_hours_25: null,
+      overtime_hours_35: null,
+    };
+  }
+
+  return {
+    overtime_hours_25: record.overtime_hours_25,
+    overtime_hours_35: record.overtime_hours_35,
+  };
+}
+
 function deduplicateLogs(logs) {
   const seen = new Set();
 
@@ -361,6 +398,9 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
       record,
     });
 
+    const lateData = computeLate(result.clock_in, record.scheduled_start);
+    const overtimeData = computeOvertimeFields(result.clock_in, result.clock_out, record);
+
     /**
      * Resetear logs del día
      */
@@ -407,6 +447,10 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
         clock_in: result.clock_in,
         clock_out: result.clock_out,
         worked_hours: result.worked_hours,
+        is_late: lateData.is_late,
+        late_minutes: lateData.late_minutes,
+        overtime_hours_25: overtimeData.overtime_hours_25,
+        overtime_hours_35: overtimeData.overtime_hours_35,
         status: result.status,
         notes: result.notes,
         updated_date: new Date(),
