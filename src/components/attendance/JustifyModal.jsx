@@ -160,7 +160,7 @@ export default function JustifyModal({
       const timeEnd = justificationData.full_day_justification ? schedEnd : justificationData.justified_time_end;
 
       let hoursToAdjust = 0;
-      let lateMinutesToAdjust = 0;
+      const lateMinutesToAdjust = 0;
 
       if (justificationData.full_day_justification) {
         hoursToAdjust = getFullDayHours();
@@ -169,6 +169,22 @@ export default function JustifyModal({
         const [eh, em] = timeEnd.split(":").map(Number);
         hoursToAdjust = Math.min(((eh * 60 + em) - (sh * 60 + sm)) / 60, 8);
       }
+
+      // Pre-fetch all existing incidents and records for the employee in the target date range
+      // to avoid unique constraint violations when creating new entries
+      const minDate = targetDates[0];
+      const maxDate = targetDates[targetDates.length - 1];
+
+      const [allIncidentsInRange, allRecordsInRange] = await Promise.all([
+        base44.entities.AttendanceIncident.filter({ employee_id: justifyingEmployee.id }),
+        base44.entities.AttendanceRecord.filter({ employee_id: justifyingEmployee.id }),
+      ]);
+
+      const incidentsByDate = {};
+      allIncidentsInRange.forEach(i => { incidentsByDate[i.incident_date] = i; });
+
+      const recordsByDate = {};
+      allRecordsInRange.forEach(r => { recordsByDate[r.date] = r; });
 
       for (const dateStr of targetDates) {
         const incidentPayload = {
@@ -188,17 +204,16 @@ export default function JustifyModal({
           review_comments: "Aprobada automáticamente al crear la justificación",
         };
 
-        // Only use existingIncident for the primary selectedDate when single-date mode
-        const isSingleMode = !multiDateMode;
-        const isPrimaryDate = dateStr === format(selectedDate, "yyyy-MM-dd");
-
-        if (isSingleMode && existingIncident) {
+        // Use existing incident if found for this date (avoids unique constraint)
+        const existingIncidentForDate = incidentsByDate[dateStr];
+        if (existingIncidentForDate) {
+          await base44.entities.AttendanceIncident.update(existingIncidentForDate.id, incidentPayload);
           await entitiesAPI.AttendanceIncident.update(existingIncident.id, incidentPayload);
         } else {
           await entitiesAPI.AttendanceIncident.create(incidentPayload);
         }
 
-        const existingRecord = todayRecords.find(r => r.employee_id === justifyingEmployee.id && r.date === dateStr);
+        const existingRecord = recordsByDate[dateStr];
         const newWorkedHours = hoursToAdjust;
         const newLateMinutes = justificationData.incident_type === "Tardanza"
           ? Math.max(0, (existingRecord?.late_minutes || 0) - lateMinutesToAdjust)
@@ -217,10 +232,12 @@ export default function JustifyModal({
 
         let savedRecordId = null;
         if (existingRecord) {
+          // Update existing record (avoids unique constraint on employee_id + date)
           await entitiesAPI.AttendanceRecord.update(existingRecord.id, recordUpdate);
-          savedRecordId = existingRecord.id;
         } else {
-          const created = await entitiesAPI.AttendanceRecord.create({
+          // Create new record only if none exists for this date
+          // await base44.entities.AttendanceRecord.create({
+          await entitiesAPI.AttendanceRecord.create({
             employee_id: justifyingEmployee.id,
             date: dateStr,
             clock_in: timeStart || null,
