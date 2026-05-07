@@ -176,8 +176,8 @@ export default function JustifyModal({
       const maxDate = targetDates[targetDates.length - 1];
 
       const [allIncidentsInRange, allRecordsInRange] = await Promise.all([
-        base44.entities.AttendanceIncident.filter({ employee_id: justifyingEmployee.id }),
-        base44.entities.AttendanceRecord.filter({ employee_id: justifyingEmployee.id }),
+        entitiesAPI.AttendanceIncident.filter({ employee_id: justifyingEmployee.id }),
+        entitiesAPI.AttendanceRecord.filter({ employee_id: justifyingEmployee.id }),
       ]);
 
       const incidentsByDate = {};
@@ -207,7 +207,7 @@ export default function JustifyModal({
         // Use existing incident if found for this date (avoids unique constraint)
         const existingIncidentForDate = incidentsByDate[dateStr];
         if (existingIncidentForDate) {
-          await base44.entities.AttendanceIncident.update(existingIncidentForDate.id, incidentPayload);
+          await entitiesAPI.AttendanceIncident.update(existingIncidentForDate.id, incidentPayload);
           await entitiesAPI.AttendanceIncident.update(existingIncident.id, incidentPayload);
         } else {
           await entitiesAPI.AttendanceIncident.create(incidentPayload);
@@ -299,8 +299,8 @@ export default function JustifyModal({
       }
 
       // Recalcular métricas (tardanza, HE 25%, HE 35%) para todas las fechas justificadas
-      const minDate = targetDates[0];
-      const maxDate = targetDates[targetDates.length - 1];
+      // const minDate = targetDates[0];
+      // const maxDate = targetDates[targetDates.length - 1];
       // await base44.functions.invoke("recalcularAsistencia", {
         // employee_id: justifyingEmployee.id,
         // date_from: minDate,
