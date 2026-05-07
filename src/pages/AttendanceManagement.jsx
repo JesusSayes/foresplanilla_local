@@ -684,7 +684,11 @@ export default function AttendanceManagement() {
     };
   };
 
-  const getStatusConfig = (status, hasClockIn) => {
+  const getStatusConfig = (status, hasClockIn, incident) => {
+    // Si hay un incidente aprobado asociado, mostrar "Justificado" independientemente del status del record
+    if (incident && incident.status === "Aprobada") {
+      return { color: "bg-blue-100 text-blue-700 border-blue-200", icon: FileText, text: "Justificado" };
+    }
     if (!hasClockIn) return { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle, text: "Sin marcar" };
     const configs = {
       "Completo": { color: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle, text: "Completo" },
@@ -937,9 +941,16 @@ export default function AttendanceManagement() {
                           const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
                           const vacation = approvedVacations.find(v => v.employee_id === emp.id && v.start_date <= rowDate && v.end_date >= rowDate) || null;
                           const scheduledTimes = vacation ? getScheduledTimes(emp.id) : null;
+                          // Buscar incidente aprobado para esta fila
+                          const rowIncident = allIncidents.find(
+                            i => i.employee_id === emp.id && i.incident_date === rowDate && i.status === "Aprobada"
+                          ) || allIncidents.find(
+                            i => i.employee_id === emp.id && i.incident_date === rowDate
+                          ) || null;
+
                           const statusConfig = vacation
                             ? { color: "bg-amber-100 text-amber-800 border-amber-300", icon: Palmtree, text: "Vacaciones" }
-                            : getStatusConfig(emp.record?.status, emp.record?.clock_in);
+                            : getStatusConfig(emp.record?.status, emp.record?.clock_in, rowIncident);
                           const StatusIcon = statusConfig.icon;
                           const rowKey = `${emp.id}-${rowDate}-${idx}`;
 
@@ -1025,8 +1036,13 @@ export default function AttendanceManagement() {
                                     <div style={{width: "62px", height: "28px", flexShrink: 0}} />
                                   )}
                                   {!vacation && (
-                                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-orange-600 border-orange-200 hover:bg-orange-50 shrink-0 whitespace-nowrap" onClick={() => handleJustifyClick(emp, emp.record, rowDate)}>
-                                      <FileText className="w-3 h-3 mr-1" />Justificar
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className={`h-7 px-2 text-xs shrink-0 whitespace-nowrap ${rowIncident ? "text-blue-700 border-blue-300 hover:bg-blue-50" : "text-orange-600 border-orange-200 hover:bg-orange-50"}`}
+                                      onClick={() => handleJustifyClick(emp, emp.record, rowDate)}
+                                    >
+                                      <FileText className="w-3 h-3 mr-1" />{rowIncident ? "Ver/Editar" : "Justificar"}
                                     </Button>
                                   )}
                                   {vacation && <div style={{width: "138px", flexShrink: 0}} />}
