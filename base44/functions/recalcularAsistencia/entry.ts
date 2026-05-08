@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // Obtener el horario vigente de un empleado en una fecha dada
 function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
@@ -150,8 +150,19 @@ Deno.serve(async (req) => {
     const emp = employee[0];
     if (!emp) return Response.json({ error: 'Empleado no encontrado' }, { status: 404 });
 
-    const allRecords = parseSDKResponse(await base44.entities.AttendanceRecord.filter({ employee_id }));
+    const [allRecordsRaw, allIncidentsRaw] = await Promise.all([
+      base44.entities.AttendanceRecord.filter({ employee_id }),
+      base44.entities.AttendanceIncident.filter({ employee_id }),
+    ]);
+    const allRecords = parseSDKResponse(allRecordsRaw);
+    const allIncidents = parseSDKResponse(allIncidentsRaw);
     const recordsInRange = allRecords.filter(r => r.date >= date_from && r.date <= date_to);
+
+    // Mapa de incidentes aprobados por fecha para consulta rápida
+    const approvedIncidentsByDate = {};
+    allIncidents.forEach(i => {
+      if (i.status === "Aprobada") approvedIncidentsByDate[i.incident_date] = i;
+    });
 
     let updated = 0;
 
@@ -161,15 +172,17 @@ Deno.serve(async (req) => {
       const overtimeAuth = record.overtime_authorized ?? schedule?.overtime_authorized ?? false;
       const metrics = calcularMetricas(record, schedule, record.date, overtimeAuth);
 
-      let status = record.status;
-      if (record.status === "Justificado") {
-        // Preservar el estado Justificado: ya fue procesado por una justificación
+      // Si existe un incidente aprobado para esta fecha → siempre "Justificado"
+      const hasApprovedIncident = !!approvedIncidentsByDate[record.date];
+
+      let status;
+      if (hasApprovedIncident || record.status === "Justificado") {
         status = "Justificado";
       } else if (record.clock_in && record.clock_out) {
         status = "Completo";
       } else if (record.clock_in && !record.clock_out) {
         status = "Incompleto";
-      } else if (!record.clock_in) {
+      } else {
         status = "Ausente";
       }
 
