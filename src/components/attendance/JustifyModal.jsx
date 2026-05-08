@@ -201,7 +201,7 @@ export default function JustifyModal({
           status: "Aprobada",
           reviewed_by: `${employee.first_name} ${employee.last_name}`,
           review_date: todayLima(),
-          review_comments: "Aprobada automáticamente al crear la justificación",
+          review_comments: "Justificación registrada por el administrador",
         };
 
         // Use existing incident if found for this date (avoids unique constraint)
