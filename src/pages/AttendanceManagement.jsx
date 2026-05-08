@@ -127,7 +127,7 @@ export default function AttendanceManagement() {
 
   const { data: allIncidents = [] } = useQuery({
     queryKey: ["allIncidents"],
-    queryFn: async () => await base44.entities.AttendanceIncident.list("-created_date", 500),
+    queryFn: async () => await base44.entities.AttendanceIncident.list("-created_date", 2000),
   });
 
   // Los incidentes se filtrarán después de calcular accessibleEmployeeIds (ver abajo)
@@ -434,7 +434,7 @@ export default function AttendanceManagement() {
 
   const [justifyingSchedule, setJustifyingSchedule] = useState(null);
 
-  const handleJustifyClick = (emp, record, overrideDate) => {
+  const handleJustifyClick = async (emp, record, overrideDate) => {
     setJustifyingEmployee(emp);
 
     const dateStr = overrideDate || format(selectedDate, "yyyy-MM-dd");
@@ -449,10 +449,20 @@ export default function AttendanceManagement() {
       start: sched[dayStarts[dow]] || "09:00",
       end:   sched[dayEnds[dow]]   || "18:00",
     } : { start: "09:00", end: "18:00" });
-    // Buscar justificación previa para este empleado en esta fecha
-    const prevIncident = allIncidents.find(
+
+    // Buscar justificación previa: primero en cache local, si no — fetch directo por fecha exacta
+    let prevIncident = allIncidents.find(
       i => i.employee_id === emp.id && i.incident_date === dateStr
     );
+
+    if (!prevIncident) {
+      // Fetch directo para asegurar que encontramos el incidente aunque no esté en los 500 cargados
+      const fetched = await base44.entities.AttendanceIncident.filter({
+        employee_id: emp.id,
+        incident_date: dateStr,
+      });
+      prevIncident = fetched?.[0] || null;
+    }
 
     if (prevIncident) {
       // Pre-cargar datos de la justificación existente
