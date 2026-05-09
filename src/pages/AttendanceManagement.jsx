@@ -498,7 +498,7 @@ export default function AttendanceManagement() {
 
     if (!prevIncident) {
       // Fetch directo para asegurar que encontramos el incidente aunque no esté en los 500 cargados
-      const fetched = await base44.entities.AttendanceIncident.filter({
+      const fetched = await entitiesAPI.AttendanceIncident.filter({
         employee_id: emp.id,
         incident_date: dateStr,
       });
