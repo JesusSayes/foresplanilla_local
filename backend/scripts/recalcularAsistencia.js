@@ -32,6 +32,81 @@ function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
       || null;
 }
 
+function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
+  const clockIn = record.clock_in;
+  const clockOut = record.clock_out;
+
+  if (!clockIn) {
+    return {
+      worked_hours: 0,
+      regular_hours: 0,
+      overtime_hours_25: 0,
+      overtime_hours_35: 0,
+      is_late: false,
+      late_minutes: 0,
+      is_absent: record.status === "Ausente",
+    };
+  }
+
+  const dow = new Date(dateStr + "T00:00:00").getDay();
+  const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+  const dayEndMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+
+  const scheduledStart = schedule ? (schedule[dayStartMap[dow]] || "09:00") : "09:00";
+  const scheduledEnd = schedule ? (schedule[dayEndMap[dow]] || "18:00") : "18:00";
+  const breakMinutes = schedule?.break_duration_minutes ?? 60;
+  const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
+
+  const [inH, inM] = clockIn.split(":").map(Number);
+  const inTotal = inH * 60 + inM;
+  const [schedH, schedM] = scheduledStart.split(":").map(Number);
+  const schedTotal = schedH * 60 + schedM;
+  const [endH, endM] = scheduledEnd.split(":").map(Number);
+  const schedEndTotal = endH * 60 + endM;
+
+  const rawLate = inTotal - schedTotal;
+  const lateMinutes = rawLate > toleranceMinutes ? rawLate : 0;
+  const isLate = lateMinutes > 0;
+
+  let workedHours = 0;
+  let regularHours = 0;
+  let overtimeHours25 = 0;
+  let overtimeHours35 = 0;
+
+  if (clockOut) {
+    const [outH, outM] = clockOut.split(":").map(Number);
+    const outTotal = outH * 60 + outM;
+    const totalMinutes = outTotal - inTotal - breakMinutes;
+    workedHours = Math.max(0, totalMinutes / 60);
+
+    const regularMinutes = Math.max(0, schedEndTotal - Math.max(inTotal, schedTotal) - breakMinutes);
+    const normalHoursMax = regularMinutes / 60;
+
+    if (workedHours <= normalHoursMax) {
+      regularHours = workedHours;
+    } else {
+      regularHours = normalHoursMax;
+      const extraHours = workedHours - normalHoursMax;
+      if (overtimeAuthorized) {
+        overtimeHours25 = Math.min(extraHours, 2);
+        overtimeHours35 = Math.max(0, extraHours - 2);
+      }
+    }
+  }
+
+  return {
+    worked_hours: workedHours,
+    regular_hours: regularHours,
+    overtime_hours_25: overtimeHours25,
+    overtime_hours_35: overtimeHours35,
+    is_late: isLate,
+    late_minutes: lateMinutes,
+    is_absent: false,
+    scheduled_start: scheduledStart,
+    scheduled_end: scheduledEnd,
+  };
+}
+
 /**
  * Recalcula métricas de asistencia (tardanza, horas trabajadas, horas extra) para un empleado en un rango de fechas.
  * Regla peruana: primeras 2h extra → 25%, a partir de la 3ra → 35%.
@@ -69,83 +144,54 @@ export async function recalcularAsistencia({ employee_id, date_from, date_to } =
     cursorRecord = page[page.length - 1].id;
   }
 
+  const incidents = await prisma.attendance_incident.findMany({
+    where: {
+      employee_id,
+      status: "Aprobada",
+      incident_date: { gte: new Date(date_from + "T00:00:00"), lte: new Date(date_to + "T00:00:00") },
+    },
+    select: { incident_date: true },
+  });
+
+  const approvedIncidentsByDate = {};
+  incidents.forEach(i => {
+    if (!i.incident_date) return;
+    approvedIncidentsByDate[i.incident_date.toISOString().slice(0, 10)] = true;
+  });
+
   let updated = 0;
 
   for (const record of records) {
-    const dateStr  = record.date.toISOString().slice(0, 10);
+    const dateStr = record.date.toISOString().slice(0, 10);
     const schedule = getScheduleForDate(employee_id, emp.department_name, allSchedules, dateStr);
+    const overtimeAuth = record.overtime_authorized ?? schedule?.overtime_authorized ?? false;
+    const metrics = calcularMetricas(record, schedule, dateStr, overtimeAuth);
 
-    const clockIn  = record.clock_in;
-    const clockOut = record.clock_out;
+    const hasApprovedIncident = !!approvedIncidentsByDate[dateStr];
 
-    let worked_hours = 0, regular_hours = 0, overtime_hours_25 = 0, overtime_hours_35 = 0;
-    let is_late = false, late_minutes = 0, is_absent = false;
-    let scheduled_start = record.scheduled_start;
-    let scheduled_end   = record.scheduled_end;
-
-    if (clockIn) {
-      const dow = new Date(dateStr + "T00:00:00").getDay();
-      const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
-      const dayEndMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-
-      scheduled_start        = schedule ? (schedule[dayStartMap[dow]] || "09:00") : "09:00";
-      scheduled_end          = schedule ? (schedule[dayEndMap[dow]]   || "18:00") : "18:00";
-      const breakMinutes     = schedule?.break_duration_minutes ?? 60;
-      const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
-
-      const [inH, inM]       = clockIn.split(":").map(Number);
-      const inTotal          = inH * 60 + inM;
-      const [schedH, schedM] = scheduled_start.split(":").map(Number);
-      const schedTotal       = schedH * 60 + schedM;
-      const [endH, endM]     = scheduled_end.split(":").map(Number);
-      const schedEndTotal    = endH * 60 + endM;
-
-      const rawLate = inTotal - schedTotal;
-      late_minutes  = rawLate > toleranceMinutes ? rawLate : 0;
-      is_late       = late_minutes > 0;
-
-      if (clockOut) {
-        const [outH, outM] = clockOut.split(":").map(Number);
-        const outTotal     = outH * 60 + outM;
-        worked_hours = Math.max(0, (outTotal - inTotal - breakMinutes) / 60);
-
-        const regularMinutes = Math.max(0, schedEndTotal - Math.max(inTotal, schedTotal) - breakMinutes);
-        const normalHoursMax = regularMinutes / 60;
-
-        const overtimeAuth = record.overtime_authorized ?? schedule?.overtime_authorized ?? false;
-
-        if (worked_hours <= normalHoursMax) {
-          regular_hours = worked_hours;
-        } else {
-          regular_hours = normalHoursMax;
-          const extraHours = worked_hours - normalHoursMax;
-          if (overtimeAuth) {
-            overtime_hours_25 = Math.min(extraHours, 2);
-            overtime_hours_35 = Math.max(0, extraHours - 2);
-          }
-        }
-      }
-    } else if (!clockIn) {
-      is_absent = record.status === "Ausente";
+    let status;
+    if (hasApprovedIncident || record.status === "Justificado") {
+      status = "Justificado";
+    } else if (record.clock_in && record.clock_out) {
+      status = "Completo";
+    } else if (record.clock_in && !record.clock_out) {
+      status = "Incompleto";
+    } else {
+      status = "Ausente";
     }
-
-    let status = record.status;
-    if (clockIn && clockOut)       status = "Completo";
-    else if (clockIn && !clockOut) status = "Incompleto";
-    else if (!clockIn)             status = record.status === "Justificado" ? "Justificado" : "Ausente";
 
     await prisma.attendance_record.update({
       where: { id: record.id },
       data: {
-        worked_hours,
-        regular_hours,
-        overtime_hours_25,
-        overtime_hours_35,
-        is_late,
-        late_minutes,
-        is_absent,
-        scheduled_start: scheduled_start || record.scheduled_start,
-        scheduled_end:   scheduled_end   || record.scheduled_end,
+        worked_hours: metrics.worked_hours,
+        regular_hours: metrics.regular_hours,
+        overtime_hours_25: metrics.overtime_hours_25,
+        overtime_hours_35: metrics.overtime_hours_35,
+        is_late: metrics.is_late,
+        late_minutes: metrics.late_minutes,
+        is_absent: metrics.is_absent,
+        scheduled_start: metrics.scheduled_start || record.scheduled_start,
+        scheduled_end: metrics.scheduled_end || record.scheduled_end,
         status,
         updated_date: new Date(),
       },
