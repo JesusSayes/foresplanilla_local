@@ -82,11 +82,16 @@ export async function generarAsistenciaDiaria({ date_from = null, employee_id = 
   const [schedulesRaw, holidaysRaw, contractsRaw] = await Promise.all([
     prisma.work_schedule.findMany({ where: { is_active: true }, orderBy: { id: 'asc' } }),
     prisma.holiday.findMany({ orderBy: { date: 'desc' } }),
-    prisma.contract.findMany({ where: { status: "Vigente" }, orderBy: { id: 'asc' } }),
+    prisma.contract.findMany({ orderBy: [{ employee_id: 'asc' }, { start_date: 'desc' }, { id: 'desc' }] }),
   ]);
 
-  const holidayDates    = new Set(holidaysRaw.map(h => h.date ? h.date.toISOString().slice(0,10) : ""));
-  const vigentContracts = contractsRaw;
+  const holidayDates = new Set(holidaysRaw.map(h => h.date ? h.date.toISOString().slice(0,10) : ""));
+  const contractsByEmployee = new Map();
+  for (const contract of contractsRaw) {
+    const employeeContracts = contractsByEmployee.get(contract.employee_id) || [];
+    employeeContracts.push(contract);
+    contractsByEmployee.set(contract.employee_id, employeeContracts);
+  }
 
   // Paginación con cursor sobre empleados activos
   const employeeQuery = {
@@ -106,8 +111,9 @@ export async function generarAsistenciaDiaria({ date_from = null, employee_id = 
 
   for (const emp of employees) {
     try {
-      const empContract  = vigentContracts.find(c => c.employee_id === emp.id);
-      const startDateRaw = empContract?.start_date || emp.hire_date;
+      const employeeContracts = contractsByEmployee.get(emp.id) || [];
+      const empContract = employeeContracts.find(c => c.status === "Vigente") || employeeContracts[0] || null;
+      const startDateRaw = empContract?.start_date || emp.hire_date || emp.created_date;
 
       if (!startDateRaw) { totalSkipped++; continue; }
 

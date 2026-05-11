@@ -186,7 +186,7 @@ export async function syncExternalAttendance(options = {}) {
           }
         });
 
-        if (existingRecord && !updateExisting) {
+        if (existingRecord) {
           const existingClockIn = existingRecord.clock_in;
           const existingClockOut = existingRecord.clock_out;
           const newClockIn = record.hora_entrada;
@@ -260,6 +260,26 @@ export async function syncExternalAttendance(options = {}) {
 
             log(`[ACTUALIZAR DUPLICADO] ID ${record.id} - ${employee.first_name} ${employee.last_name} (${record.numero_documento}) - ${record.fecha} - Campos actualizados: ${updatedFields.join(', ')} - Horas trabajadas: ${existingRecord.worked_hours?.toFixed(2) || '0.00'} → ${workedHours.toFixed(2)}, Estado: ${existingRecord.status || 'N/A'} → ${status}`);
 
+            const hasMissingClockData = updatedFields.includes('clock_in') || updatedFields.includes('clock_out');
+
+            if (!updateExisting && !hasMissingClockData) {
+              totalSkipped++;
+              skipReasons.alreadyExists++;
+              const dupInfo = {
+                external_id: record.id,
+                document_number: record.numero_documento,
+                employee_name: `${employee.first_name} ${employee.last_name}`,
+                date: record.fecha,
+                existing_clock_in: existingClockIn || 'N/A',
+                existing_clock_out: existingClockOut || 'N/A',
+                new_clock_in: newClockIn || 'N/A',
+                new_clock_out: newClockOut || 'N/A'
+              };
+              skipReasons.duplicateDates.push(dupInfo);
+              log(`[OMITIDO] ID ${record.id} - ${dupInfo.employee_name} (${record.numero_documento}): Ya existe registro para ${record.fecha} - Existente: Entrada=${existingClockIn || 'N/A'}, Salida=${existingClockOut || 'N/A'} | Nuevo: Entrada=${newClockIn || 'N/A'}, Salida=${newClockOut || 'N/A'}`);
+              continue;
+            }
+
             if (!dryRun) {
               await prisma.attendance_record.update({
                 where: { id: existingRecord.id },
@@ -271,22 +291,6 @@ export async function syncExternalAttendance(options = {}) {
             totalUpdated++;
             continue;
           }
-
-          totalSkipped++;
-          skipReasons.alreadyExists++;
-          const dupInfo = {
-            external_id: record.id,
-            document_number: record.numero_documento,
-            employee_name: `${employee.first_name} ${employee.last_name}`,
-            date: record.fecha,
-            existing_clock_in: existingClockIn || 'N/A',
-            existing_clock_out: existingClockOut || 'N/A',
-            new_clock_in: newClockIn || 'N/A',
-            new_clock_out: newClockOut || 'N/A'
-          };
-          skipReasons.duplicateDates.push(dupInfo);
-          log(`[OMITIDO] ID ${record.id} - ${dupInfo.employee_name} (${record.numero_documento}): Ya existe registro para ${record.fecha} - Existente: Entrada=${existingClockIn || 'N/A'}, Salida=${existingClockOut || 'N/A'} | Nuevo: Entrada=${newClockIn || 'N/A'}, Salida=${newClockOut || 'N/A'}`);
-          continue;
         }
 
         const workSchedule = await prisma.work_schedule.findFirst({
@@ -361,8 +365,8 @@ export async function syncExternalAttendance(options = {}) {
               data: {
                 employee_id: attendanceData.employee_id,
                 date: attendanceData.date,
-                clock_in: attendanceData.clock_in,
-                clock_out: attendanceData.clock_out,
+                clock_in: attendanceData.clock_in ?? existingRecord.clock_in,
+                clock_out: attendanceData.clock_out ?? existingRecord.clock_out,
                 scheduled_start: attendanceData.scheduled_start,
                 scheduled_end: attendanceData.scheduled_end,
                 worked_hours: attendanceData.worked_hours,
