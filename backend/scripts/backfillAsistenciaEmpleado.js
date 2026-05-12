@@ -71,17 +71,18 @@ export async function backfillAsistenciaEmpleado({ employee_id, date_from = "202
 
   const todayStr = todayInPeru();
 
-  const [emp, schedulesRaw, holidaysRaw, vigentContract] = await Promise.all([
+  const [emp, schedulesRaw, holidaysRaw, contractsRaw] = await Promise.all([
     prisma.employee.findUnique({ where: { id: employee_id } }),
     prisma.work_schedule.findMany({ where: { is_active: true }, orderBy: { id: 'asc' } }),
     prisma.holiday.findMany({ orderBy: { date: 'desc' } }),
-    prisma.contract.findFirst({ where: { employee_id, status: "Vigente" }, orderBy: { created_date: 'desc' } }),
+    prisma.contract.findMany({ where: { employee_id }, orderBy: [{ start_date: 'desc' }, { id: 'desc' }] }),
   ]);
 
   if (!emp) throw new Error('Empleado no encontrado');
 
-  const startDateRaw = vigentContract?.start_date || emp.hire_date;
-  if (!startDateRaw) throw new Error('El empleado no tiene fecha de ingreso ni contrato vigente');
+  const selectedContract = contractsRaw.find(c => c.status === "Vigente") || contractsRaw[0] || null;
+  const startDateRaw = selectedContract?.start_date || emp.hire_date || emp.created_date;
+  if (!startDateRaw) throw new Error('El empleado no tiene fecha de ingreso, fecha de creación ni contrato');
 
   const holidayDates = new Set(holidaysRaw.map(h => h.date ? h.date.toISOString().slice(0,10) : ""));
 
