@@ -86,15 +86,40 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
         },
       },
       select: {
+        employee_id: true,
+        punch_time: true,
         raw_payload: true,
       },
     });
 
+    const extractBiotimeId = (rawPayload) => {
+      if (!rawPayload) return null;
+      if (typeof rawPayload === "object") {
+        const id = rawPayload.biotime_id;
+        return id === null || id === undefined ? null : String(id);
+      }
+      if (typeof rawPayload === "string") {
+        try {
+          const parsed = JSON.parse(rawPayload);
+          const id = parsed?.biotime_id;
+          return id === null || id === undefined ? null : String(id);
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    };
+
     const seenBiotimeIds = new Set(
       existingBiotimeLogs
-        .map((log) => log?.raw_payload?.biotime_id)
-        .filter((id) => id !== null && id !== undefined)
-        .map((id) => String(id))
+        .map((log) => extractBiotimeId(log.raw_payload))
+        .filter((id) => id !== null)
+    );
+
+    const seenEmployeePunches = new Set(
+      existingBiotimeLogs
+        .filter((log) => log.employee_id && log.punch_time)
+        .map((log) => `${log.employee_id}|${new Date(log.punch_time).toISOString()}`)
     );
 
     // 🔹 Mapear empleados
@@ -134,6 +159,11 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
         }
 
         const punchTime = new Date(tx.punch_time);
+        const punchKey = `${employeeId}|${punchTime.toISOString()}`;
+        if (seenEmployeePunches.has(punchKey)) {
+          skipped++;
+          continue;
+        }
 
         await prisma.attendance_logs.create({
           data: {
@@ -155,6 +185,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
         });
 
         seenBiotimeIds.add(biotimeId);
+        seenEmployeePunches.add(punchKey);
         inserted++;
       } catch (err) {
         errors++;
