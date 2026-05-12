@@ -253,6 +253,23 @@ function computeAttendance({ logs, record }) {
    * 7. Menos de 2 válidas
    */
   if (inWindowLogs.length < 2) {
+    const firstLog = logs[0] || null;
+    const lastLog = logs[logs.length - 1] || null;
+
+    if (firstLog && lastLog && firstLog.id !== lastLog.id) {
+      const worked = diffHours(firstLog.punch_time, lastLog.punch_time);
+      return {
+        status: "Revisar",
+        clock_in: toHHMM(firstLog.punch_time),
+        clock_out: toHHMM(lastLog.punch_time),
+        worked_hours: parseFloat(worked.toFixed(2)),
+        notes: inWindowLogs.length === 1
+          ? "Marcaciones parciales dentro de ventana"
+          : "Sin marcaciones dentro de ventana horaria",
+        usedLogIds: [firstLog.id, lastLog.id],
+      };
+    }
+
     const bestLog = inWindowLogs.length > 0
       ? inWindowLogs[0]
       : logs[0];
@@ -374,7 +391,7 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
    * 4. Procesar cada empleado
    */
   for (const record of records) {
-    if (record.status === "Aprobada") {
+    if (record.status === "Aprobada" && record.clock_in && record.clock_out) {
       continue;
     }
 
