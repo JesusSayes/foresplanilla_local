@@ -93,16 +93,35 @@ export async function generarAsistenciaDiaria({ date_from = null, employee_id = 
     contractsByEmployee.set(contract.employee_id, employeeContracts);
   }
 
-  // Paginación con cursor sobre empleados activos
-  const employeeQuery = {
-    where:   { status: "Activo", ...(filterEmployeeId ? { id: filterEmployeeId } : {}) },
-    orderBy: { id: 'asc' },
-    take:    filterEmployeeId ? 1 : employeeBatch,
-    ...(cursor_employee ? { cursor: { id: cursor_employee }, skip: 1 } : {}),
-  };
-  const employees = await prisma.employee.findMany(employeeQuery);
+  let employees = [];
+  if (filterEmployeeId) {
+    employees = await prisma.employee.findMany({
+      where:   { status: "Activo", id: filterEmployeeId },
+      orderBy: { id: 'asc' },
+      take:    1,
+    });
+  } else if (isBackfill) {
+    employees = await prisma.employee.findMany({
+      where:   { status: "Activo" },
+      orderBy: { id: 'asc' },
+      take:    employeeBatch,
+      ...(cursor_employee ? { cursor: { id: cursor_employee }, skip: 1 } : {}),
+    });
+  } else {
+    let employeeCursor = cursor_employee;
+    while (true) {
+      const page = await prisma.employee.findMany({
+        where:   { status: "Activo" },
+        orderBy: { id: 'asc' },
+        take:    employeeBatch,
+        ...(employeeCursor ? { cursor: { id: employeeCursor }, skip: 1 } : {}),
+      });
+      employees.push(...page);
+      if (page.length < employeeBatch) break;
+      employeeCursor = page[page.length - 1].id;
+    }
+  }
 
-  // Total de activos (para has_more)
   const totalActive = await prisma.employee.count({ where: { status: "Activo" } });
 
   let totalCreated = 0;
@@ -202,7 +221,7 @@ export async function generarAsistenciaDiaria({ date_from = null, employee_id = 
   }
 
   const lastEmployee  = employees[employees.length - 1];
-  const nextCursor    = !filterEmployeeId && employees.length === employeeBatch ? lastEmployee?.id : null;
+  const nextCursor    = (!filterEmployeeId && isBackfill && employees.length === employeeBatch) ? lastEmployee?.id : null;
 
   return {
     success:                true,
