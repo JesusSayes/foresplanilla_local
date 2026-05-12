@@ -136,15 +136,38 @@ export async function syncExternalAttendance(options = {}) {
       };
     }
 
-    log(`Procesando ${externalData.length} registros...`);
+    const uniqueRecordsMap = new Map();
+    for (const externalRecord of externalData) {
+      if (!externalRecord?.numero_documento || !externalRecord?.fecha) {
+        uniqueRecordsMap.set(`__${externalRecord?.id || Math.random()}`, externalRecord);
+        continue;
+      }
+
+      const recordKey = `${String(externalRecord.numero_documento).trim()}|${String(externalRecord.fecha).trim()}`;
+      const currentRecord = uniqueRecordsMap.get(recordKey);
+
+      if (!currentRecord) {
+        uniqueRecordsMap.set(recordKey, externalRecord);
+        continue;
+      }
+
+      const currentCompleteness = (currentRecord.hora_entrada ? 1 : 0) + (currentRecord.hora_salida ? 1 : 0);
+      const newCompleteness = (externalRecord.hora_entrada ? 1 : 0) + (externalRecord.hora_salida ? 1 : 0);
+
+      if (newCompleteness >= currentCompleteness) {
+        uniqueRecordsMap.set(recordKey, externalRecord);
+      }
+    }
+
+    const recordsForSync = Array.from(uniqueRecordsMap.values());
+
+    log(`Procesando ${recordsForSync.length} registros...`);
     log('');
 
-    for (const record of externalData) {
+    for (const record of recordsForSync) {
       totalProcessed++;
 
       try {
-        externalIdsToConfirm.push(record.id);
-
         if (!record.numero_documento || !record.fecha) {
           totalSkipped++;
           skipReasons.missingData++;
@@ -257,10 +280,11 @@ export async function syncExternalAttendance(options = {}) {
             updateFields.status = status;
             updateFields.notes = `${existingRecord.notes || ''}\nActualizado desde duplicado (ID externo: ${record.id}) - ${updatedFields.join(', ')}`.trim();
             updateFields.updated_date = new Date();
+            updateFields.created_by = 'external_sync';
 
             log(`[ACTUALIZAR DUPLICADO] ID ${record.id} - ${employee.first_name} ${employee.last_name} (${record.numero_documento}) - ${record.fecha} - Campos actualizados: ${updatedFields.join(', ')} - Horas trabajadas: ${existingRecord.worked_hours?.toFixed(2) || '0.00'} → ${workedHours.toFixed(2)}, Estado: ${existingRecord.status || 'N/A'} → ${status}`);
 
-            const hasMissingClockData = updatedFields.includes('clock_in') || updatedFields.includes('clock_out');
+            const hasMissingClockData = missingClockIn || missingClockOut;
 
             if (!updateExisting && !hasMissingClockData) {
               totalSkipped++;
@@ -289,6 +313,7 @@ export async function syncExternalAttendance(options = {}) {
             }
 
             totalUpdated++;
+            externalIdsToConfirm.push(record.id);
             continue;
           }
         }
@@ -379,10 +404,12 @@ export async function syncExternalAttendance(options = {}) {
                 is_absent: attendanceData.is_absent,
                 status: attendanceData.status,
                 notes: attendanceData.notes,
-                updated_date: attendanceData.updated_date
+                updated_date: attendanceData.updated_date,
+                created_by: 'external_sync'
               }
             });
             savedRecordIds.push(existingRecord.id);
+            externalIdsToConfirm.push(record.id);
           }
           totalUpdated++;
         } else {
@@ -416,6 +443,7 @@ export async function syncExternalAttendance(options = {}) {
               }
             });
             savedRecordIds.push(recordId);
+            externalIdsToConfirm.push(record.id);
           }
           totalSaved++;
         }
