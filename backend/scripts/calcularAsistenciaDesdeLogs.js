@@ -514,3 +514,8 @@ if (process.argv[1].includes("calcularAsistenciaDesdeLogs")) {
 // sin horario	                  Revisar
 // marcaciones fuera de ventana	  Revisar
 // correcto	                      Completo
+//
+// for d in $(seq 0 $(( ( $(date -d "$(date +%F)" +%s) - $(date -d "2026-04-11" +%s) ) / 86400 ))); do
+//  day=$(date -d "2026-04-21 +$d day" +%F)
+//  node scripts/calcularAsistenciaDesdeLogs.js --date="$day"
+// done
