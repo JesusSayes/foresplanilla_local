@@ -11,7 +11,7 @@ import {
   Calendar, Users, CheckCircle, XCircle, Clock, 
   TrendingUp, AlertCircle, Search, FileText, Eye
 } from "lucide-react";
-import { format, differenceInDays, addYears } from "date-fns";
+import { format, differenceInDays, addYears, eachDayOfInterval, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { createPageUrl } from "../utils";
@@ -93,6 +93,98 @@ export default function VacationManagement() {
 
     return { total: 30, taken: 0, pending: 30, available: 30, expired: false };
   };
+
+  const approveRequestMutation = useMutation({
+    mutationFn: async (request) => {
+      // Actualizar estado de la solicitud
+      await base44.entities.VacationRequest.update(request.id, {
+        status: "Aprobada",
+        approved_by: `${employee.first_name} ${employee.last_name}`,
+        approved_date: format(new Date(), "yyyy-MM-dd"),
+      });
+
+      // Actualizar balance de vacaciones
+      if (request.request_type === "Vacaciones") {
+        const balances = await base44.entities.VacationBalance.filter({
+          employee_id: request.employee_id,
+          is_active: true,
+        });
+        if (balances.length > 0) {
+          const balance = balances[0];
+          await base44.entities.VacationBalance.update(balance.id, {
+            days_taken: (balance.days_taken || 0) + (request.business_days || request.total_days),
+            days_pending: (balance.total_entitled_days || 0) - ((balance.days_taken || 0) + (request.business_days || request.total_days)),
+          });
+        }
+      }
+
+      // Crear/actualizar registros de asistencia para todo el período
+      const startDate = parseISO(request.start_date);
+      const endDate = parseISO(request.end_date);
+      const days = eachDayOfInterval({ start: startDate, end: endDate });
+
+      const existingRecords = await base44.entities.AttendanceRecord.filter({
+        employee_id: request.employee_id,
+      });
+      const existingByDate = {};
+      existingRecords.forEach(r => { existingByDate[r.date] = r; });
+
+      for (const day of days) {
+        const dateStr = format(day, "yyyy-MM-dd");
+        if (existingByDate[dateStr]) {
+          await base44.entities.AttendanceRecord.update(existingByDate[dateStr].id, {
+            status: "Justificado",
+            notes: `Vacaciones aprobadas (${request.request_type})`,
+          });
+        } else {
+          await base44.entities.AttendanceRecord.create({
+            employee_id: request.employee_id,
+            date: dateStr,
+            clock_in: "09:00",
+            clock_out: "18:00",
+            scheduled_start: "09:00",
+            scheduled_end: "18:00",
+            worked_hours: 8,
+            regular_hours: 8,
+            overtime_hours_25: 0,
+            overtime_hours_35: 0,
+            is_late: false,
+            late_minutes: 0,
+            is_absent: false,
+            status: "Justificado",
+            notes: `Vacaciones aprobadas (${request.request_type})`,
+          });
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["vacationRequests"]);
+      queryClient.invalidateQueries(["vacationBalances"]);
+      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries(["allAttendanceRecords"]);
+      toast.success("Solicitud aprobada y asistencia registrada");
+    },
+    onError: () => {
+      toast.error("Error al aprobar la solicitud");
+    },
+  });
+
+  const rejectRequestMutation = useMutation({
+    mutationFn: async (request) => {
+      await base44.entities.VacationRequest.update(request.id, {
+        status: "Rechazada",
+        approved_by: `${employee.first_name} ${employee.last_name}`,
+        approved_date: format(new Date(), "yyyy-MM-dd"),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["vacationRequests"]);
+      toast.success("Solicitud rechazada");
+    },
+    onError: () => {
+      toast.error("Error al rechazar la solicitud");
+    },
+  });
 
   const createVacationBalanceMutation = useMutation({
     mutationFn: async (data) => {
@@ -397,6 +489,30 @@ export default function VacationManagement() {
                             <p className="text-sm text-slate-600 mt-2 italic">
                               "{request.reason}"
                             </p>
+                          )}
+
+                          {request.status === "Pendiente" && (
+                            <div className="flex gap-2 mt-3 pt-3 border-t border-slate-200">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 text-red-600 hover:bg-red-50 border-red-200"
+                                disabled={rejectRequestMutation.isPending || approveRequestMutation.isPending}
+                                onClick={() => rejectRequestMutation.mutate(request)}
+                              >
+                                <XCircle className="w-3 h-3 mr-1" />
+                                Rechazar
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="flex-1 bg-green-600 hover:bg-green-700"
+                                disabled={approveRequestMutation.isPending || rejectRequestMutation.isPending}
+                                onClick={() => approveRequestMutation.mutate(request)}
+                              >
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Aprobar
+                              </Button>
+                            </div>
                           )}
                         </div>
                       );
