@@ -157,29 +157,48 @@ app.use("/uploads", express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api/derechohabientes', derechohabientesRoutes);
 app.use('/api/asientos-contables', asientosContablesRoutes);
 
+// Cron configuration
+const CRON_TIMEZONE = process.env.CRON_TIMEZONE || 'America/Lima';
+let biotimeSyncJob = Promise.resolve();
+let biotimeSyncRunning = false;
+
 // Cron: sincronización biotime cada hora
 cron.schedule('0 * * * *', () => {
+  if (biotimeSyncRunning) {
+    console.log('[Cron] Sync biotime omitido: ejecución previa en curso');
+    return;
+  }
+
   console.log('[Cron] Ejecutando sync biotime...');
-  syncBiotimeAttendance().catch(err => console.error('[Cron] Error en sync biotime:', err.message));
-});
+  biotimeSyncRunning = true;
+
+  biotimeSyncJob = syncBiotimeAttendance()
+    .catch(err => console.error('[Cron] Error en sync biotime:', err.message))
+    .finally(() => {
+      biotimeSyncRunning = false;
+    });
+}, { timezone: CRON_TIMEZONE });
 
 // Cron: calcular asistencia desde logs cada hora (10 minutos después del sync biotime)
-cron.schedule('10 * * * *', () => {
+cron.schedule('10 * * * *', async () => {
   console.log('[Cron] Ejecutando calcularAsistenciaDesdeLogs...');
-  calcularAsistenciaDesdeLogs().catch(err => console.error('[Cron] Error en calcularAsistenciaDesdeLogs:', err.message));
-});
 
-// Cron: generar asistencia diaria a las 05:01 UTC (00:01 hora Perú)
-cron.schedule('1 5 * * *', () => {
+  await biotimeSyncJob.catch(() => null);
+
+  calcularAsistenciaDesdeLogs().catch(err => console.error('[Cron] Error en calcularAsistenciaDesdeLogs:', err.message));
+}, { timezone: CRON_TIMEZONE });
+
+// Cron: generar asistencia diaria a las 00:00 (medianoche hora local)
+cron.schedule('0 0 * * *', () => {
   console.log('[Cron] Ejecutando generarAsistenciaDiaria...');
   generarAsistenciaDiaria({ mode: 'cron' }).catch(err => console.error('[Cron] Error en generarAsistenciaDiaria:', err.message));
-});
+}, { timezone: CRON_TIMEZONE });
 
-// Cron: sincronización de asistencias externas cada hora
-cron.schedule('0 * * * *', () => {
+// Cron: sincronización de asistencias externas cada hora en minuto 15
+cron.schedule('15 * * * *', () => {
   console.log('[Cron] Ejecutando sincronización de asistencias externas...');
   syncExternalAttendance().catch(err => console.error('[Cron] Error en sync asistencias externas:', err.message));
-});
+}, { timezone: CRON_TIMEZONE });
 
 // 404 handler
 app.use((req, res) => {
@@ -212,10 +231,11 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`http://localhost:${PORT}`);
   console.log(`Logs: ${logsDir}`);
+  console.log('[Cron] Timezone configurado: ' + CRON_TIMEZONE);
   console.log('[Cron] Sync biotime programado cada hora (0 * * * *)');
-  console.log('[Cron] Calcular asistencia desde logs programado cada hora (10 * * * *)');
-  console.log('[Cron] Generar asistencia diaria programado a las 05:01 UTC (1 5 * * *)');
-  console.log('[Cron] Sync asistencias externas programado cada hora (0 * * * *)');
+  console.log('[Cron] Calcular asistencia desde logs programado cada hora en minuto 10 (10 * * * *)');
+  console.log('[Cron] Generar asistencia diaria programado a las 00:00 (0 0 * * *)');
+  console.log('[Cron] Sync asistencias externas programado cada hora en minuto 15 (15 * * * *)');
 });
 app.use("/uploads", (req, res, next) => {
   console.log('Static request:', req.path, 'from', process.cwd());
