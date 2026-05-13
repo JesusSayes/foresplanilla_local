@@ -11,7 +11,7 @@ import {
   CheckCircle, XCircle, Clock, Calendar, User,
   FileText, AlertCircle, Search, Filter
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, eachDayOfInterval, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
@@ -73,6 +73,53 @@ export default function ManagerApprovals() {
     enabled: !!employee,
   });
 
+  // Crea registros de asistencia para cada día del período de vacaciones
+  const createAttendanceRecordsForVacation = async (request) => {
+    const startDate = parseISO(request.start_date);
+    const endDate = parseISO(request.end_date);
+    const days = eachDayOfInterval({ start: startDate, end: endDate });
+
+    // Obtener registros existentes para el empleado en ese rango para no duplicar
+    const existingRecords = await entitiesAPI.AttendanceRecord.filter({
+      employee_id: request.employee_id,
+    });
+    const existingByDate = {};
+    existingRecords.forEach(r => { existingByDate[r.date] = r; });
+
+    // Obtener horario del empleado para saber scheduled_start/scheduled_end
+    const emp = employees.find(e => e.id === request.employee_id);
+
+    for (const day of days) {
+      const dateStr = format(day, "yyyy-MM-dd");
+      const recordPayload = {
+        employee_id: request.employee_id,
+        date: dateStr,
+        clock_in: "09:00",
+        clock_out: "18:00",
+        scheduled_start: "09:00",
+        scheduled_end: "18:00",
+        worked_hours: 8,
+        regular_hours: 8,
+        overtime_hours_25: 0,
+        overtime_hours_35: 0,
+        is_late: false,
+        late_minutes: 0,
+        is_absent: false,
+        status: "Justificado",
+        notes: `Vacaciones aprobadas (${request.request_type})`,
+      };
+
+      if (existingByDate[dateStr]) {
+        await entitiesAPI.AttendanceRecord.update(existingByDate[dateStr].id, {
+          status: "Justificado",
+          notes: `Vacaciones aprobadas (${request.request_type})`,
+        });
+      } else {
+        await entitiesAPI.AttendanceRecord.create(recordPayload);
+      }
+    }
+  };
+
   const updateRequestMutation = useMutation({
     mutationFn: async ({ id, data, request }) => {
       const updatedRequest = await entitiesAPI.VacationRequest.update(id, data);
@@ -117,8 +164,12 @@ export default function ManagerApprovals() {
               });
             }
           }
+
+          // Crear/actualizar registros de asistencia para todo el período
+          await createAttendanceRecordsForVacation(request);
+
         } catch (error) {
-          console.error("Error al actualizar balance o crear descuento:", error);
+          console.error("Error al actualizar balance, descuento o asistencia:", error);
         }
       }
 
@@ -127,7 +178,9 @@ export default function ManagerApprovals() {
     onSuccess: () => {
       queryClient.invalidateQueries(["allVacationRequests"]);
       queryClient.invalidateQueries(["vacationBalances"]);
-      toast.success("Solicitud actualizada correctamente");
+      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries(["allAttendanceRecords"]);
+      toast.success("Solicitud aprobada y asistencia registrada correctamente");
       setSelectedRequest(null);
       setReviewForm({ action: "", comments: "" });
     },
