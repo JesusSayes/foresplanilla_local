@@ -1,4 +1,5 @@
 import pg from "pg";
+import { Prisma } from "@prisma/client";
 import prisma from "../../config/prisma.js";
 import { generate24HexId } from "../../utils/idGenerator.js";
 
@@ -77,7 +78,28 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
       };
     }
 
-    const existingBiotimeLogs = await prisma.attendance_logs.findMany({
+    const uniqueTransactions = [];
+    const incomingBiotimeIdsSet = new Set();
+
+    for (const tx of transactions) {
+      const biotimeId = tx.id !== null && tx.id !== undefined ? String(tx.id) : null;
+      if (!biotimeId || incomingBiotimeIdsSet.has(biotimeId)) {
+        skipped++;
+        continue;
+      }
+      incomingBiotimeIdsSet.add(biotimeId);
+      uniqueTransactions.push(tx);
+    }
+
+    const incomingBiotimeIds = Array.from(incomingBiotimeIdsSet);
+
+    const existingBiotimeRows = incomingBiotimeIds.length
+      ? await prisma.$queryRaw(
+          Prisma.sql`SELECT raw_payload->>'biotime_id' AS biotime_id FROM attendance_logs WHERE source = 'biotime' AND raw_payload IS NOT NULL AND raw_payload->>'biotime_id' IN (${Prisma.join(incomingBiotimeIds)})`
+        )
+      : [];
+
+    const existingPunchLogs = await prisma.attendance_logs.findMany({
       where: {
         source: "biotime",
         punch_time: {
@@ -88,41 +110,22 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
       select: {
         employee_id: true,
         punch_time: true,
-        raw_payload: true,
       },
     });
 
-    const extractBiotimeId = (rawPayload) => {
-      if (!rawPayload) return null;
-      if (typeof rawPayload === "object") {
-        const id = rawPayload.biotime_id;
-        return id === null || id === undefined ? null : String(id);
-      }
-      if (typeof rawPayload === "string") {
-        try {
-          const parsed = JSON.parse(rawPayload);
-          const id = parsed?.biotime_id;
-          return id === null || id === undefined ? null : String(id);
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    };
-
     const seenBiotimeIds = new Set(
-      existingBiotimeLogs
-        .map((log) => extractBiotimeId(log.raw_payload))
-        .filter((id) => id !== null)
+      existingBiotimeRows
+        .map((row) => row?.biotime_id)
+        .filter((id) => id !== null && id !== undefined)
+        .map((id) => String(id))
     );
 
     const seenEmployeePunches = new Set(
-      existingBiotimeLogs
+      existingPunchLogs
         .filter((log) => log.employee_id && log.punch_time)
         .map((log) => `${log.employee_id}|${new Date(log.punch_time).toISOString()}`)
     );
 
-    // 🔹 Mapear empleados
     const employees = await prisma.employee.findMany({
       select: {
         id: true,
@@ -137,8 +140,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
       }
     }
 
-    // 🔹 Procesar transacciones UNA POR UNA (simple y seguro)
-    for (const tx of transactions) {
+    for (const tx of uniqueTransactions) {
       try {
         const biotimeId = tx.id !== null && tx.id !== undefined ? String(tx.id) : null;
         if (!biotimeId || seenBiotimeIds.has(biotimeId)) {
@@ -188,6 +190,10 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
         seenEmployeePunches.add(punchKey);
         inserted++;
       } catch (err) {
+        if (err?.code === "P2002") {
+          skipped++;
+          continue;
+        }
         errors++;
         errorDetails.push(`TX ${tx.id}: ${err.message}`);
       }
