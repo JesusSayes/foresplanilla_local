@@ -26,6 +26,17 @@ function writeLog(logFilePath, message) {
   console.log(message);
 }
 
+function normalizeExternalTime(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+function shouldConfirmExternalRecord(clockIn, clockOut) {
+  return Boolean(clockIn && clockOut);
+}
+
 function calcWorkedHours(startTime, endTime, breakMinutes = 60) {
   if (!startTime || !endTime) return 0;
   
@@ -212,8 +223,8 @@ export async function syncExternalAttendance(options = {}) {
         if (existingRecord) {
           const existingClockIn = existingRecord.clock_in;
           const existingClockOut = existingRecord.clock_out;
-          const newClockIn = record.hora_entrada;
-          const newClockOut = record.hora_salida;
+          const newClockIn = normalizeExternalTime(record.hora_entrada);
+          const newClockOut = normalizeExternalTime(record.hora_salida);
 
           const missingClockIn = (!existingClockIn || (typeof existingClockIn === 'string' && existingClockIn.trim() === '')) && newClockIn && (typeof newClockIn === 'string' && newClockIn.trim() !== '');
           const missingClockOut = (!existingClockOut || (typeof existingClockOut === 'string' && existingClockOut.trim() === '')) && newClockOut && (typeof newClockOut === 'string' && newClockOut.trim() !== '');
@@ -284,26 +295,6 @@ export async function syncExternalAttendance(options = {}) {
 
             log(`[ACTUALIZAR DUPLICADO] ID ${record.id} - ${employee.first_name} ${employee.last_name} (${record.numero_documento}) - ${record.fecha} - Campos actualizados: ${updatedFields.join(', ')} - Horas trabajadas: ${existingRecord.worked_hours?.toFixed(2) || '0.00'} → ${workedHours.toFixed(2)}, Estado: ${existingRecord.status || 'N/A'} → ${status}`);
 
-            const hasMissingClockData = missingClockIn || missingClockOut;
-
-            if (!updateExisting && !hasMissingClockData) {
-              totalSkipped++;
-              skipReasons.alreadyExists++;
-              const dupInfo = {
-                external_id: record.id,
-                document_number: record.numero_documento,
-                employee_name: `${employee.first_name} ${employee.last_name}`,
-                date: record.fecha,
-                existing_clock_in: existingClockIn || 'N/A',
-                existing_clock_out: existingClockOut || 'N/A',
-                new_clock_in: newClockIn || 'N/A',
-                new_clock_out: newClockOut || 'N/A'
-              };
-              skipReasons.duplicateDates.push(dupInfo);
-              log(`[OMITIDO] ID ${record.id} - ${dupInfo.employee_name} (${record.numero_documento}): Ya existe registro para ${record.fecha} - Existente: Entrada=${existingClockIn || 'N/A'}, Salida=${existingClockOut || 'N/A'} | Nuevo: Entrada=${newClockIn || 'N/A'}, Salida=${newClockOut || 'N/A'}`);
-              continue;
-            }
-
             if (!dryRun) {
               await prisma.attendance_record.update({
                 where: { id: existingRecord.id },
@@ -313,7 +304,27 @@ export async function syncExternalAttendance(options = {}) {
             }
 
             totalUpdated++;
-            externalIdsToConfirm.push(record.id);
+            if (shouldConfirmExternalRecord(updatedClockIn, updatedClockOut)) {
+              externalIdsToConfirm.push(record.id);
+            }
+            continue;
+          }
+
+          if (!updateExisting) {
+            totalSkipped++;
+            skipReasons.alreadyExists++;
+            const dupInfo = {
+              external_id: record.id,
+              document_number: record.numero_documento,
+              employee_name: `${employee.first_name} ${employee.last_name}`,
+              date: record.fecha,
+              existing_clock_in: existingClockIn || 'N/A',
+              existing_clock_out: existingClockOut || 'N/A',
+              new_clock_in: newClockIn || 'N/A',
+              new_clock_out: newClockOut || 'N/A'
+            };
+            skipReasons.duplicateDates.push(dupInfo);
+            log(`[OMITIDO] ID ${record.id} - ${dupInfo.employee_name} (${record.numero_documento}): Ya existe registro para ${record.fecha} - Existente: Entrada=${existingClockIn || 'N/A'}, Salida=${existingClockOut || 'N/A'} | Nuevo: Entrada=${newClockIn || 'N/A'}, Salida=${newClockOut || 'N/A'}`);
             continue;
           }
         }
@@ -334,19 +345,22 @@ export async function syncExternalAttendance(options = {}) {
 
         const scheduleInfo = getScheduleForDate(workSchedule, recordDate);
 
-        const clockIn = record.hora_entrada || null;
-        const clockOut = record.hora_salida || null;
+        const clockIn = normalizeExternalTime(record.hora_entrada);
+        const clockOut = normalizeExternalTime(record.hora_salida);
         const scheduledStart = scheduleInfo?.scheduledStart || '08:00';
         const scheduledEnd = scheduleInfo?.scheduledEnd || '17:00';
         const breakMinutes = scheduleInfo?.breakMinutes || 60;
 
-        const workedHours = (clockIn && clockOut)
-          ? calcWorkedHours(clockIn, clockOut, breakMinutes)
+        const effectiveClockIn = existingRecord?.clock_in || clockIn;
+        const effectiveClockOut = existingRecord?.clock_out || clockOut;
+
+        const workedHours = (effectiveClockIn && effectiveClockOut)
+          ? calcWorkedHours(effectiveClockIn, effectiveClockOut, breakMinutes)
           : 0;
 
-        const lateMinutes = clockIn ? calcLateMinutes(scheduledStart, clockIn) : 0;
+        const lateMinutes = effectiveClockIn ? calcLateMinutes(scheduledStart, effectiveClockIn) : 0;
         const isLate = lateMinutes > 0;
-        const isAbsent = !clockIn || !clockOut;
+        const isAbsent = !effectiveClockIn || !effectiveClockOut;
 
         const overtime = calcOvertimeHours(workedHours);
 
@@ -409,7 +423,9 @@ export async function syncExternalAttendance(options = {}) {
               }
             });
             savedRecordIds.push(existingRecord.id);
-            externalIdsToConfirm.push(record.id);
+            if (shouldConfirmExternalRecord(effectiveClockIn, effectiveClockOut)) {
+              externalIdsToConfirm.push(record.id);
+            }
           }
           totalUpdated++;
         } else {
@@ -443,7 +459,9 @@ export async function syncExternalAttendance(options = {}) {
               }
             });
             savedRecordIds.push(recordId);
-            externalIdsToConfirm.push(record.id);
+            if (shouldConfirmExternalRecord(clockIn, clockOut)) {
+              externalIdsToConfirm.push(record.id);
+            }
           }
           totalSaved++;
         }
