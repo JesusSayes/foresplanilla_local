@@ -52,6 +52,20 @@ const REPORT_COLUMNS = {
     { id: "net_pay", label: "Neto a Pagar" },
     { id: "status", label: "Estado" },
   ],
+  contracts: [
+    { id: "employee_name", label: "Empleado" },
+    { id: "contract_number", label: "Nº Contrato" },
+    { id: "contract_type", label: "Tipo Contrato" },
+    { id: "position", label: "Cargo" },
+    { id: "department", label: "Departamento" },
+    { id: "start_date", label: "Fecha Inicio" },
+    { id: "end_date", label: "Fecha Fin" },
+    { id: "salary", label: "Remuneración" },
+    { id: "status", label: "Estado" },
+    { id: "work_location", label: "Lugar de Trabajo" },
+    { id: "renewable", label: "Renovable" },
+    { id: "is_digitally_signed", label: "Firmado Digitalmente" },
+  ],
 };
 
 export default function ReportBuilder({ reportType, config, onChange }) {

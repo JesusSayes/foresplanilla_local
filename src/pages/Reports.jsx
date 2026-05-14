@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   FileText, Save, Star, Users, Calendar, DollarSign,
-  Clock, Plus, Trash2, Play, TrendingUp
+  Clock, Plus, Trash2, Play, TrendingUp, ScrollText
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -24,6 +24,7 @@ const REPORT_TYPES = [
   { id: "attendance", label: "Asistencia", icon: Clock, color: "green" },
   { id: "vacations", label: "Vacaciones", icon: Calendar, color: "purple" },
   { id: "payroll", label: "Nómina", icon: DollarSign, color: "amber" },
+  { id: "contracts", label: "Contratos", icon: ScrollText, color: "indigo" },
 ];
 
 export default function Reports() {
@@ -148,6 +149,15 @@ export default function Reports() {
             ...payslip,
             employee_name: allEmps.find(e => e.id === payslip.employee_id)?.first_name + ' ' +
                           allEmps.find(e => e.id === payslip.employee_id)?.last_name
+          }));
+          break;
+        case "contracts":
+          data = await entitiesAPI.Contract.list();
+          const contractEmps = await entitiesAPI.Employee.list();
+          data = data.map(contract => ({
+            ...contract,
+            employee_name: contractEmps.find(e => e.id === contract.employee_id)?.first_name + ' ' +
+                          contractEmps.find(e => e.id === contract.employee_id)?.last_name
           }));
           break;
       }
