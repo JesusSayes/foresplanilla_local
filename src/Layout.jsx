@@ -248,6 +248,18 @@ export default function Layout({ children, currentPageName }) {
       items.push({ name: "Gestión Planillas", icon: FileText, path: "PayrollManagement", submenu });
     }
 
+    // Reportes
+    if (hasPermission("reports.view")) {
+      items.push({
+        name: "Reportes",
+        icon: FileText,
+        path: "Reports",
+        submenu: [
+          { name: "Reportes Avanzados", path: "Reports" },
+        ]
+      });
+    }
+
     // Feriados
     if (hasPermission("holidays.view")) {
       items.push({ name: "Gestión Feriados", icon: CalendarDays, path: "HolidayManagement" });
