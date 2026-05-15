@@ -156,6 +156,7 @@ export default function PayrollManagement() {
       const configs = await base44.entities.PayrollConfig.filter({ config_type: "Quincenal", is_active: true });
       return configs.length > 0 ? configs[0] : { quincenal_percentage: 40, quincenal_cutoff_day: 7 };
     },
+    staleTime: 0, // Siempre refetch al invalidar para reflejar cambios de configuración inmediatamente
   });
 
   const createPayslipsMutation = useMutation({

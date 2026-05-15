@@ -43,7 +43,7 @@ export default function PayrollConfigModal({ onClose }) {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["payrollConfig"]);
+      queryClient.invalidateQueries({ queryKey: ["payrollConfig"] });
       toast.success("Configuración guardada correctamente");
       onClose();
     },
