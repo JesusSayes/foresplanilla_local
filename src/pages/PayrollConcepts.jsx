@@ -205,6 +205,7 @@ export default function PayrollConcepts() {
   });
   const [editingConcept, setEditingConcept] = useState(null);
   const [formErrors, setFormErrors] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [processingFile, setProcessingFile] = useState(false);
@@ -277,10 +278,12 @@ export default function PayrollConcepts() {
     onSuccess: () => {
       queryClient.invalidateQueries(["payrollConcepts"]);
       toast.success(editingConcept ? "Concepto actualizado" : "Concepto creado correctamente");
+      setIsSaving(false);
       resetForm();
     },
     onError: () => {
       toast.error(editingConcept ? "Error al actualizar" : "Error al crear el concepto");
+      setIsSaving(false);
     },
   });
 
@@ -447,6 +450,7 @@ export default function PayrollConcepts() {
     }
 
     setFormErrors({});
+    setIsSaving(true);
 
     const conceptData = {
       ...formData,
@@ -456,27 +460,27 @@ export default function PayrollConcepts() {
 
     // Si es ONP y es concepto general, sincronizar con empleados que tienen ONP
     if (activeTab === "general" && formData.concept_name === "ONP") {
-      const onpEmployees = allEmployees.filter(emp => emp.pension_system === "ONP");
-      
-      // Crear concepto general
-      await createConceptMutation.mutateAsync(conceptData);
-      
-      // Crear conceptos individuales para cada empleado con ONP
-      for (const emp of onpEmployees) {
-        try {
+      try {
+        const onpEmployees = allEmployees.filter(emp => emp.pension_system === "ONP");
+        
+        await base44.entities.PayrollConcept.create(conceptData);
+        
+        for (const emp of onpEmployees) {
           await base44.entities.PayrollConcept.create({
             ...conceptData,
             employee_id: emp.id,
             notes: `${conceptData.notes || "ONP - 13% sobre remuneración bruta"} (Auto-asignado)`
           });
-        } catch (error) {
-          console.error(`Error al crear concepto ONP para empleado ${emp.id}:`, error);
         }
+        
+        queryClient.invalidateQueries(["payrollConcepts"]);
+        toast.success(`Concepto ONP agregado para ${onpEmployees.length} empleados con ONP`);
+        setIsSaving(false);
+        resetForm();
+      } catch (error) {
+        toast.error("Error al guardar el concepto ONP");
+        setIsSaving(false);
       }
-      
-      toast.success(`Concepto ONP agregado para ${onpEmployees.length} empleados con ONP`);
-      queryClient.invalidateQueries(["payrollConcepts"]);
-      resetForm();
     } else {
       createConceptMutation.mutate(conceptData);
     }
@@ -678,6 +682,7 @@ export default function PayrollConcepts() {
     });
     setEditingConcept(null);
     setFormErrors({});
+    setIsSaving(false);
     setShowForm(false);
   };
 
@@ -1898,15 +1903,20 @@ export default function PayrollConcepts() {
               </div>
 
               <div className="flex gap-3 pt-4">
-                <Button variant="outline" className="flex-1" onClick={resetForm}>
+                <Button variant="outline" className="flex-1" onClick={resetForm} disabled={isSaving}>
                   Cancelar
                 </Button>
                 <Button
                   className="flex-1 bg-indigo-600 hover:bg-indigo-700"
                   onClick={handleSubmit}
-                  disabled={createConceptMutation.isPending}
+                  disabled={isSaving}
                 >
-                  {createConceptMutation.isPending ? "Guardando..." : editingConcept ? "Actualizar Concepto" : "Guardar Concepto"}
+                  {isSaving ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Guardando...
+                    </span>
+                  ) : editingConcept ? "Actualizar Concepto" : "Guardar Concepto"}
                 </Button>
               </div>
             </CardContent>
