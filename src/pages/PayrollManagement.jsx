@@ -300,16 +300,18 @@ export default function PayrollManagement() {
     if (payrollType === "Quincenal") {
       const cutoffDay = payrollConfig?.quincenal_cutoff_day ?? 7;
       filteredEmployees = filteredEmployees.filter(emp => {
-        if (!emp.hire_date) return true; // Si no tiene fecha de ingreso, se incluye
-        const hireDate = new Date(emp.hire_date);
-        // Si ingresó en un mes anterior, siempre se incluye
-        if (hireDate.getFullYear() < selectedYear) return true;
-        if (hireDate.getFullYear() === selectedYear && hireDate.getMonth() + 1 < selectedMonth) return true;
-        // Si ingresó en el mes en proceso, solo si fue antes del día de corte
-        if (hireDate.getFullYear() === selectedYear && hireDate.getMonth() + 1 === selectedMonth) {
-          return hireDate.getDate() <= cutoffDay;
+        if (!emp.hire_date) return true; // Sin fecha de ingreso: se incluye
+        // Parsear fecha como local (YYYY-MM-DD) para evitar desfases de timezone
+        const [hireYear, hireMonth, hireDay] = emp.hire_date.split("T")[0].split("-").map(Number);
+        // Si ingresó en un año anterior, siempre se incluye
+        if (hireYear < selectedYear) return true;
+        // Si ingresó en el mismo año pero en un mes anterior, se incluye
+        if (hireYear === selectedYear && hireMonth < selectedMonth) return true;
+        // Si ingresó exactamente en el mes en proceso, solo si fue hasta el día de corte
+        if (hireYear === selectedYear && hireMonth === selectedMonth) {
+          return hireDay <= cutoffDay;
         }
-        return false; // Ingresó en mes futuro
+        return false; // Ingresó en un mes futuro: no se incluye
       });
     }
     
