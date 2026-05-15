@@ -369,16 +369,40 @@ export default function PayrollManagement() {
       // Porcentaje quincenal desde la configuración (decimal, ej: 0.40)
       const quincenalPct = (payrollConfig?.quincenal_percentage ?? 40) / 100;
 
-      // Usar el calculador automático — pasamos el porcentaje para que lo aplique correctamente
+      // Para planilla quincenal: inyectar automáticamente el adelanto si no hay un concepto
+      // de ingreso tipo "Quincenal" ya configurado para este empleado
+      let conceptsForCalc = [...allEmpConcepts];
+      if (payrollType === "Quincenal") {
+        const hasQuincenalIncomeConceptConfigured = allEmpConcepts.some(c =>
+          c.concept_type === "Ingreso" &&
+          c.applies_to_payroll_types?.includes("Quincenal")
+        );
+        if (!hasQuincenalIncomeConceptConfigured) {
+          // Inyectar automáticamente el adelanto quincenal = base_salary * porcentaje
+          conceptsForCalc = [
+            ...allEmpConcepts,
+            {
+              employee_id: emp.id,
+              concept_type: "Ingreso",
+              concept_category: "Remuneración Base",
+              concept_name: "Adelanto Quincenal",
+              is_dynamic: true,
+              calculation_formula: `base_salary * ${quincenalPct}`,
+              is_recurring: true,
+              applies_to_payroll_types: ["Quincenal"],
+              amount: 0,
+            }
+          ];
+        }
+      }
+
       const calculator = new PayrollCalculator(emp, selectedMonth, selectedYear, payrollType, quincenalPct);
-      const result = await calculator.calculatePayroll(allEmpConcepts, attendanceData, rmvData?.amount || 1025);
+      const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1025);
 
       // Calcular descuentos por asistencia (solo para planillas NO quincenales)
       const lateRecords = empAttendance.filter(r => r.is_late && r.late_minutes > 10);
       const absentRecords = empAttendance.filter(r => r.is_absent);
-      const baseSalaryForCalc = payrollType === "Quincenal"
-        ? (emp.base_salary || 0) * quincenalPct
-        : (emp.base_salary || 0);
+      const baseSalaryForCalc = emp.base_salary || 0; // Siempre usar el salario del contrato
       // Regla quincenal: NO aplicar descuentos por inasistencias/tardanzas
       const tardinessDiscount = payrollType === "Quincenal" ? 0 : lateRecords.length * (baseSalaryForCalc / 30);
       const absenceDiscount = payrollType === "Quincenal" ? 0 : absentRecords.length * (baseSalaryForCalc / 30);
@@ -415,10 +439,10 @@ export default function PayrollManagement() {
         payroll_number: payrollNumber,
         advance_payment_id: advancePaymentId,
         worked_days: workedDays,
-        base_salary: result.context.base_salary,
+        base_salary: emp.base_salary || 0,  // Siempre el salario del contrato
         family_allowance: 0,
         overtime_pay: 0,
-        bonuses: result.totals.totalIncome - result.context.base_salary,
+        bonuses: result.totals.totalIncome - (emp.base_salary || 0),
         commissions: 0,
         other_income: 0,
         total_income: result.totals.totalIncome,

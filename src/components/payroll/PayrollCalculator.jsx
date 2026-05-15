@@ -23,10 +23,11 @@ export class PayrollCalculator {
       // Variables disponibles en las fórmulas
       const variables = {
         base_salary: context.base_salary || 0,
+        quincenal_amount: context.quincenal_amount || 0,
         worked_days: context.worked_days || 30,
         regular_hours: context.regular_hours || 0,
         overtime_hours: context.overtime_hours || 0,
-        rmv: context.rmv || 1025, // RMV actual
+        rmv: context.rmv || 1025,
         horas_extras_25: context.horas_extras_25 || 0,
         horas_extras_35: context.horas_extras_35 || 0,
         horas_nocturnas: context.horas_nocturnas || 0,
@@ -147,12 +148,10 @@ export class PayrollCalculator {
    * Construye el contexto de variables para cálculos
    */
   buildContext(attendanceData, rmvAmount) {
-    // Para quincenal: aplicar el porcentaje configurado (viene en this.quincenalPct)
-    // Para otros tipos: salario completo
+    // base_salary SIEMPRE es el salario del contrato (sin modificar)
+    // Para fórmulas dinámicas en quincenal, el contexto expone quincenal_amount = base_salary * pct
     const rawSalary = this.employee.base_salary || 0;
-    const baseSalary = this.payrollType === "Quincenal"
-      ? rawSalary * (this.quincenalPct ?? 0.40)
-      : rawSalary;
+    const baseSalary = rawSalary; // Siempre el salario completo del contrato
 
     const workedDays = attendanceData?.worked_days || 
       (this.payrollType === "Quincenal" ? 15 : 30);
@@ -160,8 +159,15 @@ export class PayrollCalculator {
     const regularHours = attendanceData?.regular_hours || 0;
     const overtimeHours = attendanceData?.overtime_hours || 0;
 
+    // quincenal_amount: monto del adelanto = base_salary * porcentaje quincenal
+    // Disponible como variable en fórmulas dinámicas
+    const quincenalAmount = this.payrollType === "Quincenal"
+      ? rawSalary * (this.quincenalPct ?? 0.40)
+      : rawSalary;
+
     return {
-      base_salary: baseSalary,
+      base_salary: baseSalary,            // Siempre el salario del contrato
+      quincenal_amount: quincenalAmount,  // base_salary * % quincenal (útil en fórmulas)
       worked_days: workedDays,
       regular_hours: regularHours,
       overtime_hours: overtimeHours,
@@ -169,8 +175,8 @@ export class PayrollCalculator {
       horas_extras_25: attendanceData?.horas_extras_25 || 0,
       horas_extras_35: attendanceData?.horas_extras_35 || 0,
       horas_nocturnas: attendanceData?.horas_nocturnas || 0,
-      total_income: 0, // Se actualizará después
-      total_deductions: 0, // Se actualizará después
+      total_income: 0,
+      total_deductions: 0,
     };
   }
 
