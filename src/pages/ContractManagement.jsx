@@ -28,6 +28,7 @@ export default function ContractManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [signatureFilter, setSignatureFilter] = useState("all"); // all | signed | pending
+  const [expiryFilter, setExpiryFilter] = useState("all"); // all | 15days | 30days
   const [formData, setFormData] = useState({});
   const [positionSearchTerm, setPositionSearchTerm] = useState("");
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
@@ -296,7 +297,21 @@ export default function ContractManagement() {
     );
     const matchesStatus = statusFilter === "all" || c.status === statusFilter;
     const matchesSign = signatureFilter === "all" || (signatureFilter === "signed" && c.is_digitally_signed) || (signatureFilter === "pending" && !c.is_digitally_signed);
-    return matchesSearch && matchesStatus && matchesSign;
+    
+    // Filtro de vencimiento
+    let matchesExpiry = true;
+    if (expiryFilter !== "all" && c.end_date) {
+      const today = new Date(todayLima());
+      const endDate = parseDateLima(c.end_date);
+      const daysUntilExpiry = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
+      if (expiryFilter === "15days") {
+        matchesExpiry = daysUntilExpiry > 0 && daysUntilExpiry <= 15;
+      } else if (expiryFilter === "30days") {
+        matchesExpiry = daysUntilExpiry > 0 && daysUntilExpiry <= 30;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesSign && matchesExpiry;
   });
 
   const totalPages = Math.ceil(filteredContracts.length / PAGE_SIZE);
@@ -423,6 +438,14 @@ export default function ContractManagement() {
                   <SelectItem value="all">Todas las firmas</SelectItem>
                   <SelectItem value="signed"><div className="flex items-center gap-2"><PenLine className="w-4 h-4 text-blue-600" />Firmados digitalmente</div></SelectItem>
                   <SelectItem value="pending"><div className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-amber-600" />Pendiente de firma</div></SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={expiryFilter} onValueChange={(v) => { setExpiryFilter(v); setCurrentPage(1); }}>
+                <SelectTrigger className="w-44"><SelectValue placeholder="Por vencer" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los contratos</SelectItem>
+                  <SelectItem value="15days"><div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-orange-600" />Vencen en 15 días</div></SelectItem>
+                  <SelectItem value="30days"><div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-red-600" />Vencen en 30 días</div></SelectItem>
                 </SelectContent>
               </Select>
               {canSign && signatureFilter === "pending" && pendingSignContracts.length > 0 && (
