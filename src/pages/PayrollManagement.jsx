@@ -274,6 +274,13 @@ export default function PayrollManagement() {
   };
 
   const handleOpenPeriodModal = (action) => {
+    // Resetear vista previa para forzar recálculo con datos frescos
+    setShowPreview(false);
+    setPreviewData([]);
+    // Invalidar queries para obtener datos actualizados
+    queryClient.invalidateQueries({ queryKey: ["payrollConcepts"] });
+    queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+    queryClient.invalidateQueries({ queryKey: ["payrollConfig"] });
     setPendingAction(action);
     setShowPeriodModal(true);
   };
