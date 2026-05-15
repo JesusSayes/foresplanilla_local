@@ -16,11 +16,11 @@
     },
     "cuenta": {
       "type": "string",
-      "description": "C\u00f3digo de cuenta contable (ref. AccountingAccount)"
+      "description": "C\u00f3digo de cuenta contable (ref. CuentaContable.cuenta)"
     },
     "cuenta_id": {
       "type": "string",
-      "description": "ID de la cuenta contable en AccountingAccount"
+      "description": "ID del registro en la entidad CuentaContable (FK \u2192 CuentaContable)"
     },
     "fecha_doc": {
       "type": "string",
