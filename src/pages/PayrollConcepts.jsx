@@ -456,6 +456,8 @@ export default function PayrollConcepts() {
       ...formData,
       employee_id: activeTab === "general" ? "general" : selectedEmployee,
       amount: formData.is_dynamic ? 0 : parseFloat(formData.amount),
+      month: formData.month || selectedMonth,
+      year: formData.year || selectedYear,
     };
 
     // Si es ONP y es concepto general, sincronizar con empleados que tienen ONP
