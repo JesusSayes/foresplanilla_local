@@ -204,6 +204,7 @@ export default function PayrollConcepts() {
     notes: "",
   });
   const [editingConcept, setEditingConcept] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [processingFile, setProcessingFile] = useState(false);
@@ -414,25 +415,38 @@ export default function PayrollConcepts() {
   };
 
   const handleSubmit = async () => {
-    if (!formData.concept_name) {
-      toast.error("El nombre del concepto es obligatorio");
-      return;
+    // Validación con mensajes en el modal
+    const errors = {};
+
+    if (!formData.concept_name?.trim()) {
+      errors.concept_name = "El nombre del concepto es obligatorio";
     }
 
-    if (!formData.is_dynamic && !formData.amount) {
-      toast.error("El monto es obligatorio para conceptos fijos");
-      return;
+    if (!formData.is_dynamic) {
+      const amountVal = parseFloat(formData.amount);
+      if (formData.amount === "" || formData.amount === null || formData.amount === undefined || isNaN(amountVal)) {
+        errors.amount = "Ingresa un monto válido (puede ser 0.00)";
+      }
     }
 
-    if (formData.is_dynamic && !formData.calculation_formula) {
-      toast.error("La fórmula de cálculo es obligatoria para conceptos dinámicos");
-      return;
+    if (formData.is_dynamic && !formData.calculation_formula?.trim()) {
+      errors.calculation_formula = "La fórmula de cálculo es obligatoria";
     }
 
     if (activeTab === "individual" && !selectedEmployee) {
-      toast.error("Selecciona un empleado");
+      errors.employee = "Debes seleccionar un empleado primero";
+    }
+
+    if (formData.applies_to_payroll_types?.length === 0) {
+      errors.applies_to_payroll_types = "Selecciona al menos un tipo de planilla";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
       return;
     }
+
+    setFormErrors({});
 
     const conceptData = {
       ...formData,
@@ -663,6 +677,7 @@ export default function PayrollConcepts() {
       notes: "",
     });
     setEditingConcept(null);
+    setFormErrors({});
     setShowForm(false);
   };
 
@@ -1646,14 +1661,14 @@ export default function PayrollConcepts() {
       {/* Form Modal */}
       {showForm && (
         <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto"
           onClick={resetForm}
         >
           <Card 
-            className="max-w-lg w-full"
+            className="max-w-lg w-full my-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <CardHeader className="border-b">
+            <CardHeader className="border-b sticky top-0 bg-white z-10">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl font-bold">
                   {editingConcept ? "Editar Concepto" : "Agregar Concepto"}
@@ -1662,7 +1677,7 @@ export default function PayrollConcepts() {
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-sm text-amber-800">
                   {activeTab === "general" 
                     ? "Este concepto se aplicará a todos los empleados automáticamente"
@@ -1671,10 +1686,27 @@ export default function PayrollConcepts() {
                 </p>
               </div>
 
+              {/* Panel de errores central */}
+              {Object.keys(formErrors).length > 0 && (
+                <div className="bg-red-50 border border-red-300 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-red-800 mb-1">Por favor corrige los siguientes errores:</p>
+                      <ul className="space-y-0.5">
+                        {Object.values(formErrors).map((err, i) => (
+                          <li key={i} className="text-sm text-red-700">• {err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Tipo de Concepto *</Label>
-                  <Select value={formData.concept_type} onValueChange={(v) => setFormData({...formData, concept_type: v})}>
+                  <Select value={formData.concept_type} onValueChange={(v) => { setFormData({...formData, concept_type: v}); setFormErrors(e => ({...e, concept_type: undefined})); }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -1715,9 +1747,11 @@ export default function PayrollConcepts() {
                   <Label>Nombre del Concepto *</Label>
                   <Input
                     value={formData.concept_name}
-                    onChange={(e) => setFormData({...formData, concept_name: e.target.value})}
+                    onChange={(e) => { setFormData({...formData, concept_name: e.target.value}); setFormErrors(er => ({...er, concept_name: undefined})); }}
                     placeholder="Ej: Bono productividad"
+                    className={formErrors.concept_name ? "border-red-400 focus:ring-red-400" : ""}
                   />
+                  {formErrors.concept_name && <p className="text-xs text-red-600 mt-1">{formErrors.concept_name}</p>}
                 </div>
 
                 <div>
@@ -1747,7 +1781,7 @@ export default function PayrollConcepts() {
                   onValueChange={(v) => setFormData({
                     ...formData, 
                     is_dynamic: v === "dynamic",
-                    amount: v === "dynamic" ? "0" : formData.amount,
+                    amount: v === "dynamic" ? "0" : "",
                     calculation_formula: v === "fixed" ? "" : formData.calculation_formula
                   })}
                 >
@@ -1772,12 +1806,13 @@ export default function PayrollConcepts() {
                   <Label>Fórmula de Cálculo *</Label>
                   <Input
                     value={formData.calculation_formula}
-                    onChange={(e) => setFormData({...formData, calculation_formula: e.target.value})}
+                    onChange={(e) => { setFormData({...formData, calculation_formula: e.target.value}); setFormErrors(er => ({...er, calculation_formula: undefined})); }}
                     placeholder="Ej: base_salary * 0.10"
-                    className="font-mono text-sm"
+                    className={`font-mono text-sm ${formErrors.calculation_formula ? "border-red-400" : ""}`}
                   />
+                  {formErrors.calculation_formula && <p className="text-xs text-red-600 mt-1">{formErrors.calculation_formula}</p>}
                   <p className="text-xs text-slate-500 mt-1">
-                    Variables disponibles: base_salary, worked_days, horas_extras_25, horas_extras_35, horas_nocturnas, activity_cost, food_cost, transport_cost
+                    Variables: <span className="font-mono">base_salary, worked_days, rmv, horas_extras_25, horas_extras_35, horas_nocturnas</span>
                   </p>
                 </div>
               ) : (
@@ -1786,10 +1821,13 @@ export default function PayrollConcepts() {
                   <Input
                     type="number"
                     step="0.01"
+                    min="0"
                     value={formData.amount}
-                    onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                    onChange={(e) => { setFormData({...formData, amount: e.target.value}); setFormErrors(er => ({...er, amount: undefined})); }}
                     placeholder="0.00"
+                    className={formErrors.amount ? "border-red-400" : ""}
                   />
+                  {formErrors.amount && <p className="text-xs text-red-600 mt-1">{formErrors.amount}</p>}
                 </div>
               )}
 
@@ -1832,11 +1870,9 @@ export default function PayrollConcepts() {
                         checked={formData.applies_to_payroll_types?.includes(type)}
                         onChange={(e) => {
                           const current = formData.applies_to_payroll_types || [];
-                          if (e.target.checked) {
-                            setFormData({...formData, applies_to_payroll_types: [...current, type]});
-                          } else {
-                            setFormData({...formData, applies_to_payroll_types: current.filter(t => t !== type)});
-                          }
+                          const updated = e.target.checked ? [...current, type] : current.filter(t => t !== type);
+                          setFormData({...formData, applies_to_payroll_types: updated});
+                          setFormErrors(er => ({...er, applies_to_payroll_types: undefined}));
                         }}
                         className="w-4 h-4 rounded"
                       />
@@ -1846,6 +1882,9 @@ export default function PayrollConcepts() {
                     </div>
                   ))}
                 </div>
+                {formErrors.applies_to_payroll_types && (
+                  <p className="text-xs text-red-600 mt-1">{formErrors.applies_to_payroll_types}</p>
+                )}
               </div>
 
               <div>
@@ -1867,7 +1906,7 @@ export default function PayrollConcepts() {
                   onClick={handleSubmit}
                   disabled={createConceptMutation.isPending}
                 >
-                  {createConceptMutation.isPending ? "Guardando..." : editingConcept ? "Actualizar" : "Guardar Concepto"}
+                  {createConceptMutation.isPending ? "Guardando..." : editingConcept ? "Actualizar Concepto" : "Guardar Concepto"}
                 </Button>
               </div>
             </CardContent>
