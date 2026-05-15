@@ -4,11 +4,13 @@
  */
 
 export class PayrollCalculator {
-  constructor(employee, month, year, payrollType = "Mensual") {
+  constructor(employee, month, year, payrollType = "Mensual", quincenalPct = 0.40) {
     this.employee = employee;
     this.month = month;
     this.year = year;
     this.payrollType = payrollType;
+    // Porcentaje decimal a aplicar en planillas quincenales (ej: 0.40 = 40%)
+    this.quincenalPct = quincenalPct;
     this.calculationLog = [];
     this.errors = [];
   }
@@ -145,9 +147,12 @@ export class PayrollCalculator {
    * Construye el contexto de variables para cálculos
    */
   buildContext(attendanceData, rmvAmount) {
-    const baseSalary = this.payrollType === "Quincenal" 
-      ? (this.employee.base_salary || 0) / 2 
-      : (this.employee.base_salary || 0);
+    // Para quincenal: aplicar el porcentaje configurado (viene en this.quincenalPct)
+    // Para otros tipos: salario completo
+    const rawSalary = this.employee.base_salary || 0;
+    const baseSalary = this.payrollType === "Quincenal"
+      ? rawSalary * (this.quincenalPct ?? 0.40)
+      : rawSalary;
 
     const workedDays = attendanceData?.worked_days || 
       (this.payrollType === "Quincenal" ? 15 : 30);
@@ -200,9 +205,16 @@ export class PayrollCalculator {
       return false;
     }
 
+    // REGLA: Verificar applies_to_payroll_types si está configurado en el concepto
+    if (concept.applies_to_payroll_types && concept.applies_to_payroll_types.length > 0) {
+      if (!concept.applies_to_payroll_types.includes(this.payrollType)) {
+        return false; // El concepto NO aplica a este tipo de planilla
+      }
+    }
+
     // Verificar si es recurrente o específico del mes/año
     if (concept.is_recurring) {
-      return true; // Los conceptos recurrentes siempre se aplican
+      return true; // Los conceptos recurrentes siempre se aplican (ya pasaron el filtro de tipo arriba)
     }
 
     // Verificar si el concepto es para este mes/año específico
@@ -305,8 +317,8 @@ export class PayrollCalculator {
  * Hook para usar el calculador de planilla
  */
 export function usePayrollCalculator() {
-  const calculateEmployeePayroll = async (employee, month, year, payrollType, concepts, attendanceData, rmvAmount) => {
-    const calculator = new PayrollCalculator(employee, month, year, payrollType);
+  const calculateEmployeePayroll = async (employee, month, year, payrollType, concepts, attendanceData, rmvAmount, quincenalPct = 0.40) => {
+    const calculator = new PayrollCalculator(employee, month, year, payrollType, quincenalPct);
     return await calculator.calculatePayroll(concepts, attendanceData, rmvAmount);
   };
 

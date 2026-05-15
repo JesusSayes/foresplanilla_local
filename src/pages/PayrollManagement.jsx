@@ -364,23 +364,19 @@ export default function PayrollManagement() {
       const specificConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
       const allEmpConcepts = [...generalConcepts, ...specificConcepts, ...employeeFixedConcepts];
 
-      // Para quincenal: usar el porcentaje configurado en lugar del 50% fijo
-      let empForCalc = emp;
-      if (payrollType === "Quincenal") {
-        const quincenalPct = (payrollConfig?.quincenal_percentage ?? 40) / 100;
-        // Sobreescribimos temporalmente el base_salary para que el calculador use el porcentaje correcto
-        empForCalc = { ...emp, base_salary: (emp.base_salary || 0) * quincenalPct * 2 };
-        // (*2 porque buildContext divide por 2 para Quincenal: base_salary/2 = original * pct)
-      }
+      // Porcentaje quincenal desde la configuración (decimal, ej: 0.40)
+      const quincenalPct = (payrollConfig?.quincenal_percentage ?? 40) / 100;
 
-      // Usar el calculador automático
-      const calculator = new PayrollCalculator(empForCalc, selectedMonth, selectedYear, payrollType);
+      // Usar el calculador automático — pasamos el porcentaje para que lo aplique correctamente
+      const calculator = new PayrollCalculator(emp, selectedMonth, selectedYear, payrollType, quincenalPct);
       const result = await calculator.calculatePayroll(allEmpConcepts, attendanceData, rmvData?.amount || 1025);
 
       // Calcular descuentos por asistencia (solo para planillas NO quincenales)
       const lateRecords = empAttendance.filter(r => r.is_late && r.late_minutes > 10);
       const absentRecords = empAttendance.filter(r => r.is_absent);
-      const baseSalaryForCalc = payrollType === "Quincenal" ? (emp.base_salary || 0) / 2 : (emp.base_salary || 0);
+      const baseSalaryForCalc = payrollType === "Quincenal"
+        ? (emp.base_salary || 0) * quincenalPct
+        : (emp.base_salary || 0);
       // Regla quincenal: NO aplicar descuentos por inasistencias/tardanzas
       const tardinessDiscount = payrollType === "Quincenal" ? 0 : lateRecords.length * (baseSalaryForCalc / 30);
       const absenceDiscount = payrollType === "Quincenal" ? 0 : absentRecords.length * (baseSalaryForCalc / 30);
