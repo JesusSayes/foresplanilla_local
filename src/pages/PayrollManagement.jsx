@@ -116,18 +116,20 @@ export default function PayrollManagement() {
     queryFn: async () => {
       const allConcepts = await base44.entities.PayrollConcept.list();
       
-      // Filtrar conceptos generales y específicos del mes/año
+      // Filtrar conceptos: recurrentes, del mes/año actual, sin mes/año específico, o generales
       return allConcepts.filter(c => {
-        // Conceptos recurrentes
-        if (c.is_recurring && !c.is_applied) return true;
+        if (c.is_applied) return false; // Ya fue aplicado
         
-        // Conceptos específicos del mes/año
-        if (c.month === selectedMonth && c.year === selectedYear && !c.is_applied) return true;
+        // Conceptos recurrentes: siempre incluir
+        if (c.is_recurring) return true;
         
-        // Conceptos generales (sin mes/año específico)
-        if (c.employee_id === "general" && !c.is_applied) return true;
+        // Conceptos con mes/año específico: solo si coincide
+        if (c.month && c.year) {
+          return c.month === selectedMonth && c.year === selectedYear;
+        }
         
-        return false;
+        // Conceptos sin mes/año específico (aplican siempre): incluir
+        return true;
       });
     },
   });
@@ -369,16 +371,28 @@ export default function PayrollManagement() {
       // Porcentaje quincenal desde la configuración (decimal, ej: 0.40)
       const quincenalPct = (payrollConfig?.quincenal_percentage ?? 40) / 100;
 
-      // Para planilla quincenal: inyectar automáticamente el adelanto si no hay un concepto
-      // de ingreso tipo "Quincenal" ya configurado para este empleado
+      const calculator = new PayrollCalculator(emp, selectedMonth, selectedYear, payrollType, quincenalPct);
+
+      // Para planilla quincenal: siempre inyectar el concepto base de adelanto
+      // Si el empleado tiene conceptos de ingreso para Quincenal configurados, se suman a este base
       let conceptsForCalc = [...allEmpConcepts];
       if (payrollType === "Quincenal") {
-        const hasQuincenalIncomeConceptConfigured = allEmpConcepts.some(c =>
-          c.concept_type === "Ingreso" &&
-          c.applies_to_payroll_types?.includes("Quincenal")
-        );
-        if (!hasQuincenalIncomeConceptConfigured) {
-          // Inyectar automáticamente el adelanto quincenal = base_salary * porcentaje
+        // Calcular cuánto aportan los conceptos de ingreso quincenal ya configurados
+        const configuredQuincenalIncome = allEmpConcepts
+          .filter(c => c.concept_type === "Ingreso" && c.applies_to_payroll_types?.includes("Quincenal"))
+          .reduce((sum, c) => {
+            if (c.is_dynamic && c.calculation_formula) {
+              // Evaluar la fórmula con el contexto del empleado
+              const ctx = calculator.buildContext(attendanceData, rmvData?.amount || 1025);
+              return sum + calculator.evaluateFormula(c.calculation_formula, ctx);
+            }
+            return sum + (parseFloat(c.amount) || 0);
+          }, 0);
+
+        // Si los conceptos configurados no cubren el adelanto mínimo, inyectar la diferencia
+        const expectedQuincenalAmount = (emp.base_salary || 0) * quincenalPct;
+        if (configuredQuincenalIncome === 0) {
+          // Sin conceptos configurados: inyectar el adelanto automático completo
           conceptsForCalc = [
             ...allEmpConcepts,
             {
@@ -386,17 +400,16 @@ export default function PayrollManagement() {
               concept_type: "Ingreso",
               concept_category: "Remuneración Base",
               concept_name: "Adelanto Quincenal",
-              is_dynamic: true,
-              calculation_formula: `base_salary * ${quincenalPct}`,
+              is_dynamic: false,
+              amount: expectedQuincenalAmount,
               is_recurring: true,
               applies_to_payroll_types: ["Quincenal"],
-              amount: 0,
             }
           ];
         }
+        // Si ya hay conceptos configurados con ingresos, usarlos tal cual
       }
 
-      const calculator = new PayrollCalculator(emp, selectedMonth, selectedYear, payrollType, quincenalPct);
       const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1025);
 
       // Calcular descuentos por asistencia (solo para planillas NO quincenales)
@@ -442,7 +455,7 @@ export default function PayrollManagement() {
         base_salary: emp.base_salary || 0,  // Siempre el salario del contrato
         family_allowance: 0,
         overtime_pay: 0,
-        bonuses: result.totals.totalIncome - (emp.base_salary || 0),
+        bonuses: Math.max(0, result.totals.totalIncome - (emp.base_salary || 0)),
         commissions: 0,
         other_income: 0,
         total_income: result.totals.totalIncome,
