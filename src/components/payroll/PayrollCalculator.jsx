@@ -4,11 +4,13 @@
  */
 
 export class PayrollCalculator {
-  constructor(employee, month, year, payrollType = "Mensual") {
+  constructor(employee, month, year, payrollType = "Mensual", quincenalPct = 0.40) {
     this.employee = employee;
     this.month = month;
     this.year = year;
     this.payrollType = payrollType;
+    // Porcentaje decimal a aplicar en planillas quincenales (ej: 0.40 = 40%)
+    this.quincenalPct = quincenalPct;
     this.calculationLog = [];
     this.errors = [];
   }
@@ -21,10 +23,11 @@ export class PayrollCalculator {
       // Variables disponibles en las fórmulas
       const variables = {
         base_salary: context.base_salary || 0,
+        quincenal_amount: context.quincenal_amount || 0,
         worked_days: context.worked_days || 30,
         regular_hours: context.regular_hours || 0,
         overtime_hours: context.overtime_hours || 0,
-        rmv: context.rmv || 1025, // RMV actual
+        rmv: context.rmv || 1025,
         horas_extras_25: context.horas_extras_25 || 0,
         horas_extras_35: context.horas_extras_35 || 0,
         horas_nocturnas: context.horas_nocturnas || 0,
@@ -145,9 +148,10 @@ export class PayrollCalculator {
    * Construye el contexto de variables para cálculos
    */
   buildContext(attendanceData, rmvAmount) {
-    const baseSalary = this.payrollType === "Quincenal" 
-      ? (this.employee.base_salary || 0) / 2 
-      : (this.employee.base_salary || 0);
+    // base_salary SIEMPRE es el salario del contrato (sin modificar)
+    // Para fórmulas dinámicas en quincenal, el contexto expone quincenal_amount = base_salary * pct
+    const rawSalary = this.employee.base_salary || 0;
+    const baseSalary = rawSalary; // Siempre el salario completo del contrato
 
     const workedDays = attendanceData?.worked_days || 
       (this.payrollType === "Quincenal" ? 15 : 30);
@@ -155,8 +159,15 @@ export class PayrollCalculator {
     const regularHours = attendanceData?.regular_hours || 0;
     const overtimeHours = attendanceData?.overtime_hours || 0;
 
+    // quincenal_amount: monto del adelanto = base_salary * porcentaje quincenal
+    // Disponible como variable en fórmulas dinámicas
+    const quincenalAmount = this.payrollType === "Quincenal"
+      ? rawSalary * (this.quincenalPct ?? 0.40)
+      : rawSalary;
+
     return {
-      base_salary: baseSalary,
+      base_salary: baseSalary,            // Siempre el salario del contrato
+      quincenal_amount: quincenalAmount,  // base_salary * % quincenal (útil en fórmulas)
       worked_days: workedDays,
       regular_hours: regularHours,
       overtime_hours: overtimeHours,
@@ -164,8 +175,8 @@ export class PayrollCalculator {
       horas_extras_25: attendanceData?.horas_extras_25 || 0,
       horas_extras_35: attendanceData?.horas_extras_35 || 0,
       horas_nocturnas: attendanceData?.horas_nocturnas || 0,
-      total_income: 0, // Se actualizará después
-      total_deductions: 0, // Se actualizará después
+      total_income: 0,
+      total_deductions: 0,
     };
   }
 
@@ -200,9 +211,16 @@ export class PayrollCalculator {
       return false;
     }
 
+    // REGLA: Verificar applies_to_payroll_types si está configurado en el concepto
+    if (concept.applies_to_payroll_types && concept.applies_to_payroll_types.length > 0) {
+      if (!concept.applies_to_payroll_types.includes(this.payrollType)) {
+        return false; // El concepto NO aplica a este tipo de planilla
+      }
+    }
+
     // Verificar si es recurrente o específico del mes/año
     if (concept.is_recurring) {
-      return true; // Los conceptos recurrentes siempre se aplican
+      return true; // Los conceptos recurrentes siempre se aplican (ya pasaron el filtro de tipo arriba)
     }
 
     // Verificar si el concepto es para este mes/año específico
@@ -305,8 +323,8 @@ export class PayrollCalculator {
  * Hook para usar el calculador de planilla
  */
 export function usePayrollCalculator() {
-  const calculateEmployeePayroll = async (employee, month, year, payrollType, concepts, attendanceData, rmvAmount) => {
-    const calculator = new PayrollCalculator(employee, month, year, payrollType);
+  const calculateEmployeePayroll = async (employee, month, year, payrollType, concepts, attendanceData, rmvAmount, quincenalPct = 0.40) => {
+    const calculator = new PayrollCalculator(employee, month, year, payrollType, quincenalPct);
     return await calculator.calculatePayroll(concepts, attendanceData, rmvAmount);
   };
 

@@ -76,8 +76,8 @@ export default function AsientosContables() {
   });
 
   const { data: cuentas = [] } = useQuery({
-    queryKey: ["accountingAccounts"],
-    queryFn: () => entitiesAPI.AccountingAccount.list("cuenta"),
+    queryKey: ["cuentas_contables"],
+    queryFn: () => entitiesAPI.CuentaContable.list("cuenta"),
   });
 
   const updateMutation = useMutation({
@@ -89,8 +89,11 @@ export default function AsientosContables() {
   const filtered = asientos.filter(a => {
     const emp = employees.find(e => e.id === a.employee_id);
     const empName = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
+    const cuentaInfo = cuentas.find(c => c.cuenta === a.cuenta);
+    const cuentaDesc = cuentaInfo?.descripcion?.toLowerCase() || "";
     const matchSearch = !searchTerm ||
       a.cuenta?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cuentaDesc.includes(searchTerm.toLowerCase()) ||
       a.comprobante?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.glosa?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.glosa_mov?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -423,8 +426,9 @@ export default function AsientosContables() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filtered.map(asiento => {
-                      const emp = employees.find(e => e.id === asiento.employee_id);
-                      const estConfig = ESTADO_CONFIG[asiento.estado_migracion] || ESTADO_CONFIG.Pendiente;
+                     const emp = employees.find(e => e.id === asiento.employee_id);
+                     const cuentaInfo = cuentas.find(c => c.cuenta === asiento.cuenta);
+                     const estConfig = ESTADO_CONFIG[asiento.estado_migracion] || ESTADO_CONFIG.Pendiente;
                       const EstIcon = estConfig.icon;
                       const isMigrating = migratingIds.has(asiento.id);
                       return (
@@ -432,7 +436,12 @@ export default function AsientosContables() {
                           <td className="px-3 py-3 font-mono text-xs text-slate-700 whitespace-nowrap">{asiento.annomes}</td>
                           <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{asiento.subdiario || "—"}</td>
                           <td className="px-3 py-3 font-medium text-indigo-700 whitespace-nowrap">{asiento.comprobante}</td>
-                          <td className="px-3 py-3 font-mono text-xs text-slate-800 whitespace-nowrap">{asiento.cuenta}</td>
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="font-mono text-xs font-semibold text-slate-800">{asiento.cuenta}</span>
+                            {cuentaInfo && (
+                              <p className="text-xs text-slate-500 max-w-[160px] truncate" title={cuentaInfo.descripcion}>{cuentaInfo.descripcion}</p>
+                            )}
+                          </td>
                           <td className="px-3 py-3 text-slate-600 max-w-[180px] truncate" title={asiento.glosa_mov || asiento.glosa}>
                             {asiento.glosa_mov || asiento.glosa || "—"}
                           </td>
@@ -582,8 +591,9 @@ function DetalleAsientoModal({ asiento, employees, cuentas, onClose }) {
             <Row label="Fecha Vencimiento" value={asiento.fecha_vencimiento} />
           </Section>
           <Section title="Cuenta Contable">
-            <Row label="Cuenta" value={asiento.cuenta} />
-            <Row label="Nombre Cuenta" value={cuenta?.nombre} />
+            <Row label="Código" value={asiento.cuenta} />
+            <Row label="Descripción" value={cuenta?.descripcion} />
+            <Row label="Tipo" value={cuenta?.tipo} />
             <Row label="Debe / Haber" value={asiento.debe_haber === "D" ? "DEBE" : "HABER"} />
           </Section>
           <Section title="Importe">

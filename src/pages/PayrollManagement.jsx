@@ -109,18 +109,20 @@ export default function PayrollManagement() {
     queryFn: async () => {
       const allConcepts = await entitiesAPI.PayrollConcept.list();
 
-      // Filtrar conceptos generales y específicos del mes/año
+      // Filtrar conceptos: recurrentes, del mes/año actual, sin mes/año específico, o generales
       return allConcepts.filter(c => {
-        // Conceptos recurrentes
-        if (c.is_recurring && !c.is_applied) return true;
+        if (c.is_applied) return false; // Ya fue aplicado
 
-        // Conceptos específicos del mes/año
-        if (c.month === selectedMonth && c.year === selectedYear && !c.is_applied) return true;
+        // Conceptos recurrentes: siempre incluir
+        if (c.is_recurring) return true;
 
-        // Conceptos generales (sin mes/año específico)
-        if (c.employee_id === "general" && !c.is_applied) return true;
+        // Conceptos con mes/año específico: solo si coincide
+        if (c.month && c.year) {
+          return c.month === selectedMonth && c.year === selectedYear;
+        }
 
-        return false;
+        // Conceptos sin mes/año específico (aplican siempre): incluir
+        return true;
       });
     },
   });
@@ -147,6 +149,7 @@ export default function PayrollManagement() {
       const configs = await entitiesAPI.PayrollConfig.filter({ config_type: "Quincenal", is_active: true });
       return configs.length > 0 ? configs[0] : { quincenal_percentage: 40, quincenal_cutoff_day: 7 };
     },
+    staleTime: 0, // Siempre refetch al invalidar para reflejar cambios de configuración inmediatamente
   });
 
   const createPayslipsMutation = useMutation({
@@ -265,6 +268,13 @@ export default function PayrollManagement() {
   };
 
   const handleOpenPeriodModal = (action) => {
+    // Resetear vista previa para forzar recálculo con datos frescos
+    setShowPreview(false);
+    setPreviewData([]);
+    // Invalidar queries para obtener datos actualizados
+    queryClient.invalidateQueries({ queryKey: ["payrollConcepts"] });
+    queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+    queryClient.invalidateQueries({ queryKey: ["payrollConfig"] });
     setPendingAction(action);
     setShowPeriodModal(true);
   };
@@ -295,16 +305,18 @@ export default function PayrollManagement() {
     if (payrollType === "Quincenal") {
       const cutoffDay = payrollConfig?.quincenal_cutoff_day ?? 7;
       filteredEmployees = filteredEmployees.filter(emp => {
-        if (!emp.hire_date) return true; // Si no tiene fecha de ingreso, se incluye
-        const hireDate = new Date(emp.hire_date);
-        // Si ingresó en un mes anterior, siempre se incluye
-        if (hireDate.getFullYear() < selectedYear) return true;
-        if (hireDate.getFullYear() === selectedYear && hireDate.getMonth() + 1 < selectedMonth) return true;
-        // Si ingresó en el mes en proceso, solo si fue antes del día de corte
-        if (hireDate.getFullYear() === selectedYear && hireDate.getMonth() + 1 === selectedMonth) {
-          return hireDate.getDate() <= cutoffDay;
+        if (!emp.hire_date) return true; // Sin fecha de ingreso: se incluye
+        // Parsear fecha como local (YYYY-MM-DD) para evitar desfases de timezone
+        const [hireYear, hireMonth, hireDay] = emp.hire_date.split("T")[0].split("-").map(Number);
+        // Si ingresó en un año anterior, siempre se incluye
+        if (hireYear < selectedYear) return true;
+        // Si ingresó en el mismo año pero en un mes anterior, se incluye
+        if (hireYear === selectedYear && hireMonth < selectedMonth) return true;
+        // Si ingresó exactamente en el mes en proceso, solo si fue hasta el día de corte
+        if (hireYear === selectedYear && hireMonth === selectedMonth) {
+          return hireDay <= cutoffDay;
         }
-        return false; // Ingresó en mes futuro
+        return false; // Ingresó en un mes futuro: no se incluye
       });
     }
 
@@ -359,23 +371,54 @@ export default function PayrollManagement() {
       const specificConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
       const allEmpConcepts = [...generalConcepts, ...specificConcepts, ...employeeFixedConcepts];
 
-      // Para quincenal: usar el porcentaje configurado en lugar del 50% fijo
-      let empForCalc = emp;
+      // Porcentaje quincenal desde la configuración (decimal, ej: 0.40)
+      const quincenalPct = (payrollConfig?.quincenal_percentage ?? 40) / 100;
+
+      const calculator = new PayrollCalculator(emp, selectedMonth, selectedYear, payrollType, quincenalPct);
+
+      // Para planilla quincenal: siempre inyectar el concepto base de adelanto
+      // Si el empleado tiene conceptos de ingreso para Quincenal configurados, se suman a este base
+      let conceptsForCalc = [...allEmpConcepts];
       if (payrollType === "Quincenal") {
-        const quincenalPct = (payrollConfig?.quincenal_percentage ?? 40) / 100;
-        // Sobreescribimos temporalmente el base_salary para que el calculador use el porcentaje correcto
-        empForCalc = { ...emp, base_salary: (emp.base_salary || 0) * quincenalPct * 2 };
-        // (*2 porque buildContext divide por 2 para Quincenal: base_salary/2 = original * pct)
+        // Calcular cuánto aportan los conceptos de ingreso quincenal ya configurados
+        const configuredQuincenalIncome = allEmpConcepts
+          .filter(c => c.concept_type === "Ingreso" && c.applies_to_payroll_types?.includes("Quincenal"))
+          .reduce((sum, c) => {
+            if (c.is_dynamic && c.calculation_formula) {
+              // Evaluar la fórmula con el contexto del empleado
+              const ctx = calculator.buildContext(attendanceData, rmvData?.amount || 1025);
+              return sum + calculator.evaluateFormula(c.calculation_formula, ctx);
+            }
+            return sum + (parseFloat(c.amount) || 0);
+          }, 0);
+
+        // Si los conceptos configurados no cubren el adelanto mínimo, inyectar la diferencia
+        const expectedQuincenalAmount = (emp.base_salary || 0) * quincenalPct;
+        if (configuredQuincenalIncome === 0) {
+          // Sin conceptos configurados: inyectar el adelanto automático completo
+          conceptsForCalc = [
+            ...allEmpConcepts,
+            {
+              employee_id: emp.id,
+              concept_type: "Ingreso",
+              concept_category: "Remuneración Base",
+              concept_name: "Adelanto Quincenal",
+              is_dynamic: false,
+              amount: expectedQuincenalAmount,
+              is_recurring: true,
+              applies_to_payroll_types: ["Quincenal"],
+            }
+          ];
+        }
+        // Si ya hay conceptos configurados con ingresos, usarlos tal cual
       }
 
-      // Usar el calculador automático
-      const calculator = new PayrollCalculator(empForCalc, selectedMonth, selectedYear, payrollType);
-      const result = await calculator.calculatePayroll(allEmpConcepts, attendanceData, rmvData?.amount || 1025);
+      const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1025);
 
       // Calcular descuentos por asistencia (solo para planillas NO quincenales)
       const lateRecords = empAttendance.filter(r => r.is_late && r.late_minutes > 10);
       const absentRecords = empAttendance.filter(r => r.is_absent);
-      const baseSalaryForCalc = payrollType === "Quincenal" ? (emp.base_salary || 0) / 2 : (emp.base_salary || 0);
+      const baseSalaryForCalc = emp.base_salary || 0; // Siempre usar el salario del contrato
       // Regla quincenal: NO aplicar descuentos por inasistencias/tardanzas
       const tardinessDiscount = payrollType === "Quincenal" ? 0 : lateRecords.length * (baseSalaryForCalc / 30);
       const absenceDiscount = payrollType === "Quincenal" ? 0 : absentRecords.length * (baseSalaryForCalc / 30);
@@ -412,10 +455,10 @@ export default function PayrollManagement() {
         payroll_number: payrollNumber,
         advance_payment_id: advancePaymentId,
         worked_days: workedDays,
-        base_salary: result.context.base_salary,
+        base_salary: emp.base_salary || 0,  // Siempre el salario del contrato
         family_allowance: 0,
         overtime_pay: 0,
-        bonuses: result.totals.totalIncome - result.context.base_salary,
+        bonuses: Math.max(0, result.totals.totalIncome - (emp.base_salary || 0)),
         commissions: 0,
         other_income: 0,
         total_income: result.totals.totalIncome,
