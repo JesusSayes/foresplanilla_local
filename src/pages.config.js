@@ -79,6 +79,7 @@ import Payslips from './pages/Payslips';
 import Reports from './pages/Reports';
 import RoleManagement from './pages/RoleManagement';
 import AsientosContables from './pages/AsientosContables';
+import CuentasContables from './pages/CuentasContables';
 import ConsultaPlanillas from './pages/ConsultaPlanillas';
 import BackfillAsistencia from './pages/BackfillAsistencia';
 import ScheduleManagement from './pages/ScheduleManagement';
@@ -93,6 +94,7 @@ import __Layout from './Layout.jsx';
 
 export const PAGES = {
     "AsientosContables": AsientosContables,
+    "CuentasContables": CuentasContables,
     "ConsultaPlanillas": ConsultaPlanillas,
     "BackfillAsistencia": BackfillAsistencia,
     "AccessDeviceConfig": AccessDeviceConfig,

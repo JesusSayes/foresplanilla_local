@@ -1,0 +1,36 @@
+{
+  "name": "CuentaContable",
+  "type": "object",
+  "properties": {
+    "cuenta": {
+      "type": "string",
+      "description": "C\u00f3digo de cuenta contable (PCGE)"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Descripci\u00f3n de la cuenta contable"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "Activos",
+        "Pasivos",
+        "Patrimonio",
+        "Ingresos",
+        "Gastos",
+        "Otros"
+      ],
+      "description": "Tipo / elemento contable"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Cuenta activa"
+    }
+  },
+  "required": [
+    "cuenta",
+    "descripcion",
+    "tipo"
+  ]
+}

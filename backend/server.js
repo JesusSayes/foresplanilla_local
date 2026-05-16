@@ -61,6 +61,7 @@ import { generarAsistenciaDiaria } from './scripts/generarAsistenciaDiaria.js';
 import { calcularAsistenciaDesdeLogs } from './scripts/calcularAsistenciaDesdeLogs.js';
 import { syncExternalAttendance } from './services/externalAttendanceSync.js';
 import asientosContablesRoutes from './routes/asientosContables.js';
+import cuentasContablesRoutes from './routes/cuentasContables.js';
 
 dotenv.config();
 
@@ -156,6 +157,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/uploads", express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api/derechohabientes', derechohabientesRoutes);
 app.use('/api/asientos-contables', asientosContablesRoutes);
+app.use('/api/cuentas-contables', cuentasContablesRoutes);
 
 // Cron configuration
 const CRON_TIMEZONE = process.env.CRON_TIMEZONE || 'America/Lima';

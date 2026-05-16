@@ -46,6 +46,7 @@ import SystemRoleInitializer from "./pages/SystemRoleInitializer";
 import LoanManagement from "./pages/LoanManagement";
 import ConsultaPlanillas from "./pages/ConsultaPlanillas";
 import AsientosContables from "./pages/AsientosContables";
+import CuentasContables from "./pages/CuentasContables";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -280,6 +281,11 @@ const AuthenticatedApp = () => {
       <Route path="/AsientosContables" element={
         <ProtectedRoute>
           <Layout currentPageName="AsientosContables"><AsientosContables /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/CuentasContables" element={
+        <ProtectedRoute>
+          <Layout currentPageName="CuentasContables"><CuentasContables /></Layout>
         </ProtectedRoute>
       } />
     </Routes>
