@@ -25,7 +25,7 @@ export default function VacationRequest() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
-  const { userPermissions = [] } = usePermissions();
+  const { permissions: userPermissions = [], loading: permissionsLoading } = usePermissions();
   const [formData, setFormData] = useState({
     request_type: "Vacaciones",
     is_full_day: true,
@@ -235,7 +235,7 @@ export default function VacationRequest() {
            emp.employee_code.toLowerCase().includes(searchLower);
   });
 
-  if (!employee) {
+  if (!employee || permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Card><CardContent className="p-8"><p>Cargando...</p></CardContent></Card>
