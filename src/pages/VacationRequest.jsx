@@ -60,7 +60,10 @@ export default function VacationRequest() {
     loadUserData();
   }, []);
 
-  const isHR = userPermissions.includes("vacations.manage") || userPermissions.includes("system.admin");
+  const isHR = userPermissions.includes("vacations.manage") || 
+               userPermissions.includes("system.admin") ||
+               userPermissions.includes("employees.create") ||
+               userPermissions.includes("employees.edit");
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
