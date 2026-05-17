@@ -58,15 +58,18 @@ export default function VacationRequest() {
     loadUserData();
   }, []);
 
+  const HR_ROLES = ["admin", "super_admin", "hr_readonly", "manager"];
+  const isHR = employee && HR_ROLES.includes(employee.role);
+
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
       return await base44.entities.Employee.filter({ status: "Activo" });
     },
-    enabled: employee?.role === "admin",
+    enabled: isHR,
   });
 
-  const targetEmployeeId = employee?.role === "admin" ? selectedEmployeeId : employee?.id;
+  const targetEmployeeId = isHR ? selectedEmployeeId : employee?.id;
 
   const { data: vacationBalance } = useQuery({
     queryKey: ["vacationBalance", targetEmployeeId],
@@ -123,9 +126,9 @@ export default function VacationRequest() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const employeeIdToUse = employee.role === "admin" ? selectedEmployeeId : employee.id;
+    const employeeIdToUse = isHR ? selectedEmployeeId : employee.id;
 
-    if (employee.role === "admin" && !employeeIdToUse) {
+    if (isHR && !employeeIdToUse) {
       toast.error("Por favor selecciona un empleado");
       return;
     }
@@ -170,7 +173,7 @@ export default function VacationRequest() {
       reason: "",
       supporting_document_url: null,
     });
-    if (employee?.role !== "admin") {
+    if (!isHR) {
       setSelectedEmployeeId(null);
     }
   };
@@ -349,7 +352,7 @@ export default function VacationRequest() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {employee.role === "admin" ? (
+                    {isHR ? (
                       <div>
                         <label className="block text-sm font-semibold text-slate-900 mb-2">
                           Empleado *
@@ -628,7 +631,7 @@ export default function VacationRequest() {
             <Card className="border-0 shadow-lg">
               <CardHeader className="border-b">
                 <CardTitle className="text-xl font-bold">
-                  {employee.role === "admin" && selectedEmployeeId ? "Solicitudes del Empleado" : "Mis Solicitudes"}
+                  {isHR && selectedEmployeeId ? "Solicitudes del Empleado" : "Mis Solicitudes"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
