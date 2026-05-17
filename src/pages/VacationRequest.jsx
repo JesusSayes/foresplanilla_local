@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePermissions } from "@/components/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ export default function VacationRequest() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const { permissions: userPermissions = [], loading: permissionsLoading } = usePermissions();
   const [formData, setFormData] = useState({
     request_type: "Vacaciones",
     is_full_day: true,
@@ -39,15 +41,20 @@ export default function VacationRequest() {
 
   const queryClient = useQueryClient();
 
+  const isHR = userPermissions.includes("vacations.manage") ||
+               userPermissions.includes("system.admin") ||
+               userPermissions.includes("employees.create") ||
+               userPermissions.includes("employees.edit");
+
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
       return await entitiesAPI.Employee.filter({ status: "Activo" });
     },
-    enabled: employee?.role === "admin",
+    enabled: isHR,
   });
 
-  const targetEmployeeId = employee?.role === "admin" ? selectedEmployeeId : employee?.id;
+  const targetEmployeeId = isHR ? selectedEmployeeId : employee?.id;
 
   const { data: vacationBalance } = useQuery({
     queryKey: ["vacationBalance", targetEmployeeId],
@@ -104,9 +111,9 @@ export default function VacationRequest() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const employeeIdToUse = employee.role === "admin" ? selectedEmployeeId : employee.id;
+    const employeeIdToUse = isHR ? selectedEmployeeId : employee.id;
 
-    if (employee.role === "admin" && !employeeIdToUse) {
+    if (isHR && !employeeIdToUse) {
       toast.error("Por favor selecciona un empleado");
       return;
     }
@@ -151,7 +158,7 @@ export default function VacationRequest() {
       reason: "",
       supporting_document_url: null,
     });
-    if (employee?.role !== "admin") {
+    if (!isHR) {
       setSelectedEmployeeId(null);
     }
   };
@@ -210,7 +217,7 @@ export default function VacationRequest() {
            emp.employee_code.toLowerCase().includes(searchLower);
   });
 
-  if (!employee) {
+  if (!employee || permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Card><CardContent className="p-8"><p>Cargando...</p></CardContent></Card>
@@ -333,7 +340,7 @@ export default function VacationRequest() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {employee.role === "admin" ? (
+                    {isHR ? (
                       <div>
                         <label className="block text-sm font-semibold text-slate-900 mb-2">
                           Empleado *
@@ -612,7 +619,7 @@ export default function VacationRequest() {
             <Card className="border-0 shadow-lg">
               <CardHeader className="border-b">
                 <CardTitle className="text-xl font-bold">
-                  {employee.role === "admin" && selectedEmployeeId ? "Solicitudes del Empleado" : "Mis Solicitudes"}
+                  {isHR && selectedEmployeeId ? "Solicitudes del Empleado" : "Mis Solicitudes"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
