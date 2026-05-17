@@ -25,7 +25,7 @@ export default function VacationRequest() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
-  const { userPermissions } = usePermissions();
+  const { userPermissions = [] } = usePermissions();
   const [formData, setFormData] = useState({
     request_type: "Vacaciones",
     is_full_day: true,
