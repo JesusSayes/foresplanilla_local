@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePermissions } from "@/components/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ export default function VacationRequest() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const { userPermissions } = usePermissions();
   const [formData, setFormData] = useState({
     request_type: "Vacaciones",
     is_full_day: true,
@@ -58,8 +60,7 @@ export default function VacationRequest() {
     loadUserData();
   }, []);
 
-  const HR_ROLES = ["admin", "super_admin", "hr_readonly", "manager"];
-  const isHR = employee && HR_ROLES.includes(employee.role);
+  const isHR = userPermissions.includes("vacations.manage") || userPermissions.includes("system.admin");
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
