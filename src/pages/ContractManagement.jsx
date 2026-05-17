@@ -300,14 +300,22 @@ export default function ContractManagement() {
     
     // Filtro de vencimiento
     let matchesExpiry = true;
-    if (expiryFilter !== "all" && c.end_date) {
-      const today = new Date(todayLima());
-      const endDate = parseDateLima(c.end_date);
-      const daysUntilExpiry = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
-      if (expiryFilter === "15days") {
-        matchesExpiry = daysUntilExpiry > 0 && daysUntilExpiry <= 15;
-      } else if (expiryFilter === "30days") {
-        matchesExpiry = daysUntilExpiry > 0 && daysUntilExpiry <= 30;
+    if (expiryFilter !== "all") {
+      // Contratos indeterminados sin fecha fin no tienen vencimiento → excluir del filtro
+      if (c.contract_type === "Indeterminado" && !c.end_date) {
+        matchesExpiry = false;
+      } else if (c.end_date) {
+        const today = new Date(todayLima());
+        const endDate = parseDateLima(c.end_date);
+        const daysUntilExpiry = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
+        if (expiryFilter === "15days") {
+          matchesExpiry = daysUntilExpiry > 0 && daysUntilExpiry <= 15;
+        } else if (expiryFilter === "30days") {
+          matchesExpiry = daysUntilExpiry > 0 && daysUntilExpiry <= 30;
+        }
+      } else {
+        // Otros tipos de contrato sin fecha fin → también excluir
+        matchesExpiry = false;
       }
     }
     
