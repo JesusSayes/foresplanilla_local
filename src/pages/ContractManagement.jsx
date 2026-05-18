@@ -345,8 +345,8 @@ export default function ContractManagement() {
       if (c.contract_type === "Indeterminado" && !c.end_date) {
         matchesExpiry = false;
       } else if (c.end_date) {
-        const today = new Date(todayLima());
-        const endDate = parseDateLima(c.end_date);
+        const today = parseDateLima(todayLima());
+        const endDate = parseDateLima(c.end_date.split('T')[0]);
         const daysUntilExpiry = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
         if (expiryFilter === "15days") {
           matchesExpiry = daysUntilExpiry > 0 && daysUntilExpiry <= 15;
