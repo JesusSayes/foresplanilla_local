@@ -7,6 +7,13 @@ const { Pool } = pg;
 
 let biotimePool = null;
 
+function getPunchMinuteKey(employeeId, punchTime) {
+  if (!employeeId || !punchTime) return null;
+  const parsed = new Date(punchTime);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return `${employeeId}|${parsed.toISOString().slice(0, 16)}`;
+}
+
 function getBiotimePool() {
   if (!biotimePool) {
     biotimePool = new Pool({
@@ -123,7 +130,8 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
     const seenEmployeePunches = new Set(
       existingPunchLogs
         .filter((log) => log.employee_id && log.punch_time)
-        .map((log) => `${log.employee_id}|${new Date(log.punch_time).toISOString()}`)
+        .map((log) => getPunchMinuteKey(log.employee_id, log.punch_time))
+        .filter(Boolean)
     );
 
     const employees = await prisma.employee.findMany({
@@ -161,8 +169,8 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
         }
 
         const punchTime = new Date(tx.punch_time);
-        const punchKey = `${employeeId}|${punchTime.toISOString()}`;
-        if (seenEmployeePunches.has(punchKey)) {
+        const punchKey = getPunchMinuteKey(employeeId, punchTime);
+        if (!punchKey || seenEmployeePunches.has(punchKey)) {
           skipped++;
           continue;
         }
