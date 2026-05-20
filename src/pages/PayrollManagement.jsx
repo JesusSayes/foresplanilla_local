@@ -335,6 +335,15 @@ export default function PayrollManagement() {
     // Excluir empleados que el usuario haya quitado
     filteredEmployees = filteredEmployees.filter(emp => !excludedEmployees.includes(emp.id));
 
+    // Detectar empleados sin salario base configurado
+    const employeesWithoutSalary = filteredEmployees.filter(emp => 
+      !emp.base_salary || parseFloat(emp.base_salary) <= 0
+    );
+    if (employeesWithoutSalary.length > 0) {
+      const names = employeesWithoutSalary.map(e => `${e.employee_code} - ${e.first_name} ${e.last_name}`).join(", ");
+      toast.warning(`⚠️ ${employeesWithoutSalary.length} empleado(s) sin salario base configurado: ${names}. Se calcularán con S/ 0.`, { duration: 8000 });
+    }
+
     const payslipsData = await Promise.all(filteredEmployees.map(async (emp) => {
       // Preparar datos de asistencia
       const empAttendance = attendanceRecords.filter(r => {
@@ -957,8 +966,9 @@ export default function PayrollManagement() {
                       const hasAdditionalConcepts = empConcepts.length > 0;
                       const hasCalculationErrors = payslip.has_errors;
 
+                      const hasMissingSalary = !payslip.base_salary || payslip.base_salary === 0;
                       return (
-                        <div key={index} className={`p-4 border rounded-lg ${hasCalculationErrors ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}>
+                        <div key={index} className={`p-4 border rounded-lg ${hasMissingSalary ? 'border-orange-400 bg-orange-50' : hasCalculationErrors ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}>
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
@@ -1061,6 +1071,15 @@ export default function PayrollManagement() {
                           {hasAdditionalConcepts && (
                             <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
                               ✓ {empConcepts.length} concepto(s) adicional(es) aplicado(s)
+                            </div>
+                          )}
+
+                          {(payslip.base_salary === 0 || !payslip.base_salary) && (
+                            <div className="mt-3 p-2 bg-orange-50 border border-orange-400 rounded flex items-center gap-2">
+                              <AlertCircle className="w-4 h-4 text-orange-600 shrink-0" />
+                              <p className="text-xs font-semibold text-orange-800">
+                                ⚠️ Este empleado no tiene salario base configurado. El cálculo resultará en S/ 0.00. Configure el salario base en el perfil del empleado.
+                              </p>
                             </div>
                           )}
 

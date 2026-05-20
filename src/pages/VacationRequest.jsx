@@ -54,7 +54,8 @@ export default function VacationRequest() {
     enabled: isHR,
   });
 
-  const targetEmployeeId = isHR ? selectedEmployeeId : employee?.id;
+  // HR puede ver/gestionar cualquier empleado; empleado normal solo ve el suyo
+  const targetEmployeeId = isHR ? (selectedEmployeeId || employee?.id) : employee?.id;
 
   const { data: vacationBalance } = useQuery({
     queryKey: ["vacationBalance", targetEmployeeId],
@@ -158,9 +159,7 @@ export default function VacationRequest() {
       reason: "",
       supporting_document_url: null,
     });
-    if (!isHR) {
-      setSelectedEmployeeId(null);
-    }
+    // No resetear selectedEmployeeId para que HR mantenga el empleado seleccionado
   };
 
   const handleFileUpload = async (e) => {
