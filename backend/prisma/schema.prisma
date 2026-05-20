@@ -40,7 +40,7 @@ model attendance_incident {
   justified_time_start    String?
   justified_time_end      String?
   full_day_justification  Boolean?
-  hours_to_adjust         Int?
+  hours_to_adjust         Decimal?  @db.Decimal(18, 2)
   late_minutes_to_adjust  Int?
   status                  String?
   reviewed_by             String?
@@ -55,8 +55,8 @@ model attendance_incident {
 }
 
 model attendance_record {
-  employee_id         String?
-  date                DateTime? @db.Date
+  employee_id         String
+  date                DateTime  @db.Date
   clock_in            String?
   clock_out           String?
   scheduled_start     String?
@@ -314,23 +314,39 @@ model department {
 }
 
 model derechohabiente {
-  id                String    @id @db.VarChar(255)
-  created_date      DateTime? @default(now()) @db.Timestamp(6)
-  updated_date      DateTime? @default(now()) @db.Timestamp(6)
-  created_by        String?   @default("system")
-  employee_id       String?   @db.VarChar(255)
-  first_name        String?
-  last_name         String?
-  relationship      String?
-  document_type     String?
-  document_number   String?
-  birth_date        DateTime? @db.Date
-  gender            String?
-  phone             String?
-  email             String?
-  address           String?
-  is_active         Boolean?  @default(true)
-  registration_date DateTime? @db.Date
+  id                       String    @id @db.VarChar(255)
+  created_date             DateTime? @default(now()) @db.Timestamp(6)
+  updated_date             DateTime? @default(now()) @db.Timestamp(6)
+  created_by               String?   @default("system")
+  employee_id              String?
+  first_name               String?
+  last_name                String?
+  relationship             String?
+  document_type            String?
+  document_number          String?
+  birth_date               DateTime? @db.Date
+  gender                   String?
+  phone                    String?
+  email                    String?
+  address                  String?
+  is_active                Boolean?  @default(true)
+  registration_date        DateTime? @db.Date
+  deregistration_date      DateTime? @db.Date
+  conception_month         String?
+  city_code                String?
+  ubigeo2                  String?
+  address_reference2       String?
+  health_center_indicator  String?
+  document_number_sustento String?
+  address2                 String?
+  last_name_paterno        String?
+  document_type_sustento   String?
+  address_reference        String?
+  ubigeo                   String?
+  last_name_materno        String?
+  country_code             String?
+  created_by_id            String?
+  is_sample                Boolean?
 }
 
 model device_event {
@@ -344,7 +360,7 @@ model employee {
   employee_code                  String?
   document_type                  String?
   document_number                String?
-  first_name                     String?
+  first_name                     String
   last_name                      String?
   birth_date                     DateTime?         @db.Date
   gender                         String?
@@ -728,6 +744,7 @@ model work_schedule {
   created_by             String?
   is_sample              Boolean?
   effective_from         DateTime? @db.Date
+  effective_to           DateTime? @db.Date
 }
 
 model vacation_request {
@@ -938,22 +955,6 @@ model asiento_contable {
   is_sample         Boolean?
 }
 
-model PayrollConfig {
-  id                   String    @id @db.VarChar(255)
-  created_date         DateTime? @default(now()) @db.Timestamp(6)
-  updated_date         DateTime? @default(now()) @db.Timestamp(6)
-  created_by           String?
-  updated_by           String?
-  config_type          String    @default("Quincenal") @db.VarChar(100)
-  quincenal_percentage Decimal?  @default(40) @db.Decimal(10, 2)
-  quincenal_cutoff_day Int?      @default(7)
-  is_active            Boolean?  @default(true)
-  notes                String?
-
-  @@index([is_active], map: "idx_payroll_config_active")
-  @@index([config_type], map: "idx_payroll_config_type")
-}
-
 model attendance_incident_backup_20260423 {
   employee_id             String?
   attendance_record_id    String?
@@ -964,7 +965,7 @@ model attendance_incident_backup_20260423 {
   justified_time_start    String?
   justified_time_end      String?
   full_day_justification  Boolean?
-  hours_to_adjust         Int?
+  hours_to_adjust         Decimal?  @db.Decimal(18, 2)
   late_minutes_to_adjust  Int?
   status                  String?
   reviewed_by             String?
@@ -998,8 +999,8 @@ model attendance_logs {
 }
 
 model attendance_record_backup_20260423 {
-  employee_id         String?
-  date                DateTime? @db.Date
+  employee_id         String
+  date                DateTime  @db.Date
   clock_in            String?
   clock_out           String?
   scheduled_start     String?
@@ -1038,4 +1039,7 @@ model payroll_config {
   quincenal_cutoff_day Int?      @default(7)
   is_active            Boolean?  @default(true)
   notes                String?
+
+  @@index([is_active], map: "idx_payroll_config_active")
+  @@index([config_type], map: "idx_payroll_config_type")
 }
