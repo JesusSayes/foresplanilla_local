@@ -111,52 +111,73 @@ export default function VacationManagement() {
         }
       }
 
-      // Crear/actualizar registros de asistencia para todo el período
-      // Generar lista de fechas "yyyy-MM-dd" sin desfase de timezone:
-      // iteramos día a día sumando 1 al string de fecha directamente.
+      // Extraer "yyyy-MM-dd" de forma segura desde cualquier formato
+      const extractDateStr = (input) => {
+        if (!input) return null;
+        const s = String(input).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        const d = new Date(s);
+        if (isNaN(d.getTime())) return null;
+        const y = d.getUTCFullYear();
+        const mo = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(d.getUTCDate()).padStart(2, "0");
+        return `${y}-${mo}-${day}`;
+      };
+
+      const startStr = extractDateStr(request.start_date);
+      const endStr = extractDateStr(request.end_date);
+
+      // Generar fechas "yyyy-MM-dd" usando UTC noon para evitar cualquier desfase de TZ
       const allDates = [];
-      const [sy, sm, sd] = request.start_date.split("-").map(Number);
-      const [ey, em, ed] = request.end_date.split("-").map(Number);
-      let cur = new Date(sy, sm - 1, sd); // fecha local, sin UTC
-      const end = new Date(ey, em - 1, ed);
-      while (cur <= end) {
-        const y = cur.getFullYear();
-        const m = String(cur.getMonth() + 1).padStart(2, "0");
-        const d = String(cur.getDate()).padStart(2, "0");
-        allDates.push(`${y}-${m}-${d}`);
-        cur.setDate(cur.getDate() + 1);
+      if (startStr && endStr) {
+        const [sy, sm, sd] = startStr.split("-").map(Number);
+        const [ey, em, ed] = endStr.split("-").map(Number);
+        let cur = new Date(Date.UTC(sy, sm - 1, sd, 12, 0, 0));
+        const endUTC = new Date(Date.UTC(ey, em - 1, ed, 12, 0, 0));
+        while (cur <= endUTC) {
+          const y = cur.getUTCFullYear();
+          const m = String(cur.getUTCMonth() + 1).padStart(2, "0");
+          const d = String(cur.getUTCDate()).padStart(2, "0");
+          allDates.push(`${y}-${m}-${d}`);
+          cur = new Date(cur.getTime() + 24 * 60 * 60 * 1000);
+        }
       }
 
       const existingRecords = await entitiesAPI.AttendanceRecord.filter({
         employee_id: request.employee_id,
       });
       const existingByDate = {};
-      existingRecords.forEach(r => { existingByDate[r.date] = r; });
+      existingRecords.forEach(r => {
+        // Normalizar la fecha del registro por si viene en formato ISO
+        const normalizedDate = extractDateStr(r.date) || r.date;
+        existingByDate[normalizedDate] = r;
+      });
+
+      const vacationPayload = (dateStr) => ({
+        employee_id: request.employee_id,
+        date: dateStr,
+        clock_in: "09:00",
+        clock_out: "18:00",
+        scheduled_start: "09:00",
+        scheduled_end: "18:00",
+        worked_hours: 8,
+        regular_hours: 8,
+        overtime_hours_25: 0,
+        overtime_hours_35: 0,
+        overtime_authorized: false,
+        is_late: false,
+        late_minutes: 0,
+        is_absent: false,
+        status: "Justificado",
+        notes: `Vacaciones aprobadas (${request.request_type})`,
+      });
 
       for (const dateStr of allDates) {
         if (existingByDate[dateStr]) {
-          await entitiesAPI.AttendanceRecord.update(existingByDate[dateStr].id, {
-            status: "Justificado",
-            notes: `Vacaciones aprobadas (${request.request_type})`,
-          });
+          // Sobreescribir TODOS los campos del registro existente con los datos de vacaciones
+          await entitiesAPI.AttendanceRecord.update(existingByDate[dateStr].id, vacationPayload(dateStr));
         } else {
-          await entitiesAPI.AttendanceRecord.create({
-            employee_id: request.employee_id,
-            date: dateStr,
-            clock_in: "09:00",
-            clock_out: "18:00",
-            scheduled_start: "09:00",
-            scheduled_end: "18:00",
-            worked_hours: 8,
-            regular_hours: 8,
-            overtime_hours_25: 0,
-            overtime_hours_35: 0,
-            is_late: false,
-            late_minutes: 0,
-            is_absent: false,
-            status: "Justificado",
-            notes: `Vacaciones aprobadas (${request.request_type})`,
-          });
+          await entitiesAPI.AttendanceRecord.create(vacationPayload(dateStr));
         }
       }
     },
