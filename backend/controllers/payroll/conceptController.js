@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import { generate24HexId } from '../../utils/idGenerator.js';
 
 export const getAll = async (req, res) => {
   try {
@@ -26,8 +27,12 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
+    const { id, ...data } = req.body;
     const concept = await prisma.payroll_concept.create({
-      data: req.body
+      data: {
+        id: generate24HexId(),
+        ...data
+      }
     });
     res.status(201).json(concept);
   } catch (error) {
