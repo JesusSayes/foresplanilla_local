@@ -335,16 +335,30 @@ export default function PayrollManagement() {
     // Excluir empleados que el usuario haya quitado
     filteredEmployees = filteredEmployees.filter(emp => !excludedEmployees.includes(emp.id));
 
-    // Detectar empleados sin salario base configurado
-    const employeesWithoutSalary = filteredEmployees.filter(emp => 
-      !emp.base_salary || parseFloat(emp.base_salary) <= 0
-    );
-    if (employeesWithoutSalary.length > 0) {
-      const names = employeesWithoutSalary.map(e => `${e.employee_code} - ${e.first_name} ${e.last_name}`).join(", ");
-      toast.warning(`⚠️ ${employeesWithoutSalary.length} empleado(s) sin salario base configurado: ${names}. Se calcularán con S/ 0.`, { duration: 8000 });
+    // Para cada empleado sin base_salary, buscar en su contrato vigente y actualizar
+    const enrichedEmployees = await Promise.all(filteredEmployees.map(async (emp) => {
+      if (!emp.base_salary || parseFloat(emp.base_salary) <= 0) {
+        // Buscar contrato vigente del empleado
+        const contracts = await base44.entities.Contract.filter({ employee_id: emp.id, status: "Vigente" });
+        const activeContract = contracts.find(c => c.salary && parseFloat(c.salary) > 0);
+        if (activeContract) {
+          const salaryFromContract = parseFloat(activeContract.salary);
+          // Actualizar el empleado con el salario del contrato
+          await base44.entities.Employee.update(emp.id, { base_salary: salaryFromContract });
+          return { ...emp, base_salary: salaryFromContract };
+        }
+      }
+      return emp;
+    }));
+
+    // Re-verificar empleados aún sin salario (ni en Employee ni en contrato)
+    const stillWithoutSalary = enrichedEmployees.filter(emp => !emp.base_salary || parseFloat(emp.base_salary) <= 0);
+    if (stillWithoutSalary.length > 0) {
+      const names = stillWithoutSalary.map(e => `${e.employee_code} - ${e.first_name} ${e.last_name}`).join(", ");
+      toast.warning(`⚠️ ${stillWithoutSalary.length} empleado(s) sin salario ni contrato vigente: ${names}`, { duration: 8000 });
     }
 
-    const payslipsData = await Promise.all(filteredEmployees.map(async (emp) => {
+    const payslipsData = await Promise.all(enrichedEmployees.map(async (emp) => {
       // Preparar datos de asistencia
       const empAttendance = attendanceRecords.filter(r => {
         if (r.employee_id !== emp.id) return false;
