@@ -1,4 +1,5 @@
 import prisma from "../config/prisma.js";
+import { generate24HexId } from "../utils/idGenerator.js";
 
 /**
  * CONFIG
@@ -368,8 +369,42 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
     },
   });
 
+  const logEmployeeIds = [
+    ...new Set(logs.map(log => log.employee_id).filter(Boolean)),
+  ];
+
+  const existingRecordEmployeeIds = new Set(
+    records.map(record => record.employee_id).filter(Boolean)
+  );
+
+  const missingEmployeeIds = logEmployeeIds.filter(
+    employeeId => !existingRecordEmployeeIds.has(employeeId)
+  );
+
+  if (missingEmployeeIds.length > 0) {
+    await prisma.attendance_record.createMany({
+      data: missingEmployeeIds.map(employeeId => ({
+        id: generate24HexId(),
+        employee_id: employeeId,
+        date: new Date(dateStr + "T00:00:00"),
+        status: "Sin marcar",
+        worked_hours: 0,
+        is_absent: false,
+        created_date: new Date(),
+        updated_date: new Date(),
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  const recordsToProcess = await prisma.attendance_record.findMany({
+    where: {
+      date: new Date(dateStr + "T00:00:00"),
+    },
+  });
+
   const employeeIds = [
-    ...new Set(records.map(r => r.employee_id).filter(Boolean)),
+    ...new Set(recordsToProcess.map(r => r.employee_id).filter(Boolean)),
   ];
 
   const [employees, schedulesRaw] = await Promise.all([
@@ -390,7 +425,7 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
   /**
    * 4. Procesar cada empleado
    */
-  for (const record of records) {
+  for (const record of recordsToProcess) {
     if (record.status === "Aprobada" && record.clock_in && record.clock_out) {
       continue;
     }
