@@ -197,10 +197,16 @@ cron.schedule('0 0 * * *', () => {
 }, { timezone: CRON_TIMEZONE });
 
 // Cron: sincronización de asistencias externas cada hora en minuto 15
-cron.schedule('15 * * * *', () => {
-  console.log('[Cron] Ejecutando sincronización de asistencias externas...');
-  syncExternalAttendance().catch(err => console.error('[Cron] Error en sync asistencias externas:', err.message));
-}, { timezone: CRON_TIMEZONE });
+if (process.env.NODE_ENV === 'production') {
+  cron.schedule('15 * * * *', () => {
+    console.log('[Cron] Ejecutando sincronización de asistencias externas...');
+    syncExternalAttendance().catch(err => console.error('[Cron] Error en sync asistencias externas:', err.message));
+  }, { timezone: CRON_TIMEZONE });
+} else{
+  cron.schedule('15 * * * *', () => {
+    console.log('[Cron] Ejecuta sincronización de asistencias externas...');
+  }, { timezone: CRON_TIMEZONE });
+}
 
 // 404 handler
 app.use((req, res) => {
