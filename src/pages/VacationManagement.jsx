@@ -147,32 +147,37 @@ export default function VacationManagement() {
         employee_id: request.employee_id,
       });
       const existingByDate = {};
-      existingRecords.forEach(r => { existingByDate[r.date] = r; });
+      existingRecords.forEach(r => {
+        // Normalizar la fecha del registro por si viene en formato ISO
+        const normalizedDate = extractDateStr(r.date) || r.date;
+        existingByDate[normalizedDate] = r;
+      });
+
+      const vacationPayload = (dateStr) => ({
+        employee_id: request.employee_id,
+        date: dateStr,
+        clock_in: "09:00",
+        clock_out: "18:00",
+        scheduled_start: "09:00",
+        scheduled_end: "18:00",
+        worked_hours: 8,
+        regular_hours: 8,
+        overtime_hours_25: 0,
+        overtime_hours_35: 0,
+        overtime_authorized: false,
+        is_late: false,
+        late_minutes: 0,
+        is_absent: false,
+        status: "Justificado",
+        notes: `Vacaciones aprobadas (${request.request_type})`,
+      });
 
       for (const dateStr of allDates) {
         if (existingByDate[dateStr]) {
-          await entitiesAPI.AttendanceRecord.update(existingByDate[dateStr].id, {
-            status: "Justificado",
-            notes: `Vacaciones aprobadas (${request.request_type})`,
-          });
+          // Sobreescribir TODOS los campos del registro existente con los datos de vacaciones
+          await entitiesAPI.AttendanceRecord.update(existingByDate[dateStr].id, vacationPayload(dateStr));
         } else {
-          await entitiesAPI.AttendanceRecord.create({
-            employee_id: request.employee_id,
-            date: dateStr,
-            clock_in: "09:00",
-            clock_out: "18:00",
-            scheduled_start: "09:00",
-            scheduled_end: "18:00",
-            worked_hours: 8,
-            regular_hours: 8,
-            overtime_hours_25: 0,
-            overtime_hours_35: 0,
-            is_late: false,
-            late_minutes: 0,
-            is_absent: false,
-            status: "Justificado",
-            notes: `Vacaciones aprobadas (${request.request_type})`,
-          });
+          await entitiesAPI.AttendanceRecord.create(vacationPayload(dateStr));
         }
       }
     },
