@@ -75,16 +75,20 @@ export class PayrollCalculator {
    * Evaluación segura de expresiones matemáticas
    */
   safeEval(expression) {
-    // Permitir solo operaciones matemáticas básicas
+    // Convertir la expresión a string y limpiar espacios extras
+    const expr = String(expression).trim();
+
+    // Permitir solo operaciones matemáticas básicas (números, operadores, paréntesis, punto decimal)
     const allowedChars = /^[0-9+\-*/.() ]+$/;
     
-    if (!allowedChars.test(expression)) {
-      throw new Error('Fórmula contiene caracteres no permitidos');
+    if (!allowedChars.test(expr)) {
+      throw new Error(`Fórmula contiene caracteres no permitidos tras reemplazar variables: "${expr}"`);
     }
 
     try {
       // Usar Function para evaluar de forma segura
-      return Function('"use strict"; return (' + expression + ')')();
+      const result = Function('"use strict"; return (' + expr + ')')();
+      return typeof result === 'number' && isFinite(result) ? result : 0;
     } catch (error) {
       throw new Error('Error al evaluar la fórmula: ' + error.message);
     }
