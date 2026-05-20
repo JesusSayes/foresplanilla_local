@@ -30,35 +30,37 @@ export function parseDateLima(input) {
   // Ya es un Date válido
   if (input instanceof Date) {
     if (isNaN(input.getTime())) return null;
-    // Extraer la fecha local y fijarla al mediodía Lima
-    const y = input.getFullYear();
-    const m = String(input.getMonth() + 1).padStart(2, "0");
-    const d = String(input.getDate()).padStart(2, "0");
-    return new Date(`${y}-${m}-${d}T12:00:00-05:00`);
+    // react-day-picker entrega medianoche UTC, usar propiedades UTC para evitar desfase en zonas negativas
+    const y = input.getUTCFullYear();
+    const m = String(input.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(input.getUTCDate()).padStart(2, "0");
+    return new Date(`${y}-${m}-${d}T12:00:00Z`);
   }
 
   // Timestamp numérico
   if (typeof input === "number") {
     const d = new Date(input);
     if (isNaN(d.getTime())) return null;
-    const y = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return new Date(`${y}-${mo}-${day}T12:00:00-05:00`);
+    const y = d.getUTCFullYear();
+    const mo = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return new Date(`${y}-${mo}-${day}T12:00:00Z`);
   }
 
   const str = String(input).trim();
 
-  // Formato "yyyy-MM-dd" exacto → fijarlo al mediodía Lima directamente
+  // Formato "yyyy-MM-dd" exacto → fijarlo al mediodía UTC directamente (fecha fija, sin TZ shift)
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    return new Date(`${str}T12:00:00-05:00`);
+    return new Date(`${str}T12:00:00Z`);
   }
 
-  // ISO datetime u otro string con hora → parsear y extraer sólo la parte de fecha local Lima
+  // ISO datetime u otro string con hora → parsear y extraer la parte de fecha en UTC
   const d = new Date(str);
   if (isNaN(d.getTime())) return null;
-  const dateOnly = d.toLocaleDateString("en-CA", { timeZone: LIMA_TZ }); // "yyyy-MM-dd"
-  return new Date(`${dateOnly}T12:00:00-05:00`);
+  const y = d.getUTCFullYear();
+  const mo = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return new Date(`${y}-${mo}-${day}T12:00:00Z`);
 }
 
 /**
@@ -83,15 +85,15 @@ export function formatDateTimeLima(dateOrStr, options = { day: "2-digit", month:
 
 /**
  * Convierte un objeto Date (del Calendar picker) a string "yyyy-MM-dd".
- * Usa las propiedades locales del Date (.getFullYear/.getMonth/.getDate) directamente,
- * ya que react-day-picker construye el Date con la fecha visual del usuario a medianoche UTC.
- * NO aplicar conversión de timezone aquí, de lo contrario UTC-5 adelanta un día.
+ * react-day-picker construye el Date como medianoche UTC (ej: 2026-05-20T00:00:00Z),
+ * por lo que se usan las propiedades UTC (.getUTCFullYear etc.) para evitar
+ * que una zona horaria negativa (UTC-5) adelante el día al día anterior.
  */
 export function dateToStringLima(date) {
   if (!date) return "";
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
 
