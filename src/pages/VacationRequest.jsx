@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { format, differenceInBusinessDays, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 
 export default function VacationRequest() {
@@ -310,7 +311,7 @@ export default function VacationRequest() {
                   {vacationBalance.deadline && (
                     <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                       <p className="text-sm text-amber-800">
-                        <strong>Fecha límite:</strong> {format(new Date(vacationBalance.deadline), "dd 'de' MMMM, yyyy", { locale: es })}
+                        <strong>Fecha límite:</strong> {format(parseDateLima(vacationBalance.deadline), "dd 'de' MMMM, yyyy", { locale: es })}
                       </p>
                     </div>
                   )}
@@ -664,7 +665,7 @@ export default function VacationRequest() {
                                 {request.request_type}
                               </h4>
                               <p className="text-sm text-slate-600">
-                                {format(new Date(request.start_date), "dd MMM", { locale: es })} - {format(new Date(request.end_date), "dd MMM yyyy", { locale: es })}
+                                {format(parseDateLima(request.start_date), "dd MMM", { locale: es })} - {format(parseDateLima(request.end_date), "dd MMM yyyy", { locale: es })}
                               </p>
                             </div>
                             <Badge className={getStatusConfig(request.status).color}>
