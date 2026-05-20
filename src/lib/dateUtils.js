@@ -22,12 +22,43 @@ export function nowTimeLima() {
 /**
  * Retorna un objeto Date ajustado al mediodía de Lima para evitar
  * desplazamientos de día al parsear strings "yyyy-MM-dd".
- * Usar siempre en lugar de new Date("yyyy-MM-dd") para mostrar fechas.
+ * Tolerante a: string "yyyy-MM-dd", ISO datetime, Date object, timestamp numérico.
  */
-export function parseDateLima(dateStr) {
-  if (!dateStr) return null;
-  // "2024-03-01" → "2024-03-01T12:00:00-05:00" (mediodía Lima)
-  return new Date(`${dateStr}T12:00:00-05:00`);
+export function parseDateLima(input) {
+  if (!input) return null;
+
+  // Ya es un Date válido
+  if (input instanceof Date) {
+    if (isNaN(input.getTime())) return null;
+    // Extraer la fecha local y fijarla al mediodía Lima
+    const y = input.getFullYear();
+    const m = String(input.getMonth() + 1).padStart(2, "0");
+    const d = String(input.getDate()).padStart(2, "0");
+    return new Date(`${y}-${m}-${d}T12:00:00-05:00`);
+  }
+
+  // Timestamp numérico
+  if (typeof input === "number") {
+    const d = new Date(input);
+    if (isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return new Date(`${y}-${mo}-${day}T12:00:00-05:00`);
+  }
+
+  const str = String(input).trim();
+
+  // Formato "yyyy-MM-dd" exacto → fijarlo al mediodía Lima directamente
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return new Date(`${str}T12:00:00-05:00`);
+  }
+
+  // ISO datetime u otro string con hora → parsear y extraer sólo la parte de fecha local Lima
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return null;
+  const dateOnly = d.toLocaleDateString("en-CA", { timeZone: LIMA_TZ }); // "yyyy-MM-dd"
+  return new Date(`${dateOnly}T12:00:00-05:00`);
 }
 
 /**
