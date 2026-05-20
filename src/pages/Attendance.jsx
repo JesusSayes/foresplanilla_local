@@ -13,9 +13,10 @@ import {
   Clock, Calendar as CalendarIcon, AlertCircle, CheckCircle, 
   XCircle, TrendingUp, FileText, Upload, Filter, ChevronDown, History
 } from "lucide-react";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInMinutes, parseISO } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { parseDateLima, dateToStringLima, todayLima } from "@/lib/dateUtils";
 import ClockInOutWidget from "../components/attendance/ClockInOutWidget";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 
@@ -111,7 +112,7 @@ export default function Attendance() {
       );
 
       return records.filter(r => {
-        const recordDate = new Date(r.date);
+        const recordDate = parseDateLima(r.date);
         return recordDate >= startDate && recordDate <= endDate;
       });
     },
@@ -119,7 +120,7 @@ export default function Attendance() {
   });
 
   const todayRecord = attendanceRecords.find(
-    r => r.date === format(new Date(), "yyyy-MM-dd")
+    r => r.date === todayLima()
   );
 
   const { data: incidents = [] } = useQuery({
@@ -177,7 +178,7 @@ export default function Attendance() {
     const incidentData = {
       employee_id: employee.id,
       attendance_record_id: selectedRecord?.id || null,
-      incident_date: selectedRecord?.date || format(new Date(), "yyyy-MM-dd"),
+      incident_date: selectedRecord?.date || todayLima(),
       incident_type: justificationForm.incident_type,
       justification: justificationForm.justification,
       supporting_document_url: justificationForm.supporting_document_url,
@@ -217,7 +218,7 @@ export default function Attendance() {
   const getScheduleForDay = (date) => {
     if (!workSchedule) return { start: "09:00", end: "18:00" };
     
-    const dayOfWeek = format(new Date(date), "EEEE", { locale: es }).toLowerCase();
+    const dayOfWeek = format(parseDateLima(date), "EEEE", { locale: es }).toLowerCase();
     const dayMapping = {
       "lunes": { start: workSchedule.monday_start, end: workSchedule.monday_end },
       "martes": { start: workSchedule.tuesday_start, end: workSchedule.tuesday_end },
@@ -455,7 +456,7 @@ export default function Attendance() {
                           <div className="flex items-start justify-between mb-3">
                             <div>
                               <h4 className="font-semibold text-slate-900 mb-1">
-                                {format(new Date(record.date), "EEEE, dd 'de' MMMM", { locale: es })}
+                                {format(parseDateLima(record.date), "EEEE, dd 'de' MMMM", { locale: es })}
                               </h4>
                               <div className="flex gap-4 text-sm">
                                 <div>
@@ -570,7 +571,7 @@ export default function Attendance() {
                                 {incident.incident_type}
                               </h4>
                               <p className="text-xs text-slate-600">
-                                {format(new Date(incident.incident_date), "dd MMM yyyy", { locale: es })}
+                                {format(parseDateLima(incident.incident_date), "dd MMM yyyy", { locale: es })}
                               </p>
                             </div>
                             <Badge className={getIncidentStatusConfig(incident.status).color + " text-xs"}>
@@ -688,7 +689,7 @@ export default function Attendance() {
                   {selectedRecord && (
                     <div className="p-4 bg-slate-50 rounded-lg">
                       <p className="text-sm text-slate-600 mb-1">
-                        Fecha: <strong>{format(new Date(selectedRecord.date), "dd 'de' MMMM, yyyy", { locale: es })}</strong>
+                        Fecha: <strong>{format(parseDateLima(selectedRecord.date), "dd 'de' MMMM, yyyy", { locale: es })}</strong>
                       </p>
                       {selectedRecord.is_late && (
                         <p className="text-sm text-orange-600">

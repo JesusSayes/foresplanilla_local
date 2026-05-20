@@ -18,6 +18,7 @@ import {
   endOfWeek
 } from "date-fns";
 import { es } from "date-fns/locale";
+import { parseDateLima } from "@/lib/dateUtils";
 import PermissionGuard from "../components/PermissionGuard";
 
 export default function VacationCalendar() {
@@ -90,8 +91,8 @@ export default function VacationCalendar() {
   };
 
   const isDateInVacation = (date, request) => {
-    const start = new Date(request.start_date);
-    const end = new Date(request.end_date);
+    const start = parseDateLima(request.start_date);
+    const end = parseDateLima(request.end_date);
     return date >= start && date <= end;
   };
 
@@ -280,8 +281,8 @@ export default function VacationCalendar() {
               <CardContent className="p-6">
                 <div className="space-y-4">
                   {filteredRequests
-                    .filter(r => new Date(r.start_date) >= new Date())
-                    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+                    .filter(r => parseDateLima(r.start_date) >= new Date())
+                    .sort((a, b) => parseDateLima(a.start_date) - parseDateLima(b.start_date))
                     .slice(0, 5)
                     .map(request => (
                       <div key={request.id} className="p-3 border border-slate-200 rounded-lg">
@@ -298,10 +299,10 @@ export default function VacationCalendar() {
                         </div>
                         <div className="text-xs text-slate-600">
                           <p>
-                            <strong>Desde:</strong> {format(new Date(request.start_date), "dd MMM", { locale: es })}
+                            <strong>Desde:</strong> {format(parseDateLima(request.start_date), "dd MMM", { locale: es })}
                           </p>
                           <p>
-                            <strong>Hasta:</strong> {format(new Date(request.end_date), "dd MMM", { locale: es })}
+                            <strong>Hasta:</strong> {format(parseDateLima(request.end_date), "dd MMM", { locale: es })}
                           </p>
                           <p>
                             <strong>Duración:</strong> {request.total_days} días
@@ -310,7 +311,7 @@ export default function VacationCalendar() {
                       </div>
                     ))}
                   
-                  {filteredRequests.filter(r => new Date(r.start_date) >= new Date()).length === 0 && (
+                  {filteredRequests.filter(r => parseDateLima(r.start_date) >= new Date()).length === 0 && (
                     <p className="text-slate-500 text-sm text-center py-4">
                       No hay vacaciones próximas
                     </p>

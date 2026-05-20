@@ -17,7 +17,7 @@ import {
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { todayLima, todayDateLima } from "@/lib/dateUtils";
+import { todayLima, todayDateLima, parseDateLima, dateToStringLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
 import { usePermissions } from "../components/hooks/usePermissions";
@@ -92,11 +92,11 @@ export default function AttendanceManagement() {
       if (isRangeMode && dateFrom && dateTo) {
         // Cargar todos los registros en el rango
         const allRecs = await base44.entities.AttendanceRecord.list("-date", 2000);
-        const fromStr = format(dateFrom, "yyyy-MM-dd");
-        const toStr = format(dateTo, "yyyy-MM-dd");
+        const fromStr = dateToStringLima(dateFrom);
+        const toStr = dateToStringLima(dateTo);
         return allRecs.filter(r => r.date >= fromStr && r.date <= toStr);
       }
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const dateStr = dateToStringLima(selectedDate);
       return await base44.entities.AttendanceRecord.filter({ date: dateStr }, "-created_date");
     },
   });
@@ -122,8 +122,8 @@ export default function AttendanceManagement() {
     },
   });
 
-  const todayIsHoliday = holidays.some(h => h.date === format(selectedDate, "yyyy-MM-dd") && h.is_mandatory);
-  const holidayInfo = holidays.find(h => h.date === format(selectedDate, "yyyy-MM-dd"));
+  const todayIsHoliday = holidays.some(h => h.date === dateToStringLima(selectedDate) && h.is_mandatory);
+  const holidayInfo = holidays.find(h => h.date === dateToStringLima(selectedDate));
 
   const { data: allIncidents = [] } = useQuery({
     queryKey: ["allIncidents"],
@@ -147,15 +147,15 @@ export default function AttendanceManagement() {
 
   // Vacaciones aprobadas que cubren la(s) fecha(s) seleccionada(s)
   const { data: approvedVacations = [] } = useQuery({
-    queryKey: ["approvedVacations", format(selectedDate, "yyyy-MM-dd"), isRangeMode, dateFrom, dateTo],
+    queryKey: ["approvedVacations", dateToStringLima(selectedDate), isRangeMode, dateFrom, dateTo],
     queryFn: async () => {
       const all = await base44.entities.VacationRequest.filter({ status: "Aprobada" }, "-start_date", 500);
       if (isRangeMode && dateFrom && dateTo) {
-        const fromStr = format(dateFrom, "yyyy-MM-dd");
-        const toStr = format(dateTo, "yyyy-MM-dd");
+        const fromStr = dateToStringLima(dateFrom);
+        const toStr = dateToStringLima(dateTo);
         return all.filter(v => v.start_date <= toStr && v.end_date >= fromStr);
       }
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const dateStr = dateToStringLima(selectedDate);
       return all.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
     },
   });
@@ -173,7 +173,7 @@ export default function AttendanceManagement() {
   }, [selectedDate, employee]);
 
   const { data: employeeIncidents = [] } = useQuery({
-    queryKey: ["employeeIncidents", historyEmployeeId],
+    queryKey: ["employeeIncidents", historyEmployeeId], 
     queryFn: async () => {
       if (!historyEmployeeId) return [];
       return await base44.entities.AttendanceIncident.filter({ employee_id: historyEmployeeId }, "-created_date");
@@ -215,7 +215,7 @@ export default function AttendanceManagement() {
     },
     onSuccess: async (result) => {
       // Recalcular métricas para todos los empleados con registros en la fecha seleccionada
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const dateStr = dateToStringLima(selectedDate);
       const recordsForDate = await base44.entities.AttendanceRecord.filter({ date: dateStr });
       const affectedEmployeeIds = [...new Set(recordsForDate.map(r => r.employee_id))];
       for (const empId of affectedEmployeeIds) {
@@ -261,7 +261,7 @@ export default function AttendanceManagement() {
   };
 
   // Compatibilidad: sin fecha usa la fecha seleccionada
-  const getEmployeeSchedule = (empId) => getEmployeeScheduleForDate(empId, format(selectedDate, "yyyy-MM-dd"));
+  const getEmployeeSchedule = (empId) => getEmployeeScheduleForDate(empId, dateToStringLima(selectedDate));
   const isOvertimeAuthorized = (empId) => getEmployeeSchedule(empId)?.overtime_authorized || false;
 
   const handleEditRecord = (record) => {
@@ -437,7 +437,7 @@ export default function AttendanceManagement() {
   const handleJustifyClick = async (emp, record, overrideDate) => {
     setJustifyingEmployee(emp);
 
-    const dateStr = overrideDate || format(selectedDate, "yyyy-MM-dd");
+    const dateStr = overrideDate || dateToStringLima(selectedDate);
     setJustifyingDate(overrideDate ? new Date(overrideDate + "T00:00:00") : selectedDate);
 
     // Obtener el horario del empleado para la fecha específica
@@ -576,7 +576,7 @@ export default function AttendanceManagement() {
     });
   } else {
     // Solo mostrar empleados que tengan un registro en la BD para la fecha seleccionada (no futura)
-    const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
+    const selectedDateStr = dateToStringLima(selectedDate);
     if (selectedDateStr > todayDateStr) {
       employeesWithRecords = [];
     } else {
@@ -666,8 +666,8 @@ export default function AttendanceManagement() {
     XLSX.utils.book_append_sheet(wb, ws, 'Asistencia');
     const filterText = attendanceFilter === "all" ? "Todos" : attendanceFilter === "sin_entrada" ? "Sin_Entrada" : attendanceFilter === "sin_salida" ? "Sin_Salida" : "Con_Tardanza";
     const dateLabel = isRangeMode && dateFrom && dateTo
-      ? `${format(dateFrom, "yyyy-MM-dd")}_${format(dateTo, "yyyy-MM-dd")}`
-      : format(selectedDate, "yyyy-MM-dd");
+      ? `${dateToStringLima(dateFrom)}_${dateToStringLima(dateTo)}`
+      : dateToStringLima(selectedDate);
     XLSX.writeFile(wb, `Asistencia_${dateLabel}_${filterText}.xlsx`);
     toast.success('✓ Archivo Excel generado correctamente');
   };
@@ -676,7 +676,7 @@ export default function AttendanceManagement() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) { toast.error('Por favor, permite las ventanas emergentes para imprimir'); return; }
     const filterText = attendanceFilter === "all" ? "Todos los empleados" : attendanceFilter === "sin_entrada" ? "Sin marcar entrada" : attendanceFilter === "sin_salida" ? "Sin marcar salida" : "Con tardanza";
-    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>Código</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; return `<tr><td>${emp.employee_code}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${emp.record?.clock_in || '--:--'}</td><td>${emp.record?.clock_out || '--:--'}</td><td>${wh.toFixed(2)}h</td><td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h</td><td>${(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
+    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>Código</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; return `<tr><td>${emp.employee_code}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${emp.record?.clock_in || '--:--'}</td><td>${emp.record?.clock_out || '--:--'}</td><td>${wh.toFixed(2)}h</td><td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h</td><td>${(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
     printWindow.document.write(printContent);
     printWindow.document.close();
   };
@@ -859,7 +859,7 @@ export default function AttendanceManagement() {
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="bg-green-50 border-green-200 hover:bg-green-100 whitespace-nowrap">
                             <CalendarIcon className="mr-2 h-4 w-4 text-green-700" />
-                            <span className="text-green-700">{format(selectedDate, "dd MMM yyyy", { locale: es })}</span>
+                            <span className="text-green-700">{format(parseDateLima(dateToStringLima(selectedDate)), "dd MMM yyyy", { locale: es })}</span>
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -875,7 +875,7 @@ export default function AttendanceManagement() {
                           <PopoverTrigger asChild>
                             <Button variant="outline" className="bg-blue-50 border-blue-200 hover:bg-blue-100 whitespace-nowrap">
                               <CalendarIcon className="mr-2 h-4 w-4 text-blue-700" />
-                              <span className="text-blue-700">{dateFrom ? format(dateFrom, "dd MMM yyyy", { locale: es }) : "Desde"}</span>
+                              <span className="text-blue-700">{dateFrom ? format(parseDateLima(dateToStringLima(dateFrom)), "dd MMM yyyy", { locale: es }) : "Desde"}</span>
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
@@ -887,7 +887,7 @@ export default function AttendanceManagement() {
                           <PopoverTrigger asChild>
                             <Button variant="outline" className="bg-blue-50 border-blue-200 hover:bg-blue-100 whitespace-nowrap">
                               <CalendarIcon className="mr-2 h-4 w-4 text-blue-700" />
-                              <span className="text-blue-700">{dateTo ? format(dateTo, "dd MMM yyyy", { locale: es }) : "Hasta"}</span>
+                              <span className="text-blue-700">{dateTo ? format(parseDateLima(dateToStringLima(dateTo)), "dd MMM yyyy", { locale: es }) : "Hasta"}</span>
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
@@ -992,7 +992,7 @@ export default function AttendanceManagement() {
                               {/* Fecha */}
                               <td className="px-2 py-2 text-center">
                                 <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded whitespace-nowrap">
-                                  {format(new Date(rowDate + "T00:00:00"), "dd MMM", { locale: es })}
+                                 {format(parseDateLima(rowDate), "dd MMM", { locale: es })}
                                 </span>
                               </td>
                               {/* Entrada */}
@@ -1124,7 +1124,7 @@ export default function AttendanceManagement() {
                                  <Badge className="bg-red-600 text-white">{alert.overtime_hours.toFixed(2)}h extras</Badge>
                                </div>
                                <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position} • {emp?.department_name}</p>
-                               <p className="text-sm text-slate-700">📅 {format(new Date(alert.alert_date + "T00:00:00"), "dd MMM yyyy", { locale: es })}</p>
+                               <p className="text-sm text-slate-700">📅 {format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}</p>
                                {record && <p className="text-sm text-slate-600 mt-1">Marcación: {record.clock_in} - {record.clock_out} ({record.worked_hours?.toFixed(2)}h trabajadas)</p>}
                                {alertSched && (
                                  <p className="text-sm text-slate-600 mt-1">
@@ -1167,7 +1167,7 @@ export default function AttendanceManagement() {
                                   queryClient.invalidateQueries(["overtimeAlerts"]);
                                   queryClient.invalidateQueries(["todayAttendance"]);
                                   queryClient.invalidateQueries(["attendanceRecords"]);
-                                  toast.success(`HE aceptadas y recalculadas para el ${format(new Date(alert.alert_date + "T00:00:00"), "dd MMM yyyy", { locale: es })}: HE25% y HE35% actualizadas`);
+                                  toast.success(`HE aceptadas y recalculadas para el ${format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}: HE25% y HE35% actualizadas`);
                                 }}
                               >
                                 <CheckCircle className="w-4 h-4 mr-2" />Aceptar HE (solo este día)
@@ -1231,11 +1231,11 @@ export default function AttendanceManagement() {
                                     <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm">
                                       <Badge className="bg-orange-100 text-orange-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es })}</span>
-                                      </div>
-                                      </div>
-                                      </div>
-                                      <div className="p-3 bg-slate-50 rounded-lg mb-4">
+                                      <span className="text-slate-600">📅 {format(parseDateLima(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
+                                              </div>
+                                              </div>
+                                              </div>
+                                              <div className="p-3 bg-slate-50 rounded-lg mb-4">
                                   <p className="text-sm font-semibold text-slate-900 mb-1">Justificación:</p>
                                   <p className="text-sm text-slate-700">{incident.justification}</p>
                                 </div>
@@ -1287,7 +1287,7 @@ export default function AttendanceManagement() {
                                     <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm flex-wrap">
                                       <Badge className="bg-green-100 text-green-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es })}</span>
+                                      <span className="text-slate-600">📅 {format(parseDateLima(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
                                       <Badge className="bg-green-600 text-white">Aprobada</Badge>
                                     </div>
                                   </div>
@@ -1304,7 +1304,7 @@ export default function AttendanceManagement() {
                                 )}
                                 <div className="flex items-center gap-4 text-xs text-slate-600">
                                   <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
-                                  <span>Fecha: {incident.review_date ? format(new Date(incident.review_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
+                                  <span>Fecha: {incident.review_date ? format(parseDateLima(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
                                   </div>
                                   </div>
                                   );
@@ -1339,7 +1339,7 @@ export default function AttendanceManagement() {
                                     <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
                                     <div className="flex gap-4 text-sm flex-wrap">
                                       <Badge className="bg-red-100 text-red-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(new Date(incident.incident_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es })}</span>
+                                      <span className="text-slate-600">📅 {format(parseDateLima(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
                                       <Badge className="bg-red-600 text-white">Rechazada</Badge>
                                     </div>
                                   </div>
@@ -1356,7 +1356,7 @@ export default function AttendanceManagement() {
                                 )}
                                 <div className="flex items-center gap-4 text-xs text-slate-600">
                                   <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
-                                  <span>Fecha: {incident.review_date ? format(new Date(incident.review_date + "T12:00:00-05:00"), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
+                                  <span>Fecha: {incident.review_date ? format(parseDateLima(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
                                   </div>
                                   </div>
                                   );
@@ -1384,7 +1384,7 @@ export default function AttendanceManagement() {
               <CardContent className="p-6">
                 <div className="space-y-6">
                   <div className="p-4 bg-slate-50 rounded-lg">
-                    <p className="text-sm text-slate-600">Fecha: <strong>{editingRecord.date ? format(new Date(editingRecord.date + "T00:00:00"), "dd 'de' MMMM, yyyy", { locale: es }) : "Sin fecha"}</strong></p>
+                    <p className="text-sm text-slate-600">Fecha: <strong>{editingRecord.date ? format(parseDateLima(editingRecord.date), "dd 'de' MMMM, yyyy", { locale: es }) : "Sin fecha"}</strong></p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -1490,7 +1490,7 @@ export default function AttendanceManagement() {
                 <div className="space-y-6">
                   <div className="p-4 bg-slate-50 rounded-lg">
                     <p className="text-sm text-slate-600 mb-2"><strong>Tipo:</strong> {reviewingIncident.incident_type}</p>
-                    <p className="text-sm text-slate-600 mb-2"><strong>Fecha:</strong> {format(new Date(reviewingIncident.incident_date + "T12:00:00-05:00"), "dd 'de' MMMM, yyyy", { locale: es })}</p>
+                    <p className="text-sm text-slate-600 mb-2"><strong>Fecha:</strong> {format(parseDateLima(reviewingIncident.incident_date), "dd 'de' MMMM, yyyy", { locale: es })}</p>
                     {reviewingIncident.full_day_justification ? (
                       <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> <Badge className="bg-blue-100 text-blue-700">Día completo (8 horas)</Badge></p>
                     ) : (
