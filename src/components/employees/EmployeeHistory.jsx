@@ -61,13 +61,13 @@ export default function EmployeeHistory({ changes, isLoading }) {
         <div className="space-y-4 max-h-[600px] overflow-y-auto">
           {changes.map((change) => {
             const ChangeIcon = getChangeIcon(change.change_type);
-            
+
             return (
               <div key={change.id} className="flex gap-4 pb-4 border-b border-slate-100 last:border-0">
                 <div className={`p-2 rounded-lg h-fit ${getChangeColor(change.change_type).split(' ')[0]}`}>
                   <ChangeIcon className="w-5 h-5" />
                 </div>
-                
+
                 <div className="flex-1">
                   <div className="flex items-start justify-between mb-2">
                     <div>
@@ -79,11 +79,11 @@ export default function EmployeeHistory({ changes, isLoading }) {
                       </p>
                     </div>
                     <div className="text-right text-xs text-slate-500">
-                      <p>{format(new Date(change.created_date), "dd MMM yyyy", { locale: es })}</p>
-                      <p>{format(new Date(change.created_date), "HH:mm", { locale: es })}</p>
+                      <p>{format(new Date(change.change_date), "dd MMM yyyy", { locale: es })}</p>
+                      <p>{format(new Date(change.change_date), "HH:mm", { locale: es })}</p>
                     </div>
                   </div>
-                  
+
                   {change.old_value && change.new_value && (
                     <div className="text-sm bg-slate-50 rounded p-3 space-y-1">
                       <div className="flex items-center gap-2">
@@ -96,13 +96,13 @@ export default function EmployeeHistory({ changes, isLoading }) {
                       </div>
                     </div>
                   )}
-                  
+
                   {change.notes && (
                     <p className="text-sm text-slate-600 mt-2 italic">
                       "{change.notes}"
                     </p>
                   )}
-                  
+
                   <p className="text-xs text-slate-500 mt-2">
                     Modificado por: {change.changed_by}
                   </p>

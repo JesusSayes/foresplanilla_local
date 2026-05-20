@@ -11,8 +11,9 @@ import {
   CheckCircle, XCircle, Clock, Calendar, User,
   FileText, AlertCircle, Search, Filter
 } from "lucide-react";
-import { format, eachDayOfInterval, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
 
@@ -75,22 +76,28 @@ export default function ManagerApprovals() {
 
   // Crea registros de asistencia para cada día del período de vacaciones
   const createAttendanceRecordsForVacation = async (request) => {
-    const startDate = parseISO(request.start_date);
-    const endDate = parseISO(request.end_date);
-    const days = eachDayOfInterval({ start: startDate, end: endDate });
+    // Generar fechas "yyyy-MM-dd" sin desfase UTC iterando con Date local
+    const allDates = [];
+    const [sy, sm, sd] = request.start_date.split("-").map(Number);
+    const [ey, em, ed] = request.end_date.split("-").map(Number);
+    let cur = new Date(sy, sm - 1, sd);
+    const endLocal = new Date(ey, em - 1, ed);
+    while (cur <= endLocal) {
+      const y = cur.getFullYear();
+      const m = String(cur.getMonth() + 1).padStart(2, "0");
+      const d = String(cur.getDate()).padStart(2, "0");
+      allDates.push(`${y}-${m}-${d}`);
+      cur.setDate(cur.getDate() + 1);
+    }
 
-    // Obtener registros existentes para el empleado en ese rango para no duplicar
+    // Obtener registros existentes para no duplicar
     const existingRecords = await entitiesAPI.AttendanceRecord.filter({
       employee_id: request.employee_id,
     });
     const existingByDate = {};
     existingRecords.forEach(r => { existingByDate[r.date] = r; });
 
-    // Obtener horario del empleado para saber scheduled_start/scheduled_end
-    const emp = employees.find(e => e.id === request.employee_id);
-
-    for (const day of days) {
-      const dateStr = format(day, "yyyy-MM-dd");
+    for (const dateStr of allDates) {
       const recordPayload = {
         employee_id: request.employee_id,
         date: dateStr,
@@ -147,7 +154,7 @@ export default function ManagerApprovals() {
           if (request.request_type === "Permiso sin goce") {
             const emp = employees.find(e => e.id === request.employee_id);
             if (emp && emp.base_salary) {
-              const startDate = new Date(request.start_date);
+              const [startY, startM] = request.start_date.split("-").map(Number);
               const discountAmount = (emp.base_salary / 30) * request.total_days;
 
               await entitiesAPI.PayrollConcept.create({
@@ -156,11 +163,11 @@ export default function ManagerApprovals() {
                 concept_name: "Permiso sin goce",
                 amount: discountAmount,
                 is_dynamic: false,
-                month: startDate.getMonth() + 1,
-                year: startDate.getFullYear(),
+                month: startM,
+                year: startY,
                 is_recurring: false,
                 is_applied: false,
-                notes: `Descuento por ${request.total_days} días de permiso sin goce (${format(new Date(request.start_date), "dd/MM/yyyy")} - ${format(new Date(request.end_date), "dd/MM/yyyy")})`
+                notes: `Descuento por ${request.total_days} días de permiso sin goce (${format(parseDateLima(request.start_date), "dd/MM/yyyy")} - ${format(parseDateLima(request.end_date), "dd/MM/yyyy")})`
               });
             }
           }
@@ -365,13 +372,13 @@ export default function ManagerApprovals() {
                         <div>
                           <span className="text-sm text-slate-600">Desde:</span>
                           <p className="font-semibold text-slate-900">
-                            {format(new Date(request.start_date), "dd MMM yyyy", { locale: es })}
+                            {format(parseDateLima(request.start_date), "dd MMM yyyy", { locale: es })}
                           </p>
                         </div>
                         <div>
                           <span className="text-sm text-slate-600">Hasta:</span>
                           <p className="font-semibold text-slate-900">
-                            {format(new Date(request.end_date), "dd MMM yyyy", { locale: es })}
+                            {format(parseDateLima(request.end_date), "dd MMM yyyy", { locale: es })}
                           </p>
                         </div>
                       </div>
@@ -405,7 +412,7 @@ export default function ManagerApprovals() {
                         <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
                           <strong>Aprobado por:</strong> {request.approved_by}
                           <br />
-                          <strong>Fecha:</strong> {format(new Date(request.approved_date), "dd MMM yyyy", { locale: es })}
+                          <strong>Fecha:</strong> {format(parseDateLima(request.approved_date), "dd MMM yyyy", { locale: es })}
                         </div>
                       )}
 
@@ -489,7 +496,7 @@ export default function ManagerApprovals() {
                       <strong>Tipo:</strong> {selectedRequest.request_type}
                     </p>
                     <p className="text-sm text-slate-600 mb-1">
-                      <strong>Periodo:</strong> {format(new Date(selectedRequest.start_date), "dd MMM", { locale: es })} - {format(new Date(selectedRequest.end_date), "dd MMM yyyy", { locale: es })}
+                      <strong>Periodo:</strong> {format(parseDateLima(selectedRequest.start_date), "dd MMM", { locale: es })} - {format(parseDateLima(selectedRequest.end_date), "dd MMM yyyy", { locale: es })}
                     </p>
                     <p className="text-sm text-slate-600">
                       <strong>Días:</strong> {selectedRequest.total_days} días ({selectedRequest.business_days} hábiles)

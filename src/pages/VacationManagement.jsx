@@ -12,9 +12,10 @@ import {
   Calendar, Users, CheckCircle, XCircle, Clock,
   TrendingUp, AlertCircle, Search, FileText, Eye
 } from "lucide-react";
-import { format, differenceInDays, addYears, eachDayOfInterval, parseISO } from "date-fns";
+import { format, differenceInDays, addYears } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { parseDateLima } from "@/lib/dateUtils";
 import { createPageUrl } from "../utils";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
@@ -111,9 +112,20 @@ export default function VacationManagement() {
       }
 
       // Crear/actualizar registros de asistencia para todo el período
-      const startDate = parseISO(request.start_date);
-      const endDate = parseISO(request.end_date);
-      const days = eachDayOfInterval({ start: startDate, end: endDate });
+      // Generar lista de fechas "yyyy-MM-dd" sin desfase de timezone:
+      // iteramos día a día sumando 1 al string de fecha directamente.
+      const allDates = [];
+      const [sy, sm, sd] = request.start_date.split("-").map(Number);
+      const [ey, em, ed] = request.end_date.split("-").map(Number);
+      let cur = new Date(sy, sm - 1, sd); // fecha local, sin UTC
+      const end = new Date(ey, em - 1, ed);
+      while (cur <= end) {
+        const y = cur.getFullYear();
+        const m = String(cur.getMonth() + 1).padStart(2, "0");
+        const d = String(cur.getDate()).padStart(2, "0");
+        allDates.push(`${y}-${m}-${d}`);
+        cur.setDate(cur.getDate() + 1);
+      }
 
       const existingRecords = await entitiesAPI.AttendanceRecord.filter({
         employee_id: request.employee_id,
@@ -121,8 +133,7 @@ export default function VacationManagement() {
       const existingByDate = {};
       existingRecords.forEach(r => { existingByDate[r.date] = r; });
 
-      for (const day of days) {
-        const dateStr = format(day, "yyyy-MM-dd");
+      for (const dateStr of allDates) {
         if (existingByDate[dateStr]) {
           await entitiesAPI.AttendanceRecord.update(existingByDate[dateStr].id, {
             status: "Justificado",
@@ -466,13 +477,13 @@ export default function VacationManagement() {
                             <div>
                               <p className="text-slate-600">Desde</p>
                               <p className="font-semibold text-slate-900">
-                                {format(new Date(request.start_date), "dd/MM/yyyy")}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-slate-600">Hasta</p>
-                              <p className="font-semibold text-slate-900">
-                                {format(new Date(request.end_date), "dd/MM/yyyy")}
+                                {format(parseDateLima(request.start_date), "dd/MM/yyyy")}
+                                </p>
+                                </div>
+                                <div>
+                                <p className="text-slate-600">Hasta</p>
+                                <p className="font-semibold text-slate-900">
+                                {format(parseDateLima(request.end_date), "dd/MM/yyyy")}
                               </p>
                             </div>
                           </div>
@@ -544,7 +555,7 @@ export default function VacationManagement() {
 
                           <div className="text-sm text-slate-700">
                             <p>
-                              <strong>Período:</strong> {format(new Date(request.start_date), "dd/MM/yyyy")} - {format(new Date(request.end_date), "dd/MM/yyyy")}
+                              <strong>Período:</strong> {format(parseDateLima(request.start_date), "dd/MM/yyyy")} - {format(parseDateLima(request.end_date), "dd/MM/yyyy")}
                             </p>
                             {request.approved_by && (
                               <p className="text-xs text-slate-600 mt-1">
@@ -628,7 +639,7 @@ export default function VacationManagement() {
                                 <span className="text-slate-600">{req.total_days} días</span>
                               </div>
                               <p className="text-slate-900">
-                                {format(new Date(req.start_date), "dd/MM/yyyy")} - {format(new Date(req.end_date), "dd/MM/yyyy")}
+                               {format(parseDateLima(req.start_date), "dd/MM/yyyy")} - {format(parseDateLima(req.end_date), "dd/MM/yyyy")}
                               </p>
                             </div>
                           ))

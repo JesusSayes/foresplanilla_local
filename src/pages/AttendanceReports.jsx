@@ -17,9 +17,9 @@ import {
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { parseDateLima, dateToStringLima } from "@/lib/dateUtils";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import jsPDF from 'jspdf'; import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import PermissionGuard from "../components/PermissionGuard";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
@@ -86,7 +86,7 @@ export default function AttendanceReports() {
     queryFn: async () => {
       const records = await entitiesAPI.AttendanceRecord.list("-date");
       return records.filter(r => {
-        const recordDate = new Date(r.date);
+        const recordDate = parseDateLima(r.date);
         return recordDate >= appliedStartDate && recordDate <= appliedEndDate;
       });
     },
@@ -97,7 +97,7 @@ export default function AttendanceReports() {
     queryFn: async () => {
       const allIncidents = await entitiesAPI.AttendanceIncident.list("-created_date");
       return allIncidents.filter(i => {
-        const incidentDate = new Date(i.incident_date);
+        const incidentDate = parseDateLima(i.incident_date);
         return incidentDate >= appliedStartDate && incidentDate <= appliedEndDate;
       });
     },
@@ -116,9 +116,9 @@ export default function AttendanceReports() {
       const allRequests = await entitiesAPI.VacationRequest.list("-created_date");
       return allRequests.filter(v => {
         if (v.status !== "Aprobada") return false;
-        const startDate = new Date(v.start_date);
-        const endDate = new Date(v.end_date);
-        return !(endDate < appliedStartDate || startDate > appliedEndDate);
+        const vStart = parseDateLima(v.start_date);
+        const vEnd = parseDateLima(v.end_date);
+        return !(vEnd < appliedStartDate || vStart > appliedEndDate);
       });
     },
   });
@@ -174,7 +174,7 @@ export default function AttendanceReports() {
 
   // Calcular feriados en el rango de fechas aplicado
   const holidaysInRange = holidays.filter(h => {
-    const holidayDate = new Date(h.date);
+    const holidayDate = parseDateLima(h.date);
     return holidayDate >= appliedStartDate && holidayDate <= appliedEndDate && h.is_mandatory;
   });
 
@@ -250,7 +250,7 @@ export default function AttendanceReports() {
 
     // No contar como ausencias los días con vacaciones/permisos aprobados o feriados
     const absentDays = empRecords.filter(r => {
-      const recordDate = new Date(r.date);
+      const recordDate = parseDateLima(r.date);
       return r.is_absent
         && !isHoliday(recordDate)
         && !isOnVacationOrLeave(employeeId, recordDate);
@@ -258,7 +258,7 @@ export default function AttendanceReports() {
 
     const totalHours = recordsWithClockIn.reduce((sum, r) => sum + (r.worked_hours || 0), 0);
     const totalLateMinutes = recordsWithClockIn.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
-    const holidaysInPeriod = empRecords.filter(r => isHoliday(new Date(r.date))).length;
+    const holidaysInPeriod = empRecords.filter(r => isHoliday(parseDateLima(r.date))).length;
 
     // Calcular horas extras SOLO si está autorizado
     const authorized = isOvertimeAuthorized(employeeId);
@@ -441,7 +441,7 @@ export default function AttendanceReports() {
           emp ? `${emp.first_name} ${emp.last_name}` : "N/A",
           emp?.department_name || "N/A",
           inc.incident_type,
-          format(new Date(inc.incident_date), "dd/MM/yyyy"),
+          format(parseDateLima(inc.incident_date), "dd/MM/yyyy"),
           inc.status,
           inc.justification || ""
         ];
@@ -574,11 +574,11 @@ export default function AttendanceReports() {
           'Empleado': emp ? `${emp.first_name} ${emp.last_name}` : "N/A",
           'Departamento': emp?.department_name || "N/A",
           'Tipo de Incidencia': inc.incident_type,
-          'Fecha': format(new Date(inc.incident_date), "dd/MM/yyyy"),
+          'Fecha': format(parseDateLima(inc.incident_date), "dd/MM/yyyy"),
           'Estado': inc.status,
           'Justificación': inc.justification || "",
           'Revisado por': inc.reviewed_by || "Pendiente",
-          'Fecha de Revisión': inc.review_date ? format(new Date(inc.review_date), "dd/MM/yyyy") : ""
+          'Fecha de Revisión': inc.review_date ? format(parseDateLima(inc.review_date), "dd/MM/yyyy") : ""
         };
       });
       sheetName = 'Reporte Incidencias';
@@ -702,7 +702,7 @@ export default function AttendanceReports() {
           emp ? `${emp.first_name} ${emp.last_name}` : "N/A",
           emp?.department_name || "N/A",
           inc.incident_type,
-          format(new Date(inc.incident_date), "dd/MM/yy"),
+          format(parseDateLima(inc.incident_date), "dd/MM/yy"),
           inc.status
         ];
       });
@@ -789,7 +789,7 @@ export default function AttendanceReports() {
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm">
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {format(startDate, "dd MMM yyyy", { locale: es })}
+                          {format(parseDateLima(dateToStringLima(startDate)), "dd MMM yyyy", { locale: es })}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0">
@@ -809,7 +809,7 @@ export default function AttendanceReports() {
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm">
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {format(endDate, "dd MMM yyyy", { locale: es })}
+                          {format(parseDateLima(dateToStringLima(endDate)), "dd MMM yyyy", { locale: es })}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0">
@@ -1112,10 +1112,10 @@ export default function AttendanceReports() {
                             </td>
                             <td className="p-3 text-center">
                               <p className="font-medium text-slate-900">
-                                {format(new Date(record.date + 'T12:00:00-05:00'), "dd/MM/yyyy")}
+                                {format(parseDateLima(record.date), "dd/MM/yyyy")}
                               </p>
                               <p className="text-xs text-slate-500">
-                                {format(new Date(record.date + 'T12:00:00-05:00'), "EEEE", { locale: es })}
+                                {format(parseDateLima(record.date), "EEEE", { locale: es })}
                               </p>
                             </td>
                             <td className="p-3 text-center text-sm">{emp.department_name}</td>
@@ -1224,7 +1224,7 @@ export default function AttendanceReports() {
                             </Badge>
                           </td>
                           <td className="p-3 text-center text-sm">
-                            {format(new Date(inc.incident_date), "dd/MM/yyyy")}
+                           {format(parseDateLima(inc.incident_date), "dd/MM/yyyy")}
                           </td>
                           <td className="p-3 text-center">
                             <Badge className={
@@ -1384,7 +1384,7 @@ export default function AttendanceReports() {
                               <div>
                                 <p className="font-semibold text-slate-900">{holiday.name}</p>
                                 <p className="text-xs text-slate-600">
-                                  {format(new Date(holiday.date), "EEEE, dd 'de' MMMM", { locale: es })}
+                                  {format(parseDateLima(holiday.date), "EEEE, dd 'de' MMMM", { locale: es })}
                                 </p>
                               </div>
                               <Badge className={
@@ -1556,11 +1556,11 @@ export default function AttendanceReports() {
                                 <div>
                                   <div className="flex items-center gap-2">
                                    <p className="font-medium text-slate-900">
-                                     {format(new Date(record.date), "EEEE, dd 'de' MMMM", { locale: es })}
+                                     {format(parseDateLima(record.date), "EEEE, dd 'de' MMMM", { locale: es })}
                                    </p>
-                                   {getHolidayInfo(new Date(record.date)) && (
+                                   {getHolidayInfo(parseDateLima(record.date)) && (
                                      <Badge className="bg-purple-100 text-purple-700 border-purple-200">
-                                       🎉 {getHolidayInfo(new Date(record.date)).name}
+                                       🎉 {getHolidayInfo(parseDateLima(record.date)).name}
                                      </Badge>
                                    )}
                                   </div>
