@@ -339,12 +339,12 @@ export default function PayrollManagement() {
     const enrichedEmployees = await Promise.all(filteredEmployees.map(async (emp) => {
       if (!emp.base_salary || parseFloat(emp.base_salary) <= 0) {
         // Buscar contrato vigente del empleado
-        const contracts = await base44.entities.Contract.filter({ employee_id: emp.id, status: "Vigente" });
+        const contracts = await entitiesAPI.Contract.filter({ employee_id: emp.id, status: "Vigente" });
         const activeContract = contracts.find(c => c.salary && parseFloat(c.salary) > 0);
         if (activeContract) {
           const salaryFromContract = parseFloat(activeContract.salary);
           // Actualizar el empleado con el salario del contrato
-          await base44.entities.Employee.update(emp.id, { base_salary: salaryFromContract });
+          await entitiesAPI.Employee.update(emp.id, { base_salary: salaryFromContract });
           return { ...emp, base_salary: salaryFromContract };
         }
       }
