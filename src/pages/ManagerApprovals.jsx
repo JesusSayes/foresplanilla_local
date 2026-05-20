@@ -74,20 +74,40 @@ export default function ManagerApprovals() {
     enabled: !!employee,
   });
 
+  // Extrae "yyyy-MM-dd" de forma segura desde cualquier formato de fecha
+  const extractDateStr = (input) => {
+    if (!input) return null;
+    const s = String(input).trim();
+    // Si ya es "yyyy-MM-dd" exacto, usarlo directo
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    // Para ISO datetime u otros formatos, parsear y leer en UTC
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return null;
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
   // Crea registros de asistencia para cada día del período de vacaciones
   const createAttendanceRecordsForVacation = async (request) => {
-    // Generar fechas "yyyy-MM-dd" sin desfase UTC iterando con Date local
+    const startStr = extractDateStr(request.start_date);
+    const endStr = extractDateStr(request.end_date);
+    if (!startStr || !endStr) return;
+
+    // Generar fechas "yyyy-MM-dd" iterando con Date UTC para evitar cualquier desfase
     const allDates = [];
-    const [sy, sm, sd] = request.start_date.split("-").map(Number);
-    const [ey, em, ed] = request.end_date.split("-").map(Number);
-    let cur = new Date(sy, sm - 1, sd);
-    const endLocal = new Date(ey, em - 1, ed);
-    while (cur <= endLocal) {
-      const y = cur.getFullYear();
-      const m = String(cur.getMonth() + 1).padStart(2, "0");
-      const d = String(cur.getDate()).padStart(2, "0");
+    const [sy, sm, sd] = startStr.split("-").map(Number);
+    const [ey, em, ed] = endStr.split("-").map(Number);
+    // Usar UTC noon para evitar DST u offset issues en la iteración
+    let cur = new Date(Date.UTC(sy, sm - 1, sd, 12, 0, 0));
+    const endUTC = new Date(Date.UTC(ey, em - 1, ed, 12, 0, 0));
+    while (cur <= endUTC) {
+      const y = cur.getUTCFullYear();
+      const m = String(cur.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(cur.getUTCDate()).padStart(2, "0");
       allDates.push(`${y}-${m}-${d}`);
-      cur.setDate(cur.getDate() + 1);
+      cur = new Date(cur.getTime() + 24 * 60 * 60 * 1000);
     }
 
     // Obtener registros existentes para no duplicar
