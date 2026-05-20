@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { format, differenceInBusinessDays, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { parseDateLima, dateToStringLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { uploadFile } from "@/services/uploadService";
 
@@ -129,14 +130,20 @@ export default function VacationRequest() {
       return;
     }
 
-    const totalDays = differenceInDays(formData.end_date, formData.start_date) + 1;
-    const businessDays = differenceInBusinessDays(formData.end_date, formData.start_date) + 1;
+    // Convertir el Date del picker a string "yyyy-MM-dd" en zona local (evita desfase UTC)
+    const startStr = dateToStringLima(formData.start_date);
+    const endStr = dateToStringLima(formData.end_date);
+    // Calcular días usando los strings convertidos correctamente
+    const startForCalc = parseDateLima(startStr);
+    const endForCalc = parseDateLima(endStr);
+    const totalDays = differenceInDays(endForCalc, startForCalc) + 1;
+    const businessDays = differenceInBusinessDays(endForCalc, startForCalc) + 1;
 
     const requestData = {
       employee_id: employeeIdToUse,
       request_type: formData.request_type,
-      start_date: format(formData.start_date, "yyyy-MM-dd"),
-      end_date: format(formData.end_date, "yyyy-MM-dd"),
+      start_date: startStr,
+      end_date: endStr,
       total_days: formData.is_full_day ? totalDays : 1,
       business_days: formData.is_full_day ? businessDays : 1,
       reason: formData.reason,
@@ -201,9 +208,14 @@ export default function VacationRequest() {
 
   const calculateDaysIfSelected = () => {
     if (!formData.start_date || !formData.end_date) return null;
+    // Convertir a strings locales antes de calcular para evitar desfase UTC
+    const startStr = dateToStringLima(formData.start_date);
+    const endStr = dateToStringLima(formData.end_date);
+    const s = parseDateLima(startStr);
+    const e = parseDateLima(endStr);
     return {
-      total: differenceInDays(formData.end_date, formData.start_date) + 1,
-      business: differenceInBusinessDays(formData.end_date, formData.start_date) + 1,
+      total: differenceInDays(e, s) + 1,
+      business: differenceInBusinessDays(e, s) + 1,
     };
   };
 
@@ -292,7 +304,7 @@ export default function VacationRequest() {
                   {vacationBalance.deadline && (
                     <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                       <p className="text-sm text-amber-800">
-                        <strong>Fecha límite:</strong> {format(new Date(vacationBalance.deadline), "dd 'de' MMMM, yyyy", { locale: es })}
+                        <strong>Fecha límite:</strong> {format(parseDateLima(vacationBalance.deadline), "dd 'de' MMMM, yyyy", { locale: es })}
                       </p>
                     </div>
                   )}
@@ -646,7 +658,7 @@ export default function VacationRequest() {
                                 {request.request_type}
                               </h4>
                               <p className="text-sm text-slate-600">
-                                {format(new Date(request.start_date), "dd MMM", { locale: es })} - {format(new Date(request.end_date), "dd MMM yyyy", { locale: es })}
+                                {format(parseDateLima(request.start_date), "dd MMM", { locale: es })} - {format(parseDateLima(request.end_date), "dd MMM yyyy", { locale: es })}
                               </p>
                             </div>
                             <Badge className={getStatusConfig(request.status).color}>
