@@ -82,12 +82,17 @@ export function formatDateTimeLima(dateOrStr, options = { day: "2-digit", month:
 }
 
 /**
- * Convierte un objeto Date (por ej. del Calendar picker) a string "yyyy-MM-dd" en Lima.
- * Usar al guardar fechas desde date pickers.
+ * Convierte un objeto Date (del Calendar picker) a string "yyyy-MM-dd".
+ * Usa las propiedades locales del Date (.getFullYear/.getMonth/.getDate) directamente,
+ * ya que react-day-picker construye el Date con la fecha visual del usuario a medianoche UTC.
+ * NO aplicar conversión de timezone aquí, de lo contrario UTC-5 adelanta un día.
  */
 export function dateToStringLima(date) {
   if (!date) return "";
-  return date.toLocaleDateString("en-CA", { timeZone: LIMA_TZ });
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 /**
