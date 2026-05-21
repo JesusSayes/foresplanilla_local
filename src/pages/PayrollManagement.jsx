@@ -859,7 +859,7 @@ export default function PayrollManagement() {
               <CardContent className="p-6 space-y-4">
                 <div>
                   <Label>Tipo de Planilla</Label>
-                  <Select value={payrollType} onValueChange={setPayrollType}>
+                  <Select value={payrollType} onValueChange={(v) => { setPayrollType(v); setShowPreview(false); setPreviewData([]); }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -884,7 +884,7 @@ export default function PayrollManagement() {
 
                 <div>
                   <Label>Mes</Label>
-                  <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
+                  <Select value={String(selectedMonth)} onValueChange={(v) => { setSelectedMonth(parseInt(v)); setShowPreview(false); setPreviewData([]); }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -900,7 +900,7 @@ export default function PayrollManagement() {
 
                 <div>
                   <Label>Año</Label>
-                  <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+                  <Select value={String(selectedYear)} onValueChange={(v) => { setSelectedYear(parseInt(v)); setShowPreview(false); setPreviewData([]); }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
