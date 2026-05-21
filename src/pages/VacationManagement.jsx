@@ -151,12 +151,13 @@ export default function VacationManagement() {
         }
       }
 
-      const existingRecords = await base44.entities.AttendanceRecord.filter({
+      console.log(`[Vacaciones] Registrando asistencia para ${allDates.length} días:`, allDates);
+
+      const allExisting = await base44.entities.AttendanceRecord.filter({
         employee_id: request.employee_id,
       });
       const existingByDate = {};
-      existingRecords.forEach(r => {
-        // Normalizar la fecha del registro por si viene en formato ISO
+      allExisting.forEach(r => {
         const normalizedDate = extractDateStr(r.date) || r.date;
         existingByDate[normalizedDate] = r;
       });
@@ -180,14 +181,18 @@ export default function VacationManagement() {
         notes: `Vacaciones aprobadas (${request.request_type})`,
       });
 
+      let created = 0;
+      let updated = 0;
       for (const dateStr of allDates) {
         if (existingByDate[dateStr]) {
-          // Sobreescribir TODOS los campos del registro existente con los datos de vacaciones
           await base44.entities.AttendanceRecord.update(existingByDate[dateStr].id, vacationPayload(dateStr));
+          updated++;
         } else {
           await base44.entities.AttendanceRecord.create(vacationPayload(dateStr));
+          created++;
         }
       }
+      console.log(`[Vacaciones] Asistencia procesada: ${created} creados, ${updated} actualizados.`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["vacationRequests"]);
@@ -196,7 +201,8 @@ export default function VacationManagement() {
       queryClient.invalidateQueries(["allAttendanceRecords"]);
       toast.success("Solicitud aprobada y asistencia registrada");
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("[Vacaciones] Error al aprobar:", error);
       toast.error("Error al aprobar la solicitud");
     },
   });
