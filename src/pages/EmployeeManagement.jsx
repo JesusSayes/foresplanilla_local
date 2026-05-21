@@ -31,6 +31,7 @@ export default function EmployeeManagement() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [siteFilter, setSiteFilter] = useState("all");
+  const [contractTypeFilter, setContractTypeFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -739,6 +740,7 @@ export default function EmployeeManagement() {
     : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
   const departmentNames = [...new Set(siteAllowedEmployees.map(e => e.department_name))].filter(Boolean);
+  const contractTypes = [...new Set(siteAllowedEmployees.map(e => e.contract_type))].filter(Boolean);
 
   const filteredEmployees = siteAllowedEmployees.filter(emp => {
     const matchesSearch = emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -748,7 +750,8 @@ export default function EmployeeManagement() {
     const matchesStatus = statusFilter === "all" || emp.status === statusFilter;
     const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
     const matchesSite = siteFilter === "all" || emp.site === siteFilter || (siteFilter === "sin_sede" && !emp.site);
-    return matchesSearch && matchesStatus && matchesDept && matchesSite;
+    const matchesContractType = contractTypeFilter === "all" || emp.contract_type === contractTypeFilter;
+    return matchesSearch && matchesStatus && matchesDept && matchesSite && matchesContractType;
   });
 
 
@@ -897,6 +900,18 @@ export default function EmployeeManagement() {
                     .map(site => (
                       <SelectItem key={site.id} value={site.name}>{site.code}</SelectItem>
                     ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={contractTypeFilter} onValueChange={setContractTypeFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Tipo de Contrato" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {contractTypes.map(type => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
