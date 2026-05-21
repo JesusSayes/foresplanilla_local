@@ -301,9 +301,13 @@ export default function PayrollManagement() {
     // Filtrar empleados según búsqueda y departamento
     let filteredEmployees = getFilteredEmployees();
     
-    // Filtrar por tipo de contrato si es SNP
+    // Filtrar por tipo de contrato según el tipo de planilla:
+    // - SNP: solo trabajadores con contrato SNP
+    // - Quincenal / Mensual / Adicional: excluir trabajadores SNP
     if (payrollType === "SNP") {
       filteredEmployees = filteredEmployees.filter(emp => emp.contract_type === "SNP");
+    } else {
+      filteredEmployees = filteredEmployees.filter(emp => emp.contract_type !== "SNP");
     }
 
     // Regla quincenal: solo trabajadores que ingresaron hasta el día de corte configurado
