@@ -82,7 +82,10 @@ export const update = async (req, res) => {
   try {
     const record = await prisma.attendance_record.update({
       where: { id: req.params.id },
-      data: req.body
+      data: {
+        ...req.body,
+        date: req.body.date ? new Date(req.body.date) : null,
+      }
     });
     res.json(serializeRecord(record));
   } catch (error) {
