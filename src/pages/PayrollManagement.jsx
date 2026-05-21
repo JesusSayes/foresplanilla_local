@@ -18,6 +18,7 @@ import { es } from "date-fns/locale";
 import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
+import * as XLSX from "xlsx";
 import ConceptsManager from "../components/payroll/ConceptsManager";
 import AttendancePeriodModal from "../components/payroll/AttendancePeriodModal";
 import PayrollConfigModal from "../components/payroll/PayrollConfigModal";
@@ -714,6 +715,48 @@ export default function PayrollManagement() {
     toast.success("Boleta generada");
   };
 
+  // Exportar planilla a Excel (formato lineal)
+  const exportToExcel = (payslipsData, filename) => {
+    const rows = payslipsData.map((p, idx) => {
+      const emp = allEmployees.find(e => e.id === p.employee_id);
+      return {
+        "N°": idx + 1,
+        "Código": p.employee_code || emp?.employee_code || "",
+        "Apellidos y Nombres": p.employee_name || (emp ? `${emp.first_name} ${emp.last_name}` : ""),
+        "Área / Departamento": p.department || emp?.department_name || "",
+        "Cargo": emp?.position || "",
+        "Tipo Contrato": emp?.contract_type || "",
+        "Periodo": p.period || `${String(p.month).padStart(2,'0')}/${p.year}`,
+        "Tipo Planilla": p.payroll_type || payrollType,
+        "Días Trabajados": p.worked_days || 0,
+        "Salario Base": p.base_salary || 0,
+        "Bonificaciones": p.bonuses || 0,
+        "Total Ingresos": p.total_income || 0,
+        "AFP/ONP": p.pension_deduction || 0,
+        "Impuesto Renta": p.income_tax || 0,
+        "Desc. Tardanzas": p.tardiness_discount || 0,
+        "Desc. Faltas": p.absence_discount || 0,
+        "Desc. Adelanto": p.advance_deduction || 0,
+        "Otros Descuentos": p.other_deductions || 0,
+        "Total Descuentos": p.total_deductions || 0,
+        "Neto a Pagar": p.net_pay || 0,
+        "Estado": p.status || "Calculada",
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Ajustar anchos de columna automáticamente
+    const colWidths = Object.keys(rows[0] || {}).map(key => ({
+      wch: Math.max(key.length, ...rows.map(r => String(r[key] ?? "").length)) + 2
+    }));
+    ws["!cols"] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Planilla");
+    XLSX.writeFile(wb, `${filename}.xlsx`);
+    toast.success("Excel exportado correctamente");
+  };
+
   const generateMassivePayslipsPDF = async (payslips) => {
     for (const payslip of payslips) {
       const emp = allEmployees.find(e => e.id === payslip.employee_id);
@@ -947,7 +990,7 @@ export default function PayrollManagement() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <div className="mb-6 flex gap-3">
+                  <div className="mb-6 flex gap-3 flex-wrap">
                     <Button
                       onClick={generatePDF}
                       variant="outline"
@@ -955,6 +998,14 @@ export default function PayrollManagement() {
                     >
                       <Download className="w-4 h-4 mr-2" />
                       Descargar PDF
+                    </Button>
+                    <Button
+                      onClick={() => exportToExcel(previewData, `Planilla_${payrollType}_${selectedMonth}_${selectedYear}`)}
+                      variant="outline"
+                      className="flex-1 border-green-300 text-green-700 hover:bg-green-50"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar Excel
                     </Button>
                     <Button
                       onClick={() => handleOpenPeriodModal('generate')}
@@ -1254,6 +1305,18 @@ export default function PayrollManagement() {
                                   </div>
                                   {/* Acciones a nivel de planilla completa */}
                                   <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-green-300 text-green-700 hover:bg-green-50"
+                                      onClick={() => exportToExcel(
+                                        planillasDelTipo,
+                                        `Planilla_${tipo}_${selectedMonth}_${selectedYear}`
+                                      )}
+                                    >
+                                      <Download className="w-4 h-4 mr-1" />
+                                      Excel
+                                    </Button>
                                     {puedeAprobar && (
                                       <Button
                                         size="sm"
@@ -1521,7 +1584,19 @@ export default function PayrollManagement() {
                                       </p>
                                     </div>
                                   </div>
-                                  <div className="flex gap-2">
+                                  <div className="flex gap-2 flex-wrap">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-green-300 text-green-700 hover:bg-green-50"
+                                      onClick={() => exportToExcel(
+                                        allGroupPayslips,
+                                        `Planilla_${group.type}_${group.year}_${String(group.month).padStart(2,'0')}`
+                                      )}
+                                    >
+                                      <Download className="w-3 h-3 mr-1" />
+                                      Excel
+                                    </Button>
                                     <Button
                                       size="sm"
                                       variant="outline"
