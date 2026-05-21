@@ -89,17 +89,19 @@ export default function ManagerApprovals() {
     return `${y}-${m}-${day}`;
   };
 
-  // Crea registros de asistencia para cada día del período de vacaciones
+  // Crea/sobreescribe registros de asistencia para cada día del período de vacaciones
   const createAttendanceRecordsForVacation = async (request) => {
     const startStr = extractDateStr(request.start_date);
     const endStr = extractDateStr(request.end_date);
-    if (!startStr || !endStr) return;
+    if (!startStr || !endStr) {
+      console.error("[Vacaciones] Fechas inválidas:", request.start_date, request.end_date);
+      return;
+    }
 
-    // Generar fechas "yyyy-MM-dd" iterando con Date UTC para evitar cualquier desfase
+    // Generar todas las fechas del período usando UTC noon para evitar desfases de TZ
     const allDates = [];
     const [sy, sm, sd] = startStr.split("-").map(Number);
     const [ey, em, ed] = endStr.split("-").map(Number);
-    // Usar UTC noon para evitar DST u offset issues en la iteración
     let cur = new Date(Date.UTC(sy, sm - 1, sd, 12, 0, 0));
     const endUTC = new Date(Date.UTC(ey, em - 1, ed, 12, 0, 0));
     while (cur <= endUTC) {
@@ -110,13 +112,15 @@ export default function ManagerApprovals() {
       cur = new Date(cur.getTime() + 24 * 60 * 60 * 1000);
     }
 
-    // Obtener registros existentes del período para poder sobreescribirlos
-    const existingRecords = await entitiesAPI.AttendanceRecord.filter({
+    console.log(`[Vacaciones] Registrando asistencia para ${allDates.length} días:`, allDates);
+
+    // Buscar registros existentes del empleado en el período exacto
+    const allExisting = await entitiesAPI.AttendanceRecord.filter({
       employee_id: request.employee_id,
     });
+    // Indexar por fecha normalizada para lookup O(1)
     const existingByDate = {};
-    existingRecords.forEach(r => {
-      // Normalizar la fecha del registro por si viene en formato ISO
+    allExisting.forEach(r => {
       const normalizedDate = extractDateStr(r.date) || r.date;
       existingByDate[normalizedDate] = r;
     });
@@ -140,14 +144,19 @@ export default function ManagerApprovals() {
       notes: `Vacaciones aprobadas (${request.request_type})`,
     });
 
+    let created = 0;
+    let updated = 0;
     for (const dateStr of allDates) {
       if (existingByDate[dateStr]) {
         // Sobreescribir TODOS los campos del registro existente con los datos de vacaciones
         await entitiesAPI.AttendanceRecord.update(existingByDate[dateStr].id, vacationPayload(dateStr));
+        updated++;
       } else {
         await entitiesAPI.AttendanceRecord.create(vacationPayload(dateStr));
+        created++;
       }
     }
+    console.log(`[Vacaciones] Asistencia procesada: ${created} creados, ${updated} actualizados.`);
   };
 
   const updateRequestMutation = useMutation({
@@ -155,52 +164,47 @@ export default function ManagerApprovals() {
       const updatedRequest = await entitiesAPI.VacationRequest.update(id, data);
 
       if (data.status === "Aprobada") {
-        try {
+        // Actualizar balance de vacaciones si es solicitud de vacaciones
+        if (request.request_type === "Vacaciones") {
           const balances = await entitiesAPI.VacationBalance.filter({
             employee_id: request.employee_id,
             is_active: true
           });
 
-          if (balances && balances.length > 0) {
+          if (balances.length > 0) {
             const balance = balances[0];
-            const newDaysTaken = (balance.days_taken || 0) + request.total_days;
-            const newDaysPending = balance.total_entitled_days - newDaysTaken;
-
-            if (newDaysPending >= 0) {
-              await entitiesAPI.VacationBalance.update(balance.id, {
-                days_taken: newDaysTaken,
-                days_pending: newDaysPending,
-              });
-            }
+            await entitiesAPI.VacationBalance.update(balance.id, {
+              days_taken: (balance.days_taken || 0) + request.business_days,
+              days_pending: (balance.total_entitled_days || 0) - ((balance.days_taken || 0) + request.business_days)
+            });
           }
-
-          if (request.request_type === "Permiso sin goce") {
-            const emp = employees.find(e => e.id === request.employee_id);
-            if (emp && emp.base_salary) {
-              const [startY, startM] = request.start_date.split("-").map(Number);
-              const discountAmount = (emp.base_salary / 30) * request.total_days;
-
-              await entitiesAPI.PayrollConcept.create({
-                employee_id: request.employee_id,
-                concept_type: "Descuento",
-                concept_name: "Permiso sin goce",
-                amount: discountAmount,
-                is_dynamic: false,
-                month: startM,
-                year: startY,
-                is_recurring: false,
-                is_applied: false,
-                notes: `Descuento por ${request.total_days} días de permiso sin goce (${format(parseDateLima(request.start_date), "dd/MM/yyyy")} - ${format(parseDateLima(request.end_date), "dd/MM/yyyy")})`
-              });
-            }
-          }
-
-          // Crear/actualizar registros de asistencia para todo el período
-          await createAttendanceRecordsForVacation(request);
-
-        } catch (error) {
-          console.error("Error al actualizar balance, descuento o asistencia:", error);
         }
+
+        // Si es permiso sin goce, crear concepto de descuento en planilla
+        if (request.request_type === "Permiso sin goce") {
+          const emp = employees.find(e => e.id === request.employee_id);
+          if (emp && emp.base_salary) {
+            const startDateStr = extractDateStr(request.start_date) || request.start_date;
+            const [startY, startM] = startDateStr.split("-").map(Number);
+            const discountAmount = (emp.base_salary / 30) * request.total_days;
+
+            await base44.entities.PayrollConcept.create({
+              employee_id: request.employee_id,
+              concept_type: "Descuento",
+              concept_name: "Permiso sin goce",
+              amount: discountAmount,
+              is_dynamic: false,
+              month: startM,
+              year: startY,
+              is_recurring: false,
+              is_applied: false,
+              notes: `Descuento por ${request.total_days} días de permiso sin goce (${format(parseDateLima(request.start_date), "dd/MM/yyyy")} - ${format(parseDateLima(request.end_date), "dd/MM/yyyy")})`
+            });
+          }
+        }
+
+        // Crear/sobreescribir registros de asistencia para TODOS los días del período
+        await createAttendanceRecordsForVacation(request);
       }
 
       return updatedRequest;
