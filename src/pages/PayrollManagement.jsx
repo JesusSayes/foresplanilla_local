@@ -598,30 +598,28 @@ export default function PayrollManagement() {
     );
   };
 
+  const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
+
+  // Planillas del periodo actual filtradas por mes/año/departamento/búsqueda (SIN filtrar por tipo)
   const filteredPayslips = existingPayslips.filter(p => {
     const emp = allEmployees.find(e => e.id === p.employee_id);
     if (!emp) return false;
-    
     const matchesSearch = searchTerm ? (
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase())
     ) : true;
-    
     const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
-    const matchesType = p.payroll_type === payrollType;
-    
-    return matchesSearch && matchesDept && matchesType;
+    return matchesSearch && matchesDept;
   });
 
-  const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
-
+  // Stats calculadas sobre el periodo/departamento filtrado actual
   const stats = {
-    quincenal: existingPayslips.filter(p => p.payroll_type === "Quincenal").length,
-    mensual: existingPayslips.filter(p => p.payroll_type === "Mensual").length,
-    adicional: existingPayslips.filter(p => p.payroll_type === "Adicional").length,
-    snp: existingPayslips.filter(p => p.payroll_type === "SNP").length,
-    total: existingPayslips.reduce((sum, p) => sum + (p.net_pay || 0), 0),
+    quincenal: filteredPayslips.filter(p => p.payroll_type === "Quincenal").length,
+    mensual: filteredPayslips.filter(p => p.payroll_type === "Mensual").length,
+    adicional: filteredPayslips.filter(p => p.payroll_type === "Adicional").length,
+    snp: filteredPayslips.filter(p => p.payroll_type === "SNP").length,
+    total: filteredPayslips.reduce((sum, p) => sum + (p.net_pay || 0), 0),
   };
 
   const getLatestPayslipsByMonth = () => {
@@ -914,7 +912,7 @@ export default function PayrollManagement() {
 
                 <div>
                   <Label>Departamento</Label>
-                  <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                  <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v); setShowPreview(false); setPreviewData([]); }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
