@@ -77,7 +77,8 @@ export default function PayrollManagement() {
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      // Incluir Activos y Cesados (los Cesados pueden tener días parciales en el periodo)
+      return await base44.entities.Employee.filter({});
     },
   });
 
@@ -301,9 +302,25 @@ export default function PayrollManagement() {
   const calculatePayroll = async (periodFrom, periodTo, autoGenerate = false) => {
     const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
     
+    const periodStart = new Date(selectedYear, selectedMonth - 1, 1);
+    const periodEnd = new Date(selectedYear, selectedMonth, 0); // último día del mes
+
     // Filtrar empleados según búsqueda y departamento
     let filteredEmployees = getFilteredEmployees();
     
+    // Filtrar solo empleados activos o cesados que aún tenían días en el periodo
+    filteredEmployees = filteredEmployees.filter(emp => {
+      // Excluir Suspendidos
+      if (emp.status === "Suspendido") return false;
+      // Si cesado, verificar que la fecha de cese sea dentro o después del inicio del periodo
+      if (emp.status === "Cesado") {
+        if (!emp.termination_date) return false;
+        const termDate = new Date(emp.termination_date.split("T")[0]);
+        return termDate >= periodStart; // Cesó durante o antes del fin del periodo
+      }
+      return true; // Activo: incluir
+    });
+
     // Filtrar por tipo de contrato según el tipo de planilla:
     // - SNP: solo trabajadores con contrato SNP
     // - Quincenal / Mensual / Adicional: excluir trabajadores SNP
@@ -378,7 +395,17 @@ export default function PayrollManagement() {
         if (periodTo && r.date > periodTo) return false;
         return true;
       });
-      const workedDays = payrollType === "Quincenal" ? 15 : empAttendance.filter(r => r.status === "Completo" || r.status === "Incompleto").length;
+      // Calcular días proporcionales si el empleado cesó dentro del periodo
+      let maxDaysInPeriod = periodEnd.getDate(); // días totales del mes
+      if (emp.status === "Cesado" && emp.termination_date) {
+        const termDate = new Date(emp.termination_date.split("T")[0]);
+        if (termDate >= periodStart && termDate <= periodEnd) {
+          maxDaysInPeriod = termDate.getDate(); // solo hasta el día de cese
+        }
+      }
+      const workedDays = payrollType === "Quincenal"
+        ? Math.min(15, maxDaysInPeriod)
+        : (empAttendance.filter(r => r.status === "Completo" || r.status === "Incompleto").length || maxDaysInPeriod);
       
       const attendanceData = {
         worked_days: workedDays,
@@ -615,13 +642,16 @@ export default function PayrollManagement() {
     return matchesSearch && matchesDept;
   });
 
+  // Helper para parsear números seguros (evita Infinity/NaN)
+  const safeNum = (v) => { const n = parseFloat(v); return (isFinite(n) && !isNaN(n)) ? n : 0; };
+
   // Stats calculadas sobre el periodo/departamento filtrado actual
   const stats = {
     quincenal: filteredPayslips.filter(p => p.payroll_type === "Quincenal").length,
     mensual: filteredPayslips.filter(p => p.payroll_type === "Mensual").length,
     adicional: filteredPayslips.filter(p => p.payroll_type === "Adicional").length,
     snp: filteredPayslips.filter(p => p.payroll_type === "SNP").length,
-    total: filteredPayslips.reduce((sum, p) => sum + (p.net_pay || 0), 0),
+    total: filteredPayslips.reduce((sum, p) => sum + safeNum(p.net_pay), 0),
   };
 
   const getLatestPayslipsByMonth = () => {
@@ -719,6 +749,10 @@ export default function PayrollManagement() {
   const exportToExcel = (payslipsData, filename) => {
     const rows = payslipsData.map((p, idx) => {
       const emp = allEmployees.find(e => e.id === p.employee_id);
+      // Periodo legible: usar los campos month/year de la boleta (no del estado global)
+      const periodoLabel = p.period && p.period.trim()
+        ? p.period
+        : (p.month && p.year ? format(new Date(p.year, p.month - 1), 'MMMM yyyy', { locale: es }) : "");
       return {
         "N°": idx + 1,
         "Código": p.employee_code || emp?.employee_code || "",
@@ -726,20 +760,20 @@ export default function PayrollManagement() {
         "Área / Departamento": p.department || emp?.department_name || "",
         "Cargo": emp?.position || "",
         "Tipo Contrato": emp?.contract_type || "",
-        "Periodo": p.period || `${String(p.month).padStart(2,'0')}/${p.year}`,
-        "Tipo Planilla": p.payroll_type || payrollType,
-        "Días Trabajados": p.worked_days || 0,
-        "Salario Base": p.base_salary || 0,
-        "Bonificaciones": p.bonuses || 0,
-        "Total Ingresos": p.total_income || 0,
-        "AFP/ONP": p.pension_deduction || 0,
-        "Impuesto Renta": p.income_tax || 0,
-        "Desc. Tardanzas": p.tardiness_discount || 0,
-        "Desc. Faltas": p.absence_discount || 0,
-        "Desc. Adelanto": p.advance_deduction || 0,
-        "Otros Descuentos": p.other_deductions || 0,
-        "Total Descuentos": p.total_deductions || 0,
-        "Neto a Pagar": p.net_pay || 0,
+        "Periodo": periodoLabel,
+        "Tipo Planilla": p.payroll_type || "",
+        "Días Trabajados": safeNum(p.worked_days),
+        "Salario Base": safeNum(p.base_salary),
+        "Bonificaciones": safeNum(p.bonuses),
+        "Total Ingresos": safeNum(p.total_income),
+        "AFP/ONP": safeNum(p.pension_deduction),
+        "Impuesto Renta": safeNum(p.income_tax),
+        "Desc. Tardanzas": safeNum(p.tardiness_discount),
+        "Desc. Faltas": safeNum(p.absence_discount),
+        "Desc. Adelanto": safeNum(p.advance_deduction),
+        "Otros Descuentos": safeNum(p.other_deductions),
+        "Total Descuentos": safeNum(p.total_deductions),
+        "Neto a Pagar": safeNum(p.net_pay),
         "Estado": p.status || "Calculada",
       };
     });
@@ -1201,7 +1235,7 @@ export default function PayrollManagement() {
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-slate-900 text-lg">Total General:</span>
                         <span className="font-bold text-indigo-600 text-2xl">
-                          S/ {previewData.reduce((sum, p) => sum + p.net_pay, 0).toFixed(2)}
+                          S/ {previewData.reduce((sum, p) => sum + safeNum(p.net_pay), 0).toFixed(2)}
                         </span>
                       </div>
                       <p className="text-sm text-slate-600 mt-1">
@@ -1267,9 +1301,9 @@ export default function PayrollManagement() {
                       <div className="space-y-6">
                         {tipos.map(tipo => {
                           const planillasDelTipo = filteredPayslips.filter(p => p.payroll_type === tipo);
-                          const totalNeto = planillasDelTipo.reduce((s, p) => s + (p.net_pay || 0), 0);
-                          const totalIngresos = planillasDelTipo.reduce((s, p) => s + (p.total_income || 0), 0);
-                          const totalDesc = planillasDelTipo.reduce((s, p) => s + (p.total_deductions || 0), 0);
+                          const totalNeto = planillasDelTipo.reduce((s, p) => s + safeNum(p.net_pay), 0);
+                          const totalIngresos = planillasDelTipo.reduce((s, p) => s + safeNum(p.total_income), 0);
+                          const totalDesc = planillasDelTipo.reduce((s, p) => s + safeNum(p.total_deductions), 0);
                           const allPagada   = planillasDelTipo.every(p => p.status === "Pagada");
                           const allAprobada = !allPagada && planillasDelTipo.every(p => p.status === "Aprobada" || p.status === "Pagada") && planillasDelTipo.some(p => p.status === "Aprobada");
                           const puedeAprobar = !allPagada && !allAprobada;
@@ -1558,7 +1592,7 @@ export default function PayrollManagement() {
                             p.month === group.month && 
                             p.payroll_type === group.type
                           );
-                          const total = allGroupPayslips.reduce((sum, p) => sum + (p.net_pay || 0), 0);
+                          const total = allGroupPayslips.reduce((sum, p) => sum + safeNum(p.net_pay), 0);
                           const isSelected = selectedPayrollToDelete?.year === group.year && 
                                             selectedPayrollToDelete?.month === group.month && 
                                             selectedPayrollToDelete?.type === group.type;
