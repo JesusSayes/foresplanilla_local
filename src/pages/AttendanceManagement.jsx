@@ -551,12 +551,12 @@ export default function AttendanceManagement() {
     : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
   const filteredEmployees = siteAllowedEmployees.filter(emp => {
-    const matchesSearch =
-      emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
-    return matchesSearch && matchesSite;
+  const matchesSearch =
+    emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.document_number.toLowerCase().includes(searchTerm.toLowerCase());
+  const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
+  return matchesSearch && matchesSite;
   });
 
   // IDs de empleados accesibles para filtrar incidentes y alertas
@@ -676,7 +676,8 @@ export default function AttendanceManagement() {
 
       return {
         'Fecha': rowDate,
-        'Código': emp.employee_code,
+        'Tipo Doc': emp.document_type,
+        'DNI': emp.document_number,
         'Nombres': emp.first_name,
         'Apellidos': emp.last_name,
         'Cargo': emp.position,
@@ -717,7 +718,7 @@ export default function AttendanceManagement() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) { toast.error('Por favor, permite las ventanas emergentes para imprimir'); return; }
     const filterText = attendanceFilter === "all" ? "Todos los empleados" : attendanceFilter === "sin_entrada" ? "Sin marcar entrada" : attendanceFilter === "sin_salida" ? "Sin marcar salida" : "Con tardanza";
-    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>Código</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; return `<tr><td>${emp.employee_code}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${emp.record?.clock_in || '--:--'}</td><td>${emp.record?.clock_out || '--:--'}</td><td>${wh.toFixed(2)}h</td><td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h</td><td>${(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
+    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>DNI</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; return `<tr><td>${emp.document_number}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${emp.record?.clock_in || '--:--'}</td><td>${emp.record?.clock_out || '--:--'}</td><td>${wh.toFixed(2)}h</td><td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h</td><td>${(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
     printWindow.document.write(printContent);
     printWindow.document.close();
   };
@@ -1023,8 +1024,8 @@ export default function AttendanceManagement() {
                                     {emp.first_name[0]}{emp.last_name[0]}
                                   </div>
                                   <div className="min-w-0 overflow-hidden">
-                                    <p className="font-semibold text-slate-900 text-xs truncate">{emp.first_name} {emp.last_name}</p>
-                                    <p className="text-xs text-slate-400 truncate">{emp.employee_code} · {emp.department_name}</p>
+                                    <p className="font-semibold text-slate-900 text-xs truncate">{emp.document_type} {emp.document_number} - {emp.first_name} {emp.last_name}</p>
+                                    <p className="text-xs text-slate-400 truncate">{emp.department_name}</p>
                                     {!sched && <p className="text-xs text-red-500">Sin horario</p>}
                                     {sched && !schedSt && <p className="text-xs text-slate-400">Día libre</p>}
                                     {sched && schedSt && <p className="text-xs text-indigo-600">🕐 {schedSt}–{schedEn}</p>}
@@ -1178,13 +1179,11 @@ export default function AttendanceManagement() {
                            <div className="flex items-start justify-between mb-4">
                              <div className="flex-1">
                                <div className="flex items-center gap-3 mb-2">
-                                 <h4 className="font-bold text-slate-900">{emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                 <Badge className="bg-red-600 text-white">{Number(alert.overtime_hours || 0).toFixed(2)}h extras</Badge>
+                                 <h4 className="font-bold text-slate-900">{emp ? `${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
+                                 <Badge className="bg-red-600 text-white">{alert.overtime_hours.toFixed(2)}h extras</Badge>
                                </div>
-                               <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position} • {emp?.department_name}</p>
-                               <p className="text-sm text-slate-700">
-                                📅 {format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}
-                               </p>
+                               <p className="text-sm text-slate-600 mb-2">{emp?.position} • {emp?.department_name}</p>
+                               <p className="text-sm text-slate-700">📅 {format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}</p>
                                {record && <p className="text-sm text-slate-600 mt-1">Marcación: {record.clock_in} - {record.clock_out} ({record.worked_hours?.toFixed(2)}h trabajadas)</p>}
                                {alertSched && (
                                  <p className="text-sm text-slate-600 mt-1">
@@ -1287,8 +1286,8 @@ export default function AttendanceManagement() {
                               <div key={incident.id} className="p-4 border border-slate-200 rounded-lg">
                                 <div className="flex items-start justify-between mb-4">
                                   <div className="flex-1">
-                                    <h4 className="font-bold text-slate-900 mb-1">{emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                    <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
+                                    <h4 className="font-bold text-slate-900 mb-1">{emp ? `${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
+                                    <p className="text-sm text-slate-600 mb-2">{emp?.position}</p>
                                     <div className="flex gap-4 text-sm">
                                       <Badge className="bg-orange-100 text-orange-700">{incident.incident_type}</Badge>
                                       <span className="text-slate-600">📅 {format(parseDateLima(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
@@ -1345,8 +1344,8 @@ export default function AttendanceManagement() {
                               <div key={incident.id} className="p-4 border border-green-200 bg-green-50/30 rounded-lg">
                                 <div className="flex items-start justify-between mb-4">
                                   <div className="flex-1">
-                                    <h4 className="font-bold text-slate-900 mb-1">{emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                    <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
+                                    <h4 className="font-bold text-slate-900 mb-1">{emp ? `${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
+                                    <p className="text-sm text-slate-600 mb-2">{emp?.position}</p>
                                     <div className="flex gap-4 text-sm flex-wrap">
                                       <Badge className="bg-green-100 text-green-700">{incident.incident_type}</Badge>
                                       <span className="text-slate-600">📅 {format(parseDateLima(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
@@ -1397,8 +1396,8 @@ export default function AttendanceManagement() {
                               <div key={incident.id} className="p-4 border border-red-200 bg-red-50/30 rounded-lg">
                                 <div className="flex items-start justify-between mb-4">
                                   <div className="flex-1">
-                                    <h4 className="font-bold text-slate-900 mb-1">{emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                    <p className="text-sm text-slate-600 mb-2">{emp?.employee_code} • {emp?.position}</p>
+                                    <h4 className="font-bold text-slate-900 mb-1">{emp ? `${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
+                                    <p className="text-sm text-slate-600 mb-2">{emp?.position}</p>
                                     <div className="flex gap-4 text-sm flex-wrap">
                                       <Badge className="bg-red-100 text-red-700">{incident.incident_type}</Badge>
                                       <span className="text-slate-600">📅 {format(parseDateLima(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
