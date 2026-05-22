@@ -1180,7 +1180,7 @@ export default function AttendanceManagement() {
                              <div className="flex-1">
                                <div className="flex items-center gap-3 mb-2">
                                  <h4 className="font-bold text-slate-900">{emp ? `${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                 <Badge className="bg-red-600 text-white">{alert.overtime_hours.toFixed(2)}h extras</Badge>
+                                 <Badge className="bg-red-600 text-white">{Number(alert.overtime_hours || 0).toFixed(2)}h extras</Badge>
                                </div>
                                <p className="text-sm text-slate-600 mb-2">{emp?.position} • {emp?.department_name}</p>
                                <p className="text-sm text-slate-700">📅 {format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}</p>
