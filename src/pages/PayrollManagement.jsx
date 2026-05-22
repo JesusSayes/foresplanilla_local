@@ -295,7 +295,6 @@ export default function PayrollManagement() {
 
   const calculatePayroll = async (periodFrom, periodTo, autoGenerate = false) => {
     const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
-
     const periodStart = new Date(selectedYear, selectedMonth - 1, 1);
     const periodEnd = new Date(selectedYear, selectedMonth, 0); // último día del mes
 
