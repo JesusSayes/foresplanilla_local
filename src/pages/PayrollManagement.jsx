@@ -89,6 +89,8 @@ export default function PayrollManagement() {
         year: selectedYear
       }, "-created_date");
     },
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   const { data: allPayslips = [] } = useQuery({
@@ -882,7 +884,7 @@ export default function PayrollManagement() {
 
                 <div>
                   <Label>Mes</Label>
-                  <Select value={String(selectedMonth)} onValueChange={(v) => { setSelectedMonth(parseInt(v)); setShowPreview(false); setPreviewData([]); }}>
+                  <Select value={String(selectedMonth)} onValueChange={(v) => { const m = parseInt(v); setSelectedMonth(m); setShowPreview(false); setPreviewData([]); queryClient.invalidateQueries({ queryKey: ["payslips", m, selectedYear] }); }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -898,7 +900,7 @@ export default function PayrollManagement() {
 
                 <div>
                   <Label>Año</Label>
-                  <Select value={String(selectedYear)} onValueChange={(v) => { setSelectedYear(parseInt(v)); setShowPreview(false); setPreviewData([]); }}>
+                  <Select value={String(selectedYear)} onValueChange={(v) => { const y = parseInt(v); setSelectedYear(y); setShowPreview(false); setPreviewData([]); queryClient.invalidateQueries({ queryKey: ["payslips", selectedMonth, y] }); }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
