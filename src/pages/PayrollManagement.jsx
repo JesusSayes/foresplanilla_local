@@ -353,7 +353,7 @@ export default function PayrollManagement() {
       filteredEmployees = filteredEmployees.filter(emp => 
         emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase())
+        emp.document_number.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
@@ -697,7 +697,7 @@ export default function PayrollManagement() {
     // Employee Info
     doc.setFontSize(10);
     doc.text(`Empleado: ${employee.first_name} ${employee.last_name}`, 14, 35);
-    doc.text(`Código: ${employee.employee_code}`, 14, 42);
+    doc.text(`DNI: ${employee.document_type} ${employee.document_number}`, 14, 42);
     doc.text(`Periodo: ${payslip.period}`, 14, 49);
     doc.text(`Tipo: ${payslip.payroll_type}`, 120, 49);
     
@@ -755,7 +755,8 @@ export default function PayrollManagement() {
         : (p.month && p.year ? format(new Date(p.year, p.month - 1), 'MMMM yyyy', { locale: es }) : "");
       return {
         "N°": idx + 1,
-        "Código": p.employee_code || emp?.employee_code || "",
+        "Tipo Doc": emp?.document_type || "",
+        "DNI": emp?.document_number || "",
         "Apellidos y Nombres": p.employee_name || (emp ? `${emp.first_name} ${emp.last_name}` : ""),
         "Área / Departamento": p.department || emp?.department_name || "",
         "Cargo": emp?.position || "",
@@ -1063,9 +1064,9 @@ export default function PayrollManagement() {
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <h4 className="font-bold text-slate-900">
-                                  {payslip.employee_code} - {payslip.employee_name}
-                                </h4>
+                                   <h4 className="font-bold text-slate-900">
+                                     {allEmployees.find(e => e.id === payslip.employee_id)?.document_type} {allEmployees.find(e => e.id === payslip.employee_id)?.document_number} - {payslip.employee_name}
+                                   </h4>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -1432,8 +1433,8 @@ export default function PayrollManagement() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <p className="font-semibold text-slate-900 text-sm truncate">
-                                            {emp.employee_code} — {emp.first_name} {emp.last_name}
-                                          </p>
+                                              {emp.document_type} {emp.document_number} — {emp.first_name} {emp.last_name}
+                                            </p>
                                           <p className="text-xs text-slate-500">{emp.position} · {emp.department_name}</p>
                                         </div>
                                         <div className="flex items-center gap-6 text-sm shrink-0">
@@ -1659,13 +1660,13 @@ export default function PayrollManagement() {
                                         doc.text(`${format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })}`, 14, 28);
                                         let y = 40;
                                         allGroupPayslips.forEach(p => {
-                                          const emp = allEmployees.find(e => e.id === p.employee_id);
-                                          if (emp) {
-                                            doc.text(`${emp.employee_code} - ${emp.first_name} ${emp.last_name}`, 14, y);
-                                            doc.text(`S/ ${p.net_pay.toFixed(2)}`, 160, y, { align: "right" });
-                                            y += 7;
-                                          }
-                                        });
+                                           const emp = allEmployees.find(e => e.id === p.employee_id);
+                                           if (emp) {
+                                             doc.text(`${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}`, 14, y);
+                                             doc.text(`S/ ${p.net_pay.toFixed(2)}`, 160, y, { align: "right" });
+                                             y += 7;
+                                           }
+                                         });
                                         doc.save(`Planilla_${group.type}_${group.year}_${group.month}.pdf`);
                                       }}
                                     >
@@ -1680,7 +1681,7 @@ export default function PayrollManagement() {
                                     const emp = allEmployees.find(e => e.id === p.employee_id);
                                     return emp ? (
                                       <div key={p.id} className="flex items-center justify-between text-sm p-2 bg-slate-50 rounded">
-                                        <span>{emp.employee_code} - {emp.first_name} {emp.last_name}</span>
+                                          <span>{emp.document_type} {emp.document_number} - {emp.first_name} {emp.last_name}</span>
                                         {canViewAmounts ? (
                                           <span className="font-semibold">S/ {p.net_pay.toFixed(2)}</span>
                                         ) : (
