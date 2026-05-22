@@ -228,7 +228,7 @@ export default function ConsultaPlanillas() {
           const importeNeto  = Math.round((p.net_pay || 0) * 100) / 100;
           const glosa    = `SNP ${period}`;
           const glosaEmp = `RH ${empName} - ${period}`;
-          const nroDoc   = `RH-${annomes}-${emp.document_number || emp.employee_code}`;
+          const nroDoc   = `RH-${annomes}-${emp.document_number}`;
 
           // Campos comunes a todos los movimientos de este trabajador
           const base = {
@@ -518,7 +518,7 @@ export default function ConsultaPlanillas() {
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b">
                     <tr>
-                      {["#","Código","Empleado","Cargo","Área","Días","Ingresos","Descuentos","Neto a Pagar","Estado","Acciones"].map(h => (
+                      {["#","DNI","Empleado","Cargo","Área","Días","Ingresos","Descuentos","Neto a Pagar","Estado","Acciones"].map(h => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-600 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -527,8 +527,8 @@ export default function ConsultaPlanillas() {
                     {payslipsConEmp.map(({ p, emp }, idx) => (
                       <tr key={p.id} className="hover:bg-indigo-50/30 transition-colors">
                         <td className="px-4 py-3 text-slate-400 text-xs">{idx + 1}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-700">{emp.employee_code}</td>
-                        <td className="px-4 py-3">
+                         <td className="px-4 py-3 font-mono text-xs text-slate-700">{emp.document_type} {emp.document_number}</td>
+                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
                               {emp.first_name[0]}{emp.last_name[0]}
@@ -644,8 +644,7 @@ export default function ConsultaPlanillas() {
             <div class="section-title">Información del Trabajador</div>
             <div class="grid2">
               <div><span class="lbl">Nombres y Apellidos:</span><span class="val">${emp.first_name} ${emp.last_name}</span></div>
-              <div><span class="lbl">Código:</span><span class="val">${emp.employee_code}</span></div>
-              <div><span class="lbl">Documento:</span><span class="val">${emp.document_type || ""} ${emp.document_number || ""}</span></div>
+              <div><span class="lbl">DNI:</span><span class="val">${emp.document_type || ""} ${emp.document_number || ""}</span></div>
               <div><span class="lbl">Cargo:</span><span class="val">${emp.position || "—"}</span></div>
               <div><span class="lbl">Área/Depto:</span><span class="val">${emp.department_name || "—"}</span></div>
               <div><span class="lbl">Tipo Trabajador:</span><span class="val">${emp.worker_type || "Empleado"}</span></div>
