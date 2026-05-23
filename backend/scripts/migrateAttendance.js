@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 
 const MODE = process.argv[2] || "dry";
 
-const CSV_PATH = "./data/asistencias_02.csv";
+const CSV_PATH = "./data/asistencias_03.csv";
 const LOG_DIR = "./logs";
 
 const EMP_NOT_FOUND_LOG = path.join(LOG_DIR, "employees_not_found.log");
