@@ -657,8 +657,14 @@ export default function AttendanceManagement() {
         || incidentsForRow[0]
         || null;
 
-      // Estado real de la marcación: si hay incidente aprobado → "Justificado"
+      // Estado real de la marcación: vacaciones > incidente aprobado > status del registro
       const estadoMarcacion = (() => {
+        if (emp.record?.status === 'Vacaciones') return 'Vacaciones';
+        const rowDate2 = rowDate;
+        const isOnVacation = approvedVacations.some(
+          v => v.employee_id === emp.id && v.start_date <= rowDate2 && v.end_date >= rowDate2
+        );
+        if (isOnVacation) return 'Vacaciones';
         if (incident && incident.status === 'Aprobada') return 'Justificado';
         return emp.record?.status || 'Sin marcar';
       })();
@@ -740,7 +746,11 @@ export default function AttendanceManagement() {
   };
 
   const getStatusConfig = (status, hasClockIn, incident) => {
-    // Si hay un incidente aprobado asociado, mostrar "Justificado" independientemente del status del record
+    // Si el registro está marcado como Vacaciones
+    if (status === "Vacaciones") {
+      return { color: "bg-amber-100 text-amber-800 border-amber-300", icon: Palmtree, text: "Vacaciones" };
+    }
+    // Si hay un incidente aprobado asociado, mostrar "Justificado"
     if (incident && incident.status === "Aprobada") {
       return { color: "bg-blue-100 text-blue-700 border-blue-200", icon: FileText, text: "Justificado" };
     }
@@ -1478,6 +1488,7 @@ export default function AttendanceManagement() {
                         <SelectItem value="Incompleto">Incompleto</SelectItem>
                         <SelectItem value="Ausente">Ausente</SelectItem>
                         <SelectItem value="Justificado">Justificado</SelectItem>
+                        <SelectItem value="Vacaciones">Vacaciones</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
