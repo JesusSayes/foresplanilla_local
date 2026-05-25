@@ -163,7 +163,7 @@ export default function ManagerApprovals() {
       is_late: false,
       late_minutes: 0,
       is_absent: false,
-      status: "Justificado",
+      status: "Vacaciones",
       notes: `Vacaciones aprobadas (${request.request_type})`,
     });
 
