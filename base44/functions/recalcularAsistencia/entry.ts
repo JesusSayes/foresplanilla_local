@@ -176,7 +176,10 @@ Deno.serve(async (req) => {
       const hasApprovedIncident = !!approvedIncidentsByDate[record.date];
 
       let status;
-      if (hasApprovedIncident || record.status === "Justificado") {
+      if (record.status === "Vacaciones") {
+        // Preservar estado de vacaciones, no recalcular
+        status = "Vacaciones";
+      } else if (hasApprovedIncident || record.status === "Justificado") {
         status = "Justificado";
       } else if (record.clock_in && record.clock_out) {
         status = "Completo";

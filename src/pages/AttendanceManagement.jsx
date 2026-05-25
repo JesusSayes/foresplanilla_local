@@ -601,6 +601,29 @@ export default function AttendanceManagement() {
     } // end else (fecha no futura)
   }
 
+  const [recalculandoTodo, setRecalculandoTodo] = useState(false);
+  const [recalcProgress, setRecalcProgress] = useState({ done: 0, total: 0 });
+
+  const handleRecalcularTodo = async () => {
+    if (!window.confirm("¿Recalcular tardanzas y horas para TODOS los empleados? Esto puede tardar varios minutos.")) return;
+    setRecalculandoTodo(true);
+    const empList = allEmployees.filter(e => e.status === "Activo");
+    setRecalcProgress({ done: 0, total: empList.length });
+    let done = 0;
+    for (const emp of empList) {
+      await base44.functions.invoke("recalcularAsistencia", {
+        employee_id: emp.id,
+        date_from: "2020-01-01",
+        date_to: format(new Date(), "yyyy-MM-dd"),
+      });
+      done++;
+      setRecalcProgress({ done, total: empList.length });
+    }
+    setRecalculandoTodo(false);
+    queryClient.invalidateQueries(["todayAttendance"]);
+    toast.success(`✓ Recálculo completado para ${done} empleados`);
+  };
+
   const handleExportToExcel = () => {
     const dataToExport = employeesWithRecords.map(emp => {
       const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
@@ -844,6 +867,18 @@ export default function AttendanceManagement() {
                 </TabsTrigger>
               </TabsList>
               <div className="flex items-center gap-2">
+                {hasPermission("system.admin") && (
+                  <Button
+                    onClick={handleRecalcularTodo}
+                    variant="outline"
+                    disabled={recalculandoTodo}
+                    className="whitespace-nowrap border-orange-300 text-orange-700 hover:bg-orange-50"
+                  >
+                    {recalculandoTodo
+                      ? `Recalculando... ${recalcProgress.done}/${recalcProgress.total}`
+                      : "Recalcular Todo"}
+                  </Button>
+                )}
                 <Button onClick={handleExportToExcel} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
                   <Download className="w-4 h-4 mr-2" />Excel
                 </Button>
