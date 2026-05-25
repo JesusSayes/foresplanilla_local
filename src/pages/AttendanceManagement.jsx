@@ -542,12 +542,16 @@ export default function AttendanceManagement() {
     : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
   const filteredEmployees = siteAllowedEmployees.filter(emp => {
-  const matchesSearch =
-    emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.document_number.toLowerCase().includes(searchTerm.toLowerCase());
-  const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
-  return matchesSearch && matchesSite;
+    const term = searchTerm.toLowerCase().trim();
+    const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase();
+    const fullNameReverse = `${emp.last_name} ${emp.first_name}`.toLowerCase();
+    const matchesSearch = !term ||
+      fullName.includes(term) ||
+      fullNameReverse.includes(term) ||
+      emp.document_number.toLowerCase().includes(term) ||
+      term.split(/\s+/).every(word => fullName.includes(word));
+    const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
+    return matchesSearch && matchesSite;
   });
 
   // IDs de empleados accesibles para filtrar incidentes y alertas
