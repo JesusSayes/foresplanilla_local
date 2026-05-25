@@ -112,6 +112,43 @@ export default function ManagerApprovals() {
     return `${y}-${m}-${day}`;
   };
 
+  // Obtiene horario programado del empleado para una fecha y día de semana específicos
+  const getScheduledTimesForDate = (allSchedules, empId, empDeptName, dateStr) => {
+    const dow = new Date(dateStr + "T00:00:00").getDay();
+    const dayStarts = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+    const dayEnds   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+
+    const candidates = allSchedules.filter(s => {
+      if (!s.is_active) return false;
+      const isForEmp  = s.employee_id === empId;
+      const isForDept = !s.employee_id && empDeptName &&
+        (s.departments?.includes(empDeptName) || s.department_name === empDeptName);
+      return isForEmp || isForDept;
+    });
+
+    const empSchedules  = candidates.filter(s => s.employee_id === empId);
+    const deptSchedules = candidates.filter(s => !s.employee_id);
+
+    const findBest = (list) => {
+      const valid = list.filter(s => {
+        const from = s.effective_from || "0000-01-01";
+        const to   = s.effective_to   || "9999-12-31";
+        return from <= dateStr && to >= dateStr;
+      });
+      valid.sort((a, b) => (b.effective_from || "0000-01-01").localeCompare(a.effective_from || "0000-01-01"));
+      return valid[0] || null;
+    };
+
+    const sched = findBest(empSchedules) || findBest(deptSchedules);
+    if (!sched) return { start: "09:00", end: "18:00" };
+
+    const start = sched[dayStarts[dow]] || null;
+    const end   = sched[dayEnds[dow]]   || null;
+    // Si no hay horario para ese día (día libre), usar valores genéricos
+    if (!start || !end) return { start: "09:00", end: "18:00" };
+    return { start, end };
+  };
+
   // Crea/sobreescribe registros de asistencia para cada día del período de vacaciones
   const createAttendanceRecordsForVacation = async (request) => {
     const startStr = extractDateStr(request.start_date);
@@ -120,6 +157,14 @@ export default function ManagerApprovals() {
       console.error("[Vacaciones] Fechas inválidas:", request.start_date, request.end_date);
       return;
     }
+
+    // Obtener horarios y datos del empleado
+    const [allSchedules, empData] = await Promise.all([
+      base44.entities.WorkSchedule.list("-created_date"),
+      base44.entities.Employee.filter({ id: request.employee_id }),
+    ]);
+    const emp = empData?.[0] || null;
+    const empDeptName = emp?.department_name || null;
 
     // Generar todas las fechas del período usando UTC noon para evitar desfases de TZ
     const allDates = [];
@@ -135,37 +180,41 @@ export default function ManagerApprovals() {
       cur = new Date(cur.getTime() + 24 * 60 * 60 * 1000);
     }
 
-    console.log(`[Vacaciones] Registrando asistencia para ${allDates.length} días:`, allDates);
-
-    // Buscar registros existentes del empleado en el período exacto
+    // Buscar registros existentes del empleado
     const allExisting = await base44.entities.AttendanceRecord.filter({
       employee_id: request.employee_id,
     });
-    // Indexar por fecha normalizada para lookup O(1)
     const existingByDate = {};
     allExisting.forEach(r => {
       const normalizedDate = extractDateStr(r.date) || r.date;
       existingByDate[normalizedDate] = r;
     });
 
-    const vacationPayload = (dateStr) => ({
-      employee_id: request.employee_id,
-      date: dateStr,
-      clock_in: "09:00",
-      clock_out: "18:00",
-      scheduled_start: "09:00",
-      scheduled_end: "18:00",
-      worked_hours: 8,
-      regular_hours: 8,
-      overtime_hours_25: 0,
-      overtime_hours_35: 0,
-      overtime_authorized: false,
-      is_late: false,
-      late_minutes: 0,
-      is_absent: false,
-      status: "Vacaciones",
-      notes: `Vacaciones aprobadas (${request.request_type})`,
-    });
+    const vacationPayload = (dateStr) => {
+      const { start, end } = getScheduledTimesForDate(allSchedules, request.employee_id, empDeptName, dateStr);
+      // Calcular horas trabajadas según horario real
+      const [sh, sm2] = start.split(":").map(Number);
+      const [eh, em2] = end.split(":").map(Number);
+      const workedHours = Math.max(0, ((eh * 60 + em2) - (sh * 60 + sm2)) / 60);
+      return {
+        employee_id: request.employee_id,
+        date: dateStr,
+        clock_in: start,
+        clock_out: end,
+        scheduled_start: start,
+        scheduled_end: end,
+        worked_hours: workedHours,
+        regular_hours: workedHours,
+        overtime_hours_25: 0,
+        overtime_hours_35: 0,
+        overtime_authorized: false,
+        is_late: false,
+        late_minutes: 0,
+        is_absent: false,
+        status: "Vacaciones",
+        notes: `Vacaciones aprobadas (${request.request_type})`,
+      };
+    };
 
     let created = 0;
     let updated = 0;

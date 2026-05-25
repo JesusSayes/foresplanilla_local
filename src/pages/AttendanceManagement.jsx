@@ -618,13 +618,16 @@ export default function AttendanceManagement() {
 
       // Estado real de la marcación: vacaciones > incidente aprobado > status del registro
       const estadoMarcacion = (() => {
+        // 1. Si el registro ya tiene status "Vacaciones" (grabado al aprobar)
         if (emp.record?.status === 'Vacaciones') return 'Vacaciones';
-        const rowDate2 = rowDate;
+        // 2. Si existe una solicitud de vacaciones aprobada que cubre esta fecha
         const isOnVacation = approvedVacations.some(
-          v => v.employee_id === emp.id && v.start_date <= rowDate2 && v.end_date >= rowDate2
+          v => v.employee_id === emp.id && v.start_date <= rowDate && v.end_date >= rowDate
         );
         if (isOnVacation) return 'Vacaciones';
+        // 3. Si hay incidente aprobado
         if (incident && incident.status === 'Aprobada') return 'Justificado';
+        // 4. Status real del registro
         return emp.record?.status || 'Sin marcar';
       })();
 
