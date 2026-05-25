@@ -647,7 +647,7 @@ export default function AttendanceManagement() {
       const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
       const workedHours = emp.record?.worked_hours || 0;
 
-      // Buscar la papeleta más reciente vinculada a este empleado y fecha
+      // Buscar TODOS los incidentes para este empleado y fecha (desde cache completo)
       const incidentsForRow = allIncidents.filter(
         i => i.employee_id === emp.id && i.incident_date === rowDate
       );
@@ -657,21 +657,21 @@ export default function AttendanceManagement() {
         || incidentsForRow[0]
         || null;
 
+      // Estado real de la marcación: si hay incidente aprobado → "Justificado"
+      const estadoMarcacion = (() => {
+        if (incident && incident.status === 'Aprobada') return 'Justificado';
+        return emp.record?.status || 'Sin marcar';
+      })();
+
       // Calcular tiempo justificado
       let tiempoPapeleta = '';
       if (incident) {
-        if (incident.full_day_justification) {
-          const ts = incident.justified_time_start || '09:00';
-          const te = incident.justified_time_end || '18:00';
-          const [sh, sm] = ts.split(':').map(Number);
-          const [eh, em] = te.split(':').map(Number);
-          const hrs = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
-          tiempoPapeleta = `${Number(hrs).toFixed(2)} h`;
-        } else if (incident.justified_time_start && incident.justified_time_end) {
-          const [sh, sm] = incident.justified_time_start.split(':').map(Number);
-          const [eh, em] = incident.justified_time_end.split(':').map(Number);
-          tiempoPapeleta = `${Number(Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60)).toFixed(2)} h`;
-        }
+        const ts = incident.justified_time_start || '09:00';
+        const te = incident.justified_time_end || '18:00';
+        const [sh, sm] = ts.split(':').map(Number);
+        const [eh, em] = te.split(':').map(Number);
+        const hrs = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
+        tiempoPapeleta = `${hrs.toFixed(2)} h`;
       }
 
       return {
@@ -687,9 +687,10 @@ export default function AttendanceManagement() {
         'Salida': emp.record?.clock_out || '--:--',
         'Horas Trabajadas': Number(workedHours || 0).toFixed(2),
         'Tardanza (min)': emp.record?.late_minutes || 0,
-        'HE 25%': Number(emp.record?.overtime_hours_25 ?? 0).toFixed(2),
-        'HE 35%': Number(emp.record?.overtime_hours_35 ?? 0).toFixed(2),
-        'Estado Asistencia': emp.record?.status || 'Sin marcar',
+        'HE 25%': (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
+        'HE 35%': (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
+        'Estado Marcación': estadoMarcacion,
+        'Tiene Justificación': incident ? 'Sí' : 'No',
         'Tipo Incidente': incident ? incident.incident_type : '',
         'Estado Papeleta': incident ? incident.status : '',
         'Período Justificado': incident
@@ -698,8 +699,10 @@ export default function AttendanceManagement() {
               : `${incident.justified_time_start || ''} - ${incident.justified_time_end || ''}`)
           : '',
         'Horas Justificadas': tiempoPapeleta,
-        'Justificación': incident ? incident.justification : '',
+        'Detalle Justificación': incident ? incident.justification : '',
+        'Documento Adjunto': incident?.supporting_document_url || '',
         'Revisado por': incident?.reviewed_by || '',
+        'Fecha Revisión': incident?.review_date || '',
         'Comentarios Revisión': incident?.review_comments || '',
       };
     });
