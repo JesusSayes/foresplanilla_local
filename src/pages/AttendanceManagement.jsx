@@ -325,70 +325,102 @@ export default function AttendanceManagement() {
   const handleSaveEdit = async () => {
     if (!editingRecord || isSavingEdit) return;
     setIsSavingEdit(true);
-    const clockIn = editingRecord.clock_in;
+    const clockIn  = editingRecord.clock_in;
     const clockOut = editingRecord.clock_out;
     const recordDate = editingRecord.date;
 
-    // 1. Guardar clock_in/out y notas primero
-    await base44.entities.AttendanceRecord.update(editingRecord.id, {
-      clock_in: clockIn || null,
-      clock_out: clockOut || null,
-      notes: editingRecord.notes,
-      status: editingRecord.status,
-      is_absent: editingRecord.status === "Ausente",
-    });
+    try {
+      // 1. Guardar clock_in/out, notas y estado.
+      //    IMPORTANTE: NO tocar overtime_authorized aquí — eso solo lo cambia la aprobación de la alerta.
+      await base44.entities.AttendanceRecord.update(editingRecord.id, {
+        clock_in:  clockIn  || null,
+        clock_out: clockOut || null,
+        notes:     editingRecord.notes,
+        status:    editingRecord.status,
+        is_absent: editingRecord.status === "Ausente",
+      });
 
-    // 2. Verificar si hay HE sin autorización para generar alerta
-    const schedule = getEmployeeScheduleForDate(editingRecord.employee_id, recordDate);
-    if (clockIn && clockOut && schedule) {
-      const dow = new Date(recordDate + "T00:00:00").getDay();
-      const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
-      const dayEndMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-      const schedEnd = schedule[dayEndMap[dow]] || "18:00";
-      const breakMin = schedule.break_duration_minutes ?? 60;
-      const [inH, inM]   = clockIn.split(":").map(Number);
-      const [outH, outM] = clockOut.split(":").map(Number);
-      const [endH, endM] = schedEnd.split(":").map(Number);
-      const workedMin = (outH * 60 + outM) - (inH * 60 + inM) - breakMin;
-      const normalMin = (endH * 60 + endM) - Math.max(inH * 60 + inM, new Date(recordDate + "T00:00:00").getDay()) - breakMin;
-      const workedHrs = Math.max(0, workedMin / 60);
-      const schedEndMin = endH * 60 + endM;
-      const effectiveStart = inH * 60 + inM;
-      const normalHrs = Math.max(0, (schedEndMin - effectiveStart - breakMin) / 60);
-      const extraHrs = Math.max(0, workedHrs - normalHrs);
-      const overtimeAuth = editingRecord.overtime_authorized ?? schedule.overtime_authorized ?? false;
-      if (extraHrs > 0 && !overtimeAuth) {
-        // Verificar si ya existe alerta pendiente para este registro
-        const existingAlert = await base44.entities.OvertimeAlert.filter({
-          attendance_record_id: editingRecord.id,
-          status: "Pendiente",
-        });
-        if (!existingAlert || existingAlert.length === 0) {
-          await base44.entities.OvertimeAlert.create({
-            employee_id: editingRecord.employee_id,
+      // 2. Si hay entrada Y salida, verificar si existen HE sin autorización
+      if (clockIn && clockOut) {
+        const schedule = getEmployeeScheduleForDate(editingRecord.employee_id, recordDate);
+        if (schedule) {
+          const dow = new Date(recordDate + "T00:00:00").getDay();
+          const dayEndMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+          const schedStart = (() => {
+            const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+            return schedule[dayStartMap[dow]] || "09:00";
+          })();
+          const schedEnd   = schedule[dayEndMap[dow]] || "18:00";
+          const breakMin   = schedule.break_duration_minutes ?? 60;
+
+          const [inH, inM]   = clockIn.split(":").map(Number);
+          const [outH, outM] = clockOut.split(":").map(Number);
+          const [endH, endM] = schedEnd.split(":").map(Number);
+          const [stH, stM]   = schedStart.split(":").map(Number);
+
+          const inTotal    = inH * 60 + inM;
+          const outTotal   = outH * 60 + outM;
+          const schedEndMin = endH * 60 + endM;
+          const schedStartMin = stH * 60 + stM;
+
+          const workedMin  = outTotal - inTotal - breakMin;
+          const workedHrs  = Math.max(0, workedMin / 60);
+          // Horas normales = desde cuando empezó (o desde su hora programada si llegó tarde) hasta fin de jornada, menos break
+          const normalHrs  = Math.max(0, (schedEndMin - Math.max(inTotal, schedStartMin) - breakMin) / 60);
+          const extraHrs   = Math.max(0, workedHrs - normalHrs);
+
+          // overtime_authorized: usa el valor actual del registro (ya persistido) o el del horario
+          const overtimeAuth = editingRecord.overtime_authorized ?? schedule.overtime_authorized ?? false;
+
+          // Buscar alertas pendientes para este registro
+          const existingAlerts = await base44.entities.OvertimeAlert.filter({
             attendance_record_id: editingRecord.id,
-            alert_date: recordDate,
-            overtime_hours: extraHrs,
             status: "Pendiente",
           });
-          toast.warning(`⚠️ ${extraHrs.toFixed(2)}h extras sin autorización — se generó alerta.`);
+
+          if (extraHrs > 0 && !overtimeAuth) {
+            if (!existingAlerts || existingAlerts.length === 0) {
+              // Crear nueva alerta
+              await base44.entities.OvertimeAlert.create({
+                employee_id:          editingRecord.employee_id,
+                attendance_record_id: editingRecord.id,
+                alert_date:           recordDate,
+                overtime_hours:       extraHrs,
+                status:               "Pendiente",
+              });
+              toast.warning(`⚠️ ${extraHrs.toFixed(2)}h extras sin autorización — se generó alerta de aprobación.`);
+            } else {
+              // Actualizar la alerta existente con las nuevas horas
+              await base44.entities.OvertimeAlert.update(existingAlerts[0].id, {
+                overtime_hours: extraHrs,
+              });
+              toast.warning(`⚠️ ${extraHrs.toFixed(2)}h extras — alerta de aprobación pendiente.`);
+            }
+          } else if (extraHrs === 0 && existingAlerts && existingAlerts.length > 0) {
+            // La marcación corregida ya no genera extras → cancelar alerta pendiente
+            await base44.entities.OvertimeAlert.update(existingAlerts[0].id, { status: "Descartado" });
+          }
         }
       }
+
+      // 3. Recalcular con el backend.
+      //    El backend respeta overtime_authorized del registro:
+      //    - Si es false (o no hay alerta aprobada), HE quedan en 0.
+      //    - Si es true (alerta aprobada), calcula HE 25% y 35%.
+      await base44.functions.invoke("recalcularAsistencia", {
+        employee_id: editingRecord.employee_id,
+        date_from:   recordDate,
+        date_to:     recordDate,
+      });
+
+      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries(["overtimeAlerts"]);
+      toast.success("Registro actualizado y métricas recalculadas");
+      setShowEditModal(false);
+      setEditingRecord(null);
+    } finally {
+      setIsSavingEdit(false);
     }
-
-    // 3. Recalcular con el backend (tardanza + HE 25% + HE 35%)
-    await base44.functions.invoke("recalcularAsistencia", {
-      employee_id: editingRecord.employee_id,
-      date_from: recordDate,
-      date_to: recordDate,
-    });
-
-    queryClient.invalidateQueries(["todayAttendance"]);
-    queryClient.invalidateQueries(["overtimeAlerts"]);
-    toast.success("Registro actualizado y métricas recalculadas");
-    setShowEditModal(false);
-    setEditingRecord(null);
-    setIsSavingEdit(false);
   };
 
   const handleApproveIncident = async (incident) => {
