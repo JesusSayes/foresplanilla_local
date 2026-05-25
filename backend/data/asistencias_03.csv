@@ -1,4 +1,4 @@
-﻿numero_documento|fech_regi_mar|hora_entr_reloj|hora_sali_reloj|hora_entrada_programada|hora_salida_programada|tiempo_trabajado|is_late|minu_tard_eas|is_absent|status|created
+﻿numero_documento|fech_regi_mar|hora_entr_rel|hora_sali_rel|hora_entrada|hora_salida|minu_dife_eas|is_late|minu_tard_eas|is_absent|status|created_at
 60748571|1/01/2026|08:30:00|18:30:00|08:30:00|18:30:00|10:00:00|false|00:00|false|Completo|22/05/2026  15:33:39
 06906647|1/01/2026|17:00:00|07:00:00|17:00:00|07:00:00|00:00:00|false|00:00|false|Completo|22/05/2026  15:33:39
 47097338|1/01/2026|07:00:00|17:36:00|07:00:00|17:36:00|00:00:00|false|00:00|false|Completo|22/05/2026  15:33:39
