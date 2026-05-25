@@ -660,13 +660,20 @@ export default function AttendanceManagement() {
     toast.success(`✓ Recálculo completado para ${done} empleados`);
   };
 
-  const handleExportToExcel = () => {
+  const handleExportToExcel = async () => {
+    // Cargar TODOS los incidentes frescos para no depender del caché limitado
+    let freshIncidents = allIncidents;
+    try {
+      const fetched = await base44.entities.AttendanceIncident.list("-incident_date", 5000);
+      if (fetched && fetched.length > 0) freshIncidents = fetched;
+    } catch (_) { /* usa caché si falla */ }
+
     const dataToExport = employeesWithRecords.map(emp => {
       const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
       const workedHours = emp.record?.worked_hours || 0;
 
-      // Buscar TODOS los incidentes para este empleado y fecha (desde cache completo)
-      const incidentsForRow = allIncidents.filter(
+      // Buscar TODOS los incidentes para este empleado y fecha
+      const incidentsForRow = freshIncidents.filter(
         i => i.employee_id === emp.id && i.incident_date === rowDate
       );
       // Priorizar aprobada > pendiente > rechazada
@@ -693,12 +700,16 @@ export default function AttendanceManagement() {
       // Calcular tiempo justificado
       let tiempoPapeleta = '';
       if (incident) {
-        const ts = incident.justified_time_start || '09:00';
-        const te = incident.justified_time_end || '18:00';
-        const [sh, sm] = ts.split(':').map(Number);
-        const [eh, em] = te.split(':').map(Number);
-        const hrs = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
-        tiempoPapeleta = `${hrs.toFixed(2)} h`;
+        if (incident.full_day_justification) {
+          tiempoPapeleta = '8.00 h';
+        } else {
+          const ts = incident.justified_time_start || '09:00';
+          const te = incident.justified_time_end || '18:00';
+          const [sh, sm] = ts.split(':').map(Number);
+          const [eh, em] = te.split(':').map(Number);
+          const hrs = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
+          tiempoPapeleta = `${hrs.toFixed(2)} h`;
+        }
       }
 
       // Para vacaciones: usar el horario programado real, no el que quedó grabado
@@ -915,7 +926,7 @@ export default function AttendanceManagement() {
                       : "Recalcular Todo"}
                   </Button>
                 )}
-                <Button onClick={handleExportToExcel} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
+                <Button onClick={() => handleExportToExcel()} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
                   <Download className="w-4 h-4 mr-2" />Excel
                 </Button>
                 <Button onClick={handlePrint} variant="outline" className="whitespace-nowrap">
