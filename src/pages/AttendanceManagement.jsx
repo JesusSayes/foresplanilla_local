@@ -642,6 +642,20 @@ export default function AttendanceManagement() {
         tiempoPapeleta = `${hrs.toFixed(2)} h`;
       }
 
+      // Para vacaciones: usar el horario programado real, no el que quedó grabado
+      let entradaExcel = emp.record?.clock_in || '--:--';
+      let salidaExcel  = emp.record?.clock_out || '--:--';
+      if (estadoMarcacion === 'Vacaciones') {
+        const schedVac = getEmployeeScheduleForDate(emp.id, rowDate);
+        const dowVac = new Date(rowDate + "T00:00:00").getDay();
+        const startsMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+        const endsMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+        if (schedVac) {
+          entradaExcel = schedVac[startsMap[dowVac]] || entradaExcel;
+          salidaExcel  = schedVac[endsMap[dowVac]]   || salidaExcel;
+        }
+      }
+
       return {
         'Fecha': rowDate,
         'Tipo Doc': emp.document_type,
@@ -651,8 +665,8 @@ export default function AttendanceManagement() {
         'Cargo': emp.position,
         'Departamento': emp.department_name,
         'Sede': emp.site || 'Sin sede',
-        'Entrada': emp.record?.clock_in || '--:--',
-        'Salida': emp.record?.clock_out || '--:--',
+        'Entrada': entradaExcel,
+        'Salida': salidaExcel,
         'Horas Trabajadas': workedHours.toFixed(2),
         'Tardanza (min)': emp.record?.late_minutes || 0,
         'HE 25%': (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
