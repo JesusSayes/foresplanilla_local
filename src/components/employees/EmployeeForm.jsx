@@ -384,17 +384,43 @@ export default function EmployeeForm({
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Cargo</Label>
-                  <Select value={formData.position} onValueChange={(v) => setFormData({ ...formData, position: v })}>
+                  <Label>Área/Departamento</Label>
+                  <Select value={formData.department_name} onValueChange={(v) => setFormData({ ...formData, department_name: v, position: "" })}>
                     <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                     <SelectContent>
-                      <div className="p-2 border-b sticky top-0 bg-white z-10"><Input placeholder="Buscar..." value={positionSearchTerm} onChange={(e) => setPositionSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} /></div>
-                      {positions.filter(p => p.name.toLowerCase().includes(positionSearchTerm.toLowerCase())).map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                      <div className="p-2 border-b sticky top-0 bg-white z-10"><Input placeholder="Buscar..." value={departmentSearchTerm} onChange={(e) => setDepartmentSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} /></div>
+                      {departments.filter(d => d.name.toLowerCase().includes(departmentSearchTerm.toLowerCase())).map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
+                <div>
+                  <Label>Cargo</Label>
+                  <Select value={formData.position} onValueChange={(v) => setFormData({ ...formData, position: v })} disabled={!formData.department_name}>
+                    <SelectTrigger><SelectValue placeholder={formData.department_name ? "Seleccionar cargo" : "Selecciona primero un área"} /></SelectTrigger>
+                    <SelectContent>
+                      <div className="p-2 border-b sticky top-0 bg-white z-10"><Input placeholder="Buscar..." value={positionSearchTerm} onChange={(e) => setPositionSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} /></div>
+                      {positions
+                        .filter(p => {
+                          const matchesDept = !formData.department_name || p.department === formData.department_name;
+                          const matchesSearch = p.name.toLowerCase().includes(positionSearchTerm.toLowerCase());
+                          return matchesDept && matchesSearch;
+                        })
+                        .map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                      {positions.filter(p => p.department === formData.department_name).length === 0 && formData.department_name && (
+                        <div className="px-3 py-4 text-sm text-slate-400 text-center">No hay cargos para este departamento</div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {formData.department_name && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      {positions.filter(p => p.department === formData.department_name).length} cargo(s) disponible(s)
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
                 <div><Label>Nivel</Label><Input value={formData.position_level} onChange={(e) => setFormData({ ...formData, position_level: e.target.value })} /></div>
                 <div>
                   <Label>Tipo de Contrato</Label>
@@ -410,19 +436,9 @@ export default function EmployeeForm({
                   </Select>
                   {vigentContract ? <p className="text-xs text-indigo-600 mt-1">Contrato vigente: {vigentContract.contract_type}</p> : <p className="text-xs text-amber-600 mt-1">Sin contrato vigente</p>}
                 </div>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label>Área/Departamento</Label>
-                  <Select value={formData.department_name} onValueChange={(v) => setFormData({ ...formData, department_name: v })}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                    <SelectContent>
-                      <div className="p-2 border-b sticky top-0 bg-white z-10"><Input placeholder="Buscar..." value={departmentSearchTerm} onChange={(e) => setDepartmentSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} /></div>
-                      {departments.filter(d => d.name.toLowerCase().includes(departmentSearchTerm.toLowerCase())).map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div><Label>Unidad de Trabajo</Label><Input value={formData.work_unit} onChange={(e) => setFormData({ ...formData, work_unit: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div><Label>Supervisor Directo</Label><Input value={formData.supervisor_name} onChange={(e) => setFormData({ ...formData, supervisor_name: e.target.value })} /></div>
               </div>
               <div className="grid grid-cols-3 gap-4">

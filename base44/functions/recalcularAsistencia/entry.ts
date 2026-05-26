@@ -150,12 +150,14 @@ Deno.serve(async (req) => {
     const emp = employee[0];
     if (!emp) return Response.json({ error: 'Empleado no encontrado' }, { status: 404 });
 
-    const [allRecordsRaw, allIncidentsRaw] = await Promise.all([
+    const [allRecordsRaw, allIncidentsRaw, overtimeAlertsRaw] = await Promise.all([
       base44.entities.AttendanceRecord.filter({ employee_id }),
       base44.entities.AttendanceIncident.filter({ employee_id }),
+      base44.entities.OvertimeAlert.filter({ employee_id }),
     ]);
     const allRecords = parseSDKResponse(allRecordsRaw);
     const allIncidents = parseSDKResponse(allIncidentsRaw);
+    const allOvertimeAlerts = parseSDKResponse(overtimeAlertsRaw);
     const recordsInRange = allRecords.filter(r => r.date >= date_from && r.date <= date_to);
 
     // Mapa de incidentes aprobados por fecha para consulta rápida
@@ -164,19 +166,32 @@ Deno.serve(async (req) => {
       if (i.status === "Aprobada") approvedIncidentsByDate[i.incident_date] = i;
     });
 
+    // Set de record IDs con alerta de HE pendiente (no aprobada → HE no se contabilizan)
+    const pendingOvertimeRecordIds = new Set(
+      allOvertimeAlerts
+        .filter(a => a.status === "Pendiente")
+        .map(a => a.attendance_record_id)
+        .filter(Boolean)
+    );
+
     let updated = 0;
 
     for (const record of recordsInRange) {
       const schedule = getScheduleForDate(employee_id, emp.department_name, allSchedules, record.date);
-      // overtime_authorized del registro individual tiene prioridad, luego el del horario
-      const overtimeAuth = record.overtime_authorized ?? schedule?.overtime_authorized ?? false;
+      // HE autorizadas: solo si el registro tiene overtime_authorized=true Y no hay alerta pendiente
+      const hasScheduleAuth = schedule?.overtime_authorized ?? false;
+      const overtimeAuth = (record.overtime_authorized === true || hasScheduleAuth) &&
+                           !pendingOvertimeRecordIds.has(record.id);
       const metrics = calcularMetricas(record, schedule, record.date, overtimeAuth);
 
       // Si existe un incidente aprobado para esta fecha → siempre "Justificado"
       const hasApprovedIncident = !!approvedIncidentsByDate[record.date];
 
       let status;
-      if (hasApprovedIncident || record.status === "Justificado") {
+      if (record.status === "Vacaciones") {
+        // Preservar estado de vacaciones, no recalcular
+        status = "Vacaciones";
+      } else if (hasApprovedIncident || record.status === "Justificado") {
         status = "Justificado";
       } else if (record.clock_in && record.clock_out) {
         status = "Completo";

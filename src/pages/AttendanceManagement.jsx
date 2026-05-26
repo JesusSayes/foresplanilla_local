@@ -159,14 +159,17 @@ export default function AttendanceManagement() {
   const { data: approvedVacations = [] } = useQuery({
     queryKey: ["approvedVacations", dateToStringLima(selectedDate), isRangeMode, dateFrom, dateTo],
     queryFn: async () => {
-      const all = await entitiesAPI.VacationRequest.filter({ status: "Aprobada" }, "-start_date", 500);
+      const all = await entitiesAPI.VacationRequest.list("-start_date", 500);
+      const approvedOnly = all.filter(v => ["Aprobada", "Aprobado"].includes(v.status));
+
       if (isRangeMode && dateFrom && dateTo) {
         const fromStr = dateToStringLima(dateFrom);
         const toStr = dateToStringLima(dateTo);
-        return all.filter(v => v.start_date <= toStr && v.end_date >= fromStr);
+        return approvedOnly.filter(v => String(v.start_date).slice(0, 10) <= toStr && String(v.end_date).slice(0, 10) >= fromStr);
       }
+
       const dateStr = dateToStringLima(selectedDate);
-      return all.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
+      return approvedOnly.filter(v => String(v.start_date).slice(0, 10) <= dateStr && String(v.end_date).slice(0, 10) >= dateStr);
     },
   });
 
@@ -361,75 +364,107 @@ export default function AttendanceManagement() {
   const handleSaveEdit = async () => {
     if (!editingRecord || isSavingEdit) return;
     setIsSavingEdit(true);
-    const clockIn = editingRecord.clock_in;
+    const clockIn  = editingRecord.clock_in;
     const clockOut = editingRecord.clock_out;
     const recordDate = editingRecord.date;
 
-    // 1. Guardar clock_in/out y notas primero
-    await entitiesAPI.AttendanceRecord.update(editingRecord.id, {
-      clock_in: clockIn || null,
-      clock_out: clockOut || null,
-      notes: editingRecord.notes,
-      status: editingRecord.status,
-      is_absent: editingRecord.status === "Ausente",
-    });
+    try {
+      // 1. Guardar clock_in/out, notas y estado.
+      //    IMPORTANTE: NO tocar overtime_authorized aquí — eso solo lo cambia la aprobación de la alerta.
+      await entitiesAPI.AttendanceRecord.update(editingRecord.id, {
+        clock_in:  clockIn  || null,
+        clock_out: clockOut || null,
+        notes:     editingRecord.notes,
+        status:    editingRecord.status,
+        is_absent: editingRecord.status === "Ausente",
+      });
 
-    // 2. Verificar si hay HE sin autorización para generar alerta
-    const schedule = getEmployeeScheduleForDate(editingRecord.employee_id, recordDate);
-    if (clockIn && clockOut && schedule) {
-      const dow = new Date(recordDate + "T00:00:00").getDay();
-      const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
-      const dayEndMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-      const schedEnd = schedule[dayEndMap[dow]] || "18:00";
-      const breakMin = schedule.break_duration_minutes ?? 60;
-      const [inH, inM]   = clockIn.split(":").map(Number);
-      const [outH, outM] = clockOut.split(":").map(Number);
-      const [endH, endM] = schedEnd.split(":").map(Number);
-      const workedMin = (outH * 60 + outM) - (inH * 60 + inM) - breakMin;
-      const normalMin = (endH * 60 + endM) - Math.max(inH * 60 + inM, new Date(recordDate + "T00:00:00").getDay()) - breakMin;
-      const workedHrs = Math.max(0, workedMin / 60);
-      const schedEndMin = endH * 60 + endM;
-      const effectiveStart = inH * 60 + inM;
-      const normalHrs = Math.max(0, (schedEndMin - effectiveStart - breakMin) / 60);
-      const extraHrs = Math.max(0, workedHrs - normalHrs);
-      const overtimeAuth = editingRecord.overtime_authorized ?? schedule.overtime_authorized ?? false;
-      if (extraHrs > 0 && !overtimeAuth) {
-        // Verificar si ya existe alerta pendiente para este registro
-        const existingAlert = await entitiesAPI.OvertimeAlert.filter({
-          attendance_record_id: editingRecord.id,
-          status: "Pendiente",
-        });
-        if (!existingAlert || existingAlert.length === 0) {
-          await entitiesAPI.OvertimeAlert.create({
-            employee_id: editingRecord.employee_id,
+      // 2. Si hay entrada Y salida, verificar si existen HE sin autorización
+      if (clockIn && clockOut) {
+        const schedule = getEmployeeScheduleForDate(editingRecord.employee_id, recordDate);
+        if (schedule) {
+          const dow = new Date(recordDate + "T00:00:00").getDay();
+          const dayEndMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+          const schedStart = (() => {
+            const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+            return schedule[dayStartMap[dow]] || "09:00";
+          })();
+          const schedEnd   = schedule[dayEndMap[dow]] || "18:00";
+          const breakMin   = schedule.break_duration_minutes ?? 60;
+
+          const [inH, inM]   = clockIn.split(":").map(Number);
+          const [outH, outM] = clockOut.split(":").map(Number);
+          const [endH, endM] = schedEnd.split(":").map(Number);
+          const [stH, stM]   = schedStart.split(":").map(Number);
+
+          const inTotal    = inH * 60 + inM;
+          const outTotal   = outH * 60 + outM;
+          const schedEndMin = endH * 60 + endM;
+          const schedStartMin = stH * 60 + stM;
+
+          const workedMin  = outTotal - inTotal - breakMin;
+          const workedHrs  = Math.max(0, workedMin / 60);
+          // Horas normales = desde cuando empezó (o desde su hora programada si llegó tarde) hasta fin de jornada, menos break
+          const normalHrs  = Math.max(0, (schedEndMin - Math.max(inTotal, schedStartMin) - breakMin) / 60);
+          const extraHrs   = Math.max(0, workedHrs - normalHrs);
+
+          // overtime_authorized: usa el valor actual del registro (ya persistido) o el del horario
+          const overtimeAuth = editingRecord.overtime_authorized ?? schedule.overtime_authorized ?? false;
+
+          // Buscar alertas pendientes para este registro
+          const existingAlerts = await entitiesAPI.OvertimeAlert.filter({
             attendance_record_id: editingRecord.id,
-            alert_date: recordDate,
-            overtime_hours: extraHrs,
             status: "Pendiente",
           });
-          toast.warning(`⚠️ ${Number(extraHrs || 0).toFixed(2)}h extras sin autorización — se generó alerta.`);
+
+          if (extraHrs > 0 && !overtimeAuth) {
+            if (!existingAlerts || existingAlerts.length === 0) {
+              // Crear nueva alerta
+              await entitiesAPI.OvertimeAlert.create({
+                employee_id:          editingRecord.employee_id,
+                attendance_record_id: editingRecord.id,
+                alert_date:           recordDate,
+                overtime_hours:       extraHrs,
+                status:               "Pendiente",
+              });
+              toast.warning(`⚠️ ${extraHrs.toFixed(2)}h extras sin autorización — se generó alerta de aprobación.`);
+            } else {
+              // Actualizar la alerta existente con las nuevas horas
+              await entitiesAPI.OvertimeAlert.update(existingAlerts[0].id, {
+                overtime_hours: extraHrs,
+              });
+              toast.warning(`⚠️ ${extraHrs.toFixed(2)}h extras — alerta de aprobación pendiente.`);
+            }
+          } else if (extraHrs === 0 && existingAlerts && existingAlerts.length > 0) {
+            // La marcación corregida ya no genera extras → cancelar alerta pendiente
+            await entitiesAPI.OvertimeAlert.update(existingAlerts[0].id, { status: "Descartado" });
+          }
         }
       }
+
+      // 3. Recalcular con el backend.
+      //    El backend respeta overtime_authorized del registro:
+      //    - Si es false (o no hay alerta aprobada), HE quedan en 0.
+      //    - Si es true (alerta aprobada), calcula HE 25% y 35%.
+      // await base44.functions.invoke("recalcularAsistencia", {
+        // employee_id: editingRecord.employee_id,
+        // date_from:   recordDate,
+        // date_to:     recordDate,
+      // });
+      await recalcularAsistenciaService.invoke(
+        editingRecord.employee_id,
+        recordDate,
+        recordDate,
+      );
+
+      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries(["overtimeAlerts"]);
+      toast.success("Registro actualizado y métricas recalculadas");
+      setShowEditModal(false);
+      setEditingRecord(null);
+    } finally {
+      setIsSavingEdit(false);
     }
-
-    // 3. Recalcular con el backend (tardanza + HE 25% + HE 35%)
-    // await base44.functions.invoke("recalcularAsistencia", {
-      // employee_id: editingRecord.employee_id,
-      // date_from: recordDate,
-      // date_to: recordDate,
-    // });
-    await recalcularAsistenciaService.invoke(
-      editingRecord.employee_id,
-      recordDate,
-      recordDate
-    );
-
-    queryClient.invalidateQueries(["todayAttendance"]);
-    queryClient.invalidateQueries(["overtimeAlerts"]);
-    toast.success("Registro actualizado y métricas recalculadas");
-    setShowEditModal(false);
-    setEditingRecord(null);
-    setIsSavingEdit(false);
   };
 
   const handleApproveIncident = async (incident) => {
@@ -551,12 +586,16 @@ export default function AttendanceManagement() {
     : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
   const filteredEmployees = siteAllowedEmployees.filter(emp => {
-  const matchesSearch =
-    emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.document_number.toLowerCase().includes(searchTerm.toLowerCase());
-  const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
-  return matchesSearch && matchesSite;
+    const term = searchTerm.toLowerCase().trim();
+    const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase();
+    const fullNameReverse = `${emp.last_name} ${emp.first_name}`.toLowerCase();
+    const matchesSearch = !term ||
+      fullName.includes(term) ||
+      fullNameReverse.includes(term) ||
+      emp.document_number.toLowerCase().includes(term) ||
+      term.split(/\s+/).every(word => fullName.includes(word));
+    const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
+    return matchesSearch && matchesSite;
   });
 
   // IDs de empleados accesibles para filtrar incidentes y alertas
@@ -627,7 +666,7 @@ export default function AttendanceManagement() {
         const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
         if (selected > termination) return false;
       }
-      const record = todayRecords.find(r => r.employee_id === emp.id);
+      const record = todayRecords.find(r => r.employee_id === emp.id && r.date === selectedDateStr);
       return !!record; // solo si existe registro en la BD
     }).map(emp => {
       const record = todayRecords.find(r => r.employee_id === emp.id);
@@ -642,13 +681,48 @@ export default function AttendanceManagement() {
     } // end else (fecha no futura)
   }
 
-  const handleExportToExcel = () => {
+  const [recalculandoTodo, setRecalculandoTodo] = useState(false);
+  const [recalcProgress, setRecalcProgress] = useState({ done: 0, total: 0 });
+
+  const handleRecalcularTodo = async () => {
+    if (!window.confirm("¿Recalcular tardanzas y horas para TODOS los empleados? Esto puede tardar varios minutos.")) return;
+    setRecalculandoTodo(true);
+    const empList = allEmployees.filter(e => e.status === "Activo");
+    setRecalcProgress({ done: 0, total: empList.length });
+    let done = 0;
+    for (const emp of empList) {
+      // await base44.functions.invoke("recalcularAsistencia", {
+        // employee_id: emp.id,
+        // date_from: "2020-01-01",
+        // date_to: format(new Date(), "yyyy-MM-dd"),
+      // });
+      await recalcularAsistenciaService.invoke(
+        emp.id,
+        "2020-01-01",
+        format(new Date(), "yyyy-MM-dd"),
+      );
+      done++;
+      setRecalcProgress({ done, total: empList.length });
+    }
+    setRecalculandoTodo(false);
+    queryClient.invalidateQueries(["todayAttendance"]);
+    toast.success(`✓ Recálculo completado para ${done} empleados`);
+  };
+
+  const handleExportToExcel = async () => {
+    // Cargar TODOS los incidentes frescos para no depender del caché limitado
+    let freshIncidents = allIncidents;
+    try {
+      const fetched = await entitiesAPI.AttendanceIncident.list("-incident_date", 5000);
+      if (fetched && fetched.length > 0) freshIncidents = fetched;
+    } catch (_) { /* usa caché si falla */ }
+
     const dataToExport = employeesWithRecords.map(emp => {
       const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
       const workedHours = emp.record?.worked_hours || 0;
 
-      // Buscar TODOS los incidentes para este empleado y fecha (desde cache completo)
-      const incidentsForRow = allIncidents.filter(
+      // Buscar TODOS los incidentes para este empleado y fecha
+      const incidentsForRow = freshIncidents.filter(
         i => i.employee_id === emp.id && i.incident_date === rowDate
       );
       // Priorizar aprobada > pendiente > rechazada
@@ -657,21 +731,48 @@ export default function AttendanceManagement() {
         || incidentsForRow[0]
         || null;
 
-      // Estado real de la marcación: si hay incidente aprobado → "Justificado"
+      // Estado real de la marcación: vacaciones > incidente aprobado > status del registro
       const estadoMarcacion = (() => {
+        // 1. Si el registro ya tiene status "Vacaciones" (grabado al aprobar)
+        if (emp.record?.status === 'Vacaciones') return 'Vacaciones';
+        // 2. Si existe una solicitud de vacaciones aprobada que cubre esta fecha
+        const isOnVacation = approvedVacations.some(
+          v => v.employee_id === emp.id && String(v.start_date).slice(0, 10) <= rowDate && String(v.end_date).slice(0, 10) >= rowDate
+        );
+        if (isOnVacation) return 'Vacaciones';
+        // 3. Si hay incidente aprobado
         if (incident && incident.status === 'Aprobada') return 'Justificado';
+        // 4. Status real del registro
         return emp.record?.status || 'Sin marcar';
       })();
 
       // Calcular tiempo justificado
       let tiempoPapeleta = '';
       if (incident) {
-        const ts = incident.justified_time_start || '09:00';
-        const te = incident.justified_time_end || '18:00';
-        const [sh, sm] = ts.split(':').map(Number);
-        const [eh, em] = te.split(':').map(Number);
-        const hrs = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
-        tiempoPapeleta = `${hrs.toFixed(2)} h`;
+        if (incident.full_day_justification) {
+          tiempoPapeleta = '8.00 h';
+        } else {
+          const ts = incident.justified_time_start || '09:00';
+          const te = incident.justified_time_end || '18:00';
+          const [sh, sm] = ts.split(':').map(Number);
+          const [eh, em] = te.split(':').map(Number);
+          const hrs = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
+          tiempoPapeleta = `${hrs.toFixed(2)} h`;
+        }
+      }
+
+      // Para vacaciones: usar el horario programado real, no el que quedó grabado
+      let entradaExcel = emp.record?.clock_in || '--:--';
+      let salidaExcel  = emp.record?.clock_out || '--:--';
+      if (estadoMarcacion === 'Vacaciones') {
+        const schedVac = getEmployeeScheduleForDate(emp.id, rowDate);
+        const dowVac = new Date(rowDate + "T00:00:00").getDay();
+        const startsMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+        const endsMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+        if (schedVac) {
+          entradaExcel = schedVac[startsMap[dowVac]] || entradaExcel;
+          salidaExcel  = schedVac[endsMap[dowVac]]   || salidaExcel;
+        }
       }
 
       return {
@@ -683,9 +784,9 @@ export default function AttendanceManagement() {
         'Cargo': emp.position,
         'Departamento': emp.department_name,
         'Sede': emp.site || 'Sin sede',
-        'Entrada': emp.record?.clock_in || '--:--',
-        'Salida': emp.record?.clock_out || '--:--',
-        'Horas Trabajadas': Number(workedHours || 0).toFixed(2),
+        'Entrada': entradaExcel,
+        'Salida': salidaExcel,
+        'Horas Trabajadas': workedHours.toFixed(2),
         'Tardanza (min)': emp.record?.late_minutes || 0,
         'HE 25%': (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
         'HE 35%': (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
@@ -727,12 +828,12 @@ export default function AttendanceManagement() {
   };
 
   // Obtener horario programado de entrada/salida para mostrar en vacaciones
-  const getScheduledTimes = (empId) => {
-    const schedule = getEmployeeSchedule(empId);
+  const getScheduledTimes = (empId, rowDate) => {
+    const schedule = getEmployeeScheduleForDate(empId, rowDate);
     if (!schedule) return { start: "09:00", end: "18:00" };
     const dayMap = ["sunday_start", "monday_start", "tuesday_start", "wednesday_start", "thursday_start", "friday_start", "saturday_start"];
     const dayEndMap = ["sunday_end", "monday_end", "tuesday_end", "wednesday_end", "thursday_end", "friday_end", "saturday_end"];
-    const dow = selectedDate.getDay();
+    const dow = new Date(rowDate + "T00:00:00").getDay();
     return {
       start: schedule[dayMap[dow]] || "09:00",
       end: schedule[dayEndMap[dow]] || "18:00",
@@ -740,7 +841,11 @@ export default function AttendanceManagement() {
   };
 
   const getStatusConfig = (status, hasClockIn, incident) => {
-    // Si hay un incidente aprobado asociado, mostrar "Justificado" independientemente del status del record
+    // Si el registro está marcado como Vacaciones
+    if (status === "Vacaciones") {
+      return { color: "bg-amber-100 text-amber-800 border-amber-300", icon: Palmtree, text: "Vacaciones" };
+    }
+    // Si hay un incidente aprobado asociado, mostrar "Justificado"
     if (incident && incident.status === "Aprobada") {
       return { color: "bg-blue-100 text-blue-700 border-blue-200", icon: FileText, text: "Justificado" };
     }
@@ -861,7 +966,19 @@ export default function AttendanceManagement() {
                 </TabsTrigger>
               </TabsList>
               <div className="flex items-center gap-2">
-                <Button onClick={handleExportToExcel} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
+                {hasPermission("system.admin") && (
+                  <Button
+                    onClick={handleRecalcularTodo}
+                    variant="outline"
+                    disabled={recalculandoTodo}
+                    className="whitespace-nowrap border-orange-300 text-orange-700 hover:bg-orange-50"
+                  >
+                    {recalculandoTodo
+                      ? `Recalculando... ${recalcProgress.done}/${recalcProgress.total}`
+                      : "Recalcular Todo"}
+                  </Button>
+                )}
+                <Button onClick={() => handleExportToExcel()} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
                   <Download className="w-4 h-4 mr-2" />Excel
                 </Button>
                 <Button onClick={handlePrint} variant="outline" className="whitespace-nowrap">
@@ -996,8 +1113,9 @@ export default function AttendanceManagement() {
                       <tbody>
                         {employeesWithRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((emp, idx) => {
                           const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
-                          const vacation = approvedVacations.find(v => v.employee_id === emp.id && v.start_date <= rowDate && v.end_date >= rowDate) || null;
-                          const scheduledTimes = vacation ? getScheduledTimes(emp.id) : null;
+                          const vacation = approvedVacations.find(v =>  v.employee_id === emp.id && String(v.start_date).slice(0, 10) <= rowDate && String(v.end_date).slice(0, 10) >= rowDate) || null;
+                          const isVacation = emp.record?.status === "Vacaciones" || !!vacation;
+                          const scheduledTimes = isVacation ? getScheduledTimes(emp.id, rowDate) : null;
                           // Buscar incidente aprobado para esta fila
                           const rowIncident = allIncidents.find(
                             i => i.employee_id === emp.id && i.incident_date === rowDate && i.status === "Aprobada"
@@ -1005,7 +1123,7 @@ export default function AttendanceManagement() {
                             i => i.employee_id === emp.id && i.incident_date === rowDate
                           ) || null;
 
-                          const statusConfig = vacation
+                          const statusConfig = isVacation
                             ? { color: "bg-amber-100 text-amber-800 border-amber-300", icon: Palmtree, text: "Vacaciones" }
                             : getStatusConfig(emp.record?.status, emp.record?.clock_in, rowIncident);
                           const StatusIcon = statusConfig.icon;
@@ -1019,11 +1137,11 @@ export default function AttendanceManagement() {
                           const schedEn = sched ? sched[ends[dow2]] : null;
 
                           return (
-                            <tr key={rowKey} className={`border-b last:border-b-0 hover:bg-slate-50 transition-colors ${vacation ? "bg-amber-50/40" : "bg-white"}`}>
+                            <tr key={rowKey} className={`border-b last:border-b-0 hover:bg-slate-50 transition-colors ${isVacation ? "bg-amber-50/40" : "bg-white"}`}>
                               {/* Empleado */}
-                              <td className={`px-3 py-2 border-l-2 ${vacation ? "border-amber-300" : "border-transparent"}`}>
+                              <td className={`px-3 py-2 border-l-2 ${isVacation ? "border-amber-300" : "border-transparent"}`}>
                                 <div className="flex items-center gap-2">
-                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${vacation ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-purple-600"}`}>
+                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${isVacation ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-purple-600"}`}>
                                     {emp.first_name[0]}{emp.last_name[0]}
                                   </div>
                                   <div className="min-w-0 overflow-hidden">
@@ -1032,7 +1150,7 @@ export default function AttendanceManagement() {
                                     {!sched && <p className="text-xs text-red-500">Sin horario</p>}
                                     {sched && !schedSt && <p className="text-xs text-slate-400">Día libre</p>}
                                     {sched && schedSt && <p className="text-xs text-indigo-600">🕐 {schedSt}–{schedEn}</p>}
-                                    {vacation && <p className="text-xs text-amber-700 font-medium">🌴 {vacation.request_type}</p>}
+                                    {isVacation && <p className="text-xs text-amber-700 font-medium">🌴 {vacation.request_type}</p>}
                                   </div>
                                 </div>
                               </td>
@@ -1044,7 +1162,7 @@ export default function AttendanceManagement() {
                               </td>
                               {/* Entrada */}
                               <td className="px-2 py-2 text-center">
-                                {vacation
+                                {isVacation
                                   ? <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{scheduledTimes?.start}</span>
                                   : <span className={`text-sm font-bold ${emp.record?.clock_in ? 'text-slate-900' : 'text-slate-300'}`}>{emp.record?.clock_in ? emp.record.clock_in.slice(0, 5) : "--:--"}</span>
                                 }
@@ -1478,6 +1596,7 @@ export default function AttendanceManagement() {
                         <SelectItem value="Incompleto">Incompleto</SelectItem>
                         <SelectItem value="Ausente">Ausente</SelectItem>
                         <SelectItem value="Justificado">Justificado</SelectItem>
+                        <SelectItem value="Vacaciones">Vacaciones</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
