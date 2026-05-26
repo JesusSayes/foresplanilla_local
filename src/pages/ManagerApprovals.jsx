@@ -188,7 +188,7 @@ export default function ManagerApprovals() {
             const [startY, startM] = startDateStr.split("-").map(Number);
             const discountAmount = (emp.base_salary / 30) * request.total_days;
 
-            await base44.entities.PayrollConcept.create({
+            await entitiesAPI.PayrollConcept.create({
               employee_id: request.employee_id,
               concept_type: "Descuento",
               concept_name: "Permiso sin goce",

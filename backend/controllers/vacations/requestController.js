@@ -106,7 +106,7 @@ export const update = async (req, res) => {
     const parsedApproved = parseDate(approved_date);
 
     // Reglas de negocio (clave)
-    if (data.status === 'Aprobado') {
+    if (data.status === 'Aprobada') {
       if (!parsedApproved || !data.approved_by) {
         return res.status(400).json({
           error: 'Para aprobar se requiere approved_date y approved_by'
@@ -114,13 +114,13 @@ export const update = async (req, res) => {
       }
     }
 
-    if (data.status === 'Rechazada') {
-      if (!data.rejection_reason) {
-        return res.status(400).json({
-          error: 'Para rechazar se requiere rejection_reason'
-        });
-      }
-    }
+    // if (data.status === 'Rechazada') {
+      // if (!data.rejection_reason) {
+        // return res.status(400).json({
+          // error: 'Para rechazar se requiere rejection_reason'
+        // });
+      // }
+    // }
 
     const request = await MODEL.update({
       where: { id: req.params.id },
