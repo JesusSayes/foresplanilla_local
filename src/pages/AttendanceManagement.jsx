@@ -159,14 +159,17 @@ export default function AttendanceManagement() {
   const { data: approvedVacations = [] } = useQuery({
     queryKey: ["approvedVacations", dateToStringLima(selectedDate), isRangeMode, dateFrom, dateTo],
     queryFn: async () => {
-      const all = await entitiesAPI.VacationRequest.filter({ status: "Aprobada" }, "-start_date", 500);
+      const all = await entitiesAPI.VacationRequest.list("-start_date", 500);
+      const approvedOnly = all.filter(v => ["Aprobada", "Aprobado"].includes(v.status));
+
       if (isRangeMode && dateFrom && dateTo) {
         const fromStr = dateToStringLima(dateFrom);
         const toStr = dateToStringLima(dateTo);
-        return all.filter(v => v.start_date <= toStr && v.end_date >= fromStr);
+        return approvedOnly.filter(v => String(v.start_date).slice(0, 10) <= toStr && String(v.end_date).slice(0, 10) >= fromStr);
       }
+
       const dateStr = dateToStringLima(selectedDate);
-      return all.filter(v => v.start_date <= dateStr && v.end_date >= dateStr);
+      return approvedOnly.filter(v => String(v.start_date).slice(0, 10) <= dateStr && String(v.end_date).slice(0, 10) >= dateStr);
     },
   });
 
@@ -663,7 +666,7 @@ export default function AttendanceManagement() {
         const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
         if (selected > termination) return false;
       }
-      const record = todayRecords.find(r => r.employee_id === emp.id);
+      const record = todayRecords.find(r => r.employee_id === emp.id && r.date === selectedDateStr);
       return !!record; // solo si existe registro en la BD
     }).map(emp => {
       const record = todayRecords.find(r => r.employee_id === emp.id);
@@ -734,7 +737,7 @@ export default function AttendanceManagement() {
         if (emp.record?.status === 'Vacaciones') return 'Vacaciones';
         // 2. Si existe una solicitud de vacaciones aprobada que cubre esta fecha
         const isOnVacation = approvedVacations.some(
-          v => v.employee_id === emp.id && v.start_date <= rowDate && v.end_date >= rowDate
+          v => v.employee_id === emp.id && String(v.start_date).slice(0, 10) <= rowDate && String(v.end_date).slice(0, 10) >= rowDate
         );
         if (isOnVacation) return 'Vacaciones';
         // 3. Si hay incidente aprobado
@@ -825,12 +828,12 @@ export default function AttendanceManagement() {
   };
 
   // Obtener horario programado de entrada/salida para mostrar en vacaciones
-  const getScheduledTimes = (empId) => {
-    const schedule = getEmployeeSchedule(empId);
+  const getScheduledTimes = (empId, rowDate) => {
+    const schedule = getEmployeeScheduleForDate(empId, rowDate);
     if (!schedule) return { start: "09:00", end: "18:00" };
     const dayMap = ["sunday_start", "monday_start", "tuesday_start", "wednesday_start", "thursday_start", "friday_start", "saturday_start"];
     const dayEndMap = ["sunday_end", "monday_end", "tuesday_end", "wednesday_end", "thursday_end", "friday_end", "saturday_end"];
-    const dow = selectedDate.getDay();
+    const dow = new Date(rowDate + "T00:00:00").getDay();
     return {
       start: schedule[dayMap[dow]] || "09:00",
       end: schedule[dayEndMap[dow]] || "18:00",
@@ -1110,8 +1113,9 @@ export default function AttendanceManagement() {
                       <tbody>
                         {employeesWithRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((emp, idx) => {
                           const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
-                          const vacation = approvedVacations.find(v => v.employee_id === emp.id && v.start_date <= rowDate && v.end_date >= rowDate) || null;
-                          const scheduledTimes = vacation ? getScheduledTimes(emp.id) : null;
+                          const vacation = approvedVacations.find(v =>  v.employee_id === emp.id && String(v.start_date).slice(0, 10) <= rowDate && String(v.end_date).slice(0, 10) >= rowDate) || null;
+                          const isVacation = emp.record?.status === "Vacaciones" || !!vacation;
+                          const scheduledTimes = isVacation ? getScheduledTimes(emp.id, rowDate) : null;
                           // Buscar incidente aprobado para esta fila
                           const rowIncident = allIncidents.find(
                             i => i.employee_id === emp.id && i.incident_date === rowDate && i.status === "Aprobada"
@@ -1119,7 +1123,7 @@ export default function AttendanceManagement() {
                             i => i.employee_id === emp.id && i.incident_date === rowDate
                           ) || null;
 
-                          const statusConfig = vacation
+                          const statusConfig = isVacation
                             ? { color: "bg-amber-100 text-amber-800 border-amber-300", icon: Palmtree, text: "Vacaciones" }
                             : getStatusConfig(emp.record?.status, emp.record?.clock_in, rowIncident);
                           const StatusIcon = statusConfig.icon;
@@ -1133,11 +1137,11 @@ export default function AttendanceManagement() {
                           const schedEn = sched ? sched[ends[dow2]] : null;
 
                           return (
-                            <tr key={rowKey} className={`border-b last:border-b-0 hover:bg-slate-50 transition-colors ${vacation ? "bg-amber-50/40" : "bg-white"}`}>
+                            <tr key={rowKey} className={`border-b last:border-b-0 hover:bg-slate-50 transition-colors ${isVacation ? "bg-amber-50/40" : "bg-white"}`}>
                               {/* Empleado */}
-                              <td className={`px-3 py-2 border-l-2 ${vacation ? "border-amber-300" : "border-transparent"}`}>
+                              <td className={`px-3 py-2 border-l-2 ${isVacation ? "border-amber-300" : "border-transparent"}`}>
                                 <div className="flex items-center gap-2">
-                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${vacation ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-purple-600"}`}>
+                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${isVacation ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-indigo-500 to-purple-600"}`}>
                                     {emp.first_name[0]}{emp.last_name[0]}
                                   </div>
                                   <div className="min-w-0 overflow-hidden">
@@ -1146,7 +1150,7 @@ export default function AttendanceManagement() {
                                     {!sched && <p className="text-xs text-red-500">Sin horario</p>}
                                     {sched && !schedSt && <p className="text-xs text-slate-400">Día libre</p>}
                                     {sched && schedSt && <p className="text-xs text-indigo-600">🕐 {schedSt}–{schedEn}</p>}
-                                    {vacation && <p className="text-xs text-amber-700 font-medium">🌴 {vacation.request_type}</p>}
+                                    {isVacation && <p className="text-xs text-amber-700 font-medium">🌴 {vacation.request_type}</p>}
                                   </div>
                                 </div>
                               </td>
@@ -1158,7 +1162,7 @@ export default function AttendanceManagement() {
                               </td>
                               {/* Entrada */}
                               <td className="px-2 py-2 text-center">
-                                {vacation
+                                {isVacation
                                   ? <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{scheduledTimes?.start}</span>
                                   : <span className={`text-sm font-bold ${emp.record?.clock_in ? 'text-slate-900' : 'text-slate-300'}`}>{emp.record?.clock_in ? emp.record.clock_in.slice(0, 5) : "--:--"}</span>
                                 }
