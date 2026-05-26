@@ -36,21 +36,13 @@ function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
     return valid[0] || null;
   };
 
-  return (
-    findBest(empSchedules) ||
-    findBest(deptSchedules) ||
-    null
-  );
+  return findBest(empSchedules) || findBest(deptSchedules) || null;
 }
 
-// Regla Peruana:
-// Primeras 2h extras → 25%
-// Desde la 3ra hora → 35%
 function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
-  const clockIn = record.clock_in;
+  const clockIn  = record.clock_in;
   const clockOut = record.clock_out;
 
-  // Sin entrada
   if (!clockIn) {
     return {
       worked_hours: 0,
@@ -86,36 +78,34 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
   ];
 
   const scheduledStart =
-    schedule?.[dayStartMap[dow]] || "09:00";
+    schedule
+      ? (schedule[dayStartMap[dow]] || "09:00")
+      : "09:00";
 
   const scheduledEnd =
-    schedule?.[dayEndMap[dow]] || "18:00";
+    schedule
+      ? (schedule[dayEndMap[dow]] || "18:00")
+      : "18:00";
 
-  const breakMinutes =
-    schedule?.break_duration_minutes ?? 60;
-
-  const toleranceMinutes =
-    schedule?.tolerance_minutes ?? 10;
+  const breakMinutes = schedule?.break_duration_minutes ?? 60;
+  const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
 
   const [inH, inM] = clockIn.split(":").map(Number);
-
   const inTotal = inH * 60 + inM;
 
-  const [schedH, schedM] =
-    scheduledStart.split(":").map(Number);
-
+  const [schedH, schedM] = scheduledStart.split(":").map(Number);
   const schedTotal = schedH * 60 + schedM;
 
-  const [endH, endM] =
-    scheduledEnd.split(":").map(Number);
-
+  const [endH, endM] = scheduledEnd.split(":").map(Number);
   const schedEndTotal = endH * 60 + endM;
 
   // Tardanza
   const rawLate = inTotal - schedTotal;
 
   const lateMinutes =
-    rawLate > toleranceMinutes ? rawLate : 0;
+    rawLate > toleranceMinutes
+      ? rawLate
+      : 0;
 
   const isLate = lateMinutes > 0;
 
@@ -124,10 +114,9 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
   let overtimeHours25 = 0;
   let overtimeHours35 = 0;
 
-  // Solo si hay salida
+  // Horas trabajadas y extras
   if (clockOut) {
-    const [outH, outM] =
-      clockOut.split(":").map(Number);
+    const [outH, outM] = clockOut.split(":").map(Number);
 
     const outTotal = outH * 60 + outM;
 
@@ -136,12 +125,9 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
 
     workedHours = Math.max(0, totalMinutes / 60);
 
-    // Horas normales máximas
     const regularMinutes = Math.max(
       0,
-      schedEndTotal -
-        Math.max(inTotal, schedTotal) -
-        breakMinutes
+      schedEndTotal - Math.max(inTotal, schedTotal) - breakMinutes
     );
 
     const normalHoursMax = regularMinutes / 60;
@@ -151,17 +137,11 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
     } else {
       regularHours = normalHoursMax;
 
-      const extraHours =
-        workedHours - normalHoursMax;
+      const extraHours = workedHours - normalHoursMax;
 
-      // Solo contabilizar HE autorizadas
       if (overtimeAuthorized) {
         overtimeHours25 = Math.min(extraHours, 2);
-
-        overtimeHours35 = Math.max(
-          0,
-          extraHours - 2
-        );
+        overtimeHours35 = Math.max(0, extraHours - 2);
       }
     }
   }
@@ -179,49 +159,44 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
   };
 }
 
-const recalcularAsistenciaService = {
-  invoke: async (employee_id, date_from, date_to) => {
+const recalcularTodaAsistenciaService = {
+  invoke: async (date_from = null, date_to = null) => {
     try {
-      if (!employee_id || !date_from || !date_to) {
-        throw new Error(
-          'employee_id, date_from y date_to son requeridos'
-        );
-      }
-
       const [
-        employee,
+        allEmployees,
         allSchedules,
         allRecords,
         allIncidents,
         allOvertimeAlerts,
       ] = await Promise.all([
-        entitiesAPI.Employee.filter({ id: employee_id }),
+        entitiesAPI.Employee.list("-created_date"),
         entitiesAPI.WorkSchedule.list("-effective_from"),
-        entitiesAPI.AttendanceRecord.filter({ employee_id }),
-        entitiesAPI.AttendanceIncident.filter({ employee_id }),
-        entitiesAPI.OvertimeAlert.filter({ employee_id }),
+        entitiesAPI.AttendanceRecord.list("-date"),
+        entitiesAPI.AttendanceIncident.filter({
+          status: "Aprobada",
+        }),
+        entitiesAPI.OvertimeAlert.list("-created_date"),
       ]);
 
-      const emp = employee?.[0];
+      let records = [...allRecords];
 
-      if (!emp) {
-        throw new Error('Empleado no encontrado');
+      // Filtrar por rango si se especificó
+      if (date_from && date_to) {
+        records = records.filter(
+          r => r.date >= date_from && r.date <= date_to
+        );
       }
 
-      const recordsInRange = allRecords.filter(
-        r => r.date >= date_from && r.date <= date_to
-      );
-
-      // Incidentes aprobados
-      const approvedIncidentsByDate = {};
+      // Índice de incidentes aprobados
+      const approvedIdx = {};
 
       allIncidents.forEach(i => {
-        if (i.status === "Aprobada") {
-          approvedIncidentsByDate[i.incident_date] = i;
-        }
+        approvedIdx[
+          `${i.employee_id}_${i.incident_date}`
+        ] = true;
       });
 
-      // Alertas HE pendientes
+      // Set de registros con HE pendiente
       const pendingOvertimeRecordIds = new Set(
         allOvertimeAlerts
           .filter(a => a.status === "Pendiente")
@@ -229,20 +204,40 @@ const recalcularAsistenciaService = {
           .filter(Boolean)
       );
 
-      let updated = 0;
+      // Índice de empleados
+      const empById = {};
 
-      for (const record of recordsInRange) {
+      allEmployees.forEach(e => {
+        empById[e.id] = e;
+      });
+
+      let updated = 0;
+      let skipped = 0;
+
+      const updates = [];
+
+      for (const record of records) {
+        // Preservar vacaciones
+        if (record.status === "Vacaciones") {
+          skipped++;
+          continue;
+        }
+
+        const emp = empById[record.employee_id];
+
+        if (!emp) {
+          skipped++;
+          continue;
+        }
+
         const schedule = getScheduleForDate(
-          employee_id,
+          record.employee_id,
           emp.department_name,
           allSchedules,
           record.date
         );
 
-        // HE autorizadas:
-        // - overtime_authorized del registro
-        // - overtime_authorized del horario
-        // - NO debe existir alerta pendiente
+        // HE autorizadas
         const hasScheduleAuth =
           schedule?.overtime_authorized ?? false;
 
@@ -261,39 +256,30 @@ const recalcularAsistenciaService = {
         );
 
         const hasApprovedIncident =
-          !!approvedIncidentsByDate[record.date];
+          !!approvedIdx[
+            `${record.employee_id}_${record.date}`
+          ];
 
         let status;
 
-        // PRESERVAR VACACIONES
         if (record.status === "Vacaciones") {
           status = "Vacaciones";
-        }
-        else if (
+        } else if (
           hasApprovedIncident ||
           record.status === "Justificado"
         ) {
           status = "Justificado";
-        }
-        else if (
-          record.clock_in &&
-          record.clock_out
-        ) {
+        } else if (record.clock_in && record.clock_out) {
           status = "Completo";
-        }
-        else if (
-          record.clock_in &&
-          !record.clock_out
-        ) {
+        } else if (record.clock_in && !record.clock_out) {
           status = "Incompleto";
-        }
-        else {
+        } else {
           status = "Ausente";
         }
 
-        await entitiesAPI.AttendanceRecord.update(
-          record.id,
-          {
+        updates.push({
+          id: record.id,
+          data: {
             worked_hours: metrics.worked_hours,
             regular_hours: metrics.regular_hours,
             overtime_hours_25: metrics.overtime_hours_25,
@@ -302,48 +288,57 @@ const recalcularAsistenciaService = {
             late_minutes: metrics.late_minutes,
             is_absent: metrics.is_absent,
             scheduled_start:
-              metrics.scheduled_start ||
-              record.scheduled_start,
+              metrics.scheduled_start || record.scheduled_start,
             scheduled_end:
-              metrics.scheduled_end ||
-              record.scheduled_end,
+              metrics.scheduled_end || record.scheduled_end,
             status,
-          }
+          },
+        });
+      }
+
+      // Procesar en lotes
+      const BATCH = 5;
+
+      for (let i = 0; i < updates.length; i += BATCH) {
+        const batch = updates.slice(i, i + BATCH);
+
+        await Promise.all(
+          batch.map(u =>
+            entitiesAPI.AttendanceRecord.update(
+              u.id,
+              u.data
+            )
+          )
         );
 
-        updated++;
+        updated += batch.length;
+
+        // Pausa pequeña
+        if (i + BATCH < updates.length) {
+          await new Promise(r => setTimeout(r, 100));
+        }
       }
 
       return {
         success: true,
         updated,
-        range: {
-          date_from,
-          date_to,
-        },
-        employee_id,
+        skipped,
+        total: records.length,
       };
-
     } catch (error) {
       console.error(
-        'Error en recalcularAsistenciaService.invoke:',
+        'Error en recalcularTodaAsistenciaService.invoke:',
         error
       );
 
       throw new Error(
-        error.message ||
-        'Error recalculando asistencia'
+        error.message || 'Error recalculando toda la asistencia'
       );
     }
   },
 
-  recalculate: async (
-    employee_id,
-    date_from,
-    date_to
-  ) => {
-    return recalcularAsistenciaService.invoke(
-      employee_id,
+  recalculate: async (date_from = null, date_to = null) => {
+    return recalcularTodaAsistenciaService.invoke(
       date_from,
       date_to
     );
@@ -353,4 +348,4 @@ const recalcularAsistenciaService = {
   calcularMetricas,
 };
 
-export default recalcularAsistenciaService;
+export default recalcularTodaAsistenciaService;
