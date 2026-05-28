@@ -182,13 +182,13 @@ cron.schedule('0 * * * *', () => {
 }, { timezone: CRON_TIMEZONE });
 
 // Cron: calcular asistencia desde logs cada hora (10 minutos después del sync biotime)
-cron.schedule('10 * * * *', async () => {
-  console.log('[Cron] Ejecutando calcularAsistenciaDesdeLogs...');
+// cron.schedule('10 * * * *', async () => {
+  // console.log('[Cron] Ejecutando calcularAsistenciaDesdeLogs...');
 
-  await biotimeSyncJob.catch(() => null);
+  // await biotimeSyncJob.catch(() => null);
 
-  calcularAsistenciaDesdeLogs().catch(err => console.error('[Cron] Error en calcularAsistenciaDesdeLogs:', err.message));
-}, { timezone: CRON_TIMEZONE });
+  // calcularAsistenciaDesdeLogs().catch(err => console.error('[Cron] Error en calcularAsistenciaDesdeLogs:', err.message));
+// }, { timezone: CRON_TIMEZONE });
 
 // Cron: generar asistencia diaria a las 00:00 (medianoche hora local)
 cron.schedule('0 0 * * *', () => {

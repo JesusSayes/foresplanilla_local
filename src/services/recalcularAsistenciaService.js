@@ -1,4 +1,5 @@
 import { entitiesAPI } from '@/api/entitiesClient';
+// Fuente oficial: backend/utils/attendanceMetrics.js
 
 function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
   const candidates = schedules.filter(s => {

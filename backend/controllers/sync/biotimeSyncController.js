@@ -1,6 +1,7 @@
 import pg from "pg";
 import { Prisma } from "@prisma/client";
 import prisma from "../../config/prisma.js";
+import { calcularAsistenciaDesdeLogs } from "../../scripts/calcularAsistenciaDesdeLogs.js";
 import { generate24HexId } from "../../utils/idGenerator.js";
 
 const { Pool } = pg;
@@ -26,6 +27,23 @@ function getBiotimePool() {
   return biotimePool;
 }
 
+function normalizeDocumentNumber(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const digits = String(value)
+    .trim()
+    .replace(/\.0$/, "")
+    .replace(/\D/g, "");
+
+  if (!digits) {
+    return null;
+  }
+
+  return digits.padStart(8, "0");
+}
+
 export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
   const startedAt = new Date();
 
@@ -38,7 +56,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
     ? new Date(startDate)
     : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const dateTo = endDate ? new Date(endDate) : new Date();
+  const dateTo = endDate ? new Date(`${endDate}T23:59:59.999`) : new Date();
 
   if (isNaN(dateFrom.getTime()) || isNaN(dateTo.getTime())) {
     return {
@@ -86,6 +104,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
     }
 
     const uniqueTransactions = [];
+    const affectedDates = new Set();
     const incomingBiotimeIdsSet = new Set();
 
     for (const tx of transactions) {
@@ -106,32 +125,11 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
         )
       : [];
 
-    const existingPunchLogs = await prisma.attendance_logs.findMany({
-      where: {
-        source: "biotime",
-        punch_time: {
-          gte: dateFrom,
-          lte: dateTo,
-        },
-      },
-      select: {
-        employee_id: true,
-        punch_time: true,
-      },
-    });
-
     const seenBiotimeIds = new Set(
       existingBiotimeRows
         .map((row) => row?.biotime_id)
         .filter((id) => id !== null && id !== undefined)
         .map((id) => String(id))
-    );
-
-    const seenEmployeePunches = new Set(
-      existingPunchLogs
-        .filter((log) => log.employee_id && log.punch_time)
-        .map((log) => getPunchMinuteKey(log.employee_id, log.punch_time))
-        .filter(Boolean)
     );
 
     const employees = await prisma.employee.findMany({
@@ -141,39 +139,118 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
       },
     });
 
-    const employeeMap = {};
+    // console.log("[BiotimeSync][DEBUG EMPLOYEES]", {
+      // total: employees.length,
+      // sample: employees.slice(0, 10).map(emp => ({
+        // id: emp.id,
+        // document_number: emp.document_number,
+        // normalized: normalizeDocumentNumber(emp.document_number),
+      // })),
+      // Busca específicamente el 74590081
+      // targetMatch: employees.filter(emp => {
+        // const normalized = normalizeDocumentNumber(emp.document_number);
+        // return normalized === '74590081' || String(emp.document_number)?.trim() === '19851589';
+      // }),
+    // });
+
+    const employeeMap = new Map();
+
     for (const emp of employees) {
-      if (emp.document_number) {
-        employeeMap[emp.document_number.padStart(8, "0")] = emp.id;
+      if (!emp.document_number) {
+        console.log("[BiotimeSync][EMPLOYEE WITHOUT DOCUMENT]", {
+          employee_id: emp.id,
+        });
+
+        continue;
       }
+
+      const normalizedDocument = normalizeDocumentNumber(
+        emp.document_number
+      );
+
+      if (!normalizedDocument) {
+        console.log("[BiotimeSync][INVALID DOCUMENT]", {
+          employee_id: emp.id,
+          document_number: emp.document_number,
+        });
+
+        continue;
+      }
+
+      employeeMap.set(normalizedDocument, emp.id);
+
     }
+
+    // console.log("[BiotimeSync][MAP]", {
+      // employeeMap: employeeMap,
+    // });
+
+    const encontrados = new Array();
+    const noEncontrados = new Array();
 
     for (const tx of uniqueTransactions) {
       try {
         const biotimeId = tx.id !== null && tx.id !== undefined ? String(tx.id) : null;
-        if (!biotimeId || seenBiotimeIds.has(biotimeId)) {
+
+        if (!biotimeId) {
           skipped++;
           continue;
         }
 
-        const empCode = tx.emp_code?.padStart(8, "0");
+        // Preservar hora local Perú
+        const punchTime = new Date(tx.punch_time);
+
+        // Recalcular aunque el log ya exista
+        affectedDates.add(
+          punchTime.toLocaleDateString("sv-SE", {
+            timeZone: "America/Lima",
+          })
+        );
+
+        if (seenBiotimeIds.has(biotimeId)) {
+          skipped++;
+          continue;
+        }
+
+        const empCode = normalizeDocumentNumber(tx.emp_code);
+
         if (!empCode) {
           skipped++;
           continue;
         }
 
-        const employeeId = employeeMap[empCode];
-        if (!employeeId) {
-          skipped++;
-          continue;
-        }
+        const employeeId = employeeMap.get(empCode);
 
-        const punchTime = new Date(tx.punch_time);
-        const punchKey = getPunchMinuteKey(employeeId, punchTime);
-        if (!punchKey || seenEmployeePunches.has(punchKey)) {
+        // console.log("[BiotimeSync][LOOKUP]", {
+          // raw_emp_code: tx.emp_code,
+          // normalized_emp_code: empCode,
+          // employee_id: employeeId,
+          // exists: !!employeeId,
+        // });
+        noEncontrados.push(tx.emp_code);
+
+        if (!employeeId) {
+          console.log("[BiotimeSync][EMPLOYEE NOT FOUND]", {
+            biotime_id: tx.id,
+
+            raw_emp_code: tx.emp_code,
+            normalized_emp_code: empCode,
+
+            available_matches: Array.from(employeeMap.keys())
+              .filter(k =>
+                k.includes(empCode) ||
+                empCode.includes(k)
+              )
+              .slice(0, 10),
+
+            punch_time: tx.punch_time,
+            terminal: tx.terminal_alias,
+          });
+
           skipped++;
           continue;
         }
+        if(!!employee_id){encontrados.push(tx.emp_code);}
 
         await prisma.attendance_logs.create({
           data: {
@@ -195,8 +272,9 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
         });
 
         seenBiotimeIds.add(biotimeId);
-        seenEmployeePunches.add(punchKey);
+
         inserted++;
+
       } catch (err) {
         if (err?.code === "P2002") {
           skipped++;
@@ -207,12 +285,29 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
       }
     }
 
+    console.log("[BiotimeSync][Encontrados - No Encontrados]", {
+      encontrados: encontrados,
+      noEncontrados: noEncontrados,
+    });
+
+    console.log(
+      `[BiotimeSync] Recalculando ${affectedDates.size} fechas`
+    );
+
+    for (const affectedDate of affectedDates) {
+      await calcularAsistenciaDesdeLogs({
+        date: affectedDate,
+        force: true,
+      });
+    }
+
     const finishedAt = new Date();
     const durationMs = finishedAt - startedAt;
 
     console.log(`[BiotimeSync] Logs insertados: ${inserted}`);
     console.log(`[BiotimeSync] Logs omitidos: ${skipped}`);
     console.log(`[BiotimeSync] Errores: ${errors}`);
+    console.log(`[BiotimeSync] Fechas recalculadas: ${affectedDates.size}`);
     console.log(`[BiotimeSync] Duración: ${durationMs} ms`);
 
     return {
@@ -220,6 +315,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
       inserted,
       skipped,
       errors,
+      recalculatedDates: affectedDates.size,
       errorDetails,
       durationMs,
     };
