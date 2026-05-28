@@ -1,58 +1,48 @@
 import prisma from "../config/prisma.js";
 import { generate24HexId } from "../utils/idGenerator.js";
+import {
+  getScheduleForDate,
+  calcularMetricas,
+} from "../utils/attendanceMetrics.js";
 
 /**
  * CONFIG
  */
 const WINDOW_HOURS = 2;
-const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
 /**
  * Utils
  */
 function toHHMM(date) {
-  return date.toTimeString().slice(0, 5);
+  return date.toLocaleTimeString("en-GB", {
+    timeZone: "America/Lima",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function toPeruDateString(date) {
+  const peru = new Date(
+    date.getTime() - (5 * 60 * 60 * 1000)
+  );
+
+  const year = peru.getUTCFullYear();
+  const month = String(peru.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(peru.getUTCDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getPeruDayBounds(dateStr) {
+  const start = new Date(`${dateStr}T05:00:00.000Z`);
+  const end = new Date(start.getTime() + (24 * 60 * 60 * 1000) - 1);
+
+  return { start, end };
 }
 
 function diffHours(a, b) {
   return (b - a) / 3600000;
-}
-
-function toMinutes(hhmm) {
-  if (!hhmm || typeof hhmm !== "string") return null;
-  const [h, m] = hhmm.slice(0, 5).split(":").map(Number);
-  if (Number.isNaN(h) || Number.isNaN(m)) return null;
-  return h * 60 + m;
-}
-
-function computeLate(clockIn, scheduledStart) {
-  if (!clockIn) {
-    return { is_late: null, late_minutes: null };
-  }
-
-  const inMinutes = toMinutes(clockIn);
-  const startMinutes = toMinutes(scheduledStart);
-
-  if (inMinutes === null || startMinutes === null) {
-    return { is_late: false, late_minutes: 0 };
-  }
-
-  const lateMinutes = Math.max(0, inMinutes - startMinutes);
-  return { is_late: lateMinutes > 0, late_minutes: lateMinutes };
-}
-
-function computeOvertimeFields(clockIn, clockOut, record) {
-  if (!clockIn || !clockOut) {
-    return {
-      overtime_hours_25: null,
-      overtime_hours_35: null,
-    };
-  }
-
-  return {
-    overtime_hours_25: record.overtime_hours_25,
-    overtime_hours_35: record.overtime_hours_35,
-  };
 }
 
 function deduplicateLogs(logs) {
@@ -66,58 +56,32 @@ function deduplicateLogs(logs) {
   });
 }
 
-function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
-  const candidates = schedules.filter(s => {
-    const isForEmployee = s.employee_id === employeeId;
-    const isForDept = !s.employee_id && departmentName &&
-      (Array.isArray(s.departments)
-        ? s.departments.includes(departmentName)
-        : s.department_name === departmentName);
-    return isForEmployee || isForDept;
-  });
-
-  const findBest = (list) => {
-    const valid = list.filter(s => {
-      const from = s.effective_from ? s.effective_from.toISOString().slice(0, 10) : "0000-01-01";
-      const to = s.effective_to ? s.effective_to.toISOString().slice(0, 10) : "9999-12-31";
-      return from <= dateStr && dateStr <= to;
-    });
-
-    valid.sort((a, b) => {
-      const af = a.effective_from ? a.effective_from.toISOString().slice(0, 10) : "0000-01-01";
-      const bf = b.effective_from ? b.effective_from.toISOString().slice(0, 10) : "0000-01-01";
-      return bf.localeCompare(af);
-    });
-
-    return valid[0] || null;
-  };
-
-  return findBest(candidates.filter(s => s.employee_id === employeeId))
-    || findBest(candidates.filter(s => !s.employee_id))
-    || null;
-}
-
 function buildWindow(date, startTime, endTime) {
   const baseDate =
     typeof date === "string"
       ? date.slice(0, 10)
-      : new Date(date).toISOString().slice(0, 10);
+      : toPeruDateString(new Date(date));
 
   const [sh, sm] = startTime.split(":").map(Number);
   const [eh, em] = endTime.split(":").map(Number);
 
-  const start = new Date(`${baseDate}T00:00:00`);
-  const end = new Date(`${baseDate}T00:00:00`);
+  // Perú UTC-5
+  const startUTC = new Date(`${baseDate}T00:00:00.000Z`);
+  const endUTC = new Date(`${baseDate}T00:00:00.000Z`);
 
-  start.setHours(sh - WINDOW_HOURS, sm, 0, 0);
-  end.setHours(eh + WINDOW_HOURS, em, 0, 0);
+  startUTC.setUTCHours(sh + 5 - WINDOW_HOURS, sm, 0, 0);
+  endUTC.setUTCHours(eh + 5 + WINDOW_HOURS, em, 0, 0);
 
-  return { start, end };
+  return {
+    start: startUTC,
+    end: endUTC,
+  };
 }
 
 /**
  * CORE LOGIC
  */
+
 function computeAttendance({ logs, record }) {
   const punches = logs.map(l => l.punch_time);
 
@@ -174,7 +138,7 @@ function computeAttendance({ logs, record }) {
         status,
         clock_in: toHHMM(clockIn),
         clock_out: toHHMM(clockOut),
-        worked_hours: parseFloat(worked.toFixed(2)),
+        worked_hours: 0,
         notes:
           worked >= 6
             ? "Calculado sin horario definido"
@@ -191,7 +155,7 @@ function computeAttendance({ logs, record }) {
       status: "Revisar",
       clock_in: toHHMM(clockIn),
       clock_out: toHHMM(clockOut),
-      worked_hours: parseFloat(worked.toFixed(2)),
+      worked_hours: 0,
       notes: "Sin horario definido con múltiples marcaciones",
       usedLogIds: [firstLog.id, lastLog.id],
     };
@@ -214,6 +178,18 @@ function computeAttendance({ logs, record }) {
       log.punch_time >= start &&
       log.punch_time <= end;
   }
+
+  console.log("WINDOW DEBUG", {
+    employee: record.employee_id,
+    date: record.date,
+    start,
+    end,
+    logs: logs.map(l => ({
+      id: l.id,
+      punch_time: l.punch_time,
+      peru: toHHMM(l.punch_time),
+    })),
+  });
 
   const inWindowLogs = logs.filter(
     l => l._is_within_window
@@ -244,7 +220,7 @@ function computeAttendance({ logs, record }) {
       status,
       clock_in: toHHMM(firstLog.punch_time),
       clock_out: toHHMM(lastLog.punch_time),
-      worked_hours: parseFloat(worked.toFixed(2)),
+      worked_hours: 0,
       notes: worked >= 6 ? null : "Jornada incompleta",
       usedLogIds: [firstLog.id, lastLog.id],
     };
@@ -258,12 +234,11 @@ function computeAttendance({ logs, record }) {
     const lastLog = logs[logs.length - 1] || null;
 
     if (firstLog && lastLog && firstLog.id !== lastLog.id) {
-      const worked = diffHours(firstLog.punch_time, lastLog.punch_time);
       return {
         status: "Revisar",
         clock_in: toHHMM(firstLog.punch_time),
         clock_out: toHHMM(lastLog.punch_time),
-        worked_hours: parseFloat(worked.toFixed(2)),
+        worked_hours: 0,
         notes: inWindowLogs.length === 1
           ? "Marcaciones parciales dentro de ventana"
           : "Sin marcaciones dentro de ventana horaria",
@@ -296,8 +271,6 @@ function computeAttendance({ logs, record }) {
   const clockIn = firstLog.punch_time;
   const clockOut = lastLog.punch_time;
 
-  const worked = diffHours(clockIn, clockOut);
-
   let status = "Completo";
   let notes = null;
 
@@ -310,7 +283,7 @@ function computeAttendance({ logs, record }) {
     status,
     clock_in: toHHMM(clockIn),
     clock_out: toHHMM(clockOut),
-    worked_hours: parseFloat(worked.toFixed(2)),
+    worked_hours: 0,
     notes,
     usedLogIds: [firstLog.id, lastLog.id],
   };
@@ -319,27 +292,37 @@ function computeAttendance({ logs, record }) {
 /**
  * MAIN
  */
-export async function calcularAsistenciaDesdeLogs({ date } = {}) {
+export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) {
   const targetDate = date
     ? new Date(date)
     : new Date();
 
-  const dateStr = targetDate.toISOString().slice(0, 10);
+  const dateStr = typeof date === "string"
+    ? date.slice(0, 10)
+    : toPeruDateString(targetDate);
+
+  const forceRecalc = force === true || force === "true";
 
   console.log(`[FASE 2] Calculando asistencia para ${dateStr}`);
+
+  const { start: startOfDay, end: endOfDay } = getPeruDayBounds(dateStr);
 
   /**
    * 1. Obtener logs del día
    */
-  const logs = await prisma.attendance_logs.findMany({
+  const allLogs = await prisma.attendance_logs.findMany({
     where: {
       punch_time: {
-        gte: new Date(dateStr + "T00:00:00"),
-        lte: new Date(dateStr + "T23:59:59"),
+        gte: startOfDay,
+        lte: endOfDay,
       },
     },
     orderBy: { punch_time: "asc" },
   });
+
+  const logs = allLogs.filter(log =>
+    toPeruDateString(log.punch_time) === dateStr
+  );
 
   /**
    * 2. Agrupar por empleado
@@ -363,9 +346,10 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
   /**
    * 3. Obtener registros base
    */
+
   const records = await prisma.attendance_record.findMany({
     where: {
-      date: new Date(dateStr + "T00:00:00"),
+      date: new Date(`${dateStr}T00:00:00.000Z`),
     },
   });
 
@@ -386,7 +370,7 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
       data: missingEmployeeIds.map(employeeId => ({
         id: generate24HexId(),
         employee_id: employeeId,
-        date: new Date(dateStr + "T00:00:00"),
+        date: startOfDay,
         status: "Sin marcar",
         worked_hours: 0,
         is_absent: false,
@@ -399,7 +383,7 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
 
   const recordsToProcess = await prisma.attendance_record.findMany({
     where: {
-      date: new Date(dateStr + "T00:00:00"),
+      date: new Date(`${dateStr}T00:00:00.000Z`),
     },
   });
 
@@ -410,7 +394,11 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
   const [employees, schedulesRaw] = await Promise.all([
     prisma.employee.findMany({
       where: { id: { in: employeeIds } },
-      select: { id: true, department_name: true },
+      select: { id: true, department_name: true,
+        document_number: true,
+        first_name: true,
+        last_name: true,
+      },
     }),
     prisma.work_schedule.findMany({
       where: { is_active: true },
@@ -420,13 +408,62 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
 
   const employeeMap = new Map(employees.map(emp => [emp.id, emp]));
 
+  // console.log("\n[ATTENDANCE] EMPLOYEES TO PROCESS\n");
+  // for (const emp of employees) {
+    // console.log({
+      // employee_id: emp.id,
+      // document_number: emp.document_number,
+      // name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim(),
+      // department: emp.department_name,
+    // });
+  // }
+  // console.log("\n");
+
   let updated = 0;
+
+  const incidents = await prisma.attendance_incident.findMany({
+    where: {
+      incident_date: {
+        gte: startOfDay,
+        lte: endOfDay,
+      },
+      status: "Aprobada",
+    },
+  });
+
+  const approvedIncidentsByDate = {};
+
+  for (const incident of incidents) {
+    approvedIncidentsByDate[toPeruDateString(incident.incident_date)] = true;
+  }
+
+  const overtimeAlerts = await prisma.overtime_alert.findMany({
+    where: { status: "Pendiente", },
+    select: { attendance_record_id: true, },
+  });
+
+  const pendingOvertimeRecordIds = new Set(
+    overtimeAlerts
+      .map(a => a.attendance_record_id)
+      .filter(Boolean)
+  );
 
   /**
    * 4. Procesar cada empleado
    */
   for (const record of recordsToProcess) {
-    if (record.status === "Aprobada" && record.clock_in && record.clock_out) {
+    const recordDate = toPeruDateString(record.date);
+    const today = toPeruDateString(new Date());
+
+    // automático:
+    // solo recalcular HOY
+    if (!forceRecalc && recordDate !== today) {
+      continue;
+    }
+
+    const protectedStatuses = ["Justificado", "Vacaciones", ]; // Aprobada?
+
+    if (protectedStatuses.includes(record.status) && !forceRecalc) {
       continue;
     }
 
@@ -438,31 +475,70 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
       dateStr
     );
 
+    const dow = new Date(dateStr + "T00:00:00").getDay();
+
+    const dayStartMap = ["sunday_start", "monday_start", "tuesday_start", "wednesday_start", "thursday_start", "friday_start", "saturday_start",];
+    const dayEndMap = ["sunday_end", "monday_end", "tuesday_end", "wednesday_end", "thursday_end", "friday_end", "saturday_end",];
+
+    const scheduledStart = schedule?.[dayStartMap[dow]] || null;
+    const scheduledEnd = schedule?.[dayEndMap[dow]] || null;
+
     if (schedule?.exempt_from_clocking) {
       continue;
     }
 
     const key = `${record.employee_id}__${dateStr}`;
     const employeeLogs = grouped[key] || [];
+    const hasSchedule = !!scheduledStart && !!scheduledEnd;
 
     const result = computeAttendance({
       logs: employeeLogs,
-      record,
+      record: {
+        ...record,
+        scheduled_start: hasSchedule ? scheduledStart : null,
+        scheduled_end: hasSchedule ? scheduledEnd : null,
+      },
     });
 
-    const lateData = computeLate(result.clock_in, record.scheduled_start);
-    const overtimeData = computeOvertimeFields(result.clock_in, result.clock_out, record);
+    const overtimeAuth =
+      (record.overtime_authorized === true || schedule?.overtime_authorized === true) &&
+      !pendingOvertimeRecordIds.has(record.id);
+
+    const metrics = calcularMetricas(
+      {
+        ...record,
+        clock_in: result.clock_in,
+        clock_out: result.clock_out,
+        status: result.status,
+      },
+      schedule,
+      dateStr,
+      overtimeAuth
+    );
+
+    const hasApprovedIncident =  !!approvedIncidentsByDate[recordDate];
+
+    let finalStatus = result.status;
+
+    if (record.status === "Vacaciones") {
+      finalStatus = "Vacaciones";
+    }
+    else if (hasApprovedIncident || record.status === "Justificado") {
+      finalStatus = "Justificado";
+    }
+    else if (!result.clock_in) {
+      finalStatus = "Ausente";
+    }
+    else if (result.clock_in && !result.clock_out) {
+      finalStatus = "Incompleto";
+    }
 
     /**
      * Resetear logs del día
      */
     await prisma.attendance_logs.updateMany({
       where: {
-        employee_id: record.employee_id,
-        punch_time: {
-          gte: new Date(dateStr + "T00:00:00"),
-          lte: new Date(dateStr + "T23:59:59"),
-        },
+        attendance_record_id: record.id,
       },
       data: {
         attendance_record_id: null,
@@ -487,24 +563,49 @@ export async function calcularAsistenciaDesdeLogs({ date } = {}) {
               ? log._is_within_window
               : null,
           is_used_for_calculation:
+            Array.isArray(result.usedLogIds) &&
             result.usedLogIds.includes(log.id),
           updated_date: new Date(),
         },
       });
     }
 
+    // console.log({
+      // employee: record.employee_id,
+      // date: recordDate,
+      // before: {
+        // clock_in: record.clock_in,
+        // clock_out: record.clock_out,
+        // status: record.status,
+      // },
+      // after: {
+        // clock_in: result.clock_in,
+        // clock_out: result.clock_out,
+        // status: finalStatus,
+      // },
+    // });
+
     await prisma.attendance_record.update({
       where: { id: record.id },
       data: {
         clock_in: result.clock_in,
         clock_out: result.clock_out,
-        worked_hours: result.worked_hours,
-        is_late: lateData.is_late,
-        late_minutes: lateData.late_minutes,
-        overtime_hours_25: overtimeData.overtime_hours_25,
-        overtime_hours_35: overtimeData.overtime_hours_35,
-        status: result.status,
-        notes: result.notes,
+
+        worked_hours: metrics.worked_hours,
+        regular_hours: metrics.regular_hours,
+        overtime_hours_25: metrics.overtime_hours_25,
+        overtime_hours_35: metrics.overtime_hours_35,
+
+        is_late: metrics.is_late,
+        late_minutes: metrics.late_minutes,
+        is_absent: metrics.is_absent,
+
+        scheduled_start: hasSchedule ? scheduledStart : null,
+        scheduled_end: hasSchedule ? scheduledEnd : null,
+
+        status: finalStatus,
+        notes: result.notes ?? record.notes,
+
         updated_date: new Date(),
       },
     });
@@ -550,7 +651,7 @@ if (process.argv[1].includes("calcularAsistenciaDesdeLogs")) {
 // marcaciones fuera de ventana	  Revisar
 // correcto	                      Completo
 //
-// for d in $(seq 0 $(( ( $(date -d "$(date +%F)" +%s) - $(date -d "2026-04-11" +%s) ) / 86400 ))); do
+// for d in $(seq 0 $(( ( $(date -d "$(date +%F)" +%s) - $(date -d "2026-04-21" +%s) ) / 86400 ))); do
 //  day=$(date -d "2026-04-21 +$d day" +%F)
-//  node scripts/calcularAsistenciaDesdeLogs.js --date="$day"
+//  node scripts/calcularAsistenciaDesdeLogs.js --date="$day" --force=true
 // done
