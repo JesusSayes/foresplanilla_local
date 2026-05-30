@@ -628,6 +628,7 @@ export default function EmployeeManagement() {
       status: emp?.status || "Activo",
       role: emp?.role || "empleado",
       supervisor_name: emp?.supervisor_name || "",
+      attendance_method: emp?.attendance_method || "",
       emergency_contact_name: emp?.emergency_contact_name || "",
       emergency_contact_phone: emp?.emergency_contact_phone || "",
       emergency_contact_relationship: emp?.emergency_contact_relationship || "",
@@ -660,6 +661,12 @@ export default function EmployeeManagement() {
   };
 
   const handleSubmit = async () => {
+    // Validar campo obligatorio de marcación siempre
+    if (!formData.attendance_method) {
+      setFormErrors(["El campo 'Tipo de Marcación' en la pestaña Laboral es obligatorio"]);
+      return;
+    }
+
     // Si está editando, permitir actualización parcial
     if (editingEmployee) {
       setFormErrors([]);

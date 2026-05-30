@@ -373,6 +373,28 @@ export default function EmployeeForm({
 
             {/* WORK */}
             <TabsContent value="work" className="space-y-4">
+              {/* Campo obligatorio de marcación */}
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg">
+                <Label className="text-sm font-semibold text-amber-800">
+                  Tipo de Marcación <span className="text-red-600">*</span>
+                </Label>
+                <Select
+                  value={formData.attendance_method || ""}
+                  onValueChange={(v) => setFormData({ ...formData, attendance_method: v })}
+                >
+                  <SelectTrigger className={`mt-1.5 bg-white ${!formData.attendance_method ? "border-red-400" : "border-amber-300"}`}>
+                    <SelectValue placeholder="— Selecciona el tipo de marcación (obligatorio) —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="API FORESPAMA">API FORESPAMA</SelectItem>
+                    <SelectItem value="MARCADOR">MARCADOR</SelectItem>
+                  </SelectContent>
+                </Select>
+                {!formData.attendance_method && (
+                  <p className="text-xs text-red-600 mt-1">⚠ Este campo es obligatorio</p>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div><Label>Empresa</Label><Input value={formData.company} onChange={(e) => setFormData({ ...formData, company: e.target.value })} /></div>
                 <div>
