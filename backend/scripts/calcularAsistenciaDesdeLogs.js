@@ -398,6 +398,7 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
         document_number: true,
         first_name: true,
         last_name: true,
+        attendance_method: true,
       },
     }),
     prisma.work_schedule.findMany({
@@ -431,11 +432,11 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
     },
   });
 
-  const approvedIncidentsByDate = {};
+  const approvedIncidents = new Set();
 
   for (const incident of incidents) {
-    approvedIncidentsByDate[toPeruDateString(incident.incident_date)] = true;
-  }
+    approvedIncidents.add(`${incident.employee_id}__${toPeruDateString(incident.incident_date)}`);
+  };
 
   const overtimeAlerts = await prisma.overtime_alert.findMany({
     where: { status: "Pendiente", },
@@ -468,6 +469,11 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
     }
 
     const employee = employeeMap.get(record.employee_id);
+
+    if (employee?.attendance_method !== "MARCADOR") {
+      continue;
+    }
+
     const schedule = getScheduleForDate(
       record.employee_id,
       employee?.department_name,
@@ -516,7 +522,7 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
       overtimeAuth
     );
 
-    const hasApprovedIncident =  !!approvedIncidentsByDate[recordDate];
+    const hasApprovedIncident =  approvedIncidents.has(`${record.employee_id}__${recordDate}`);
 
     let finalStatus = result.status;
 

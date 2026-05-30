@@ -158,7 +158,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
     for (const emp of employees) {
       if (!emp.document_number) {
         console.log("[BiotimeSync][EMPLOYEE WITHOUT DOCUMENT]", {
-          employee_id: emp.id,
+          employeeId: emp.id,
         });
 
         continue;
@@ -170,7 +170,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
 
       if (!normalizedDocument) {
         console.log("[BiotimeSync][INVALID DOCUMENT]", {
-          employee_id: emp.id,
+          employeeId: emp.id,
           document_number: emp.document_number,
         });
 
@@ -224,7 +224,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
         // console.log("[BiotimeSync][LOOKUP]", {
           // raw_emp_code: tx.emp_code,
           // normalized_emp_code: empCode,
-          // employee_id: employeeId,
+          // employeeId: employeeId,
           // exists: !!employeeId,
         // });
         noEncontrados.push(tx.emp_code);
@@ -250,7 +250,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
           skipped++;
           continue;
         }
-        if(!!employee_id){encontrados.push(tx.emp_code);}
+        if(employeeId){encontrados.push(tx.emp_code);}
 
         await prisma.attendance_logs.create({
           data: {
