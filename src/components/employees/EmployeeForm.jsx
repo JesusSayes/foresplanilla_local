@@ -440,6 +440,24 @@ export default function EmployeeForm({
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div><Label>Supervisor Directo</Label><Input value={formData.supervisor_name} onChange={(e) => setFormData({ ...formData, supervisor_name: e.target.value })} /></div>
+                <div>
+                  <Label>Tipo de Marcación <span className="text-red-600">*</span></Label>
+                  <Select
+                    value={formData.attendance_method || ""}
+                    onValueChange={(v) => setFormData({ ...formData, attendance_method: v })}
+                  >
+                    <SelectTrigger className={!formData.attendance_method ? "border-red-400 bg-red-50" : ""}>
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="API FORESPAMA">API FORESPAMA</SelectItem>
+                      <SelectItem value="MARCADOR">MARCADOR</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {!formData.attendance_method && (
+                    <p className="text-xs text-red-600 mt-1">⚠ Obligatorio</p>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div><Label>Fecha de Ingreso</Label><Input type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} /></div>
