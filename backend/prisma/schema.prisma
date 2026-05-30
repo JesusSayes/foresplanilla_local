@@ -380,9 +380,9 @@ model employee {
   work_unit                      String?
   site                           String?
   hire_date                      DateTime?         @db.Date
-  termination_date               String?
+  termination_date               DateTime?         @db.Date
   contract_type                  String?
-  base_salary                    Int?
+  base_salary                    Decimal?          @db.Decimal(18, 2)
   bank_name                      String?
   bank_account                   String?
   cci_account                    String?
@@ -391,7 +391,7 @@ model employee {
   cts_currency                   String?
   pension_system                 String?
   afp_id                         String?
-  afp_affiliation_date           String?
+  afp_affiliation_date           DateTime?         @db.Date
   cuspp                          String?
   worker_type                    String?
   tax_residence                  String?
@@ -410,6 +410,7 @@ model employee {
   created_by_id                  String?
   created_by                     String?
   is_sample                      Boolean?
+  attendance_method              String?
   attendance_logs                attendance_logs[]
 }
 
@@ -1042,4 +1043,21 @@ model payroll_config {
 
   @@index([is_active], map: "idx_payroll_config_active")
   @@index([config_type], map: "idx_payroll_config_type")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model attendance_logs_duplicates_backup_20260521 {
+  id                      String?   @db.VarChar(24)
+  employee_id             String?   @db.VarChar(255)
+  attendance_record_id    String?   @db.VarChar(255)
+  punch_time              DateTime? @db.Timestamp(6)
+  punch_date              DateTime? @db.Date
+  source                  String?   @db.VarChar(50)
+  raw_payload             Json?
+  is_within_window        Boolean?
+  is_used_for_calculation Boolean?
+  created_date            DateTime? @db.Timestamp(6)
+  updated_date            DateTime? @db.Timestamp(6)
+
+  @@ignore
 }

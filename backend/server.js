@@ -165,21 +165,21 @@ let biotimeSyncJob = Promise.resolve();
 let biotimeSyncRunning = false;
 
 // Cron: sincronización biotime cada hora
-cron.schedule('0 * * * *', () => {
-  if (biotimeSyncRunning) {
-    console.log('[Cron] Sync biotime omitido: ejecución previa en curso');
-    return;
-  }
+// cron.schedule('0 * * * *', () => {
+  // if (biotimeSyncRunning) {
+    // console.log('[Cron] Sync biotime omitido: ejecución previa en curso');
+    // return;
+  // }
 
-  console.log('[Cron] Ejecutando sync biotime...');
-  biotimeSyncRunning = true;
+  // console.log('[Cron] Ejecutando sync biotime...');
+  // biotimeSyncRunning = true;
 
-  biotimeSyncJob = syncBiotimeAttendance()
-    .catch(err => console.error('[Cron] Error en sync biotime:', err.message))
-    .finally(() => {
-      biotimeSyncRunning = false;
-    });
-}, { timezone: CRON_TIMEZONE });
+  // biotimeSyncJob = syncBiotimeAttendance()
+    // .catch(err => console.error('[Cron] Error en sync biotime:', err.message))
+    // .finally(() => {
+      // biotimeSyncRunning = false;
+    // });
+// }, { timezone: CRON_TIMEZONE });
 
 // Cron: calcular asistencia desde logs cada hora (10 minutos después del sync biotime)
 // cron.schedule('10 * * * *', async () => {
