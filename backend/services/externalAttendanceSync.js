@@ -1,6 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import { generate24HexId } from '../utils/idGenerator.js';
 import { getAsistenciasExternal, confirmarAsistenciasExternal } from '../utils/externalApiService.js';
+import {
+  getScheduleForDate,
+  calcularMetricas,
+} from "../utils/attendanceMetrics.js";
 import fs from 'fs';
 import path from 'path';
 
@@ -35,61 +39,6 @@ function normalizeExternalTime(value) {
 
 function shouldConfirmExternalRecord(clockIn, clockOut) {
   return Boolean(clockIn && clockOut);
-}
-
-function calcWorkedHours(startTime, endTime, breakMinutes = 60) {
-  if (!startTime || !endTime) return 0;
-  
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  
-  const totalMinutes = (eh * 60 + em) - (sh * 60 + sm);
-  const workedMinutes = Math.max(0, totalMinutes - breakMinutes);
-  
-  return workedMinutes / 60;
-}
-
-function calcLateMinutes(scheduledStart, actualClockIn) {
-  if (!scheduledStart || !actualClockIn) return 0;
-  
-  const [sh, sm] = scheduledStart.split(":").map(Number);
-  const [ah, am] = actualClockIn.split(":").map(Number);
-  
-  const scheduledMinutes = sh * 60 + sm;
-  const actualMinutes = ah * 60 + am;
-  
-  return Math.max(0, actualMinutes - scheduledMinutes);
-}
-
-function calcOvertimeHours(workedHours, regularHours = 8) {
-  if (workedHours <= regularHours) {
-    return { overtime_25: 0, overtime_35: 0, regular: workedHours };
-  }
-
-  const overtime = workedHours - regularHours;
-
-  if (overtime <= 2) {
-    return { overtime_25: overtime, overtime_35: 0, regular: regularHours };
-  }
-
-  return { overtime_25: 2, overtime_35: overtime - 2, regular: regularHours };
-}
-
-function getScheduleForDate(workSchedule, date) {
-  if (!workSchedule) return null;
-
-  const dayOfWeek = date.getDay();
-  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const dayName = dayNames[dayOfWeek];
-
-  const startField = `${dayName}_start`;
-  const endField = `${dayName}_end`;
-
-  return {
-    scheduledStart: workSchedule[startField] || null,
-    scheduledEnd: workSchedule[endField] || null,
-    breakMinutes: workSchedule.break_duration_minutes || 60
-  };
 }
 
 export async function syncExternalAttendance(options = {}) {
@@ -244,30 +193,30 @@ export async function syncExternalAttendance(options = {}) {
               }
             });
 
-            const scheduleInfo = getScheduleForDate(workSchedule, recordDate);
-
             const updatedClockIn = existingClockIn || newClockIn;
             const updatedClockOut = existingClockOut || newClockOut;
-            const scheduledStart = scheduleInfo?.scheduledStart || '08:00';
-            const scheduledEnd = scheduleInfo?.scheduledEnd || '17:00';
-            const breakMinutes = scheduleInfo?.breakMinutes || 60;
 
-            const workedHours = (updatedClockIn && updatedClockOut)
-              ? calcWorkedHours(updatedClockIn, updatedClockOut, breakMinutes)
-              : 0;
+            let status = "Completo";
 
-            const lateMinutes = updatedClockIn ? calcLateMinutes(scheduledStart, updatedClockIn) : 0;
-            const isLate = lateMinutes > 0;
-            const isAbsent = !updatedClockIn || !updatedClockOut;
-
-            const overtime = calcOvertimeHours(workedHours);
-
-            let status = 'Completo';
-            if (isAbsent) {
-              status = 'Ausente';
-            } else if (isLate) {
-              status = 'Tardanza';
+            if (!updatedClockIn) {
+              status = "Ausente";
             }
+            else if (updatedClockIn && !updatedClockOut) {
+              status = "Incompleto";
+            }
+
+            const dateStr = record.fecha instanceof Date ? record.fecha.toISOString().slice(0, 10) : String(record.fecha).slice(0, 10);
+
+            const metrics = calcularMetricas(
+              {
+                clock_in: updatedClockIn,
+                clock_out: updatedClockOut,
+                status,
+              },
+              workSchedule,
+              dateStr,
+              false
+            );
 
             const updateFields = {};
             const updatedFields = [];
@@ -281,19 +230,19 @@ export async function syncExternalAttendance(options = {}) {
               updatedFields.push(`Salida: ${existingClockOut || 'N/A'} → ${newClockOut}`);
             }
 
-            updateFields.worked_hours = workedHours;
-            updateFields.regular_hours = overtime.regular;
-            updateFields.overtime_hours_25 = overtime.overtime_25;
-            updateFields.overtime_hours_35 = overtime.overtime_35;
-            updateFields.is_late = isLate;
-            updateFields.late_minutes = lateMinutes;
-            updateFields.is_absent = isAbsent;
+            updateFields.worked_hours = metrics.worked_hours;
+            updateFields.regular_hours = metrics.regular_hours;
+            updateFields.overtime_hours_25 = metrics.overtime_hours_25;
+            updateFields.overtime_hours_35 = metrics.overtime_hours_35;
+            updateFields.is_late = metrics.is_late;
+            updateFields.late_minutes = metrics.late_minutes;
+            updateFields.is_absent = metrics.is_absent;
             updateFields.status = status;
             updateFields.notes = `${existingRecord.notes || ''}\nActualizado desde duplicado (ID externo: ${record.id}) - ${updatedFields.join(', ')}`.trim();
             updateFields.updated_date = new Date();
             updateFields.created_by = 'external_sync';
 
-            log(`[ACTUALIZAR DUPLICADO] ID ${record.id} - ${employee.first_name} ${employee.last_name} (${record.numero_documento}) - ${record.fecha} - Campos actualizados: ${updatedFields.join(', ')} - Horas trabajadas: ${existingRecord.worked_hours?.toFixed(2) || '0.00'} → ${workedHours.toFixed(2)}, Estado: ${existingRecord.status || 'N/A'} → ${status}`);
+            log(`[ACTUALIZAR DUPLICADO] ID ${record.id} - ${employee.first_name} ${employee.last_name} (${record.numero_documento}) - ${record.fecha} - Campos actualizados: ${updatedFields.join(', ')} - Horas trabajadas: ${Number(existingRecord.worked_hours || 0).toFixed(2)} → ${Number(metrics.worked_hours || 0).toFixed(2)}, Estado: ${existingRecord.status || 'N/A'} → ${status}`);
 
             if (!dryRun) {
               await prisma.attendance_record.update({
@@ -343,33 +292,39 @@ export async function syncExternalAttendance(options = {}) {
           }
         });
 
-        const scheduleInfo = getScheduleForDate(workSchedule, recordDate);
-
         const clockIn = normalizeExternalTime(record.hora_entrada);
         const clockOut = normalizeExternalTime(record.hora_salida);
-        const scheduledStart = scheduleInfo?.scheduledStart || '08:00';
-        const scheduledEnd = scheduleInfo?.scheduledEnd || '17:00';
-        const breakMinutes = scheduleInfo?.breakMinutes || 60;
-
         const effectiveClockIn = existingRecord?.clock_in || clockIn;
         const effectiveClockOut = existingRecord?.clock_out || clockOut;
 
-        const workedHours = (effectiveClockIn && effectiveClockOut)
-          ? calcWorkedHours(effectiveClockIn, effectiveClockOut, breakMinutes)
-          : 0;
+        let status = "Completo";
 
-        const lateMinutes = effectiveClockIn ? calcLateMinutes(scheduledStart, effectiveClockIn) : 0;
-        const isLate = lateMinutes > 0;
-        const isAbsent = !effectiveClockIn || !effectiveClockOut;
-
-        const overtime = calcOvertimeHours(workedHours);
-
-        let status = 'Completo';
-        if (isAbsent) {
-          status = 'Ausente';
-        } else if (isLate) {
-          status = 'Tardanza';
+        if (!effectiveClockIn) {
+          status = "Ausente";
         }
+        else if (effectiveClockIn && !effectiveClockOut) {
+          status = "Incompleto";
+        }
+
+        const dateStr = record.fecha instanceof Date ? record.fecha.toISOString().slice(0, 10) : String(record.fecha).slice(0, 10);
+        const metrics = calcularMetricas(
+          {
+            clock_in: effectiveClockIn,
+            clock_out: effectiveClockOut,
+            status,
+          },
+          workSchedule,
+          dateStr,
+          false
+        );
+
+        const dow = recordDate.getDay();
+
+        const startFields = ["sunday_start", "monday_start", "tuesday_start", "wednesday_start", "thursday_start", "friday_start", "saturday_start",];
+        const endFields = ["sunday_end", "monday_end", "tuesday_end", "wednesday_end", "thursday_end", "friday_end", "saturday_end",];
+
+        const scheduledStart =  workSchedule?.[startFields[dow]] || employee.entry_time || "08:00";
+        const scheduledEnd = workSchedule?.[endFields[dow]] || employee.exit_time || "17:00";
 
         const attendanceData = {
           employee_id: employee.id,
@@ -380,14 +335,14 @@ export async function syncExternalAttendance(options = {}) {
           clock_out: clockOut,
           scheduled_start: scheduledStart,
           scheduled_end: scheduledEnd,
-          worked_hours: workedHours,
-          regular_hours: overtime.regular,
-          overtime_hours_25: overtime.overtime_25,
-          overtime_hours_35: overtime.overtime_35,
+          worked_hours: metrics.worked_hours,
+          regular_hours: metrics.regular_hours,
+          overtime_hours_25: metrics.overtime_hours_25,
+          overtime_hours_35: metrics.overtime_hours_35,
+          is_late: metrics.is_late,
+          late_minutes: metrics.late_minutes,
+          is_absent: metrics.is_absent,
           overtime_authorized: false,
-          is_late: isLate,
-          late_minutes: lateMinutes,
-          is_absent: isAbsent,
           status: status,
           notes: `Registro sincronizado desde API externa (ID externo: ${record.id})`,
           updated_date: new Date(),
@@ -396,7 +351,7 @@ export async function syncExternalAttendance(options = {}) {
 
         if (existingRecord) {
           recordsToUpdate.push(attendanceData);
-          log(`[ACTUALIZAR] ID ${record.id} - ${attendanceData.employee_name} (${record.numero_documento}) - ${record.fecha} - Entrada: ${clockIn}, Salida: ${clockOut}, Horas: ${workedHours.toFixed(2)}, Estado: ${status}`);
+          log(`[ACTUALIZAR] ID ${record.id} - ${attendanceData.employee_name} (${record.numero_documento}) - ${record.fecha} - Entrada: ${clockIn}, Salida: ${clockOut}, Horas: ${Number(metrics.worked_hours || 0).toFixed(2)}, Estado: ${status}`);
 
           if (!dryRun) {
             await prisma.attendance_record.update({
@@ -430,7 +385,7 @@ export async function syncExternalAttendance(options = {}) {
           totalUpdated++;
         } else {
           recordsToSave.push(attendanceData);
-          log(`[GUARDAR] ID ${record.id} - ${attendanceData.employee_name} (${record.numero_documento}) - ${record.fecha} - Entrada: ${clockIn}, Salida: ${clockOut}, Horas: ${workedHours.toFixed(2)}, Estado: ${status}`);
+          log(`[GUARDAR] ID ${record.id} - ${attendanceData.employee_name} (${record.numero_documento}) - ${record.fecha} - Entrada: ${clockIn}, Salida: ${clockOut}, Horas: ${Number(metrics.worked_hours || 0).toFixed(2)}, Estado: ${status}`);
 
           if (!dryRun) {
             const recordId = generate24HexId();
