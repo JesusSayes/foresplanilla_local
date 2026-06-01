@@ -524,12 +524,12 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
 
     const hasApprovedIncident =  approvedIncidents.has(`${record.employee_id}__${recordDate}`);
 
-    console.log({
-      employee: record.employee_id,
-      recordDate,
-      hasApprovedIncident,
-      recordStatus: record.status,
-    });
+    // console.log({
+      // employee: record.employee_id,
+      // recordDate,
+      // hasApprovedIncident,
+      // recordStatus: record.status,
+    // });
     let finalStatus = result.status;
 
     if (record.status === "Vacaciones") {
