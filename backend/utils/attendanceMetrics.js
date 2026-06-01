@@ -2,7 +2,7 @@ export function getScheduleForDate(employeeId, departmentName, schedules, dateSt
   const candidates = schedules.filter(s => {
     if (!s.is_active) return false;
 
-    const isForEmployee = s.id === employeeId;
+    const isForEmployee = s.employee_id === employeeId;
 
     const isForDept =
       !s.employee_id &&
@@ -75,45 +75,45 @@ export function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) 
     "saturday_end",
   ];
 
-  // const scheduledStart = schedule?.[dayStartMap[dow]] || "09:00";
-  // const scheduledEnd = schedule?.[dayEndMap[dow]] || "18:00";
-  const scheduledStart = schedule?.[dayStartMap[dow]] || null;
-  const scheduledEnd = schedule?.[dayEndMap[dow]] || null;
+  const scheduledStart = schedule?.[dayStartMap[dow]] || "09:00";
+  const scheduledEnd = schedule?.[dayEndMap[dow]] || "18:00";
+  // const scheduledStart = schedule?.[dayStartMap[dow]] || null;
+  // const scheduledEnd = schedule?.[dayEndMap[dow]] || null;
 
   const [inH, inM] = clockIn.split(":").map(Number);
   const inTotal = inH * 60 + inM;
 
-  const hasSchedule = !!scheduledStart && !!scheduledEnd;
+  // const hasSchedule = !!scheduledStart && !!scheduledEnd;
 
   /**
   * SIN HORARIO ASIGNADO
   */
-  if (!hasSchedule) {
-    let workedHours = 0;
+  // if (!hasSchedule) {
+    // let workedHours = 0;
 
-    if (clockOut) {
-      const [outH, outM] = clockOut.split(":").map(Number);
-      const outTotal = outH * 60 + outM;
+    // if (clockOut) {
+      // const [outH, outM] = clockOut.split(":").map(Number);
+      // const outTotal = outH * 60 + outM;
 
-      workedHours = Math.max(0, (outTotal - inTotal) / 60);
-    }
+      // workedHours = Math.max(0, (outTotal - inTotal) / 60);
+    // }
 
-    return {
-      worked_hours: workedHours,
-      regular_hours: workedHours,
+    // return {
+      // worked_hours: workedHours,
+      // regular_hours: workedHours,
 
-      overtime_hours_25: 0,
-      overtime_hours_35: 0,
+      // overtime_hours_25: 0,
+      // overtime_hours_35: 0,
 
-      is_late: false,
-      late_minutes: 0,
+      // is_late: false,
+      // late_minutes: 0,
 
-      is_absent: false,
+      // is_absent: false,
 
-      scheduled_start: null,
-      scheduled_end: null,
-    };
-  }
+      // scheduled_start: null,
+      // scheduled_end: null,
+    // };
+  // }
 
   const breakMinutes = schedule?.break_duration_minutes ?? 60;
   const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
