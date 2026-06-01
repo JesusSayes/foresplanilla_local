@@ -462,7 +462,7 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
       continue;
     }
 
-    const protectedStatuses = ["Justificado", "Vacaciones", ]; // Aprobada?
+    const protectedStatuses = ["Vacaciones", ]; // Aprobada?
 
     if (protectedStatuses.includes(record.status) && !forceRecalc) {
       continue;
@@ -524,12 +524,18 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
 
     const hasApprovedIncident =  approvedIncidents.has(`${record.employee_id}__${recordDate}`);
 
+    console.log({
+      employee: record.employee_id,
+      recordDate,
+      hasApprovedIncident,
+      recordStatus: record.status,
+    });
     let finalStatus = result.status;
 
     if (record.status === "Vacaciones") {
       finalStatus = "Vacaciones";
     }
-    else if (hasApprovedIncident || record.status === "Justificado") {
+    else if (hasApprovedIncident) {
       finalStatus = "Justificado";
     }
     else if (!result.clock_in) {
