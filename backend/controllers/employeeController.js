@@ -55,6 +55,14 @@ export const getEmployee = async (req, res) => {
 export const createEmployee = async (req, res) => {
   try {
     const data = req.body;
+    const cleanData = { ...data };
+
+    [ 'birth_date', 'hire_date', 'termination_date', 'afp_affiliation_date'].forEach(field => {
+      if (cleanData[field] === undefined || cleanData[field] === null || cleanData[field] === '') {
+        cleanData[field] = null;
+      }
+    });
+
     const userId = req.user.id;
     const userEmail = req.user.email;
 
@@ -82,15 +90,15 @@ export const createEmployee = async (req, res) => {
 
     const values = [
       data.employee_code, data.document_type, data.document_number,
-      data.first_name, data.last_name, data.birth_date, data.gender,
+      data.first_name, data.last_name, cleanData.birth_date, data.gender,
       data.personal_email, data.work_email, data.phone, data.mobile,
       data.address, data.district, data.province, data.department,
       data.company, data.position, data.position_level, data.profession,
-      data.department_name, data.work_unit, data.site, data.hire_date,
-      data.termination_date, data.contract_type, data.base_salary,
+      data.department_name, data.work_unit, data.site, cleanData.hire_date,
+      cleanData.termination_date, data.contract_type, data.base_salary,
       data.bank_name, data.bank_account, data.cci_account, data.cts_bank,
       data.cts_account_number, data.cts_currency, data.pension_system,
-      data.afp_id, data.afp_affiliation_date, data.cuspp, data.worker_type,
+      data.afp_id, cleanData.afp_affiliation_date, data.cuspp, data.worker_type,
       data.tax_residence, data.photo_url, data.status || 'Activo',
       data.role || 'empleado', data.managed_team_ids ? JSON.stringify(data.managed_team_ids) : null,
       data.supervisor_id, data.supervisor_name, data.emergency_contact_name,
@@ -115,7 +123,13 @@ export const updateEmployee = async (req, res) => {
     const values = [];
     let paramIndex = 1;
 
+    const dateFields = [ 'birth_date', 'hire_date', 'termination_date', 'afp_affiliation_date'];
+
     Object.entries(data).forEach(([key, value]) => {
+      if (dateFields.includes(key) && (value === '' || value === undefined)) {
+        value = null;
+      }
+
       if (key !== 'id' && key !== 'created_date' && key !== 'created_by_id' && key !== 'created_by') {
         fields.push(`${key} = $${paramIndex}`);
         values.push(value);
