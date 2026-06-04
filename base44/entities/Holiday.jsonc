@@ -1,0 +1,38 @@
+{
+  "name": "Holiday",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del feriado"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del feriado"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "Nacional",
+        "Regional",
+        "Laboral"
+      ],
+      "default": "Nacional",
+      "description": "Tipo de feriado"
+    },
+    "is_mandatory": {
+      "type": "boolean",
+      "default": true,
+      "description": "Es obligatorio (no se trabaja)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del feriado"
+    }
+  },
+  "required": [
+    "name",
+    "date"
+  ]
+}

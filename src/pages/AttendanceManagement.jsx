@@ -509,26 +509,85 @@ export default function AttendanceManagement() {
       });
     } else {
       setExistingIncident(null);
-      let incidentType = "Olvido de Marcación";
-      let startTime = record?.scheduled_start || "09:00";
-      let endTime = record?.scheduled_end || "18:00";
-      if (record) {
-        if (record.is_absent) {
-          incidentType = "Falta";
-        } else if (record.is_late) {
-          incidentType = "Tardanza";
-          endTime = record.clock_in || startTime;
-        } else if (record.clock_in && !record.clock_out) {
-          startTime = record.clock_in;
+
+      // Horario programado del día
+      const schedStart = sched ? (sched[dayStarts[dow]] || "09:00") : "09:00";
+      const schedEnd   = sched ? (sched[dayEnds[dow]]   || "18:00") : "18:00";
+
+      const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+      const fromMin = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+      const breakMin = sched?.break_duration_minutes ?? 60;
+
+      const schedStartMin = toMin(schedStart);
+      const schedEndMin   = toMin(schedEnd);
+      // Horas de jornada completa (sin break)
+      const fullDayHours = Math.max(0, (schedEndMin - schedStartMin - breakMin) / 60);
+
+      let incidentType = "Omisión de Marcación";
+      let startTime = schedStart;
+      let endTime = schedEnd;
+      let isFullDay = false;
+
+      if (!record || record.is_absent || (!record.clock_in && !record.clock_out)) {
+        // Sin ninguna marcación → justificar día completo
+        incidentType = record?.is_absent ? "Falta" : "Omisión de Marcación";
+        isFullDay = true;
+        startTime = schedStart;
+        endTime = schedEnd;
+      } else if (record.clock_in && !record.clock_out) {
+        // Tiene entrada pero no salida → justificar desde salida programada
+        // Las horas a justificar son las que faltan desde la hora programada de salida
+        const clockInMin = toMin(record.clock_in.slice(0, 5));
+        // Horas ya trabajadas (estimado hasta fin de jornada)
+        const workedSoFar = Math.max(0, (schedEndMin - clockInMin - breakMin) / 60);
+        const missingHours = Math.max(0, fullDayHours - workedSoFar);
+
+        if (missingHours <= 0) {
+          // Ya completó la jornada, justificar salida programada
+          startTime = schedEnd;
+          endTime = schedEnd;
+        } else {
+          // Justificar desde la hora de salida programada
+          startTime = schedEnd;
+          endTime = schedEnd;
         }
+        incidentType = "Omisión de Marcación";
+        isFullDay = false;
+      } else if (record.clock_in && record.clock_out) {
+        // Tiene entrada y salida pero hay horas faltantes
+        const clockInMin  = toMin(record.clock_in.slice(0, 5));
+        const clockOutMin = toMin(record.clock_out.slice(0, 5));
+        const workedMin   = Math.max(0, clockOutMin - clockInMin - breakMin);
+        const workedHrs   = workedMin / 60;
+        const missingHrs  = Math.max(0, fullDayHours - workedHrs);
+
+        if (missingHrs > 0) {
+          // Calcular el período faltante: desde clock_out hasta completar la jornada
+          const justEndMin  = Math.min(clockOutMin + Math.round(missingHrs * 60), schedEndMin);
+          startTime = record.clock_out.slice(0, 5);
+          endTime   = fromMin(justEndMin);
+        } else {
+          startTime = schedStart;
+          endTime   = schedEnd;
+          isFullDay = true;
+        }
+        incidentType = "Omisión de Marcación";
+        isFullDay = false;
+      } else if (record.is_late) {
+        // Llegó tarde → justificar tardanza (desde schedStart hasta clock_in)
+        incidentType = "Justificación de Tardanza";
+        startTime = schedStart;
+        endTime   = record.clock_in?.slice(0, 5) || schedStart;
+        isFullDay = false;
       }
+
       setJustificationData({
-        incident_type: incidentType === "Olvido de Marcación" ? "Omisión de Marcación" : incidentType,
+        incident_type: incidentType,
         justification: "",
         supporting_document_url: "",
         justified_time_start: startTime,
         justified_time_end: endTime,
-        full_day_justification: incidentType === "Falta",
+        full_day_justification: isFullDay,
       });
     }
 
@@ -1667,6 +1726,7 @@ export default function AttendanceManagement() {
             setJustificationData={setJustificationData}
             selectedDate={justifyingDate || selectedDate}
             employeeSchedule={justifyingSchedule}
+            attendanceRecord={todayRecords.find(r => r.employee_id === justifyingEmployee.id && r.date === (justifyingDate ? format(justifyingDate, "yyyy-MM-dd") : dateToStringLima(selectedDate)))}
             todayRecords={todayRecords}
             employee={employee}
             existingIncident={existingIncident}

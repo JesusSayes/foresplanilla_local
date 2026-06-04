@@ -1,0 +1,28 @@
+{
+  "name": "CostCenter",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "C\u00f3digo del centro de costos"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre del centro de costos"
+    },
+    "category_id": {
+      "type": "string",
+      "description": "ID de la categor\u00eda del centro de costos"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Centro de costos activo"
+    }
+  },
+  "required": [
+    "code",
+    "name",
+    "category_id"
+  ]
+}

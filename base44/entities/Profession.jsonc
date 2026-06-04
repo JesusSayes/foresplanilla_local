@@ -1,0 +1,22 @@
+{
+  "name": "Profession",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre de la profesi\u00f3n"
+    },
+    "category": {
+      "type": "string",
+      "description": "Categor\u00eda de la profesi\u00f3n"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Profesi\u00f3n activa"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

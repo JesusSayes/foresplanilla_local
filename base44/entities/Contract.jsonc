@@ -1,0 +1,152 @@
+{
+  "name": "Contract",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "contract_number": {
+      "type": "string",
+      "description": "N\u00famero de contrato"
+    },
+    "contract_type": {
+      "type": "string",
+      "enum": [
+        "Indeterminado",
+        "Plazo Fijo",
+        "Part-Time",
+        "Pr\u00e1cticas",
+        "Obra o Servicio",
+        "Intermitente",
+        "Temporal"
+      ],
+      "description": "Tipo de contrato"
+    },
+    "template_id": {
+      "type": "string",
+      "description": "ID de la plantilla de contrato a usar"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de inicio"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de fin (si aplica)"
+    },
+    "position": {
+      "type": "string",
+      "description": "Cargo"
+    },
+    "department": {
+      "type": "string",
+      "description": "Departamento/\u00c1rea"
+    },
+    "work_location": {
+      "type": "string",
+      "description": "Lugar de trabajo"
+    },
+    "salary": {
+      "type": "number",
+      "description": "Remuneraci\u00f3n mensual"
+    },
+    "activity_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "Costo de Actividad"
+    },
+    "food_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "Costo de Alimento"
+    },
+    "transport_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "Costo de Movilidad"
+    },
+    "work_schedule": {
+      "type": "string",
+      "description": "Horario de trabajo"
+    },
+    "weekly_hours": {
+      "type": "integer",
+      "default": 48,
+      "description": "Horas semanales"
+    },
+    "functions": {
+      "type": "string",
+      "description": "Funciones y responsabilidades"
+    },
+    "benefits": {
+      "type": "string",
+      "description": "Beneficios adicionales"
+    },
+    "trial_period_days": {
+      "type": "integer",
+      "default": 90,
+      "description": "D\u00edas de per\u00edodo de prueba"
+    },
+    "renewable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Contrato renovable"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Vigente",
+        "Vencido",
+        "Rescindido",
+        "Renovado"
+      ],
+      "default": "Vigente",
+      "description": "Estado del contrato"
+    },
+    "signed_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de firma"
+    },
+    "pdf_url": {
+      "type": "string",
+      "description": "URL del PDF generado"
+    },
+    "is_digitally_signed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si fue firmado digitalmente"
+    },
+    "digital_signature_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de la firma digital"
+    },
+    "digital_signature_by": {
+      "type": "string",
+      "description": "Email del usuario que realiz\u00f3 la firma digital"
+    },
+    "digital_signature_name": {
+      "type": "string",
+      "description": "Nombre del firmante digital"
+    },
+    "digital_signature_image_url": {
+      "type": "string",
+      "description": "URL de la imagen de la r\u00fabrica/firma del firmante"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "employee_id",
+    "contract_type",
+    "start_date",
+    "position",
+    "salary"
+  ]
+}

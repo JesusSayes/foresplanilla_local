@@ -1,0 +1,22 @@
+{
+  "name": "Bank",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del banco"
+    },
+    "code": {
+      "type": "string",
+      "description": "C\u00f3digo del banco"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Banco activo"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

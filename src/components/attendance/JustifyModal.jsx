@@ -19,6 +19,7 @@ export default function JustifyModal({
   setJustificationData,
   selectedDate,
   employeeSchedule,
+  attendanceRecord,
   todayRecords,
   employee,
   existingIncident,
@@ -36,6 +37,76 @@ export default function JustifyModal({
     const totalMin = (eh * 60 + em) - (sh * 60 + sm);
     return Math.max(0, totalMin / 60);
   };
+
+  // Calcular horas a justificar según el período seleccionado
+  const getJustifiedHours = () => {
+    if (justificationData.full_day_justification) return getFullDayHours();
+    const ts = justificationData.justified_time_start;
+    const te = justificationData.justified_time_end;
+    if (!ts || !te) return 0;
+    const [sh, sm] = ts.split(":").map(Number);
+    const [eh, em] = te.split(":").map(Number);
+    return Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
+  };
+
+  // Calcular horas ya trabajadas según el registro real
+  const getWorkedHoursFromRecord = () => {
+    if (!attendanceRecord) return 0;
+    return attendanceRecord.worked_hours || 0;
+  };
+
+  // Info del panel de diagnóstico
+  const buildAttendanceInfo = () => {
+    const hasClockIn  = !!attendanceRecord?.clock_in;
+    const hasClockOut = !!attendanceRecord?.clock_out;
+    const workedHrs   = getWorkedHoursFromRecord();
+    const justHrs     = getJustifiedHours();
+    const totalHrs    = Math.min(workedHrs + justHrs, 8);
+    const fullDayHrs  = getFullDayHours();
+
+    if (!hasClockIn && !hasClockOut) {
+      return {
+        type: "sin_marcacion",
+        label: "Sin marcación",
+        color: "red",
+        worked: 0,
+        justified: justHrs,
+        total: justHrs,
+        fullDay: fullDayHrs,
+        message: `Sin registro de asistencia. Justificar día completo: ${schedStart}–${schedEnd}`,
+      };
+    }
+    if (hasClockIn && !hasClockOut) {
+      return {
+        type: "sin_salida",
+        label: "Tiene entrada, sin salida",
+        color: "orange",
+        worked: workedHrs,
+        justified: justHrs,
+        total: totalHrs,
+        fullDay: fullDayHrs,
+        clockIn: attendanceRecord.clock_in,
+        message: `Entrada registrada a las ${attendanceRecord.clock_in}. Se justifica el período de salida faltante.`,
+      };
+    }
+    if (hasClockIn && hasClockOut) {
+      return {
+        type: "completo",
+        label: "Con entrada y salida",
+        color: "blue",
+        worked: workedHrs,
+        justified: justHrs,
+        total: totalHrs,
+        fullDay: fullDayHrs,
+        clockIn: attendanceRecord.clock_in,
+        clockOut: attendanceRecord.clock_out,
+        message: `Marcación: ${attendanceRecord.clock_in}–${attendanceRecord.clock_out}. Se suman las horas justificadas a las trabajadas.`,
+      };
+    }
+    return null;
+  };
+
+  const attInfo = buildAttendanceInfo();
   const [uploadingFile, setUploadingFile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState("");
@@ -209,19 +280,33 @@ export default function JustifyModal({
         }
 
         const existingRecord = recordsByDate[dateStr];
-        const newWorkedHours = hoursToAdjust;
-        const newLateMinutes = justificationData.incident_type === "Tardanza"
+
+        // Si ya hay horas trabajadas en el registro, sumarlas a las justificadas
+        const existingWorkedHours = existingRecord?.worked_hours || 0;
+        const isSingleDate = !multiDateMode;
+        // En modo fecha única, usar el registro pasado como prop para calcular suma
+        const baseWorkedHours = (isSingleDate && attendanceRecord && attendanceRecord.employee_id === justifyingEmployee.id)
+          ? (attendanceRecord.worked_hours || 0)
+          : existingWorkedHours;
+
+        const newWorkedHours = Math.min(baseWorkedHours + hoursToAdjust, 8);
+        const newLateMinutes = justificationData.incident_type === "Tardanza" || justificationData.incident_type === "Justificación de Tardanza"
           ? Math.max(0, (existingRecord?.late_minutes || 0) - lateMinutesToAdjust)
-          : 0;
+          : (existingRecord?.late_minutes || 0);
+
+        // Determinar clock_in y clock_out finales:
+        // Si ya hay entrada registrada, conservarla; solo actualizar salida si no existe
+        const finalClockIn  = existingRecord?.clock_in  || timeStart || null;
+        const finalClockOut = existingRecord?.clock_out || timeEnd   || null;
 
         const recordUpdate = {
-          worked_hours: Math.min(newWorkedHours, 8),
+          worked_hours: newWorkedHours,
           late_minutes: newLateMinutes,
           is_late: newLateMinutes > 0,
           status: "Justificado",
+          clock_in:  finalClockIn,
+          clock_out: finalClockOut,
         };
-        if (timeStart) recordUpdate.clock_in = timeStart;
-        if (timeEnd) recordUpdate.clock_out = timeEnd;
 
         if (existingRecord) {
           // Update existing record (avoids unique constraint on employee_id + date)
@@ -233,7 +318,7 @@ export default function JustifyModal({
             date: dateStr,
             clock_in: timeStart || null,
             clock_out: timeEnd || null,
-            worked_hours: Math.min(newWorkedHours, 8),
+            worked_hours: Math.min(hoursToAdjust, 8),
             late_minutes: 0,
             is_late: false,
             is_absent: false,
@@ -381,6 +466,54 @@ export default function JustifyModal({
                       ))}
                     </div>
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Panel informativo de horas */}
+            {attInfo && !multiDateMode && (
+              <div className={`p-4 rounded-lg border-2 ${
+                attInfo.color === "red"    ? "bg-red-50 border-red-200" :
+                attInfo.color === "orange" ? "bg-orange-50 border-orange-200" :
+                "bg-blue-50 border-blue-200"
+              }`}>
+                <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${
+                  attInfo.color === "red" ? "text-red-700" : attInfo.color === "orange" ? "text-orange-700" : "text-blue-700"
+                }`}>
+                  📋 Situación actual — {attInfo.label}
+                </p>
+                <p className={`text-xs mb-3 ${
+                  attInfo.color === "red" ? "text-red-800" : attInfo.color === "orange" ? "text-orange-800" : "text-blue-800"
+                }`}>
+                  {attInfo.message}
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-white rounded p-2 text-center">
+                    <p className="text-xs text-slate-500 mb-0.5">Horas trabajadas</p>
+                    <p className="text-lg font-bold text-slate-800">{attInfo.worked.toFixed(2)}h</p>
+                  </div>
+                  <div className="bg-white rounded p-2 text-center">
+                    <p className="text-xs text-slate-500 mb-0.5">Horas a justificar</p>
+                    <p className={`text-lg font-bold ${
+                      attInfo.color === "red" ? "text-red-600" : attInfo.color === "orange" ? "text-orange-600" : "text-blue-600"
+                    }`}>{attInfo.justified.toFixed(2)}h</p>
+                  </div>
+                  <div className="bg-white rounded p-2 text-center">
+                    <p className="text-xs text-slate-500 mb-0.5">Total resultante</p>
+                    <p className={`text-lg font-bold ${attInfo.total >= attInfo.fullDay ? "text-green-600" : "text-amber-600"}`}>
+                      {attInfo.total.toFixed(2)}h
+                    </p>
+                  </div>
+                </div>
+                {attInfo.total < attInfo.fullDay && (
+                  <p className="text-xs text-amber-700 mt-2">
+                    ⚠️ Aún faltan {(attInfo.fullDay - attInfo.total).toFixed(2)}h para completar la jornada de {attInfo.fullDay.toFixed(2)}h
+                  </p>
+                )}
+                {attInfo.total >= attInfo.fullDay && (
+                  <p className="text-xs text-green-700 mt-2">
+                    ✓ Con esta justificación se completa la jornada de {attInfo.fullDay.toFixed(2)}h
+                  </p>
                 )}
               </div>
             )}

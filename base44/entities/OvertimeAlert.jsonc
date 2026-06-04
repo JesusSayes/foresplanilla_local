@@ -1,0 +1,52 @@
+{
+  "name": "OvertimeAlert",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "attendance_record_id": {
+      "type": "string",
+      "description": "ID del registro de asistencia"
+    },
+    "alert_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de la alerta"
+    },
+    "overtime_hours": {
+      "type": "number",
+      "description": "Horas extras registradas sin autorizaci\u00f3n"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pendiente",
+        "Corregido",
+        "Autorizado",
+        "Descartado"
+      ],
+      "default": "Pendiente",
+      "description": "Estado de la alerta"
+    },
+    "resolved_by": {
+      "type": "string",
+      "description": "Email de quien resolvi\u00f3"
+    },
+    "resolution_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de resoluci\u00f3n"
+    },
+    "resolution_notes": {
+      "type": "string",
+      "description": "Notas de resoluci\u00f3n"
+    }
+  },
+  "required": [
+    "employee_id",
+    "alert_date",
+    "overtime_hours"
+  ]
+}

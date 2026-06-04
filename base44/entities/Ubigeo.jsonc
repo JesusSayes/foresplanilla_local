@@ -1,0 +1,36 @@
+{
+  "name": "Ubigeo",
+  "type": "object",
+  "properties": {
+    "codigo_ubigeo": {
+      "type": "string",
+      "description": "C\u00f3digo \u00fanico de ubigeo (6 d\u00edgitos)"
+    },
+    "departamento": {
+      "type": "string",
+      "description": "Nombre del departamento"
+    },
+    "provincia": {
+      "type": "string",
+      "description": "Nombre de la provincia"
+    },
+    "distrito": {
+      "type": "string",
+      "description": "Nombre del distrito"
+    },
+    "codigo_departamento": {
+      "type": "string",
+      "description": "C\u00f3digo del departamento (2 d\u00edgitos)"
+    },
+    "codigo_provincia": {
+      "type": "string",
+      "description": "C\u00f3digo de la provincia (4 d\u00edgitos)"
+    }
+  },
+  "required": [
+    "codigo_ubigeo",
+    "departamento",
+    "provincia",
+    "distrito"
+  ]
+}

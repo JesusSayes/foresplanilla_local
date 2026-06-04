@@ -1,0 +1,28 @@
+{
+  "name": "RMV",
+  "type": "object",
+  "properties": {
+    "amount": {
+      "type": "number",
+      "description": "Monto de la Remuneraci\u00f3n M\u00ednima Vital"
+    },
+    "effective_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de vigencia"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "RMV activa"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observaciones"
+    }
+  },
+  "required": [
+    "amount",
+    "effective_date"
+  ]
+}
