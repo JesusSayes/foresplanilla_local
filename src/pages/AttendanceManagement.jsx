@@ -1150,7 +1150,7 @@ export default function AttendanceManagement() {
                                     {!sched && <p className="text-xs text-red-500">Sin horario</p>}
                                     {sched && !schedSt && <p className="text-xs text-slate-400">Día libre</p>}
                                     {sched && schedSt && <p className="text-xs text-indigo-600">🕐 {schedSt}–{schedEn}</p>}
-                                    {isVacation && <p className="text-xs text-amber-700 font-medium">🌴 {vacation.request_type}</p>}
+                                    {isVacation && <p className="text-xs text-amber-700 font-medium">🌴 {vacation?.request_type || "Vacaciones"}</p>}
                                   </div>
                                 </div>
                               </td>
