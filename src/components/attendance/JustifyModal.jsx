@@ -34,7 +34,7 @@ function calcEffectiveMetrics({ record, approvedIncidents, schedStart, schedEnd,
   const schedEndMin   = toMin(schedEnd);
   const fullDayMins   = Math.max(0, schedEndMin - schedStartMin - breakMinutes);
 
-  // Tardanza base del registro real
+  // Tardanza base del registro real (antes de justificaciones)
   const baseLateMin = clockIn ? Math.max(0, toMin(clockIn) - schedStartMin) : 0;
 
   // Horas trabajadas del registro real (sin justificaciones)
@@ -43,24 +43,36 @@ function calcEffectiveMetrics({ record, approvedIncidents, schedStart, schedEnd,
     rawWorkedMin = Math.max(0, toMin(clockOut) - toMin(clockIn) - breakMinutes);
   }
 
-  // Calcular minutos justificados y si alguno cubre la entrada
-  let justifiedMins = 0;
+  // Calcular clock_in y clock_out efectivos considerando todas las justificaciones
+  // (si una justificación adelanta la entrada o atrasa la salida, se recalcula)
+  let effectiveClockInMin  = clockIn  ? toMin(clockIn)  : null;
+  let effectiveClockOutMin = clockOut ? toMin(clockOut) : null;
   let lateMinutesJustified = 0;
+  let justifiedMins = 0;
+  let fullDayJustified = false;
 
   for (const inc of approvedIncidents) {
     if (inc.full_day_justification) {
-      justifiedMins = fullDayMins;
-      lateMinutesJustified = baseLateMin; // día completo → tardanza a 0
+      fullDayJustified = true;
+      effectiveClockInMin  = schedStartMin;
+      effectiveClockOutMin = schedEndMin;
+      lateMinutesJustified = baseLateMin;
       break;
     }
     const jStart = toMin(inc.justified_time_start || schedStart);
     const jEnd   = toMin(inc.justified_time_end   || schedEnd);
-    const jMins  = Math.max(0, jEnd - jStart);
-    justifiedMins += jMins;
 
-    // ¿Esta justificación cubre el período de tardanza? (schedStart → clockIn)
+    // Adelantar clock_in efectivo si la justificación empieza antes
+    if (effectiveClockInMin === null || jStart < effectiveClockInMin) {
+      effectiveClockInMin = jStart;
+    }
+    // Atrasar clock_out efectivo si la justificación termina después
+    if (effectiveClockOutMin === null || jEnd > effectiveClockOutMin) {
+      effectiveClockOutMin = jEnd;
+    }
+
+    // Minutos de tardanza cubiertos por esta justificación
     if (clockIn && baseLateMin > 0) {
-      // Solapamiento entre [schedStart, clockIn] y [jStart, jEnd]
       const overlapStart = Math.max(schedStartMin, jStart);
       const overlapEnd   = Math.min(toMin(clockIn), jEnd);
       if (overlapEnd > overlapStart) {
@@ -69,9 +81,25 @@ function calcEffectiveMetrics({ record, approvedIncidents, schedStart, schedEnd,
     }
   }
 
-  const totalWorkedMins  = Math.min(rawWorkedMin + justifiedMins, fullDayMins);
+  // Calcular horas efectivas con los clock_in/out ajustados
+  let effectiveWorkedMin = rawWorkedMin;
+  if (!fullDayJustified && effectiveClockInMin !== null && effectiveClockOutMin !== null) {
+    effectiveWorkedMin = Math.max(0, effectiveClockOutMin - effectiveClockInMin - breakMinutes);
+    // Las "justifiedMins" son la diferencia respecto a las marcadas reales
+    justifiedMins = Math.max(0, effectiveWorkedMin - rawWorkedMin);
+  } else if (fullDayJustified) {
+    effectiveWorkedMin = fullDayMins;
+    justifiedMins = Math.max(0, fullDayMins - rawWorkedMin);
+  }
+
+  const totalWorkedMins  = Math.min(effectiveWorkedMin, fullDayMins);
   const totalWorkedHours = totalWorkedMins / 60;
-  const remainingLate    = Math.max(0, baseLateMin - lateMinutesJustified);
+  const remainingLate    = Math.max(0, baseLateMin - Math.min(lateMinutesJustified, baseLateMin));
+
+  // Si el clock_in efectivo ya es igual o anterior al schedStart, tardanza = 0
+  const effectiveLate = effectiveClockInMin !== null
+    ? Math.max(0, effectiveClockInMin - schedStartMin)
+    : baseLateMin;
 
   return {
     rawWorkedHours: rawWorkedMin / 60,
@@ -79,8 +107,8 @@ function calcEffectiveMetrics({ record, approvedIncidents, schedStart, schedEnd,
     totalWorkedHours,
     fullDayHours: fullDayMins / 60,
     baseLateMinutes: baseLateMin,
-    remainingLateMinutes: remainingLate,
-    lateMinutesJustified,
+    remainingLateMinutes: effectiveLate,
+    lateMinutesJustified: baseLateMin - effectiveLate,
   };
 }
 
@@ -293,19 +321,25 @@ export default function JustifyModal({
           breakMinutes,
         });
 
-        // clock_in: si la justificación cubre la entrada, usar schedStart; si no, conservar
-        let finalClockIn  = existingRecord?.clock_in  || timeStart || null;
-        let finalClockOut = existingRecord?.clock_out || timeEnd   || null;
+        // Calcular clock_in y clock_out efectivos tras la justificación
+        let finalClockIn  = existingRecord?.clock_in  || null;
+        let finalClockOut = existingRecord?.clock_out || null;
 
-        // Si justifica tardanza (cubre inicio de jornada), el clock_in "efectivo" es schedStart
-        if (metrics.lateMinutesJustified >= metrics.baseLateMinutes && metrics.baseLateMinutes > 0) {
-          finalClockIn = schedStart;
-        }
-
-        // Si es día completo sin marcación, generar clock_in/out desde horario
-        if (justificationData.full_day_justification && !existingRecord?.clock_in) {
+        if (justificationData.full_day_justification) {
+          // Día completo: usar siempre el horario programado
           finalClockIn  = schedStart;
           finalClockOut = schedEnd;
+        } else if (timeStart && timeEnd) {
+          const justStartMin = toMin(timeStart);
+          const justEndMin   = toMin(timeEnd);
+          // Si la justificación empieza ANTES del clock_in actual → adelantar clock_in
+          if (!finalClockIn || justStartMin < toMin(finalClockIn)) {
+            finalClockIn = timeStart;
+          }
+          // Si la justificación termina DESPUÉS del clock_out actual → atrasar clock_out
+          if (!finalClockOut || justEndMin > toMin(finalClockOut)) {
+            finalClockOut = timeEnd;
+          }
         }
 
         const recordUpdate = {
