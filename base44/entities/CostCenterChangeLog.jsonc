@@ -1,0 +1,71 @@
+{
+  "name": "CostCenterChangeLog",
+  "type": "object",
+  "properties": {
+    "cost_center_id": {
+      "type": "string",
+      "description": "ID del centro de costos afectado"
+    },
+    "assignment_id": {
+      "type": "string",
+      "description": "ID de la asignaci\u00f3n afectada (si aplica)"
+    },
+    "change_type": {
+      "type": "string",
+      "enum": [
+        "Creaci\u00f3n Centro Costo",
+        "Modificaci\u00f3n Centro Costo",
+        "Asignaci\u00f3n Empleado",
+        "Asignaci\u00f3n Departamento",
+        "Reasignaci\u00f3n",
+        "Finalizaci\u00f3n Asignaci\u00f3n"
+      ],
+      "description": "Tipo de cambio realizado"
+    },
+    "entity_type": {
+      "type": "string",
+      "enum": [
+        "CostCenter",
+        "Assignment",
+        "Employee",
+        "Department"
+      ],
+      "description": "Tipo de entidad afectada"
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "ID de la entidad afectada"
+    },
+    "field_changed": {
+      "type": "string",
+      "description": "Campo modificado"
+    },
+    "old_value": {
+      "type": "string",
+      "description": "Valor anterior"
+    },
+    "new_value": {
+      "type": "string",
+      "description": "Valor nuevo"
+    },
+    "changed_by": {
+      "type": "string",
+      "description": "Email de quien realiz\u00f3 el cambio"
+    },
+    "change_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora del cambio"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales sobre el cambio"
+    }
+  },
+  "required": [
+    "change_type",
+    "entity_type",
+    "changed_by",
+    "change_date"
+  ]
+}

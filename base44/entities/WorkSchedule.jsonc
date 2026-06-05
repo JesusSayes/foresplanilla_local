@@ -1,0 +1,119 @@
+{
+  "name": "WorkSchedule",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado (si es horario individual)"
+    },
+    "department_name": {
+      "type": "string",
+      "description": "Nombre del departamento (si es horario departamental)"
+    },
+    "departments": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Lista de departamentos asignados (horarios m\u00faltiples departamentos)"
+    },
+    "effective_from": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha desde la que aplica este horario para el empleado (YYYY-MM-DD). Si es nulo, aplica desde siempre."
+    },
+    "effective_to": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha hasta la que aplica este horario (YYYY-MM-DD). Nulo = sin fecha de fin."
+    },
+    "schedule_name": {
+      "type": "string",
+      "description": "Nombre del horario"
+    },
+    "monday_start": {
+      "type": "string",
+      "description": "Hora de entrada lunes (HH:mm)"
+    },
+    "monday_end": {
+      "type": "string",
+      "description": "Hora de salida lunes (HH:mm)"
+    },
+    "tuesday_start": {
+      "type": "string",
+      "description": "Hora de entrada martes (HH:mm)"
+    },
+    "tuesday_end": {
+      "type": "string",
+      "description": "Hora de salida martes (HH:mm)"
+    },
+    "wednesday_start": {
+      "type": "string",
+      "description": "Hora de entrada mi\u00e9rcoles (HH:mm)"
+    },
+    "wednesday_end": {
+      "type": "string",
+      "description": "Hora de salida mi\u00e9rcoles (HH:mm)"
+    },
+    "thursday_start": {
+      "type": "string",
+      "description": "Hora de entrada jueves (HH:mm)"
+    },
+    "thursday_end": {
+      "type": "string",
+      "description": "Hora de salida jueves (HH:mm)"
+    },
+    "friday_start": {
+      "type": "string",
+      "description": "Hora de entrada viernes (HH:mm)"
+    },
+    "friday_end": {
+      "type": "string",
+      "description": "Hora de salida viernes (HH:mm)"
+    },
+    "saturday_start": {
+      "type": "string",
+      "description": "Hora de entrada s\u00e1bado (HH:mm)"
+    },
+    "saturday_end": {
+      "type": "string",
+      "description": "Hora de salida s\u00e1bado (HH:mm)"
+    },
+    "sunday_start": {
+      "type": "string",
+      "description": "Hora de entrada domingo (HH:mm)"
+    },
+    "sunday_end": {
+      "type": "string",
+      "description": "Hora de salida domingo (HH:mm)"
+    },
+    "break_duration_minutes": {
+      "type": "integer",
+      "default": 60,
+      "description": "Duraci\u00f3n del break/almuerzo en minutos"
+    },
+    "tolerance_minutes": {
+      "type": "integer",
+      "default": 10,
+      "description": "Minutos de tolerancia para tardanzas"
+    },
+    "exempt_from_clocking": {
+      "type": "boolean",
+      "default": false,
+      "description": "Exonerado de marcaci\u00f3n (se genera autom\u00e1ticamente)"
+    },
+    "overtime_authorized": {
+      "type": "boolean",
+      "default": false,
+      "description": "Autorizado a realizar horas extras"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Horario activo"
+    }
+  },
+  "required": [
+    "schedule_name"
+  ]
+}

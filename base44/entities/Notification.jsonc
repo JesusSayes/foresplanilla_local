@@ -1,0 +1,75 @@
+{
+  "name": "Notification",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario destinatario"
+    },
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado destinatario"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "incident_pending",
+        "incident_approved",
+        "incident_rejected",
+        "vacation_pending",
+        "vacation_approved",
+        "vacation_rejected",
+        "contract_expiring",
+        "payslip_ready",
+        "attendance_alert",
+        "system"
+      ],
+      "description": "Tipo de notificaci\u00f3n"
+    },
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo de la notificaci\u00f3n"
+    },
+    "message": {
+      "type": "string",
+      "description": "Mensaje de la notificaci\u00f3n"
+    },
+    "link": {
+      "type": "string",
+      "description": "Enlace a la p\u00e1gina relacionada"
+    },
+    "link_page": {
+      "type": "string",
+      "description": "Nombre de la p\u00e1gina a la que enlaza"
+    },
+    "is_read": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si la notificaci\u00f3n fue le\u00edda"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "normal",
+        "high"
+      ],
+      "default": "normal",
+      "description": "Prioridad de la notificaci\u00f3n"
+    },
+    "related_entity_id": {
+      "type": "string",
+      "description": "ID de la entidad relacionada"
+    },
+    "related_entity_type": {
+      "type": "string",
+      "description": "Tipo de entidad relacionada"
+    }
+  },
+  "required": [
+    "user_email",
+    "type",
+    "title",
+    "message"
+  ]
+}

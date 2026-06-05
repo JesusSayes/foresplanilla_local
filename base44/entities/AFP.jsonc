@@ -1,0 +1,41 @@
+{
+  "name": "AFP",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre de la AFP"
+    },
+    "code": {
+      "type": "string",
+      "description": "C\u00f3digo de la AFP"
+    },
+    "commission_percentage": {
+      "type": "number",
+      "description": "Porcentaje de comisi\u00f3n (%)"
+    },
+    "obligatory_contribution_percentage": {
+      "type": "number",
+      "default": 10,
+      "description": "Porcentaje de aporte obligatorio (%)"
+    },
+    "insurance_percentage": {
+      "type": "number",
+      "description": "Porcentaje de seguro (%)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "AFP activa"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observaciones"
+    }
+  },
+  "required": [
+    "name",
+    "commission_percentage",
+    "insurance_percentage"
+  ]
+}

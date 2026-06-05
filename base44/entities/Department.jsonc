@@ -1,0 +1,26 @@
+{
+  "name": "Department",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del departamento/\u00e1rea"
+    },
+    "code": {
+      "type": "string",
+      "description": "C\u00f3digo del departamento"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del departamento"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Departamento activo"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "name": "DeviceEvent",
+  "type": "object",
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "description": "ID del dispositivo"
+    },
+    "event_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp del evento"
+    },
+    "identifier_value": {
+      "type": "string",
+      "description": "Identificador presentado"
+    },
+    "identifier_type": {
+      "type": "string",
+      "description": "Tipo de identificador"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "Entrada",
+        "Salida"
+      ],
+      "description": "Tipo de evento"
+    },
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado identificado"
+    },
+    "processing_status": {
+      "type": "string",
+      "enum": [
+        "Pendiente",
+        "Procesado",
+        "Fallido",
+        "No Identificado"
+      ],
+      "default": "Pendiente",
+      "description": "Estado del procesamiento"
+    },
+    "attendance_record_id": {
+      "type": "string",
+      "description": "ID del registro de asistencia creado/actualizado"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Mensaje de error si fall\u00f3"
+    },
+    "raw_data": {
+      "type": "object",
+      "description": "Datos crudos del dispositivo"
+    }
+  },
+  "required": [
+    "device_id",
+    "event_timestamp",
+    "identifier_value",
+    "event_type"
+  ]
+}

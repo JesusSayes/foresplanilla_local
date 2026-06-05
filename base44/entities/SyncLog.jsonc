@@ -1,0 +1,51 @@
+{
+  "name": "SyncLog",
+  "type": "object",
+  "properties": {
+    "connection_id": {
+      "type": "string",
+      "description": "ID de la conexi\u00f3n"
+    },
+    "sync_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de la sincronizaci\u00f3n"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Exitosa",
+        "Fallida",
+        "Parcial"
+      ],
+      "description": "Estado de la sincronizaci\u00f3n"
+    },
+    "records_imported": {
+      "type": "integer",
+      "default": 0,
+      "description": "Registros importados"
+    },
+    "records_failed": {
+      "type": "integer",
+      "default": 0,
+      "description": "Registros fallidos"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Mensaje de error si fall\u00f3"
+    },
+    "execution_time": {
+      "type": "number",
+      "description": "Tiempo de ejecuci\u00f3n en segundos"
+    },
+    "details": {
+      "type": "object",
+      "description": "Detalles adicionales de la sincronizaci\u00f3n"
+    }
+  },
+  "required": [
+    "connection_id",
+    "sync_date",
+    "status"
+  ]
+}

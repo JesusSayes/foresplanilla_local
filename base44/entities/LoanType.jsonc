@@ -1,0 +1,27 @@
+{
+  "name": "LoanType",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "enum": [
+        "Personal",
+        "Escolar",
+        "Vacaciones"
+      ],
+      "description": "Tipo de pr\u00e9stamo"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del tipo de pr\u00e9stamo"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Tipo de pr\u00e9stamo activo"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

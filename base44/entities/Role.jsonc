@@ -1,0 +1,56 @@
+{
+  "name": "Role",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del rol"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del rol"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Lista de permisos asignados al rol"
+    },
+    "is_system_role": {
+      "type": "boolean",
+      "default": false,
+      "description": "Rol del sistema (no se puede eliminar)"
+    },
+    "department_restricted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si es true, solo puede ver datos de su departamento"
+    },
+    "team_restricted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si es true, solo puede ver datos de su equipo asignado (managed_team_ids)"
+    },
+    "site_restricted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si es true, solo puede ver datos de las sedes permitidas"
+    },
+    "allowed_sites": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Lista de nombres de sedes que este rol puede visualizar (vac\u00edo = todas)"
+    },
+    "priority": {
+      "type": "integer",
+      "default": 0,
+      "description": "Prioridad del rol (mayor n\u00famero = mayor prioridad)"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

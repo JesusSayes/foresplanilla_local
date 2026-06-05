@@ -1,0 +1,27 @@
+{
+  "name": "UserRole",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "role_id": {
+      "type": "string",
+      "description": "ID del rol"
+    },
+    "assigned_by": {
+      "type": "string",
+      "description": "Email de quien asign\u00f3 el rol"
+    },
+    "assigned_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de asignaci\u00f3n"
+    }
+  },
+  "required": [
+    "employee_id",
+    "role_id"
+  ]
+}

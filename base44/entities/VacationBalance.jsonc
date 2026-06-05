@@ -1,0 +1,54 @@
+{
+  "name": "VacationBalance",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "period_start": {
+      "type": "string",
+      "format": "date",
+      "description": "Inicio del periodo vacacional"
+    },
+    "period_end": {
+      "type": "string",
+      "format": "date",
+      "description": "Fin del periodo vacacional"
+    },
+    "total_entitled_days": {
+      "type": "integer",
+      "description": "Total de d\u00edas de derecho (30 o 15)"
+    },
+    "days_taken": {
+      "type": "integer",
+      "default": 0,
+      "description": "D\u00edas tomados"
+    },
+    "days_pending": {
+      "type": "integer",
+      "description": "D\u00edas pendientes de goce"
+    },
+    "days_sold": {
+      "type": "integer",
+      "default": 0,
+      "description": "D\u00edas vendidos"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Periodo activo"
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha l\u00edmite para gozar"
+    }
+  },
+  "required": [
+    "employee_id",
+    "period_start",
+    "period_end",
+    "total_entitled_days"
+  ]
+}

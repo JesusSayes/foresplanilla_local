@@ -795,7 +795,7 @@ model overtime_alert {
   created_by           String?
   employee_id          String    @db.VarChar(255)
   attendance_record_id String    @db.VarChar(255)
-  alert_date           DateTime  @db.Timestamp(6)
+  alert_date           DateTime  @db.Date
   overtime_hours       Decimal   @db.Decimal(5, 2)
   status               String?   @default("Pendiente") @db.VarChar(50)
   notes                String?
