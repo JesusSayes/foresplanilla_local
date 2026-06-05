@@ -29,6 +29,7 @@ dist-ssr
 .codellm
 
 .env
+.codellm
 
 Apuntes
 backend/node_modules

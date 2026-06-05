@@ -528,7 +528,7 @@ export default function AttendanceManagement() {
 
     // Buscar justificación previa: primero en cache local, si no — fetch directo por fecha exacta
     let prevIncident = allIncidents.find(
-      i => i.employee_id === emp.id && i.incident_date === dateStr
+      i => i.employee_id === emp.id && String(i.incident_date).slice(0, 10) === dateStr
     );
 
     if (!prevIncident) {
@@ -1177,9 +1177,9 @@ export default function AttendanceManagement() {
                           const scheduledTimes = isVacation ? getScheduledTimes(emp.id, rowDate) : null;
                           // Buscar incidente aprobado para esta fila
                           const rowIncident = allIncidents.find(
-                            i => i.employee_id === emp.id && i.incident_date === rowDate && i.status === "Aprobada"
+                            i => i.employee_id === emp.id && String(i.incident_date).slice(0, 10) === rowDate && i.status === "Aprobada"
                           ) || allIncidents.find(
-                            i => i.employee_id === emp.id && i.incident_date === rowDate
+                            i => i.employee_id === emp.id && String(i.incident_date).slice(0, 10) === rowDate
                           ) || null;
 
                           const statusConfig = isVacation
