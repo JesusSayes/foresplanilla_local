@@ -20,6 +20,7 @@ import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { generateContractPDF } from "../components/contracts/ContractTemplate";
 import { usePermissions } from "../components/hooks/usePermissions";
+import { MapPin } from "lucide-react";
 
 export default function ContractManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -40,10 +41,11 @@ export default function ContractManagement() {
   const [isBulkSigning, setIsBulkSigning] = useState(false);
   const [signatureImageUrl, setSignatureImageUrl] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [siteFilterContracts, setSiteFilterContracts] = useState("all");
   const PAGE_SIZE = 50;
 
   const queryClient = useQueryClient();
-  const { hasPermission, employee, loading: loadingPerms } = usePermissions();
+  const { hasPermission, employee, getAccessibleSites, loading: loadingPerms } = usePermissions();
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(console.error);
@@ -283,12 +285,31 @@ export default function ContractManagement() {
 
   const pendingSignContracts = contracts.filter(c => !c.is_digitally_signed && c.status === "Vigente");
 
+  // Restricción de sedes
+  const accessibleSites = getAccessibleSites();
+  const isSiteRestricted = accessibleSites !== null;
+  const hasSingleSite = isSiteRestricted && accessibleSites.length === 1;
+
+  // Auto-aplicar filtro de sede cuando hay restricción a una sola sede
+  useEffect(() => {
+    if (hasSingleSite) {
+      setSiteFilterContracts(accessibleSites[0]);
+    }
+  }, [hasSingleSite, accessibleSites?.join(",")]);
+
   // Reset page when filters change
   const handleFilterChange = (setter) => (val) => { setter(val); setCurrentPage(1); };
+
+  // Empleados accesibles según restricción de sede
+  const accessibleEmployees = isSiteRestricted
+    ? allEmployees.filter(e => accessibleSites.includes(e.site))
+    : allEmployees;
 
   const filteredContracts = contracts.filter(c => {
     const emp = allEmployees.find(e => e.id === c.employee_id);
     if (!emp) return false;
+    // Filtrar por sede accesible
+    if (isSiteRestricted && !accessibleSites.includes(emp.site)) return false;
     const matchesSearch = !searchTerm || (
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -297,11 +318,12 @@ export default function ContractManagement() {
     );
     const matchesStatus = statusFilter === "all" || c.status === statusFilter;
     const matchesSign = signatureFilter === "all" || (signatureFilter === "signed" && c.is_digitally_signed) || (signatureFilter === "pending" && !c.is_digitally_signed);
+    // Filtro de sede (selector UI)
+    const matchesSite = siteFilterContracts === "all" || emp.site === siteFilterContracts;
     
     // Filtro de vencimiento
     let matchesExpiry = true;
     if (expiryFilter !== "all") {
-      // Contratos indeterminados sin fecha fin no tienen vencimiento → excluir del filtro
       if (c.contract_type === "Indeterminado" && !c.end_date) {
         matchesExpiry = false;
       } else if (c.end_date) {
@@ -314,12 +336,11 @@ export default function ContractManagement() {
           matchesExpiry = daysUntilExpiry > 0 && daysUntilExpiry <= 30;
         }
       } else {
-        // Otros tipos de contrato sin fecha fin → también excluir
         matchesExpiry = false;
       }
     }
     
-    return matchesSearch && matchesStatus && matchesSign && matchesExpiry;
+    return matchesSearch && matchesStatus && matchesSign && matchesSite && matchesExpiry;
   });
 
   const totalPages = Math.ceil(filteredContracts.length / PAGE_SIZE);
@@ -456,6 +477,25 @@ export default function ContractManagement() {
                   <SelectItem value="30days"><div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-red-600" />Vencen en 30 días</div></SelectItem>
                 </SelectContent>
               </Select>
+              {/* Filtro de sede */}
+              <div className="relative">
+                <Select value={siteFilterContracts} onValueChange={(v) => { setSiteFilterContracts(v); setCurrentPage(1); }} disabled={hasSingleSite}>
+                  <SelectTrigger className={`w-40 ${hasSingleSite ? "opacity-70 cursor-not-allowed bg-slate-100" : ""}`}>
+                    <MapPin className="w-3 h-3 mr-1 text-slate-400" />
+                    <SelectValue placeholder="Sede" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {!isSiteRestricted && <SelectItem value="all">Todas las sedes</SelectItem>}
+                    {isSiteRestricted && accessibleSites.length > 1 && <SelectItem value="all">Todas (permitidas)</SelectItem>}
+                    {sites
+                      .filter(s => accessibleSites === null || accessibleSites.includes(s.name))
+                      .map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {hasSingleSite && (
+                  <span className="absolute -top-5 left-0 text-xs text-amber-600 font-medium whitespace-nowrap">🔒 Sede restringida</span>
+                )}
+              </div>
               {canSign && signatureFilter === "pending" && pendingSignContracts.length > 0 && (
                 <Button
                   size="sm"
