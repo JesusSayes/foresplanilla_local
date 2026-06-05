@@ -285,30 +285,26 @@ export default function ContractManagement() {
 
   const pendingSignContracts = contracts.filter(c => !c.is_digitally_signed && c.status === "Vigente");
 
-  // Restricción de sedes
-  const accessibleSites = getAccessibleSites();
-  const isSiteRestricted = accessibleSites !== null;
-  const hasSingleSite = isSiteRestricted && accessibleSites.length === 1;
+  // Restricción de sedes (null=todas, undefined=cargando, [...]=lista)
+  const accessibleSites = loadingPerms ? undefined : getAccessibleSites();
+  const isSiteRestricted = accessibleSites !== null && accessibleSites !== undefined;
+  const hasSingleSite = isSiteRestricted && Array.isArray(accessibleSites) && accessibleSites.length === 1;
 
   // Auto-aplicar filtro de sede cuando hay restricción a una sola sede
   useEffect(() => {
     if (hasSingleSite) {
       setSiteFilterContracts(accessibleSites[0]);
     }
-  }, [hasSingleSite, accessibleSites?.join(",")]);
+  }, [hasSingleSite, Array.isArray(accessibleSites) ? accessibleSites.join(",") : ""]);
 
   // Reset page when filters change
   const handleFilterChange = (setter) => (val) => { setter(val); setCurrentPage(1); };
 
-  // Empleados accesibles según restricción de sede
-  const accessibleEmployees = isSiteRestricted
-    ? allEmployees.filter(e => accessibleSites.includes(e.site))
-    : allEmployees;
-
   const filteredContracts = contracts.filter(c => {
     const emp = allEmployees.find(e => e.id === c.employee_id);
     if (!emp) return false;
-    // Filtrar por sede accesible
+    // Filtrar por sede accesible (mientras carga, no mostrar nada)
+    if (accessibleSites === undefined) return false;
     if (isSiteRestricted && !accessibleSites.includes(emp.site)) return false;
     const matchesSearch = !searchTerm || (
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -486,9 +482,9 @@ export default function ContractManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     {!isSiteRestricted && <SelectItem value="all">Todas las sedes</SelectItem>}
-                    {isSiteRestricted && accessibleSites.length > 1 && <SelectItem value="all">Todas (permitidas)</SelectItem>}
+                    {isSiteRestricted && Array.isArray(accessibleSites) && accessibleSites.length > 1 && <SelectItem value="all">Todas (permitidas)</SelectItem>}
                     {sites
-                      .filter(s => accessibleSites === null || accessibleSites.includes(s.name))
+                      .filter(s => !isSiteRestricted || (Array.isArray(accessibleSites) && accessibleSites.includes(s.name)))
                       .map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>

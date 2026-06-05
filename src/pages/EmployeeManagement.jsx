@@ -748,24 +748,24 @@ export default function EmployeeManagement() {
     setFormErrors([]);
   };
 
-  // Obtener sedes accesibles según el rol (null = todas)
-  const accessibleSites = getAccessibleSites();
-  const isSiteRestricted = accessibleSites !== null; // hay restricción de sede
-  const hasSingleSite = isSiteRestricted && accessibleSites.length === 1;
+  // Obtener sedes accesibles según el rol (null=todas, undefined=cargando, [..]=lista)
+  const accessibleSites = permissionsLoading ? undefined : getAccessibleSites();
+  const isSiteRestricted = accessibleSites !== null && accessibleSites !== undefined;
+  const hasSingleSite = isSiteRestricted && Array.isArray(accessibleSites) && accessibleSites.length === 1;
 
   // Auto-aplicar el filtro de sede si está restringido a una sola sede
   useEffect(() => {
     if (hasSingleSite) {
       setSiteFilter(accessibleSites[0]);
-    } else if (isSiteRestricted && accessibleSites.length > 1 && siteFilter === "all") {
-      // múltiples sedes permitidas: dejar en "all" pero el dropdown solo mostrará las permitidas
     }
-  }, [hasSingleSite, isSiteRestricted, accessibleSites?.join(",")]);
+  }, [hasSingleSite, Array.isArray(accessibleSites) ? accessibleSites.join(",") : ""]);
 
   // Empleados filtrados por sedes permitidas según rol
-  const siteAllowedEmployees = accessibleSites === null
-    ? allEmployees
-    : allEmployees.filter(emp => accessibleSites.includes(emp.site));
+  const siteAllowedEmployees = !accessibleSites && accessibleSites !== null
+    ? [] // cargando: no mostrar nada aún
+    : accessibleSites === null
+      ? allEmployees
+      : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
   const departmentNames = [...new Set(siteAllowedEmployees.map(e => e.department_name))].filter(Boolean);
   const contractTypes = [...new Set(siteAllowedEmployees.map(e => e.contract_type))].filter(Boolean);

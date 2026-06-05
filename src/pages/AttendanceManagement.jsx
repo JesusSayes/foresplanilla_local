@@ -62,7 +62,7 @@ export default function AttendanceManagement() {
     full_day_justification: true,
   });
 
-  const { getAccessibleSites, hasPermission } = usePermissions();
+  const { getAccessibleSites, hasPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -594,21 +594,23 @@ export default function AttendanceManagement() {
     setShowJustifyModal(true);
   };
 
-  // Aplicar restricción de sedes según el rol del usuario (null = todas)
-  const accessibleSites = getAccessibleSites();
-  const isSiteRestricted = accessibleSites !== null;
-  const hasSingleSite = isSiteRestricted && accessibleSites.length === 1;
+  // Aplicar restricción de sedes según el rol (null=todas, undefined=cargando)
+  const accessibleSites = permissionsLoading ? undefined : getAccessibleSites();
+  const isSiteRestricted = accessibleSites !== null && accessibleSites !== undefined;
+  const hasSingleSite = isSiteRestricted && Array.isArray(accessibleSites) && accessibleSites.length === 1;
 
   // Auto-aplicar filtro de sede cuando hay restricción a una sola sede
   useEffect(() => {
     if (hasSingleSite) {
       setSelectedSite(accessibleSites[0]);
     }
-  }, [hasSingleSite, accessibleSites?.join(",")]);
+  }, [hasSingleSite, Array.isArray(accessibleSites) ? accessibleSites.join(",") : ""]);
 
-  const siteAllowedEmployees = accessibleSites === null
-    ? allEmployees
-    : allEmployees.filter(emp => accessibleSites.includes(emp.site));
+  const siteAllowedEmployees = !accessibleSites && accessibleSites !== null
+    ? [] // cargando
+    : accessibleSites === null
+      ? allEmployees
+      : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
   const filteredEmployees = siteAllowedEmployees.filter(emp => {
     const term = searchTerm.toLowerCase().trim();
