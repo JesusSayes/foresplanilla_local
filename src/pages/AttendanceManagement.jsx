@@ -640,6 +640,16 @@ export default function AttendanceManagement() {
 
   // Aplicar restricción de sedes según el rol del usuario (null = todas)
   const accessibleSites = getAccessibleSites();
+  const isSiteRestricted = accessibleSites !== null;
+  const hasSingleSite = isSiteRestricted && accessibleSites.length === 1;
+
+  // Auto-aplicar filtro de sede cuando hay restricción a una sola sede
+  useEffect(() => {
+    if (hasSingleSite) {
+      setSelectedSite(accessibleSites[0]);
+    }
+  }, [hasSingleSite, accessibleSites?.join(",")]);
+
   const siteAllowedEmployees = accessibleSites === null
     ? allEmployees
     : allEmployees.filter(emp => accessibleSites.includes(emp.site));
@@ -1056,16 +1066,24 @@ export default function AttendanceManagement() {
                         <Input placeholder="Buscar empleado..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="pl-10" />
                       </div>
                     </div>
-                    <Select value={selectedSite} onValueChange={(v) => { setSelectedSite(v); setCurrentPage(1); }}>
-                      <SelectTrigger className="w-36"><SelectValue placeholder="Sede" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas</SelectItem>
-                        <SelectItem value="sin_sede">Sin sede</SelectItem>
-                        {sites
-                          .filter(site => accessibleSites === null || accessibleSites.includes(site.name))
-                          .map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <div className="relative">
+                      <Select value={selectedSite} onValueChange={(v) => { setSelectedSite(v); setCurrentPage(1); }} disabled={hasSingleSite}>
+                        <SelectTrigger className={`w-36 ${hasSingleSite ? "opacity-70 cursor-not-allowed bg-slate-100" : ""}`}>
+                          <SelectValue placeholder="Sede" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {!isSiteRestricted && <SelectItem value="all">Todas</SelectItem>}
+                          {!isSiteRestricted && <SelectItem value="sin_sede">Sin sede</SelectItem>}
+                          {isSiteRestricted && accessibleSites.length > 1 && <SelectItem value="all">Todas (permitidas)</SelectItem>}
+                          {sites
+                            .filter(site => accessibleSites === null || accessibleSites.includes(site.name))
+                            .map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {hasSingleSite && (
+                        <span className="absolute -top-5 left-0 text-xs text-amber-600 font-medium whitespace-nowrap">🔒 Sede restringida</span>
+                      )}
+                    </div>
                     <Select value={attendanceFilter} onValueChange={(v) => { setAttendanceFilter(v); setCurrentPage(1); }}>
                       <SelectTrigger className="w-44"><SelectValue placeholder="Filtro" /></SelectTrigger>
                       <SelectContent>

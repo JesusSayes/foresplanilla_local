@@ -740,6 +740,17 @@ export default function EmployeeManagement() {
 
   // Obtener sedes accesibles según el rol (null = todas)
   const accessibleSites = getAccessibleSites();
+  const isSiteRestricted = accessibleSites !== null; // hay restricción de sede
+  const hasSingleSite = isSiteRestricted && accessibleSites.length === 1;
+
+  // Auto-aplicar el filtro de sede si está restringido a una sola sede
+  useEffect(() => {
+    if (hasSingleSite) {
+      setSiteFilter(accessibleSites[0]);
+    } else if (isSiteRestricted && accessibleSites.length > 1 && siteFilter === "all") {
+      // múltiples sedes permitidas: dejar en "all" pero el dropdown solo mostrará las permitidas
+    }
+  }, [hasSingleSite, isSiteRestricted, accessibleSites?.join(",")]);
 
   // Empleados filtrados por sedes permitidas según rol
   const siteAllowedEmployees = accessibleSites === null
@@ -895,20 +906,26 @@ export default function EmployeeManagement() {
                 </SelectContent>
               </Select>
 
-              <Select value={siteFilter} onValueChange={setSiteFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Sede" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="sin_sede">Sin sede</SelectItem>
-                  {sites
-                    .filter(site => accessibleSites === null || accessibleSites.includes(site.name))
-                    .map(site => (
-                      <SelectItem key={site.id} value={site.name}>{site.code}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Select value={siteFilter} onValueChange={setSiteFilter} disabled={hasSingleSite}>
+                  <SelectTrigger className={`w-40 ${hasSingleSite ? "opacity-70 cursor-not-allowed bg-slate-100" : ""}`}>
+                    <SelectValue placeholder="Sede" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {!isSiteRestricted && <SelectItem value="all">Todas</SelectItem>}
+                    {!isSiteRestricted && <SelectItem value="sin_sede">Sin sede</SelectItem>}
+                    {isSiteRestricted && accessibleSites.length > 1 && <SelectItem value="all">Todas (permitidas)</SelectItem>}
+                    {sites
+                      .filter(site => accessibleSites === null || accessibleSites.includes(site.name))
+                      .map(site => (
+                        <SelectItem key={site.id} value={site.name}>{site.code}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {hasSingleSite && (
+                  <span className="absolute -top-5 left-0 text-xs text-amber-600 font-medium whitespace-nowrap">🔒 Sede restringida</span>
+                )}
+              </div>
 
               <Select value={contractTypeFilter} onValueChange={setContractTypeFilter}>
                 <SelectTrigger className="w-48">
