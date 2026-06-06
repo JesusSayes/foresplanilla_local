@@ -753,7 +753,7 @@ export default function AttendanceManagement() {
       return !!record; // solo si existe registro en la BD
     }).map(emp => {
       const record = todayRecords.find(r => r.employee_id === emp.id);
-      return { ...emp, record, displayDate: format(selectedDate, "yyyy-MM-dd") };
+      return { ...emp, record, displayDate: selectedDateStr };
     }).filter(emp => {
       if (attendanceFilter === "all") return true;
       if (attendanceFilter === "sin_entrada") return !emp.record.clock_in;
@@ -793,43 +793,22 @@ export default function AttendanceManagement() {
   };
 
   const handleExportToExcel = async () => {
-    // Cargar TODOS los incidentes frescos para no depender del caché limitado
-    let freshIncidents = allIncidents;
-    try {
-      const fetched = await entitiesAPI.AttendanceIncident.list("-incident_date", 5000);
-      if (fetched && fetched.length > 0) freshIncidents = fetched;
-    } catch (_) { /* usa caché si falla */ }
-
     const dataToExport = employeesWithRecords.map(emp => {
-      const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
-      const workedHours = emp.record?.worked_hours || 0;
-
-      // Buscar TODOS los incidentes para este empleado y fecha
-      const incidentsForRow = freshIncidents.filter(
-        i => i.employee_id === emp.id && i.incident_date === rowDate
+      const rowDate = emp.displayDate || dateToStringLima(selectedDate);
+      const vacation = approvedVacations.find(
+        v => v.employee_id === emp.id && String(v.start_date).slice(0, 10) <= rowDate && String(v.end_date).slice(0, 10) >= rowDate
+      ) || null;
+      const isVacation = emp.record?.status === "Vacaciones" || !!vacation;
+      const incidentsForRow = allIncidents.filter(
+        i => i.employee_id === emp.id && String(i.incident_date).slice(0, 10) === rowDate
       );
-      // Priorizar aprobada > pendiente > rechazada
       const incident = incidentsForRow.find(i => i.status === 'Aprobada')
-        || incidentsForRow.find(i => i.status === 'Pendiente')
         || incidentsForRow[0]
         || null;
+      const estadoMarcacion = isVacation
+        ? 'Vacaciones'
+        : getStatusConfig(emp.record?.status, emp.record?.clock_in, incident).text;
 
-      // Estado real de la marcación: vacaciones > incidente aprobado > status del registro
-      const estadoMarcacion = (() => {
-        // 1. Si el registro ya tiene status "Vacaciones" (grabado al aprobar)
-        if (emp.record?.status === 'Vacaciones') return 'Vacaciones';
-        // 2. Si existe una solicitud de vacaciones aprobada que cubre esta fecha
-        const isOnVacation = approvedVacations.some(
-          v => v.employee_id === emp.id && String(v.start_date).slice(0, 10) <= rowDate && String(v.end_date).slice(0, 10) >= rowDate
-        );
-        if (isOnVacation) return 'Vacaciones';
-        // 3. Si hay incidente aprobado
-        if (incident && incident.status === 'Aprobada') return 'Justificado';
-        // 4. Status real del registro
-        return emp.record?.status || 'Sin marcar';
-      })();
-
-      // Calcular tiempo justificado
       let tiempoPapeleta = '';
       if (incident) {
         if (incident.full_day_justification) {
@@ -844,20 +823,7 @@ export default function AttendanceManagement() {
         }
       }
 
-      // Para vacaciones: usar el horario programado real, no el que quedó grabado
-      let entradaExcel = emp.record?.clock_in || '--:--';
-      let salidaExcel  = emp.record?.clock_out || '--:--';
-      if (estadoMarcacion === 'Vacaciones') {
-        const schedVac = getEmployeeScheduleForDate(emp.id, rowDate);
-        const dowVac = new Date(rowDate + "T00:00:00").getDay();
-        const startsMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
-        const endsMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-        if (schedVac) {
-          entradaExcel = schedVac[startsMap[dowVac]] || entradaExcel;
-          salidaExcel  = schedVac[endsMap[dowVac]]   || salidaExcel;
-        }
-      }
-
+      const scheduledTimes = isVacation ? getScheduledTimes(emp.id, rowDate) : null;
       return {
         'Fecha': rowDate,
         'Tipo Doc': emp.document_type,
@@ -867,12 +833,12 @@ export default function AttendanceManagement() {
         'Cargo': emp.position,
         'Departamento': emp.department_name,
         'Sede': emp.site || 'Sin sede',
-        'Entrada': entradaExcel,
-        'Salida': salidaExcel,
-        'Horas Trabajadas': workedHours.toFixed(2),
-        'Tardanza (min)': emp.record?.late_minutes || 0,
-        'HE 25%': (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
-        'HE 35%': (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
+        'Entrada': isVacation ? scheduledTimes?.start : emp.record?.clock_in?.slice(0, 5) || '--:--',
+        'Salida': vacation ? scheduledTimes?.end : emp.record?.clock_out?.slice(0, 5) || '--:--',
+        'Horas Trabajadas': vacation ? '8.00' : (emp.record?.worked_hours?.toFixed(2) || '0.00'),
+        'Tardanza (min)': vacation ? 0 : (emp.record?.late_minutes || 0),
+        'HE 25%': vacation ? '0.00' : (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
+        'HE 35%': vacation ? '0.00' : (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
         'Estado Marcación': estadoMarcacion,
         'Tiene Justificación': incident ? 'Sí' : 'No',
         'Tipo Incidente': incident ? incident.incident_type : '',
