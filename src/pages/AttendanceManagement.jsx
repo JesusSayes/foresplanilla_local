@@ -71,6 +71,10 @@ export default function AttendanceManagement() {
   });
 
   const { getAccessibleSites, hasPermission, loading: permissionsLoading } = usePermissions();
+  const canEditAttendance = hasPermission("attendance.edit") || hasPermission("system.admin");
+  const canApproveIncidents = hasPermission("attendance.approve_incidents") || hasPermission("system.admin");
+  const canManageSchedules = hasPermission("attendance.manage_schedules") || hasPermission("system.admin");
+  const canExportAttendance = hasPermission("attendance.export") || hasPermission("system.admin");
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -84,9 +88,12 @@ export default function AttendanceManagement() {
   }, [currentUser]);
 
   const { data: allEmployees = [] } = useQuery({
-    queryKey: ["allEmployees"],
+    queryKey: ["attendanceAccessibleEmployees", currentUser?.employee?.id],
     queryFn: async () => {
-      return await entitiesAPI.Employee.list("-created_date");
+      return await entitiesAPI.Employee.accessible([
+        "attendance.view_all",
+        "attendance.view_department",
+      ]);
     },
   });
 
@@ -118,6 +125,7 @@ export default function AttendanceManagement() {
       const conns = await entitiesAPI.DatabaseConnection.list("-created_date");
       return conns.filter(c => c.is_active);
     },
+    enabled: hasPermission("system.admin"),
   });
 
   const { data: sites = [] } = useQuery({
@@ -639,7 +647,10 @@ export default function AttendanceManagement() {
   };
 
   // Aplicar restricción de sedes según el rol (null=todas, undefined=cargando)
-  const accessibleSites = permissionsLoading ? undefined : getAccessibleSites();
+  const accessibleSites = permissionsLoading ? undefined : getAccessibleSites([
+    "attendance.view_all",
+    "attendance.view_department",
+  ]);
   const isSiteRestricted = accessibleSites !== null && accessibleSites !== undefined;
   const hasSingleSite = isSiteRestricted && Array.isArray(accessibleSites) && accessibleSites.length === 1;
 
@@ -650,11 +661,9 @@ export default function AttendanceManagement() {
     }
   }, [hasSingleSite, Array.isArray(accessibleSites) ? accessibleSites.join(",") : ""]);
 
-  const siteAllowedEmployees = !accessibleSites && accessibleSites !== null
-    ? [] // cargando
-    : accessibleSites === null
-      ? allEmployees
-      : allEmployees.filter(emp => accessibleSites.includes(emp.site));
+  // El backend ya aplica el alcance autorizado por sede/departamento/equipo.
+  const siteAllowedEmployees = permissionsLoading ? [] : allEmployees;
+  const normalizeSite = value => String(value || "").trim().toLocaleLowerCase();
 
   const filteredEmployees = siteAllowedEmployees.filter(emp => {
     const term = searchTerm.toLowerCase().trim();
@@ -665,7 +674,10 @@ export default function AttendanceManagement() {
       fullNameReverse.includes(term) ||
       emp.document_number.toLowerCase().includes(term) ||
       term.split(/\s+/).every(word => fullName.includes(word));
-    const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
+    const matchesSite = hasSingleSite ||
+      selectedSite === "all" ||
+      normalizeSite(emp.site) === normalizeSite(selectedSite) ||
+      (selectedSite === "sin_sede" && !emp.site);
     return matchesSearch && matchesSite;
   });
 
@@ -1049,9 +1061,9 @@ export default function AttendanceManagement() {
                       : "Recalcular Todo"}
                   </Button>
                 )}
-                <Button onClick={() => handleExportToExcel()} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
+                {canExportAttendance && <Button onClick={() => handleExportToExcel()} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
                   <Download className="w-4 h-4 mr-2" />Excel
-                </Button>
+                </Button>}
                 <Button onClick={handlePrint} variant="outline" className="whitespace-nowrap">
                   <Printer className="w-4 h-4 mr-2" />Imprimir
                 </Button>
@@ -1076,9 +1088,9 @@ export default function AttendanceManagement() {
                         <SelectContent>
                           {!isSiteRestricted && <SelectItem value="all">Todas</SelectItem>}
                           {!isSiteRestricted && <SelectItem value="sin_sede">Sin sede</SelectItem>}
-                          {isSiteRestricted && accessibleSites.length > 1 && <SelectItem value="all">Todas (permitidas)</SelectItem>}
+                          {isSiteRestricted && accessibleSites?.length > 1 && <SelectItem value="all">Todas (permitidas)</SelectItem>}
                           {sites
-                            .filter(site => accessibleSites === null || accessibleSites.includes(site.name))
+                            .filter(site => accessibleSites === null || accessibleSites?.includes(site.name))
                             .map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
@@ -1283,7 +1295,7 @@ export default function AttendanceManagement() {
                                   </Badge>
 
                                   {/* === CUSTOM BLOCK: validación manual RRHH === */}
-                                  {(
+                                  {canEditAttendance && (
                                     (
                                       [
                                       "Revisar", "Incompleto"
@@ -1297,7 +1309,7 @@ export default function AttendanceManagement() {
                                     </Button>
                                   )}
 
-                                  {!vacation && emp.record && (
+                                  {canEditAttendance && !vacation && emp.record && (
                                     <Button size="sm" variant="outline" className="h-7 px-2 text-xs shrink-0 whitespace-nowrap" onClick={() => handleEditRecord(emp.record)}>
                                       <Edit className="w-3 h-3 mr-1" />Editar
                                     </Button>
@@ -1305,7 +1317,7 @@ export default function AttendanceManagement() {
                                   {!vacation && !emp.record && (
                                     <div style={{width: "62px", height: "28px", flexShrink: 0}} />
                                   )}
-                                  {!vacation && (
+                                  {canEditAttendance && !vacation && (
                                     <Button
                                       size="sm"
                                       variant="outline"
@@ -1316,10 +1328,10 @@ export default function AttendanceManagement() {
                                     </Button>
                                   )}
                                   {vacation && <div style={{width: "138px", flexShrink: 0}} />}
-                                  <Button size="sm" variant="outline" className="h-7 px-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50 shrink-0" title="Asignar horario"
+                                  {canManageSchedules && <Button size="sm" variant="outline" className="h-7 px-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50 shrink-0" title="Asignar horario"
                                     onClick={() => { setSchedulingEmployee({ ...emp, _rowDate: rowDate }); setShowScheduleModal(true); }}>
                                     <CalendarClock className="w-3 h-3" />
-                                  </Button>
+                                  </Button>}
                                 </div>
                               </td>
                             </tr>
@@ -1396,7 +1408,7 @@ export default function AttendanceManagement() {
                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
                              <p className="text-sm text-yellow-900">⚠️ Este empleado <strong>no está autorizado</strong> para realizar horas extras de forma permanente. Puede corregir la marcación, descartar la alerta o <strong>aceptar las HE únicamente para este día</strong> sin modificar su autorización general.</p>
                            </div>
-                           <div className="flex gap-2 flex-wrap">
+                           {canEditAttendance && <div className="flex gap-2 flex-wrap">
                               <Button size="sm" variant="outline" className="flex-1" onClick={() => record && handleEditRecord(record)}>
                                 <Edit className="w-4 h-4 mr-2" />Corregir Marcación
                               </Button>
@@ -1439,7 +1451,7 @@ export default function AttendanceManagement() {
                               }}>
                                 <XCircle className="w-4 h-4 mr-2" />Descartar
                               </Button>
-                            </div>
+                           </div>}
                          </div>
                        );
                       })}
@@ -1505,14 +1517,14 @@ export default function AttendanceManagement() {
                                     </a>
                                   </div>
                                 )}
-                                <div className="flex gap-3">
+                                {canApproveIncidents && <div className="flex gap-3">
                                   <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => { setReviewingIncident(incident); setShowIncidentModal(true); }}>
                                     <CheckCircle className="w-4 h-4 mr-2" />Aprobar
                                   </Button>
                                   <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setReviewingIncident(incident); setShowIncidentModal(true); }}>
                                     <XCircle className="w-4 h-4 mr-2" />Rechazar
                                   </Button>
-                                </div>
+                                </div>}
                               </div>
                             );
                           })}

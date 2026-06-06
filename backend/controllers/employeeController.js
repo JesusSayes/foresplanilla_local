@@ -1,5 +1,43 @@
 import { query } from '../config/database.js';
 import { buildFilterQuery, buildSortQuery } from '../utils/queryBuilder.js';
+import { canAccessEmployee, hasPermission, resolveAccessibleEmployeeIds } from '../middleware/authorization.js';
+
+const ALLOWED_ACCESS_PERMISSIONS = new Set([
+  'attendance.view_all',
+  'attendance.view_department',
+  'attendance.view_own',
+  'attendance.edit',
+  'attendance.approve_incidents',
+  'roles.assign',
+  'roles.manage',
+]);
+
+export const listAccessibleEmployees = async (req, res) => {
+  try {
+    const requestedPermissions = String(req.query.permissions || '')
+      .split(',')
+      .map(permission => permission.trim())
+      .filter(permission => ALLOWED_ACCESS_PERMISSIONS.has(permission));
+
+    if (requestedPermissions.length === 0 ||
+        !requestedPermissions.some(permission => hasPermission(req.access, permission))) {
+      return res.status(403).json({ error: 'Permiso insuficiente' });
+    }
+
+    const employeeIds = await resolveAccessibleEmployeeIds(req.access, requestedPermissions);
+    const employees = await query(
+      employeeIds === null
+        ? 'SELECT * FROM employee ORDER BY created_date DESC'
+        : 'SELECT * FROM employee WHERE id = ANY($1::varchar[]) ORDER BY created_date DESC',
+      employeeIds === null ? [] : [employeeIds]
+    );
+
+    res.json(employees.rows);
+  } catch (error) {
+    console.error('Error listing accessible employees:', error);
+    res.status(500).json({ error: 'Error al listar empleados accesibles' });
+  }
+};
 
 export const listEmployees = async (req, res) => {
   try {
@@ -55,6 +93,9 @@ export const getEmployee = async (req, res) => {
 export const createEmployee = async (req, res) => {
   try {
     const data = req.body;
+    if (data.role && data.role !== 'empleado' && !hasPermission(req.access, 'system.admin')) {
+      return res.status(403).json({ error: 'Solo un administrador del sistema puede asignar un rol legacy privilegiado' });
+    }
     const cleanData = { ...data };
 
     [ 'birth_date', 'hire_date', 'termination_date', 'afp_affiliation_date'].forEach(field => {
@@ -118,6 +159,10 @@ export const updateEmployee = async (req, res) => {
   try {
     const { id } = req.params;
     const data = req.body;
+    if (!canAccessEmployee(req, id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    if (Object.prototype.hasOwnProperty.call(data, 'role') && !hasPermission(req.access, 'system.admin')) {
+      return res.status(403).json({ error: 'Solo un administrador del sistema puede cambiar el rol legacy' });
+    }
 
     const fields = [];
     const values = [];
@@ -166,6 +211,7 @@ export const updateEmployee = async (req, res) => {
 export const deleteEmployee = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!canAccessEmployee(req, id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
 
     const result = await query('DELETE FROM employee WHERE id = $1 RETURNING id', [id]);
 

@@ -135,7 +135,7 @@ export const usePermissions = () => {
           setEmployee(emp);
 
           // Super Admin tiene acceso total inmediato
-          if (emp.role === "super_admin" || emp.role === "admin") {
+          if (emp.role === "super_admin") {
             setPermissions(Object.keys(AVAILABLE_PERMISSIONS));
             setRoles([{ name: "Super Admin", permissions: Object.keys(AVAILABLE_PERMISSIONS), priority: 1000 }]);
             setFallbackSiteRestriction(null);
@@ -193,7 +193,7 @@ export const usePermissions = () => {
 
   const hasPermission = (permission) => {
     // Super Admin siempre tiene todos los permisos
-    if (employee?.role === "super_admin" || employee?.role === "admin") return true;
+    if (employee?.role === "super_admin") return true;
     return permissions.includes(permission) || permissions.includes("system.admin");
   };
 
@@ -211,7 +211,7 @@ export const usePermissions = () => {
     return accessible.includes(siteName);
   };
 
-  const getAccessibleSites = () => {
+  const getAccessibleSites = (permissionList = null) => {
     // Mientras carga, devolver undefined para que los componentes esperen
     if (loading) return undefined;
 
@@ -223,12 +223,19 @@ export const usePermissions = () => {
       // system.admin en los roles custom => acceso total
       if (permissions.includes("system.admin")) return null;
 
-      const siteRestrictedRoles = roles.filter(r => r.site_restricted);
+      const relevantRoles = permissionList
+        ? roles.filter(role => (role.permissions || []).some(permission =>
+            permission === "system.admin" || permissionList.includes(permission)
+          ))
+        : roles;
+      if (permissionList && relevantRoles.length === 0) return [];
+
+      const siteRestrictedRoles = relevantRoles.filter(r => r.site_restricted);
       // Ningún rol tiene restricción → acceso total
       if (siteRestrictedRoles.length === 0) return null;
 
       // Si tiene algún rol SIN restricción de sede, ve todas
-      const hasUnrestrictedRole = roles.some(r => !r.site_restricted);
+      const hasUnrestrictedRole = relevantRoles.some(r => !r.site_restricted);
       if (hasUnrestrictedRole) return null;
 
       // Combinar sedes de TODOS los roles site_restricted

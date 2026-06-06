@@ -1,6 +1,13 @@
 import prisma from "../config/prisma.js";
+import { hasPermission } from "../middleware/authorization.js";
 
 import { v4 as uuidv4 } from 'uuid';
+
+const isPrivilegedRole = role => (
+  role?.is_system_role || (Array.isArray(role?.permissions) && role.permissions.includes('system.admin'))
+);
+
+const canManagePrivilegedRoles = req => hasPermission(req.access, 'system.admin');
 
 export const getAllRoles = async (req, res) => {
   try {
@@ -35,6 +42,9 @@ export const getRoleById = async (req, res) => {
 export const createRole = async (req, res) => {
   try {
     const { name, description, permissions, is_system_role, department_restricted, team_restricted, site_restricted, allowed_sites, priority } = req.body;
+    if (isPrivilegedRole({ permissions, is_system_role }) && !canManagePrivilegedRoles(req)) {
+      return res.status(403).json({ error: 'Solo un administrador del sistema puede crear roles privilegiados' });
+    }
 
     const role = await prisma.role.create({
       data: {
@@ -66,6 +76,11 @@ export const updateRole = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, permissions, is_system_role, department_restricted, team_restricted, site_restricted, allowed_sites, priority } = req.body;
+    const existing = await prisma.role.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Rol no encontrado' });
+    if ((isPrivilegedRole(existing) || isPrivilegedRole({ permissions, is_system_role })) && !canManagePrivilegedRoles(req)) {
+      return res.status(403).json({ error: 'Solo un administrador del sistema puede modificar roles privilegiados' });
+    }
 
     const role = await prisma.role.update({
       where: { id },
@@ -93,6 +108,11 @@ export const updateRole = async (req, res) => {
 export const deleteRole = async (req, res) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.role.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ error: 'Rol no encontrado' });
+    if (isPrivilegedRole(existing) && !canManagePrivilegedRoles(req)) {
+      return res.status(403).json({ error: 'Solo un administrador del sistema puede eliminar roles privilegiados' });
+    }
     await prisma.role.delete({
       where: { id }
     });

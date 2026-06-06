@@ -1,6 +1,7 @@
 import prisma from "../../config/prisma.js";
 
 import crypto from 'crypto';
+import { canAccessEmployee } from "../../middleware/authorization.js";
 
 const serializeRecord = (r) => ({
   ...r,
@@ -18,6 +19,7 @@ export const getAll = async (req, res) => {
     const field = sort.replace('-', '');
 
     const records = await prisma.attendance_record.findMany({
+      where: req.accessibleEmployeeIds === null ? {} : { employee_id: { in: req.accessibleEmployeeIds } },
       orderBy: { [field]: desc ? 'desc' : 'asc' }
     });
     res.json(records.map(serializeRecord));
@@ -34,6 +36,7 @@ export const getById =  async (req, res) => {
       // include: { employee: true, schedule: true, incidents: true }
     });
     if (!record) return res.status(404).json({ error: 'Record not found' });
+    if (!canAccessEmployee(req, record.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     res.json(serializeRecord(record));
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -47,6 +50,7 @@ export const create = async (req, res) => {
     console.log('AttendanceRecord.create body:', req.body);
 
     const data = req.body || {};
+    if (!canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     const now = new Date();
 
     const record = await prisma.attendance_record.create({
@@ -81,6 +85,10 @@ export const create = async (req, res) => {
 export const update = async (req, res) => {
   try {
     const data = { ...req.body, };
+    const existing = await prisma.attendance_record.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Record not found' });
+    if (!canAccessEmployee(req, existing.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    if (data.employee_id && !canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
 
     // Solo incluir date si viene en el request
     if (req.body.date) {
@@ -102,6 +110,9 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
+    const existing = await prisma.attendance_record.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Record not found' });
+    if (!canAccessEmployee(req, existing.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     await prisma.attendance_record.delete({
       where: { id: req.params.id }
     });
@@ -119,6 +130,9 @@ export const filter = async (req, res) => {
 
     const filters = req.body || {};
     const where = {};
+    if (req.accessibleEmployeeIds !== null) {
+      where.employee_id = { in: req.accessibleEmployeeIds };
+    }
 
     // log de lo que llega
     console.log('AttendanceRecord.filter body:', req.body);
@@ -133,6 +147,7 @@ export const filter = async (req, res) => {
     }
 
     if (filters.employee_id) {
+      if (!canAccessEmployee(req, filters.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
       where.employee_id = filters.employee_id;
     }
 
