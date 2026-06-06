@@ -10,6 +10,9 @@ const ALLOWED_ACCESS_PERMISSIONS = new Set([
   'attendance.approve_incidents',
   'roles.assign',
   'roles.manage',
+  'certificates.view_all',
+  'certificates.create',
+  'certificates.approve',
 ]);
 
 export const listAccessibleEmployees = async (req, res) => {
