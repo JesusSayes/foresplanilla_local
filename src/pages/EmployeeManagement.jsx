@@ -545,6 +545,8 @@ export default function EmployeeManagement() {
     return age;
   };
 
+  const toDateInputValue = (value) => value ? String(value).split("T")[0] : "";
+
   const initializeForm = (emp = null) => {
     // Buscar el último contrato vigente del empleado
     let baseSalary = emp?.base_salary || "";
@@ -579,8 +581,7 @@ export default function EmployeeManagement() {
       document_number: emp?.document_number || "",
       first_name: emp?.first_name || "",
       last_name: emp?.last_name || "",
-      // birth_date: emp?.birth_date || "",
-      birth_date: emp?.birth_date.split("T")[0] || "",
+      birth_date: toDateInputValue(emp?.birth_date),
       gender: emp?.gender || "M",
       personal_email: emp?.personal_email || "",
       work_email: emp?.work_email || "",
@@ -597,17 +598,14 @@ export default function EmployeeManagement() {
       department_name: emp?.department_name || "",
       work_unit: emp?.work_unit || "",
       site: emp?.site || "",
-      // hire_date: emp?.hire_date || "",
-      hire_date: emp?.hire_date.split("T")[0] || "",
-      //termination_date: emp?.termination_date || "",
-      termination_date: emp?.termination_date ? emp?.termination_date.split("T")[0] : "",
+      hire_date: toDateInputValue(emp?.hire_date),
+      termination_date: toDateInputValue(emp?.termination_date),
       contract_type: contractType,
       base_salary: baseSalary || null,
       photo_url: emp?.photo_url || "",
       pension_system: emp?.pension_system || "Ninguno",
       afp_id: emp?.afp_id || "",
-      // afp_affiliation_date: emp?.afp_affiliation_date || "",
-      afp_affiliation_date: emp?.afp_affiliation_date ? emp.afp_affiliation_date.split("T")[0] : "",
+      afp_affiliation_date: toDateInputValue(emp?.afp_affiliation_date),
       cuspp: emp?.cuspp || "",
       bank_name: emp?.bank_name || "",
       bank_account: emp?.bank_account || "",
