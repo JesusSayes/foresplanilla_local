@@ -93,9 +93,18 @@ export default function ScheduleManagement() {
   const assignments = schedules.filter(s => s.employee_id || s.departments?.length > 0 || s.department_name);
 
   const { data: allEmployees = [] } = useQuery({
-    queryKey: ["allEmployees"],
+    queryKey: ["scheduleAccessibleEmployees", currentUser?.employee?.id],
     queryFn: async () => {
-      return await entitiesAPI.Employee.filter({ status: "Activo" });
+      const employees = await entitiesAPI.Employee.accessible([
+        "schedules.view",
+        "schedules.create",
+        "schedules.edit",
+        "schedules.assign",
+        "schedules.delete",
+        "schedules.manage",
+        "attendance.manage_schedules",
+      ]);
+      return employees.filter(employee => employee.status === "Activo");
     },
   });
 
