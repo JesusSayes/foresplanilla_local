@@ -16,10 +16,17 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { usePermissions } from "../components/hooks/usePermissions";
 
 export default function Certificates() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
+  const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
+  const canSelectEmployee = hasAnyPermission([
+    "certificates.view_all",
+    "certificates.create",
+    "certificates.approve",
+  ]);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestType, setRequestType] = useState("Certificado de Trabajo");
   const [requestDescription, setRequestDescription] = useState("");
@@ -29,14 +36,19 @@ export default function Certificates() {
   const queryClient = useQueryClient();
 
   const { data: allEmployees = [] } = useQuery({
-    queryKey: ["allEmployees"],
+    queryKey: ["certificateAccessibleEmployees", employee?.id],
     queryFn: async () => {
-      return await entitiesAPI.Employee.filter({ status: "Activo" });
+      const employees = await entitiesAPI.Employee.accessible([
+        "certificates.view_all",
+        "certificates.create",
+        "certificates.approve",
+      ]);
+      return employees.filter(emp => emp.status === "Activo");
     },
-    enabled: employee?.role === "admin",
+    enabled: !permissionsLoading && canSelectEmployee,
   });
 
-  const targetEmployeeId = employee?.role === "admin" ? selectedEmployeeId : employee?.id;
+  const targetEmployeeId = canSelectEmployee ? selectedEmployeeId : employee?.id;
 
   const { data: certificates = [], isLoading } = useQuery({
     queryKey: ["certificates", targetEmployeeId],
@@ -74,9 +86,9 @@ export default function Certificates() {
       return;
     }
 
-    const employeeIdToUse = employee.role === "admin" ? selectedEmployeeId : employee.id;
+    const employeeIdToUse = canSelectEmployee ? selectedEmployeeId : employee.id;
 
-    if (employee.role === "admin" && !employeeIdToUse) {
+    if (canSelectEmployee && !employeeIdToUse) {
       toast.error("Por favor selecciona un empleado");
       return;
     }
@@ -85,7 +97,7 @@ export default function Certificates() {
       employee_id: employeeIdToUse,
       certificate_type: requestType,
       description: requestDescription || `Solicitud de ${requestType}`,
-      requested_by_employee: employee.role !== "admin",
+      requested_by_employee: !canSelectEmployee,
       status: "Solicitado",
     };
 
@@ -256,7 +268,7 @@ export default function Certificates() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="space-y-6">
-                    {employee.role === "admin" ? (
+                    {canSelectEmployee ? (
                       <div>
                         <Label className="text-sm font-semibold text-slate-900 mb-2 block">
                           Empleado *
@@ -281,9 +293,9 @@ export default function Certificates() {
                             {allEmployees
                               .filter(emp => {
                                 const searchLower = employeeSearchTerm.toLowerCase();
-                                return emp.first_name.toLowerCase().includes(searchLower) ||
-                                       emp.last_name.toLowerCase().includes(searchLower) ||
-                                       emp.employee_code.toLowerCase().includes(searchLower);
+                                return String(emp.first_name || "").toLowerCase().includes(searchLower) ||
+                                       String(emp.last_name || "").toLowerCase().includes(searchLower) ||
+                                       String(emp.employee_code || "").toLowerCase().includes(searchLower);
                               })
                               .map((emp) => (
                                 <SelectItem key={emp.id} value={emp.id}>
@@ -328,11 +340,11 @@ export default function Certificates() {
                       </p>
                     </div>
 
-                    {((employee.role === "admin" && selectedEmployeeId) || employee.role !== "admin") && (
+                    {((canSelectEmployee && selectedEmployeeId) || !canSelectEmployee) && (
                       <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                         <h4 className="font-semibold text-slate-900 mb-2">Datos del empleado:</h4>
                         <div className="grid grid-cols-2 gap-4 text-sm">
-                          {employee.role === "admin" && selectedEmployeeId ? (
+                          {canSelectEmployee && selectedEmployeeId ? (
                             <>
                               {(() => {
                                 const selectedEmp = allEmployees.find(e => e.id === selectedEmployeeId);
@@ -429,7 +441,7 @@ export default function Certificates() {
             <Card className="border-0 shadow-lg sticky top-8">
               <CardHeader className="border-b">
                 <CardTitle className="text-xl font-bold">
-                  {employee.role === "admin" && selectedEmployeeId ? "Solicitudes del Empleado" : "Mis Solicitudes"}
+                  {canSelectEmployee && selectedEmployeeId ? "Solicitudes del Empleado" : "Mis Solicitudes"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
