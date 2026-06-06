@@ -1,0 +1,47 @@
+{
+  "name": "LoanInstallment",
+  "type": "object",
+  "properties": {
+    "loan_id": {
+      "type": "string",
+      "description": "ID del pr\u00e9stamo"
+    },
+    "month": {
+      "type": "integer",
+      "description": "Mes (1-12)"
+    },
+    "year": {
+      "type": "integer",
+      "description": "A\u00f1o"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Monto de la cuota"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pendiente",
+        "Aplicado",
+        "Omitido"
+      ],
+      "default": "Pendiente",
+      "description": "Estado de la cuota"
+    },
+    "payslip_id": {
+      "type": "string",
+      "description": "ID de la planilla donde se aplic\u00f3"
+    },
+    "applied_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha en que se aplic\u00f3"
+    }
+  },
+  "required": [
+    "loan_id",
+    "month",
+    "year",
+    "amount"
+  ]
+}

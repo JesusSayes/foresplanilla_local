@@ -1,0 +1,117 @@
+{
+  "name": "PayrollConcept",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "concept_type": {
+      "type": "string",
+      "enum": [
+        "Ingreso",
+        "Descuento",
+        "Aportaci\u00f3n",
+        "Otros"
+      ],
+      "description": "Tipo de concepto"
+    },
+    "concept_category": {
+      "type": "string",
+      "enum": [
+        "Remuneraci\u00f3n Base",
+        "Bonificaciones",
+        "Horas Extras",
+        "Asignaciones",
+        "AFP/ONP",
+        "Impuestos",
+        "Pr\u00e9stamos",
+        "Descuentos Varios",
+        "EsSalud",
+        "SCTR",
+        "Otros"
+      ],
+      "description": "Categor\u00eda del concepto"
+    },
+    "concept_name": {
+      "type": "string",
+      "description": "Nombre del concepto (ej: Bono productividad, Pr\u00e9stamo)"
+    },
+    "concept_code": {
+      "type": "string",
+      "description": "C\u00f3digo \u00fanico del concepto (ej: ING001, DESC001)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n detallada del concepto"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Monto del concepto"
+    },
+    "is_dynamic": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el monto se calcula din\u00e1micamente"
+    },
+    "calculation_formula": {
+      "type": "string",
+      "description": "F\u00f3rmula de c\u00e1lculo (ej: base_salary, base_salary * 0.25, etc)"
+    },
+    "period": {
+      "type": "string",
+      "description": "Periodo (Mes YYYY)"
+    },
+    "month": {
+      "type": "integer",
+      "description": "Mes (1-12)"
+    },
+    "year": {
+      "type": "integer",
+      "description": "A\u00f1o"
+    },
+    "is_recurring": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se repite autom\u00e1ticamente cada mes"
+    },
+    "is_mandatory": {
+      "type": "boolean",
+      "default": false,
+      "description": "Concepto obligatorio que debe aplicarse"
+    },
+    "applies_to_payroll_types": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "Quincenal",
+          "Mensual",
+          "Adicional",
+          "SNP"
+        ]
+      },
+      "description": "Tipos de planilla donde aplica este concepto"
+    },
+    "is_applied": {
+      "type": "boolean",
+      "default": false,
+      "description": "Ya fue aplicado en una planilla"
+    },
+    "payslip_id": {
+      "type": "string",
+      "description": "ID de la planilla donde fue aplicado"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "employee_id",
+    "concept_type",
+    "concept_name",
+    "month",
+    "year"
+  ]
+}

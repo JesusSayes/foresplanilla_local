@@ -1,0 +1,83 @@
+{
+  "name": "DatabaseConnection",
+  "type": "object",
+  "properties": {
+    "connection_name": {
+      "type": "string",
+      "description": "Nombre de la conexi\u00f3n"
+    },
+    "connection_type": {
+      "type": "string",
+      "enum": [
+        "MySQL",
+        "PostgreSQL",
+        "SQL Server",
+        "Oracle"
+      ],
+      "description": "Tipo de base de datos"
+    },
+    "host": {
+      "type": "string",
+      "description": "Host o direcci\u00f3n IP"
+    },
+    "port": {
+      "type": "integer",
+      "description": "Puerto de conexi\u00f3n"
+    },
+    "database_name": {
+      "type": "string",
+      "description": "Nombre de la base de datos"
+    },
+    "username": {
+      "type": "string",
+      "description": "Usuario de la base de datos"
+    },
+    "password": {
+      "type": "string",
+      "description": "Contrase\u00f1a (encriptada)"
+    },
+    "table_name": {
+      "type": "string",
+      "description": "Nombre de la tabla de marcaciones"
+    },
+    "field_mapping": {
+      "type": "object",
+      "description": "Mapeo de campos (employee_id, date, clock_in, clock_out, etc)"
+    },
+    "query_template": {
+      "type": "string",
+      "description": "Query SQL para extraer marcaciones"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Conexi\u00f3n activa"
+    },
+    "last_sync": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima sincronizaci\u00f3n"
+    },
+    "sync_frequency": {
+      "type": "string",
+      "enum": [
+        "Manual",
+        "Diaria",
+        "Cada 6 horas",
+        "Cada hora"
+      ],
+      "default": "Manual",
+      "description": "Frecuencia de sincronizaci\u00f3n"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "connection_name",
+    "connection_type",
+    "host",
+    "database_name"
+  ]
+}

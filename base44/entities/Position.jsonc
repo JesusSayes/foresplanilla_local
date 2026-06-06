@@ -1,0 +1,38 @@
+{
+  "name": "Position",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del cargo"
+    },
+    "department": {
+      "type": "string",
+      "description": "Departamento al que pertenece"
+    },
+    "level": {
+      "type": "string",
+      "enum": [
+        "Directivo",
+        "Gerencial",
+        "Jefatura",
+        "Supervisor",
+        "Operativo",
+        "Administrativo"
+      ],
+      "description": "Nivel jer\u00e1rquico"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Cargo activo"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del cargo"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

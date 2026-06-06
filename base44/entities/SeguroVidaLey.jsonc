@@ -1,0 +1,28 @@
+{
+  "name": "SeguroVidaLey",
+  "type": "object",
+  "properties": {
+    "age_range_start": {
+      "type": "integer",
+      "description": "Edad de inicio del rango"
+    },
+    "age_range_end": {
+      "type": "integer",
+      "description": "Edad de fin del rango"
+    },
+    "commercial_rate": {
+      "type": "number",
+      "description": "Tasa comercial de empleados (%)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Rango activo"
+    }
+  },
+  "required": [
+    "age_range_start",
+    "age_range_end",
+    "commercial_rate"
+  ]
+}

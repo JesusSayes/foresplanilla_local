@@ -1,0 +1,27 @@
+{
+  "name": "CostCenterCategory",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "C\u00f3digo de la categor\u00eda"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre de la categor\u00eda"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n de la categor\u00eda"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Categor\u00eda activa"
+    }
+  },
+  "required": [
+    "code",
+    "name"
+  ]
+}

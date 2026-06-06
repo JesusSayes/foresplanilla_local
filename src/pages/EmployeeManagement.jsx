@@ -545,6 +545,8 @@ export default function EmployeeManagement() {
     return age;
   };
 
+  const toDateInputValue = (value) => value ? String(value).split("T")[0] : "";
+
   const initializeForm = (emp = null) => {
     // Buscar el último contrato vigente del empleado
     let baseSalary = emp?.base_salary || "";
@@ -579,8 +581,7 @@ export default function EmployeeManagement() {
       document_number: emp?.document_number || "",
       first_name: emp?.first_name || "",
       last_name: emp?.last_name || "",
-      // birth_date: emp?.birth_date || "",
-      birth_date: emp?.birth_date.split("T")[0] || "",
+      birth_date: toDateInputValue(emp?.birth_date),
       gender: emp?.gender || "M",
       personal_email: emp?.personal_email || "",
       work_email: emp?.work_email || "",
@@ -597,17 +598,14 @@ export default function EmployeeManagement() {
       department_name: emp?.department_name || "",
       work_unit: emp?.work_unit || "",
       site: emp?.site || "",
-      // hire_date: emp?.hire_date || "",
-      hire_date: emp?.hire_date.split("T")[0] || "",
-      //termination_date: emp?.termination_date || "",
-      termination_date: emp?.termination_date ? emp?.termination_date.split("T")[0] : "",
+      hire_date: toDateInputValue(emp?.hire_date),
+      termination_date: toDateInputValue(emp?.termination_date),
       contract_type: contractType,
       base_salary: baseSalary || null,
       photo_url: emp?.photo_url || "",
       pension_system: emp?.pension_system || "Ninguno",
       afp_id: emp?.afp_id || "",
-      // afp_affiliation_date: emp?.afp_affiliation_date || "",
-      afp_affiliation_date: emp?.afp_affiliation_date ? emp.afp_affiliation_date.split("T")[0] : "",
+      afp_affiliation_date: toDateInputValue(emp?.afp_affiliation_date),
       cuspp: emp?.cuspp || "",
       bank_name: emp?.bank_name || "",
       bank_account: emp?.bank_account || "",
@@ -738,13 +736,24 @@ export default function EmployeeManagement() {
     setFormErrors([]);
   };
 
-  // Obtener sedes accesibles según el rol (null = todas)
-  const accessibleSites = getAccessibleSites();
+  // Obtener sedes accesibles según el rol (null=todas, undefined=cargando, [..]=lista)
+  const accessibleSites = permissionsLoading ? undefined : getAccessibleSites();
+  const isSiteRestricted = accessibleSites !== null && accessibleSites !== undefined;
+  const hasSingleSite = isSiteRestricted && Array.isArray(accessibleSites) && accessibleSites.length === 1;
+
+  // Auto-aplicar el filtro de sede si está restringido a una sola sede
+  useEffect(() => {
+    if (hasSingleSite) {
+      setSiteFilter(accessibleSites[0]);
+    }
+  }, [hasSingleSite, Array.isArray(accessibleSites) ? accessibleSites.join(",") : ""]);
 
   // Empleados filtrados por sedes permitidas según rol
-  const siteAllowedEmployees = accessibleSites === null
-    ? allEmployees
-    : allEmployees.filter(emp => accessibleSites.includes(emp.site));
+  const siteAllowedEmployees = !accessibleSites && accessibleSites !== null
+    ? [] // cargando: no mostrar nada aún
+    : accessibleSites === null
+      ? allEmployees
+      : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
   const departmentNames = [...new Set(siteAllowedEmployees.map(e => e.department_name))].filter(Boolean);
   const contractTypes = [...new Set(siteAllowedEmployees.map(e => e.contract_type))].filter(Boolean);
@@ -895,20 +904,26 @@ export default function EmployeeManagement() {
                 </SelectContent>
               </Select>
 
-              <Select value={siteFilter} onValueChange={setSiteFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Sede" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="sin_sede">Sin sede</SelectItem>
-                  {sites
-                    .filter(site => accessibleSites === null || accessibleSites.includes(site.name))
-                    .map(site => (
-                      <SelectItem key={site.id} value={site.name}>{site.code}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Select value={siteFilter} onValueChange={setSiteFilter} disabled={hasSingleSite}>
+                  <SelectTrigger className={`w-40 ${hasSingleSite ? "opacity-70 cursor-not-allowed bg-slate-100" : ""}`}>
+                    <SelectValue placeholder="Sede" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {!isSiteRestricted && <SelectItem value="all">Todas</SelectItem>}
+                    {!isSiteRestricted && <SelectItem value="sin_sede">Sin sede</SelectItem>}
+                    {isSiteRestricted && accessibleSites.length > 1 && <SelectItem value="all">Todas (permitidas)</SelectItem>}
+                    {sites
+                      .filter(site => accessibleSites === null || accessibleSites.includes(site.name))
+                      .map(site => (
+                        <SelectItem key={site.id} value={site.name}>{site.code}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {hasSingleSite && (
+                  <span className="absolute -top-5 left-0 text-xs text-amber-600 font-medium whitespace-nowrap">🔒 Sede restringida</span>
+                )}
+              </div>
 
               <Select value={contractTypeFilter} onValueChange={setContractTypeFilter}>
                 <SelectTrigger className="w-48">

@@ -53,10 +53,21 @@ export default function HRDashboard() {
   // }, []);
 
   const { user: currentUser } = useAuth();
-  const employee = currentUser?.employee || null;
+
+  const { data: employeeMatches = [] } = useQuery({
+    queryKey: ["employeeByEmail", currentUser?.email],
+    queryFn: async () => {
+      return await entitiesAPI.Employee.filter({
+        work_email: currentUser.email,
+      });
+    },
+    enabled: !!currentUser?.email && !currentUser?.employee,
+  });
+
+  const employee = currentUser?.employee || employeeMatches[0] || null;
 
   useEffect(() => {
-    if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
+    if (employee?.role === "admin" || employee?.role === "super_admin") {
       updateEmployeeStatuses().then(result => {
         // Ejecutar actualización automática de estados de empleados (solo para admin)
         if (result.success && result.updatedCount > 0) {
@@ -64,7 +75,7 @@ export default function HRDashboard() {
         }
       });
     }
-  }, [currentUser]);
+  }, [employee]);
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
@@ -267,7 +278,17 @@ export default function HRDashboard() {
   }
 
   return (
-    <PermissionGuard employee={employee} requiredAnyPermissions={["employees.view", "attendance.view", "payroll.view"]}>
+    <PermissionGuard employee={employee} requiredAnyPermissions={[
+      "employees.view",
+      "attendance.view",
+      "attendance.view_all",
+      "attendance.view_department",
+      "attendance.view_own",
+      "payroll.view",
+      "payroll.view_all",
+      "payroll.view_department",
+      "payroll.view_own",
+    ]}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header */}

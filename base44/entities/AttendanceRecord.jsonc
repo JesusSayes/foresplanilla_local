@@ -1,0 +1,91 @@
+{
+  "name": "AttendanceRecord",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de asistencia"
+    },
+    "clock_in": {
+      "type": "string",
+      "description": "Hora de entrada (HH:mm)"
+    },
+    "clock_out": {
+      "type": "string",
+      "description": "Hora de salida (HH:mm)"
+    },
+    "scheduled_start": {
+      "type": "string",
+      "default": "09:00",
+      "description": "Hora programada de entrada"
+    },
+    "scheduled_end": {
+      "type": "string",
+      "default": "18:00",
+      "description": "Hora programada de salida"
+    },
+    "worked_hours": {
+      "type": "number",
+      "description": "Horas trabajadas totales (incluyendo extras)"
+    },
+    "regular_hours": {
+      "type": "number",
+      "default": 0,
+      "description": "Horas dentro del horario normal"
+    },
+    "overtime_hours_25": {
+      "type": "number",
+      "default": 0,
+      "description": "Horas extras al 25% (primeras 2h extra del d\u00eda)"
+    },
+    "overtime_hours_35": {
+      "type": "number",
+      "default": 0,
+      "description": "Horas extras al 35% (a partir de la 3ra hora extra)"
+    },
+    "overtime_authorized": {
+      "type": "boolean",
+      "default": false,
+      "description": "Horas extras aceptadas/autorizadas para este d\u00eda espec\u00edfico"
+    },
+    "is_late": {
+      "type": "boolean",
+      "default": false,
+      "description": "Lleg\u00f3 tarde"
+    },
+    "late_minutes": {
+      "type": "integer",
+      "default": 0,
+      "description": "Minutos de tardanza"
+    },
+    "is_absent": {
+      "type": "boolean",
+      "default": false,
+      "description": "Falta"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Completo",
+        "Incompleto",
+        "Ausente",
+        "Justificado"
+      ],
+      "default": "Completo",
+      "description": "Estado del registro"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observaciones"
+    }
+  },
+  "required": [
+    "employee_id",
+    "date"
+  ]
+}

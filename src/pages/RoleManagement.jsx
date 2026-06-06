@@ -13,7 +13,7 @@ import {
   Search, UserPlus, X
 } from "lucide-react";
 import { toast } from "sonner";
-import { AVAILABLE_PERMISSIONS } from "../components/hooks/usePermissions";
+import { AVAILABLE_PERMISSIONS, usePermissions } from "../components/hooks/usePermissions";
 import PermissionGuard from "../components/PermissionGuard";
 import PermissionMatrix from "../components/roles/PermissionMatrix";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
@@ -21,6 +21,11 @@ import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUp
 export default function RoleManagement() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
+  const { hasPermission } = usePermissions();
+  const canCreateRoles = hasPermission("roles.create") || hasPermission("roles.manage");
+  const canEditRoles = hasPermission("roles.edit") || hasPermission("roles.manage");
+  const canDeleteRoles = hasPermission("roles.delete") || hasPermission("roles.manage");
+  const canAssignRoles = hasPermission("roles.assign") || hasPermission("roles.manage");
   const [showRoleForm, setShowRoleForm] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
   const [roleFormData, setRoleFormData] = useState({
@@ -63,8 +68,10 @@ export default function RoleManagement() {
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await entitiesAPI.Employee.filter({ status: "Activo" });
+      const employees = await entitiesAPI.Employee.accessible(["roles.assign", "roles.manage"]);
+      return employees.filter(emp => emp.status === "Activo");
     },
+    enabled: canAssignRoles,
   });
 
   const { data: userRoles = [] } = useQuery({
@@ -72,6 +79,7 @@ export default function RoleManagement() {
     queryFn: async () => {
       return await entitiesAPI.UserRole.list("-created_date");
     },
+    enabled: canAssignRoles,
   });
 
   const { data: sites = [] } = useQuery({
@@ -147,26 +155,6 @@ export default function RoleManagement() {
         await Promise.all(assignments.map(a => entitiesAPI.UserRole.create(a)));
       }
 
-      // Calcular rol legacy a partir de los roles asignados
-      const assignedRoles = roles.filter(r => roleIds.includes(r.id));
-      let legacyRole = "empleado";
-
-      const allPerms = new Set();
-      assignedRoles.forEach(r => (r.permissions || []).forEach(p => allPerms.add(p)));
-
-      if (allPerms.has("system.admin")) {
-        legacyRole = "admin";
-      } else if (assignedRoles.some(r => r.name.toLowerCase().includes("super admin"))) {
-        legacyRole = "super_admin";
-      } else if (assignedRoles.some(r => r.name.toLowerCase().includes("admin") || r.name.toLowerCase().includes("administrador"))) {
-        legacyRole = "admin";
-      } else if (allPerms.has("employees.view") && allPerms.has("attendance.view_all")) {
-        legacyRole = "hr_readonly";
-      } else if (allPerms.has("vacations.approve") || allPerms.has("attendance.approve_incidents") || allPerms.has("attendance.view_department")) {
-        legacyRole = "manager";
-      }
-
-      await entitiesAPI.Employee.update(employeeId, { role: legacyRole });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["userRoles"] });
@@ -390,7 +378,7 @@ export default function RoleManagement() {
           <Tabs defaultValue="roles" className="space-y-6">
             <TabsList className="grid w-full max-w-md grid-cols-2">
               <TabsTrigger value="roles">Roles</TabsTrigger>
-              <TabsTrigger value="assignments">Asignaciones</TabsTrigger>
+              {canAssignRoles && <TabsTrigger value="assignments">Asignaciones</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="roles" className="space-y-6">
@@ -398,13 +386,13 @@ export default function RoleManagement() {
                 <CardHeader className="border-b bg-slate-50/50">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-xl font-bold">Roles del Sistema</CardTitle>
-                    <Button
+                    {canCreateRoles && <Button
                       onClick={() => setShowRoleForm(true)}
                       className="bg-indigo-600 hover:bg-indigo-700"
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Nuevo Rol
-                    </Button>
+                    </Button>}
                   </div>
                 </CardHeader>
                 <CardContent className="p-6">
@@ -446,14 +434,14 @@ export default function RoleManagement() {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button
+                            {canEditRoles && <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleEditRole(role)}
                             >
                               <Edit className="w-4 h-4" />
-                            </Button>
-                            {!role.is_system_role && (
+                            </Button>}
+                            {canDeleteRoles && !role.is_system_role && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -472,7 +460,7 @@ export default function RoleManagement() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="assignments" className="space-y-6">
+            {canAssignRoles && <TabsContent value="assignments" className="space-y-6">
               <Card className="border-0 shadow-lg">
                 <CardHeader className="border-b bg-slate-50/50">
                   <div className="flex items-center justify-between">
@@ -549,7 +537,7 @@ export default function RoleManagement() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent>}
           </Tabs>
         </div>
 

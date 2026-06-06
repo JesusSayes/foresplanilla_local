@@ -1,0 +1,166 @@
+{
+  "name": "ContractTemplate",
+  "type": "object",
+  "properties": {
+    "template_name": {
+      "type": "string",
+      "description": "Nombre de la plantilla"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n de la plantilla"
+    },
+    "is_default": {
+      "type": "boolean",
+      "default": false,
+      "description": "Plantilla por defecto"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Plantilla activa"
+    },
+    "contract_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tipos de contrato aplicables"
+    },
+    "company_name": {
+      "type": "string",
+      "description": "Raz\u00f3n social de la empresa"
+    },
+    "company_ruc": {
+      "type": "string",
+      "description": "RUC de la empresa"
+    },
+    "company_address": {
+      "type": "string",
+      "description": "Direcci\u00f3n de la empresa"
+    },
+    "company_representative": {
+      "type": "string",
+      "description": "Representante legal"
+    },
+    "company_representative_doc": {
+      "type": "string",
+      "description": "Documento del representante"
+    },
+    "contract_title": {
+      "type": "string",
+      "description": "T\u00edtulo principal del contrato"
+    },
+    "contract_subtitle": {
+      "type": "string",
+      "description": "Subt\u00edtulo del contrato"
+    },
+    "employer_section_title": {
+      "type": "string",
+      "description": "T\u00edtulo secci\u00f3n empleador"
+    },
+    "employer_section_text": {
+      "type": "string",
+      "description": "Contenido secci\u00f3n empleador"
+    },
+    "worker_section_title": {
+      "type": "string",
+      "description": "T\u00edtulo secci\u00f3n trabajador"
+    },
+    "worker_section_text": {
+      "type": "string",
+      "description": "Contenido secci\u00f3n trabajador"
+    },
+    "introduction_text": {
+      "type": "string",
+      "description": "Texto introductorio del contrato"
+    },
+    "section_object_title": {
+      "type": "string",
+      "description": "T\u00edtulo secci\u00f3n Objeto del Contrato"
+    },
+    "contract_object_text": {
+      "type": "string",
+      "description": "Texto del objeto del contrato"
+    },
+    "section_functions_title": {
+      "type": "string",
+      "description": "T\u00edtulo secci\u00f3n Funciones y Responsabilidades"
+    },
+    "functions_intro_text": {
+      "type": "string",
+      "description": "Introducci\u00f3n a las funciones"
+    },
+    "section_duration_title": {
+      "type": "string",
+      "description": "T\u00edtulo secci\u00f3n Vigencia del Contrato"
+    },
+    "duration_indeterminate_text": {
+      "type": "string",
+      "description": "Texto de vigencia para contrato indeterminado"
+    },
+    "duration_fixed_text": {
+      "type": "string",
+      "description": "Texto de vigencia para contrato plazo fijo"
+    },
+    "trial_period_text": {
+      "type": "string",
+      "description": "Texto del per\u00edodo de prueba"
+    },
+    "section_salary_title": {
+      "type": "string",
+      "description": "T\u00edtulo secci\u00f3n Remuneraci\u00f3n"
+    },
+    "salary_text": {
+      "type": "string",
+      "description": "Texto de remuneraci\u00f3n"
+    },
+    "section_schedule_title": {
+      "type": "string",
+      "description": "T\u00edtulo secci\u00f3n Jornada y Horario"
+    },
+    "schedule_text": {
+      "type": "string",
+      "description": "Texto de jornada y horario"
+    },
+    "work_location_text": {
+      "type": "string",
+      "description": "Texto de lugar de trabajo"
+    },
+    "section_obligations_title": {
+      "type": "string",
+      "description": "T\u00edtulo secci\u00f3n Obligaciones del Trabajador"
+    },
+    "obligations_text": {
+      "type": "string",
+      "description": "Obligaciones del trabajador"
+    },
+    "section_benefits_title": {
+      "type": "string",
+      "description": "T\u00edtulo secci\u00f3n Beneficios Sociales"
+    },
+    "benefits_text": {
+      "type": "string",
+      "description": "Beneficios sociales"
+    },
+    "section_termination_title": {
+      "type": "string",
+      "description": "T\u00edtulo secci\u00f3n T\u00e9rmino del Contrato"
+    },
+    "termination_text": {
+      "type": "string",
+      "description": "T\u00e9rmino del contrato"
+    },
+    "section_domicile_title": {
+      "type": "string",
+      "description": "T\u00edtulo secci\u00f3n Domicilio"
+    },
+    "domicile_text": {
+      "type": "string",
+      "description": "Texto de domicilio"
+    }
+  },
+  "required": [
+    "template_name"
+  ]
+}

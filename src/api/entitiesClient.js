@@ -33,7 +33,15 @@ const createEntityAPI = (endpoint) => ({
 });
 
 export const entitiesAPI = {
-  Employee: createEntityAPI('/api/employees'),
+  Employee: {
+    ...createEntityAPI('/api/employees'),
+    accessible: async (permissions) => {
+      const response = await localClient.get('/api/employees/accessible', {
+        params: { permissions: permissions.join(',') }
+      });
+      return response.data;
+    }
+  },
   Position: createEntityAPI('/api/master-data/positions'),
   Department: createEntityAPI('/api/master-data/departments'),
   Bank: createEntityAPI('/api/master-data/banks'),

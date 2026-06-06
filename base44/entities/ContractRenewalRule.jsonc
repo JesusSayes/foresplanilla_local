@@ -1,0 +1,57 @@
+{
+  "name": "ContractRenewalRule",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre de la regla"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Regla activa"
+    },
+    "days_before_expiration": {
+      "type": "integer",
+      "default": 30,
+      "description": "D\u00edas antes del vencimiento para activar"
+    },
+    "contract_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tipos de contrato a los que aplica"
+    },
+    "send_notification": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enviar notificaci\u00f3n a RRHH"
+    },
+    "notification_emails": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Emails para notificaciones"
+    },
+    "auto_create_draft": {
+      "type": "boolean",
+      "default": false,
+      "description": "Crear borrador autom\u00e1ticamente"
+    },
+    "only_renewable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Solo contratos marcados como renovables"
+    },
+    "draft_extension_months": {
+      "type": "integer",
+      "default": 12,
+      "description": "Meses de extensi\u00f3n del nuevo contrato"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

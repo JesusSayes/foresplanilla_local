@@ -1,0 +1,51 @@
+{
+  "name": "EmployeeChangeLog",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "field_changed": {
+      "type": "string",
+      "description": "Campo modificado"
+    },
+    "old_value": {
+      "type": "string",
+      "description": "Valor anterior"
+    },
+    "new_value": {
+      "type": "string",
+      "description": "Valor nuevo"
+    },
+    "change_type": {
+      "type": "string",
+      "enum": [
+        "Creaci\u00f3n",
+        "Actualizaci\u00f3n",
+        "Cambio de Estado",
+        "Cambio de Rol"
+      ],
+      "description": "Tipo de cambio"
+    },
+    "changed_by": {
+      "type": "string",
+      "description": "Email de quien realiz\u00f3 el cambio"
+    },
+    "change_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora del cambio"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "employee_id",
+    "field_changed",
+    "change_type",
+    "changed_by"
+  ]
+}

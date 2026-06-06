@@ -2,15 +2,18 @@ import express from 'express';
 const router = express.Router();
 import controller from '../../controllers/attendance/incidentController.js';
 import { authenticateToken } from '../../middleware/auth.js';
+import { attachEmployeeScope, loadAccessContext, requireAnyPermission } from '../../middleware/authorization.js';
 
-router.use(authenticateToken);
+const VIEW_PERMISSIONS = ['attendance.view_all', 'attendance.view_department', 'attendance.view_own'];
 
-router.get('/', controller.getAll);
-router.get('/:id', controller.getById);
-router.post('/', controller.create);
-router.put('/:id', controller.update);
-router.delete('/:id', controller.delete);
+router.use(authenticateToken, loadAccessContext);
 
-router.post('/filter', controller.filter);
+router.get('/', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.getAll);
+router.get('/:id', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.getById);
+router.post('/', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.create);
+router.put('/:id', requireAnyPermission('attendance.edit', 'attendance.approve_incidents'), attachEmployeeScope('attendance.edit', 'attendance.approve_incidents'), controller.update);
+router.delete('/:id', requireAnyPermission('attendance.edit'), attachEmployeeScope('attendance.edit'), controller.delete);
+
+router.post('/filter', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.filter);
 
 export default router

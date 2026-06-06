@@ -1,0 +1,35 @@
+{
+  "name": "AccountingAccount",
+  "type": "object",
+  "properties": {
+    "elemento": {
+      "type": "string",
+      "enum": [
+        "Activos",
+        "Pasivos",
+        "Patrimonio",
+        "Ingresos",
+        "Gastos"
+      ],
+      "description": "Elemento contable"
+    },
+    "cuenta": {
+      "type": "string",
+      "description": "C\u00f3digo de cuenta contable"
+    },
+    "nombre": {
+      "type": "string",
+      "description": "Nombre de la cuenta contable"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Cuenta activa"
+    }
+  },
+  "required": [
+    "elemento",
+    "cuenta",
+    "nombre"
+  ]
+}

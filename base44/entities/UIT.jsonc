@@ -1,0 +1,23 @@
+{
+  "name": "UIT",
+  "type": "object",
+  "properties": {
+    "year": {
+      "type": "integer",
+      "description": "A\u00f1o de vigencia"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Monto de la UIT en soles"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Registro activo"
+    }
+  },
+  "required": [
+    "year",
+    "amount"
+  ]
+}

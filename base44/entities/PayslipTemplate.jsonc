@@ -1,0 +1,132 @@
+{
+  "name": "PayslipTemplate",
+  "type": "object",
+  "properties": {
+    "template_name": {
+      "type": "string",
+      "description": "Nombre de la plantilla"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Plantilla activa"
+    },
+    "show_company_logo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Mostrar logo de la empresa"
+    },
+    "show_employee_photo": {
+      "type": "boolean",
+      "default": false,
+      "description": "Mostrar foto del empleado"
+    },
+    "header_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Campos a mostrar en el encabezado (company_name, ruc, period, employee_code, etc.)"
+    },
+    "employee_info_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Campos de informaci\u00f3n del empleado (names, dni, position, department, hire_date, worker_type, pension_system, cuspp, tax_residence)"
+    },
+    "work_period_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Campos de per\u00edodo laboral (worked_days, non_worked_days, subsidized_days, regular_hours, overtime_hours)"
+    },
+    "income_section": {
+      "type": "object",
+      "properties": {
+        "show": {
+          "type": "boolean",
+          "default": true
+        },
+        "title": {
+          "type": "string",
+          "default": "Ingresos"
+        },
+        "show_codes": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "discount_section": {
+      "type": "object",
+      "properties": {
+        "show": {
+          "type": "boolean",
+          "default": true
+        },
+        "title": {
+          "type": "string",
+          "default": "Descuentos"
+        },
+        "show_codes": {
+          "type": "boolean",
+          "default": true
+        },
+        "group_by_type": {
+          "type": "boolean",
+          "default": true,
+          "description": "Agrupar descuentos por tipo (general, AFP, impuestos)"
+        }
+      }
+    },
+    "employer_contribution_section": {
+      "type": "object",
+      "properties": {
+        "show": {
+          "type": "boolean",
+          "default": true
+        },
+        "title": {
+          "type": "string",
+          "default": "Aportes del Empleador"
+        },
+        "show_codes": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "footer_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Campos del pie de p\u00e1gina (net_pay, payment_date, notes)"
+    },
+    "show_signatures": {
+      "type": "boolean",
+      "default": true,
+      "description": "Mostrar l\u00edneas de firma"
+    },
+    "custom_notes": {
+      "type": "string",
+      "description": "Notas personalizadas al pie de la boleta"
+    },
+    "color_scheme": {
+      "type": "string",
+      "enum": [
+        "blue",
+        "green",
+        "gray",
+        "purple"
+      ],
+      "default": "blue",
+      "description": "Esquema de colores"
+    }
+  },
+  "required": [
+    "template_name"
+  ]
+}

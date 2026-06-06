@@ -1,11 +1,12 @@
 import prisma from "../../config/prisma.js";
 
 import { generate24HexId } from '../../utils/idGenerator.js';
+import { canAccessEmployee } from "../../middleware/authorization.js";
 
 export const getAll = async (req, res) => {
   try {
     const incidents = await prisma.attendance_incident.findMany({
-      // include: { attendance: true },
+      where: req.accessibleEmployeeIds === null ? {} : { employee_id: { in: req.accessibleEmployeeIds } },
       orderBy: { created_date: 'desc' }
     });
     res.json(incidents);
@@ -21,8 +22,10 @@ export const filter = async (req, res) => {
 
     // Mapea filtros simples a where de Prisma
     const where = {};
+    if (req.accessibleEmployeeIds !== null) where.employee_id = { in: req.accessibleEmployeeIds };
 
     if (filters.employee_id) {
+      if (!canAccessEmployee(req, filters.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
       where.employee_id = filters.employee_id;
     }
 
@@ -74,6 +77,7 @@ export const getById =  async (req, res) => {
       include: { attendance: true }
     });
     if (!incident) return res.status(404).json({ error: 'Incident not found' });
+    if (!canAccessEmployee(req, incident.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     res.json(incident);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -83,6 +87,7 @@ export const getById =  async (req, res) => {
 export const create = async (req, res) => {
   try {
     const { id, created_date, updated_date, created_by, incident_date, review_date,...data } = req.body;
+    if (!canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     const incident = await prisma.attendance_incident.create({
       data: {
         id: generate24HexId(),
@@ -99,7 +104,11 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
+    const existing = await prisma.attendance_incident.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Incident not found' });
+    if (!canAccessEmployee(req, existing.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     const { review_date, ...data } = req.body;
+    if (data.employee_id && !canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
 
     const incident = await prisma.attendance_incident.update({
       where: { id: req.params.id },
@@ -116,6 +125,9 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
+    const existing = await prisma.attendance_incident.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Incident not found' });
+    if (!canAccessEmployee(req, existing.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     await prisma.attendance_incident.delete({
       where: { id: req.params.id }
     });

@@ -1,0 +1,176 @@
+{
+  "name": "Payslip",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "period": {
+      "type": "string",
+      "description": "Periodo (Mes YYYY)"
+    },
+    "month": {
+      "type": "integer",
+      "description": "Mes (1-12)"
+    },
+    "year": {
+      "type": "integer",
+      "description": "A\u00f1o"
+    },
+    "payroll_type": {
+      "type": "string",
+      "enum": [
+        "Quincenal",
+        "Mensual",
+        "Adicional",
+        "SNP"
+      ],
+      "default": "Mensual",
+      "description": "Tipo de planilla"
+    },
+    "payroll_number": {
+      "type": "string",
+      "description": "N\u00famero de planilla (ej: Q1-2024-01 para quincenal 1 de enero)"
+    },
+    "advance_payment_id": {
+      "type": "string",
+      "description": "ID de la planilla quincenal (adelanto) si es mensual"
+    },
+    "worked_days": {
+      "type": "integer",
+      "description": "D\u00edas trabajados"
+    },
+    "non_worked_days": {
+      "type": "integer",
+      "default": 0,
+      "description": "D\u00edas no laborados"
+    },
+    "subsidized_days": {
+      "type": "integer",
+      "default": 0,
+      "description": "D\u00edas subsidiados"
+    },
+    "regular_hours": {
+      "type": "number",
+      "default": 0,
+      "description": "Horas de jornada ordinaria"
+    },
+    "overtime_hours": {
+      "type": "number",
+      "default": 0,
+      "description": "Horas extras trabajadas"
+    },
+    "base_salary": {
+      "type": "number",
+      "description": "Remuneraci\u00f3n b\u00e1sica"
+    },
+    "family_allowance": {
+      "type": "number",
+      "default": 0,
+      "description": "Asignaci\u00f3n familiar"
+    },
+    "overtime_pay": {
+      "type": "number",
+      "default": 0,
+      "description": "Horas extras"
+    },
+    "bonuses": {
+      "type": "number",
+      "default": 0,
+      "description": "Bonificaciones"
+    },
+    "commissions": {
+      "type": "number",
+      "default": 0,
+      "description": "Comisiones"
+    },
+    "other_income": {
+      "type": "number",
+      "default": 0,
+      "description": "Otros ingresos"
+    },
+    "total_income": {
+      "type": "number",
+      "description": "Total ingresos"
+    },
+    "pension_deduction": {
+      "type": "number",
+      "default": 0,
+      "description": "Descuento AFP/ONP"
+    },
+    "health_insurance": {
+      "type": "number",
+      "default": 0,
+      "description": "Seguro de salud"
+    },
+    "income_tax": {
+      "type": "number",
+      "default": 0,
+      "description": "Impuesto 5ta categor\u00eda"
+    },
+    "tardiness_discount": {
+      "type": "number",
+      "default": 0,
+      "description": "Descuento por tardanzas"
+    },
+    "absence_discount": {
+      "type": "number",
+      "default": 0,
+      "description": "Descuento por faltas"
+    },
+    "loan_deduction": {
+      "type": "number",
+      "default": 0,
+      "description": "Pr\u00e9stamos"
+    },
+    "advance_deduction": {
+      "type": "number",
+      "default": 0,
+      "description": "Descuento por adelanto quincenal"
+    },
+    "other_deductions": {
+      "type": "number",
+      "default": 0,
+      "description": "Otros descuentos"
+    },
+    "total_deductions": {
+      "type": "number",
+      "description": "Total descuentos"
+    },
+    "net_pay": {
+      "type": "number",
+      "description": "Neto a pagar"
+    },
+    "payment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de pago"
+    },
+    "pdf_url": {
+      "type": "string",
+      "description": "URL del PDF de la boleta"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Calculada",
+        "Aprobada",
+        "Pagada"
+      ],
+      "default": "Calculada",
+      "description": "Estado de la boleta"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas o comentarios adicionales"
+    }
+  },
+  "required": [
+    "employee_id",
+    "period",
+    "month",
+    "year",
+    "payroll_type"
+  ]
+}

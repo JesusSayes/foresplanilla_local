@@ -1,0 +1,57 @@
+{
+  "name": "ContractClause",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo de la cl\u00e1usula"
+    },
+    "content": {
+      "type": "string",
+      "description": "Contenido de la cl\u00e1usula"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "obligatoria",
+        "opcional"
+      ],
+      "default": "opcional",
+      "description": "Tipo de cl\u00e1usula"
+    },
+    "contract_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tipos de contrato a los que aplica esta cl\u00e1usula"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Orden de aparici\u00f3n en el contrato"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Cl\u00e1usula activa"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "general",
+        "derechos",
+        "obligaciones",
+        "confidencialidad",
+        "terminacion",
+        "otros"
+      ],
+      "default": "general",
+      "description": "Categor\u00eda de la cl\u00e1usula"
+    }
+  },
+  "required": [
+    "title",
+    "content"
+  ]
+}

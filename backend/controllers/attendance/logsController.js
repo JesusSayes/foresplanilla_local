@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import { canAccessEmployee } from "../../middleware/authorization.js";
 
 export const getByEmployeeAndDate = async (req, res) => {
   try {
@@ -9,6 +10,7 @@ export const getByEmployeeAndDate = async (req, res) => {
         error: "employee_id y date son obligatorios",
       });
     }
+    if (!canAccessEmployee(req, employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
 
     const logs = await prisma.attendance_logs.findMany({
       where: {

@@ -1,0 +1,76 @@
+{
+  "name": "AccessDevice",
+  "type": "object",
+  "properties": {
+    "device_name": {
+      "type": "string",
+      "description": "Nombre del dispositivo"
+    },
+    "device_type": {
+      "type": "string",
+      "enum": [
+        "Torniquete",
+        "Lector de Huella",
+        "Lector de Tarjeta",
+        "Reconocimiento Facial",
+        "Lector QR"
+      ],
+      "description": "Tipo de dispositivo"
+    },
+    "device_id": {
+      "type": "string",
+      "description": "ID \u00fanico del dispositivo"
+    },
+    "location": {
+      "type": "string",
+      "description": "Ubicaci\u00f3n f\u00edsica del dispositivo"
+    },
+    "ip_address": {
+      "type": "string",
+      "description": "Direcci\u00f3n IP del dispositivo"
+    },
+    "mac_address": {
+      "type": "string",
+      "description": "Direcci\u00f3n MAC"
+    },
+    "api_endpoint": {
+      "type": "string",
+      "description": "Endpoint API del dispositivo"
+    },
+    "api_key": {
+      "type": "string",
+      "description": "API Key para autenticaci\u00f3n"
+    },
+    "event_types": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "Entrada",
+          "Salida",
+          "Ambos"
+        ]
+      },
+      "description": "Tipos de eventos que registra"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Dispositivo activo"
+    },
+    "last_heartbeat": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima se\u00f1al de vida del dispositivo"
+    },
+    "configuration": {
+      "type": "object",
+      "description": "Configuraci\u00f3n espec\u00edfica del dispositivo"
+    }
+  },
+  "required": [
+    "device_name",
+    "device_type",
+    "device_id"
+  ]
+}

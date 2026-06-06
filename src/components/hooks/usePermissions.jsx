@@ -106,6 +106,8 @@ export const usePermissions = () => {
   const [roles, setRoles] = useState([]);
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
+  // fallbackSiteRestriction: undefined=cargando, null=todas, []|[...]=restricción
+  const [fallbackSiteRestriction, setFallbackSiteRestriction] = useState(undefined);
 
   useEffect(() => {
     const loadPermissions = async () => {
@@ -133,9 +135,10 @@ export const usePermissions = () => {
           setEmployee(emp);
 
           // Super Admin tiene acceso total inmediato
-          if (emp.role === "super_admin" || emp.role === "admin") {
+          if (emp.role === "super_admin") {
             setPermissions(Object.keys(AVAILABLE_PERMISSIONS));
             setRoles([{ name: "Super Admin", permissions: Object.keys(AVAILABLE_PERMISSIONS), priority: 1000 }]);
+            setFallbackSiteRestriction(null);
             setLoading(false);
             return;
           }
@@ -152,6 +155,7 @@ export const usePermissions = () => {
             const assignedRoles = allRoles.filter(r => roleIds.includes(r.id));
 
             setRoles(assignedRoles);
+            setFallbackSiteRestriction(null); // los roles custom manejan la restricción
 
             // Combinar permisos de todos los roles
             const allPermissions = new Set();
@@ -163,9 +167,18 @@ export const usePermissions = () => {
 
             setPermissions([...allPermissions]);
           } else {
-            // Fallback al rol básico del empleado si no tiene roles asignados
+            // Fallback al rol básico del empleado si no tiene roles asignados en UserRole
             const basicPermissions = getBasicPermissionsByRole(emp.role);
             setPermissions(basicPermissions);
+            // Calcular restricción de sede para roles legacy:
+            // admin y super_admin: sin restricción
+            // cualquier otro rol: restringido a su propia sede
+            if (emp.role === "admin" || emp.role === "super_admin") {
+              setFallbackSiteRestriction(null);
+            } else {
+              // Roles como manager, hr_readonly, empleado: solo su sede
+              setFallbackSiteRestriction(emp.site ? [emp.site] : []);
+            }
           }
         }
       } catch (error) {
@@ -180,7 +193,7 @@ export const usePermissions = () => {
 
   const hasPermission = (permission) => {
     // Super Admin siempre tiene todos los permisos
-    if (employee?.role === "super_admin" || employee?.role === "admin") return true;
+    if (employee?.role === "super_admin") return true;
     return permissions.includes(permission) || permissions.includes("system.admin");
   };
 
@@ -193,48 +206,50 @@ export const usePermissions = () => {
   };
 
   const canAccessSite = (siteName) => {
-    if (employee?.role === "super_admin" || employee?.role === "admin") return true;
-    if (hasPermission("system.admin")) return true;
-
-    // Si ningún rol tiene restricción de sede, puede ver todas
-    const siteRestrictedRoles = roles.filter(r => r.site_restricted);
-    if (siteRestrictedRoles.length === 0) return true;
-
-    // Roles sin restricción de sede: otorgan acceso a todo
-    const hasUnrestrictedRole = roles.some(r => !r.site_restricted);
-    if (hasUnrestrictedRole) return true;
-
-    // Combinar todas las sedes permitidas de TODOS los roles site_restricted del usuario
-    const allowedSites = siteRestrictedRoles.flatMap(r => r.allowed_sites || []);
-
-    // Si ningún rol tiene sedes específicas definidas, aplica la restricción a la sede propia
-    if (allowedSites.length === 0) {
-      return employee?.site === siteName;
-    }
-
-    return allowedSites.includes(siteName);
+    const accessible = getAccessibleSites();
+    if (accessible === null) return true;
+    return accessible.includes(siteName);
   };
 
-  const getAccessibleSites = () => {
-    if (employee?.role === "super_admin" || employee?.role === "admin") return null; // null = todas
-    if (hasPermission("system.admin")) return null;
+  const getAccessibleSites = (permissionList = null) => {
+    // Mientras carga, devolver undefined para que los componentes esperen
+    if (loading) return undefined;
 
-    const siteRestrictedRoles = roles.filter(r => r.site_restricted);
-    if (siteRestrictedRoles.length === 0) return null;
+    // Super admin siempre ve todo
+    if (employee?.role === "super_admin") return null;
 
-    // Si el usuario tiene algún rol sin restricción de sede, ve todas
-    const hasUnrestrictedRole = roles.some(r => !r.site_restricted);
-    if (hasUnrestrictedRole) return null;
+    // Si el usuario tiene roles custom asignados en UserRole
+    if (roles.length > 0) {
+      // system.admin en los roles custom => acceso total
+      if (permissions.includes("system.admin")) return null;
 
-    // Combinar sedes de TODOS los roles site_restricted
-    const allowedSites = [...new Set(siteRestrictedRoles.flatMap(r => r.allowed_sites || []))];
+      const relevantRoles = permissionList
+        ? roles.filter(role => (role.permissions || []).some(permission =>
+            permission === "system.admin" || permissionList.includes(permission)
+          ))
+        : roles;
+      if (permissionList && relevantRoles.length === 0) return [];
 
-    // Si ningún rol tiene sedes específicas, restringir a la sede propia del empleado
-    if (allowedSites.length === 0) {
-      return employee?.site ? [employee.site] : [];
+      const siteRestrictedRoles = relevantRoles.filter(r => r.site_restricted);
+      // Ningún rol tiene restricción → acceso total
+      if (siteRestrictedRoles.length === 0) return null;
+
+      // Si tiene algún rol SIN restricción de sede, ve todas
+      const hasUnrestrictedRole = relevantRoles.some(r => !r.site_restricted);
+      if (hasUnrestrictedRole) return null;
+
+      // Combinar sedes de TODOS los roles site_restricted
+      const allowedSites = [...new Set(siteRestrictedRoles.flatMap(r => r.allowed_sites || []))];
+      // Si ningún rol tiene sedes específicas, restringir a la sede propia
+      if (allowedSites.length === 0) {
+        return employee?.site ? [employee.site] : [];
+      }
+      return allowedSites;
     }
 
-    return allowedSites;
+    // Fallback para usuarios con rol legacy (sin UserRole asignado)
+    // fallbackSiteRestriction se calculó en el useEffect (undefined mientras carga)
+    return fallbackSiteRestriction ?? null;
   };
 
   const canAccessDepartment = (departmentName) => {

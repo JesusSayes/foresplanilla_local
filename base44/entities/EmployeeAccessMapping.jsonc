@@ -1,0 +1,54 @@
+{
+  "name": "EmployeeAccessMapping",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "identifier_type": {
+      "type": "string",
+      "enum": [
+        "Badge",
+        "Huella Digital",
+        "Tarjeta RFID",
+        "Facial",
+        "QR Code",
+        "PIN"
+      ],
+      "description": "Tipo de identificador"
+    },
+    "identifier_value": {
+      "type": "string",
+      "description": "Valor del identificador (n\u00famero de badge, ID de huella, etc)"
+    },
+    "device_id": {
+      "type": "string",
+      "description": "ID del dispositivo asociado (opcional)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Mapeo activo"
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date",
+      "description": "V\u00e1lido desde"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date",
+      "description": "V\u00e1lido hasta"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "employee_id",
+    "identifier_type",
+    "identifier_value"
+  ]
+}

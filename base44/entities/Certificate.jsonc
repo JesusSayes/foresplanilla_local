@@ -1,0 +1,53 @@
+{
+  "name": "Certificate",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "certificate_type": {
+      "type": "string",
+      "enum": [
+        "Certificado de Trabajo",
+        "Liquidaci\u00f3n de Beneficios",
+        "CTS",
+        "Gratificaci\u00f3n",
+        "Constancia de Ingresos"
+      ],
+      "description": "Tipo de certificado"
+    },
+    "issue_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de emisi\u00f3n"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del certificado"
+    },
+    "pdf_url": {
+      "type": "string",
+      "description": "URL del PDF"
+    },
+    "requested_by_employee": {
+      "type": "boolean",
+      "default": false,
+      "description": "Solicitado por el empleado"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Solicitado",
+        "En Proceso",
+        "Emitido"
+      ],
+      "default": "Solicitado",
+      "description": "Estado del certificado"
+    }
+  },
+  "required": [
+    "employee_id",
+    "certificate_type"
+  ]
+}

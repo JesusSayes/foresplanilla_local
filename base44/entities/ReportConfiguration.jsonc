@@ -1,0 +1,62 @@
+{
+  "name": "ReportConfiguration",
+  "type": "object",
+  "properties": {
+    "report_name": {
+      "type": "string",
+      "description": "Nombre del reporte"
+    },
+    "report_type": {
+      "type": "string",
+      "enum": [
+        "employees",
+        "attendance",
+        "vacations",
+        "payroll"
+      ],
+      "description": "Tipo de reporte"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del reporte"
+    },
+    "filters": {
+      "type": "object",
+      "description": "Filtros aplicados al reporte"
+    },
+    "columns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Columnas seleccionadas para el reporte"
+    },
+    "sort_by": {
+      "type": "string",
+      "description": "Campo por el cual ordenar"
+    },
+    "sort_order": {
+      "type": "string",
+      "enum": [
+        "asc",
+        "desc"
+      ],
+      "default": "asc",
+      "description": "Orden ascendente o descendente"
+    },
+    "is_shared": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el reporte es compartido con otros usuarios"
+    },
+    "is_favorite": {
+      "type": "boolean",
+      "default": false,
+      "description": "Marcado como favorito"
+    }
+  },
+  "required": [
+    "report_name",
+    "report_type"
+  ]
+}

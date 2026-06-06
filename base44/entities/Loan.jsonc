@@ -1,0 +1,72 @@
+{
+  "name": "Loan",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "loan_type_id": {
+      "type": "string",
+      "description": "ID del tipo de pr\u00e9stamo"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Monto total del pr\u00e9stamo"
+    },
+    "total_installments": {
+      "type": "integer",
+      "description": "Total de cuotas mensuales"
+    },
+    "installments_paid": {
+      "type": "integer",
+      "default": 0,
+      "description": "Cuotas pagadas"
+    },
+    "monthly_amount": {
+      "type": "number",
+      "description": "Monto mensual a descontar"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de inicio del descuento"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha estimada de fin"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Activo",
+        "Pagado",
+        "Cancelado"
+      ],
+      "default": "Activo",
+      "description": "Estado del pr\u00e9stamo"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Email de quien aprob\u00f3"
+    },
+    "approval_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de aprobaci\u00f3n"
+    }
+  },
+  "required": [
+    "employee_id",
+    "loan_type_id",
+    "amount",
+    "total_installments",
+    "monthly_amount",
+    "start_date"
+  ]
+}

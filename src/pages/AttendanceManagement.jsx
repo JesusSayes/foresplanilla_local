@@ -70,7 +70,11 @@ export default function AttendanceManagement() {
     full_day_justification: true,
   });
 
-  const { getAccessibleSites, hasPermission } = usePermissions();
+  const { getAccessibleSites, hasPermission, loading: permissionsLoading } = usePermissions();
+  const canEditAttendance = hasPermission("attendance.edit") || hasPermission("system.admin");
+  const canApproveIncidents = hasPermission("attendance.approve_incidents") || hasPermission("system.admin");
+  const canManageSchedules = hasPermission("attendance.manage_schedules") || hasPermission("system.admin");
+  const canExportAttendance = hasPermission("attendance.export") || hasPermission("system.admin");
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -84,9 +88,12 @@ export default function AttendanceManagement() {
   }, [currentUser]);
 
   const { data: allEmployees = [] } = useQuery({
-    queryKey: ["allEmployees"],
+    queryKey: ["attendanceAccessibleEmployees", currentUser?.employee?.id],
     queryFn: async () => {
-      return await entitiesAPI.Employee.list("-created_date");
+      return await entitiesAPI.Employee.accessible([
+        "attendance.view_all",
+        "attendance.view_department",
+      ]);
     },
   });
 
@@ -118,6 +125,7 @@ export default function AttendanceManagement() {
       const conns = await entitiesAPI.DatabaseConnection.list("-created_date");
       return conns.filter(c => c.is_active);
     },
+    enabled: hasPermission("system.admin"),
   });
 
   const { data: sites = [] } = useQuery({
@@ -553,37 +561,109 @@ export default function AttendanceManagement() {
       });
     } else {
       setExistingIncident(null);
-      let incidentType = "Olvido de Marcación";
-      let startTime = record?.scheduled_start || "09:00";
-      let endTime = record?.scheduled_end || "18:00";
-      if (record) {
-        if (record.is_absent) {
-          incidentType = "Falta";
-        } else if (record.is_late) {
-          incidentType = "Tardanza";
-          endTime = record.clock_in || startTime;
-        } else if (record.clock_in && !record.clock_out) {
-          startTime = record.clock_in;
+
+      // Horario programado del día
+      const schedStart = sched ? (sched[dayStarts[dow]] || "09:00") : "09:00";
+      const schedEnd   = sched ? (sched[dayEnds[dow]]   || "18:00") : "18:00";
+
+      const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+      const fromMin = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+      const breakMin = sched?.break_duration_minutes ?? 60;
+
+      const schedStartMin = toMin(schedStart);
+      const schedEndMin   = toMin(schedEnd);
+      // Horas de jornada completa (sin break)
+      const fullDayHours = Math.max(0, (schedEndMin - schedStartMin - breakMin) / 60);
+
+      let incidentType = "Omisión de Marcación";
+      let startTime = schedStart;
+      let endTime = schedEnd;
+      let isFullDay = false;
+
+      if (!record || record.is_absent || (!record.clock_in && !record.clock_out)) {
+        // Sin ninguna marcación → justificar día completo
+        incidentType = record?.is_absent ? "Falta" : "Omisión de Marcación";
+        isFullDay = true;
+        startTime = schedStart;
+        endTime = schedEnd;
+      } else if (record.clock_in && !record.clock_out) {
+        // Tiene entrada pero no salida → justificar desde salida programada
+        // Las horas a justificar son las que faltan desde la hora programada de salida
+        const clockInMin = toMin(record.clock_in.slice(0, 5));
+        // Horas ya trabajadas (estimado hasta fin de jornada)
+        const workedSoFar = Math.max(0, (schedEndMin - clockInMin - breakMin) / 60);
+        const missingHours = Math.max(0, fullDayHours - workedSoFar);
+
+        if (missingHours <= 0) {
+          // Ya completó la jornada, justificar salida programada
+          startTime = schedEnd;
+          endTime = schedEnd;
+        } else {
+          // Justificar desde la hora de salida programada
+          startTime = schedEnd;
+          endTime = schedEnd;
         }
+        incidentType = "Omisión de Marcación";
+        isFullDay = false;
+      } else if (record.clock_in && record.clock_out) {
+        // Tiene entrada y salida pero hay horas faltantes
+        const clockInMin  = toMin(record.clock_in.slice(0, 5));
+        const clockOutMin = toMin(record.clock_out.slice(0, 5));
+        const workedMin   = Math.max(0, clockOutMin - clockInMin - breakMin);
+        const workedHrs   = workedMin / 60;
+        const missingHrs  = Math.max(0, fullDayHours - workedHrs);
+
+        if (missingHrs > 0) {
+          // Calcular el período faltante: desde clock_out hasta completar la jornada
+          const justEndMin  = Math.min(clockOutMin + Math.round(missingHrs * 60), schedEndMin);
+          startTime = record.clock_out.slice(0, 5);
+          endTime   = fromMin(justEndMin);
+        } else {
+          startTime = schedStart;
+          endTime   = schedEnd;
+          isFullDay = true;
+        }
+        incidentType = "Omisión de Marcación";
+        isFullDay = false;
+      } else if (record.is_late) {
+        // Llegó tarde → justificar tardanza (desde schedStart hasta clock_in)
+        incidentType = "Justificación de Tardanza";
+        startTime = schedStart;
+        endTime   = record.clock_in?.slice(0, 5) || schedStart;
+        isFullDay = false;
       }
+
       setJustificationData({
-        incident_type: incidentType === "Olvido de Marcación" ? "Omisión de Marcación" : incidentType,
+        incident_type: incidentType,
         justification: "",
         supporting_document_url: "",
         justified_time_start: startTime,
         justified_time_end: endTime,
-        full_day_justification: incidentType === "Falta",
+        full_day_justification: isFullDay,
       });
     }
 
     setShowJustifyModal(true);
   };
 
-  // Aplicar restricción de sedes según el rol del usuario (null = todas)
-  const accessibleSites = getAccessibleSites();
-  const siteAllowedEmployees = accessibleSites === null
-    ? allEmployees
-    : allEmployees.filter(emp => accessibleSites.includes(emp.site));
+  // Aplicar restricción de sedes según el rol (null=todas, undefined=cargando)
+  const accessibleSites = permissionsLoading ? undefined : getAccessibleSites([
+    "attendance.view_all",
+    "attendance.view_department",
+  ]);
+  const isSiteRestricted = accessibleSites !== null && accessibleSites !== undefined;
+  const hasSingleSite = isSiteRestricted && Array.isArray(accessibleSites) && accessibleSites.length === 1;
+
+  // Auto-aplicar filtro de sede cuando hay restricción a una sola sede
+  useEffect(() => {
+    if (hasSingleSite) {
+      setSelectedSite(accessibleSites[0]);
+    }
+  }, [hasSingleSite, Array.isArray(accessibleSites) ? accessibleSites.join(",") : ""]);
+
+  // El backend ya aplica el alcance autorizado por sede/departamento/equipo.
+  const siteAllowedEmployees = permissionsLoading ? [] : allEmployees;
+  const normalizeSite = value => String(value || "").trim().toLocaleLowerCase();
 
   const filteredEmployees = siteAllowedEmployees.filter(emp => {
     const term = searchTerm.toLowerCase().trim();
@@ -594,7 +674,10 @@ export default function AttendanceManagement() {
       fullNameReverse.includes(term) ||
       emp.document_number.toLowerCase().includes(term) ||
       term.split(/\s+/).every(word => fullName.includes(word));
-    const matchesSite = selectedSite === "all" || emp.site === selectedSite || (selectedSite === "sin_sede" && !emp.site);
+    const matchesSite = hasSingleSite ||
+      selectedSite === "all" ||
+      normalizeSite(emp.site) === normalizeSite(selectedSite) ||
+      (selectedSite === "sin_sede" && !emp.site);
     return matchesSearch && matchesSite;
   });
 
@@ -978,9 +1061,9 @@ export default function AttendanceManagement() {
                       : "Recalcular Todo"}
                   </Button>
                 )}
-                <Button onClick={() => handleExportToExcel()} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
+                {canExportAttendance && <Button onClick={() => handleExportToExcel()} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
                   <Download className="w-4 h-4 mr-2" />Excel
-                </Button>
+                </Button>}
                 <Button onClick={handlePrint} variant="outline" className="whitespace-nowrap">
                   <Printer className="w-4 h-4 mr-2" />Imprimir
                 </Button>
@@ -997,16 +1080,24 @@ export default function AttendanceManagement() {
                         <Input placeholder="Buscar empleado..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="pl-10" />
                       </div>
                     </div>
-                    <Select value={selectedSite} onValueChange={(v) => { setSelectedSite(v); setCurrentPage(1); }}>
-                      <SelectTrigger className="w-36"><SelectValue placeholder="Sede" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas</SelectItem>
-                        <SelectItem value="sin_sede">Sin sede</SelectItem>
-                        {sites
-                          .filter(site => accessibleSites === null || accessibleSites.includes(site.name))
-                          .map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <div className="relative">
+                      <Select value={selectedSite} onValueChange={(v) => { setSelectedSite(v); setCurrentPage(1); }} disabled={hasSingleSite}>
+                        <SelectTrigger className={`w-36 ${hasSingleSite ? "opacity-70 cursor-not-allowed bg-slate-100" : ""}`}>
+                          <SelectValue placeholder="Sede" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {!isSiteRestricted && <SelectItem value="all">Todas</SelectItem>}
+                          {!isSiteRestricted && <SelectItem value="sin_sede">Sin sede</SelectItem>}
+                          {isSiteRestricted && accessibleSites?.length > 1 && <SelectItem value="all">Todas (permitidas)</SelectItem>}
+                          {sites
+                            .filter(site => accessibleSites === null || accessibleSites?.includes(site.name))
+                            .map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {hasSingleSite && (
+                        <span className="absolute -top-5 left-0 text-xs text-amber-600 font-medium whitespace-nowrap">🔒 Sede restringida</span>
+                      )}
+                    </div>
                     <Select value={attendanceFilter} onValueChange={(v) => { setAttendanceFilter(v); setCurrentPage(1); }}>
                       <SelectTrigger className="w-44"><SelectValue placeholder="Filtro" /></SelectTrigger>
                       <SelectContent>
@@ -1204,7 +1295,7 @@ export default function AttendanceManagement() {
                                   </Badge>
 
                                   {/* === CUSTOM BLOCK: validación manual RRHH === */}
-                                  {(
+                                  {canEditAttendance && (
                                     (
                                       [
                                       "Revisar", "Incompleto"
@@ -1218,7 +1309,7 @@ export default function AttendanceManagement() {
                                     </Button>
                                   )}
 
-                                  {!vacation && emp.record && (
+                                  {canEditAttendance && !vacation && emp.record && (
                                     <Button size="sm" variant="outline" className="h-7 px-2 text-xs shrink-0 whitespace-nowrap" onClick={() => handleEditRecord(emp.record)}>
                                       <Edit className="w-3 h-3 mr-1" />Editar
                                     </Button>
@@ -1226,7 +1317,7 @@ export default function AttendanceManagement() {
                                   {!vacation && !emp.record && (
                                     <div style={{width: "62px", height: "28px", flexShrink: 0}} />
                                   )}
-                                  {!vacation && (
+                                  {canEditAttendance && !vacation && (
                                     <Button
                                       size="sm"
                                       variant="outline"
@@ -1237,10 +1328,10 @@ export default function AttendanceManagement() {
                                     </Button>
                                   )}
                                   {vacation && <div style={{width: "138px", flexShrink: 0}} />}
-                                  <Button size="sm" variant="outline" className="h-7 px-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50 shrink-0" title="Asignar horario"
+                                  {canManageSchedules && <Button size="sm" variant="outline" className="h-7 px-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50 shrink-0" title="Asignar horario"
                                     onClick={() => { setSchedulingEmployee({ ...emp, _rowDate: rowDate }); setShowScheduleModal(true); }}>
                                     <CalendarClock className="w-3 h-3" />
-                                  </Button>
+                                  </Button>}
                                 </div>
                               </td>
                             </tr>
@@ -1317,7 +1408,7 @@ export default function AttendanceManagement() {
                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
                              <p className="text-sm text-yellow-900">⚠️ Este empleado <strong>no está autorizado</strong> para realizar horas extras de forma permanente. Puede corregir la marcación, descartar la alerta o <strong>aceptar las HE únicamente para este día</strong> sin modificar su autorización general.</p>
                            </div>
-                           <div className="flex gap-2 flex-wrap">
+                           {canEditAttendance && <div className="flex gap-2 flex-wrap">
                               <Button size="sm" variant="outline" className="flex-1" onClick={() => record && handleEditRecord(record)}>
                                 <Edit className="w-4 h-4 mr-2" />Corregir Marcación
                               </Button>
@@ -1360,7 +1451,7 @@ export default function AttendanceManagement() {
                               }}>
                                 <XCircle className="w-4 h-4 mr-2" />Descartar
                               </Button>
-                            </div>
+                           </div>}
                          </div>
                        );
                       })}
@@ -1426,14 +1517,14 @@ export default function AttendanceManagement() {
                                     </a>
                                   </div>
                                 )}
-                                <div className="flex gap-3">
+                                {canApproveIncidents && <div className="flex gap-3">
                                   <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => { setReviewingIncident(incident); setShowIncidentModal(true); }}>
                                     <CheckCircle className="w-4 h-4 mr-2" />Aprobar
                                   </Button>
                                   <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setReviewingIncident(incident); setShowIncidentModal(true); }}>
                                     <XCircle className="w-4 h-4 mr-2" />Rechazar
                                   </Button>
-                                </div>
+                                </div>}
                               </div>
                             );
                           })}
@@ -1754,6 +1845,7 @@ export default function AttendanceManagement() {
             setJustificationData={setJustificationData}
             selectedDate={justifyingDate || selectedDate}
             employeeSchedule={justifyingSchedule}
+            attendanceRecord={todayRecords.find(r => r.employee_id === justifyingEmployee.id && r.date === (justifyingDate ? format(justifyingDate, "yyyy-MM-dd") : dateToStringLima(selectedDate)))}
             todayRecords={todayRecords}
             employee={employee}
             existingIncident={existingIncident}

@@ -1,0 +1,27 @@
+{
+  "name": "Site",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre de la sede"
+    },
+    "code": {
+      "type": "string",
+      "description": "C\u00f3digo de la sede"
+    },
+    "address": {
+      "type": "string",
+      "description": "Direcci\u00f3n de la sede"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Sede activa"
+    }
+  },
+  "required": [
+    "name",
+    "code"
+  ]
+}

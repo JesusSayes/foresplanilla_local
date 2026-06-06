@@ -1,0 +1,81 @@
+{
+  "name": "VacationRequest",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "request_type": {
+      "type": "string",
+      "enum": [
+        "Vacaciones",
+        "Permiso con goce",
+        "Permiso sin goce",
+        "Licencia m\u00e9dica"
+      ],
+      "description": "Tipo de solicitud"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de inicio"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de fin"
+    },
+    "total_days": {
+      "type": "integer",
+      "description": "Total de d\u00edas solicitados"
+    },
+    "business_days": {
+      "type": "integer",
+      "description": "D\u00edas h\u00e1biles"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Motivo de la solicitud"
+    },
+    "supporting_document_url": {
+      "type": "string",
+      "description": "Documento de sustento (ej: certificado m\u00e9dico)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pendiente",
+        "Aprobada",
+        "Rechazada",
+        "Cancelada"
+      ],
+      "default": "Pendiente",
+      "description": "Estado de la solicitud"
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Nombre de quien aprob\u00f3"
+    },
+    "approved_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de aprobaci\u00f3n"
+    },
+    "rejection_reason": {
+      "type": "string",
+      "description": "Motivo de rechazo"
+    },
+    "comments": {
+      "type": "string",
+      "description": "Comentarios adicionales"
+    }
+  },
+  "required": [
+    "employee_id",
+    "request_type",
+    "start_date",
+    "end_date",
+    "total_days"
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "name": "NotificationPreference",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario"
+    },
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "incident_pending": {
+      "type": "boolean",
+      "default": true,
+      "description": "Notificar incidencias pendientes de aprobaci\u00f3n"
+    },
+    "incident_approved": {
+      "type": "boolean",
+      "default": true,
+      "description": "Notificar cuando se aprueba una incidencia"
+    },
+    "incident_rejected": {
+      "type": "boolean",
+      "default": true,
+      "description": "Notificar cuando se rechaza una incidencia"
+    },
+    "vacation_pending": {
+      "type": "boolean",
+      "default": true,
+      "description": "Notificar solicitudes de vacaciones pendientes"
+    },
+    "vacation_approved": {
+      "type": "boolean",
+      "default": true,
+      "description": "Notificar cuando se aprueban vacaciones"
+    },
+    "vacation_rejected": {
+      "type": "boolean",
+      "default": true,
+      "description": "Notificar cuando se rechazan vacaciones"
+    },
+    "contract_expiring": {
+      "type": "boolean",
+      "default": true,
+      "description": "Notificar contratos pr\u00f3ximos a vencer"
+    },
+    "payslip_ready": {
+      "type": "boolean",
+      "default": true,
+      "description": "Notificar cuando hay boletas disponibles"
+    },
+    "attendance_alert": {
+      "type": "boolean",
+      "default": true,
+      "description": "Notificar alertas de asistencia"
+    },
+    "system": {
+      "type": "boolean",
+      "default": true,
+      "description": "Notificaciones del sistema"
+    },
+    "email_notifications": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enviar notificaciones por email"
+    }
+  },
+  "required": [
+    "user_email",
+    "employee_id"
+  ]
+}

@@ -69,6 +69,7 @@ export default function Layout({ children, currentPageName }) {
 
           if (emp.role === "super_admin") {
             setUserPermissions(["system.admin"]);
+            setAssignedRoleNames([]);
             setLoading(false);
             return;
           }
@@ -168,9 +169,6 @@ export default function Layout({ children, currentPageName }) {
     }
     setSavingPassword(true);
     setPasswordErrors([]);
-      const user = await authAPI.me();
-      await authAPI.changePassword(user.email, passwordData.newPassword);
-      setPasswordSuccess(true);
     try {
       const user = await authAPI.me();
       await authAPI.changePassword(user.email, passwordData.newPassword);

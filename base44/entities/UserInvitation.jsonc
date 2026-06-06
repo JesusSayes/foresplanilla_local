@@ -1,0 +1,38 @@
+{
+  "name": "UserInvitation",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado invitado"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email al que se envi\u00f3 la invitaci\u00f3n"
+    },
+    "invited_by": {
+      "type": "string",
+      "description": "Email de quien envi\u00f3 la invitaci\u00f3n"
+    },
+    "invited_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de la invitaci\u00f3n"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Enviada",
+        "Aceptada",
+        "Expirada"
+      ],
+      "default": "Enviada",
+      "description": "Estado de la invitaci\u00f3n"
+    }
+  },
+  "required": [
+    "employee_id",
+    "email",
+    "invited_by"
+  ]
+}

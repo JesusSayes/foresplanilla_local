@@ -4,8 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar, AlertCircle, Info } from "lucide-react";
-import { format, subDays, parseISO } from "date-fns";
+import { format, isValid, subDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+
+const parseValidDate = (value) => {
+  if (!value) return null;
+  const date = parseISO(String(value));
+  return isValid(date) ? date : null;
+};
+
+const formatDate = (value, pattern, options) => {
+  const date = parseValidDate(value);
+  return date ? format(date, pattern, options) : "";
+};
 
 export default function AttendancePeriodModal({ defaultDateFrom, defaultDateTo, onConfirm, onCancel, actionLabel = "Vista Previa" }) {
   const [dateFrom, setDateFrom] = useState(defaultDateFrom);
@@ -18,12 +29,15 @@ export default function AttendancePeriodModal({ defaultDateFrom, defaultDateTo, 
     setError("");
   }, [defaultDateFrom, defaultDateTo]);
 
-  const minDateFrom = format(subDays(parseISO(defaultDateFrom), 7), "yyyy-MM-dd");
-  const minDateTo = format(subDays(parseISO(defaultDateTo), 7), "yyyy-MM-dd");
+  const parsedDefaultDateFrom = parseValidDate(defaultDateFrom);
+  const parsedDefaultDateTo = parseValidDate(defaultDateTo);
+  const minDateFrom = parsedDefaultDateFrom ? format(subDays(parsedDefaultDateFrom, 7), "yyyy-MM-dd") : "";
+  const minDateTo = parsedDefaultDateTo ? format(subDays(parsedDefaultDateTo, 7), "yyyy-MM-dd") : "";
+  const hasValidDates = Boolean(parseValidDate(dateFrom) && parseValidDate(dateTo));
 
   const handleConfirm = () => {
-    if (!dateFrom || !dateTo) {
-      setError("Debes especificar ambas fechas.");
+    if (!hasValidDates) {
+      setError("Debes especificar ambas fechas correctamente.");
       return;
     }
     if (dateFrom > dateTo) {
@@ -31,11 +45,11 @@ export default function AttendancePeriodModal({ defaultDateFrom, defaultDateTo, 
       return;
     }
     if (dateFrom < minDateFrom) {
-      setError(`La fecha de inicio no puede ser más de 7 días antes del ${format(parseISO(defaultDateFrom), "dd/MM/yyyy")}.`);
+      setError(`La fecha de inicio no puede ser más de 7 días antes del ${formatDate(defaultDateFrom, "dd/MM/yyyy")}.`);
       return;
     }
     if (dateTo < minDateTo) {
-      setError(`La fecha de fin no puede ser más de 7 días antes del ${format(parseISO(defaultDateTo), "dd/MM/yyyy")}.`);
+      setError(`La fecha de fin no puede ser más de 7 días antes del ${formatDate(defaultDateTo, "dd/MM/yyyy")}.`);
       return;
     }
     setError("");
@@ -79,7 +93,7 @@ export default function AttendancePeriodModal({ defaultDateFrom, defaultDateTo, 
                 onChange={(e) => { setDateFrom(e.target.value); setError(""); }}
               />
               <p className="text-xs text-slate-400 mt-1">
-                Por defecto: {format(parseISO(defaultDateFrom), "dd/MM/yyyy")}
+                Por defecto: {formatDate(defaultDateFrom, "dd/MM/yyyy")}
               </p>
             </div>
             <div>
@@ -92,25 +106,25 @@ export default function AttendancePeriodModal({ defaultDateFrom, defaultDateTo, 
                 onChange={(e) => { setDateTo(e.target.value); setError(""); }}
               />
               <p className="text-xs text-slate-400 mt-1">
-                Por defecto: {format(parseISO(defaultDateTo), "dd/MM/yyyy")}
+                Por defecto: {formatDate(defaultDateTo, "dd/MM/yyyy")}
               </p>
             </div>
           </div>
 
-          {isModified && !error && (
+          {isModified && hasValidDates && !error && (
             <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
               <p className="text-xs text-amber-800">
-                Período modificado: <strong>{format(parseISO(dateFrom), "dd MMM", { locale: es })} — {format(parseISO(dateTo), "dd MMM yyyy", { locale: es })}</strong>
+                Período modificado: <strong>{formatDate(dateFrom, "dd MMM", { locale: es })} — {formatDate(dateTo, "dd MMM yyyy", { locale: es })}</strong>
               </p>
             </div>
           )}
 
-          {!isModified && !error && (
+          {!isModified && hasValidDates && !error && (
             <div className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg">
               <Calendar className="w-4 h-4 text-green-600 shrink-0" />
               <p className="text-xs text-green-800">
-                Período por defecto: <strong>{format(parseISO(dateFrom), "dd MMM", { locale: es })} — {format(parseISO(dateTo), "dd MMM yyyy", { locale: es })}</strong>
+                Período por defecto: <strong>{formatDate(dateFrom, "dd MMM", { locale: es })} — {formatDate(dateTo, "dd MMM yyyy", { locale: es })}</strong>
               </p>
             </div>
           )}

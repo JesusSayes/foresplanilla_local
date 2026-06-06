@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import { canAccessEmployee } from "../../middleware/authorization.js";
 
 function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
   const candidates = schedules.filter(s => {
@@ -116,6 +117,9 @@ const recalcularAsistencia = async (req, res) => {
 
     if (!employee_id || !date_from || !date_to) {
       return res.status(400).json({ error: 'employee_id, date_from y date_to son requeridos' });
+    }
+    if (!canAccessEmployee(req, employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
 
     const [employee, allSchedules] = await Promise.all([
