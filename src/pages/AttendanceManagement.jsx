@@ -64,6 +64,9 @@ export default function AttendanceManagement() {
   const { getAccessibleSites, hasPermission, loading: permissionsLoading, employee: permEmployee } = usePermissions();
   const queryClient = useQueryClient();
 
+  // Definir aquí para que esté disponible en todos los useEffect y handlers
+  const effectiveEmployee = employee || permEmployee;
+
   useEffect(() => {
     const loadUserData = async () => {
       try {
@@ -880,10 +883,7 @@ export default function AttendanceManagement() {
     return configs[status] || configs["Incompleto"];
   };
 
-  // Usar employee del hook de permisos si el local aún no cargó
-  const effectiveEmployee = employee || permEmployee;
-
-  if (permissionsLoading) {
+  if (permissionsLoading && !effectiveEmployee) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Card><CardContent className="p-8"><p>Cargando...</p></CardContent></Card>
