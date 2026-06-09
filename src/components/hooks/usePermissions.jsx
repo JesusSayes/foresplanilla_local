@@ -18,6 +18,7 @@ export const AVAILABLE_PERMISSIONS = {
   "attendance.view_all": "Ver asistencia de todos",
   "attendance.view_department": "Ver asistencia del departamento",
   "attendance.edit": "Editar registros de asistencia",
+  "attendance.approve_edits": "Aprobar/rechazar edición de registros de asistencia",
   "attendance.approve_incidents": "Aprobar/rechazar incidencias",
   "attendance.manage": "Gestión completa de asistencia",
   "attendance.export": "Exportar reportes de asistencia",
@@ -345,7 +346,7 @@ const getBasicPermissionsByRole = (role) => {
     admin: [
       "system.admin", "system.settings",
       "employees.view", "employees.edit", "employees.create", "employees.delete", "employees.import", "employees.export", "employees.change_status",
-      "attendance.view_all", "attendance.edit", "attendance.approve_incidents", "attendance.manage", "attendance.export",
+      "attendance.view_all", "attendance.edit", "attendance.approve_edits", "attendance.approve_incidents", "attendance.manage", "attendance.export",
       "vacations.view_all", "vacations.approve", "vacations.manage", "vacations.calendar",
       "payroll.view_all", "payroll.view_amounts", "payroll.edit", "payroll.create", "payroll.delete", "payroll.calculate", "payroll.approve", "payroll.view_department",
       "certificates.view_all", "certificates.approve", "certificates.create", "certificates.request",
