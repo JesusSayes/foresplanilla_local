@@ -606,10 +606,10 @@ export default function AttendanceManagement() {
     }
   }, [hasSingleSite, Array.isArray(accessibleSites) ? accessibleSites.join(",") : ""]);
 
-  const siteAllowedEmployees = !accessibleSites && accessibleSites !== null
-    ? [] // cargando
+  const siteAllowedEmployees = accessibleSites === undefined
+    ? [] // cargando permisos
     : accessibleSites === null
-      ? allEmployees
+      ? allEmployees // acceso total
       : allEmployees.filter(emp => accessibleSites.includes(emp.site));
 
   const filteredEmployees = siteAllowedEmployees.filter(emp => {
