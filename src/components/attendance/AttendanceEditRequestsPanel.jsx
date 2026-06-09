@@ -36,8 +36,8 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
 
   const employee = allEmployees.find(e => e.id === req.employee_id);
   const requestedBy = allEmployees.find(e => e.id === req.requested_by_id);
-  // Bloquear aprobación solo si el revisor solicitó la edición de su propio registro
-  const isSelfRequest = reviewer?.id === req.requested_by_id && reviewer?.id === req.employee_id;
+  // No hay restricción por autogestión: si tiene el rol, puede aprobar cualquier solicitud
+  const isSelfRequest = false;
   const isPending = req.status === "Pendiente";
 
   const handleApprove = async () => {
@@ -218,11 +218,7 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
             </>
           )}
 
-          {canApprove && isSelfRequest && (
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-              ⚠️ No puedes aprobar tu propia solicitud de edición.
-            </p>
-          )}
+
         </div>
       )}
     </div>
