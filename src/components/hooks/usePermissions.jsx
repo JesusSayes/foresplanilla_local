@@ -262,6 +262,17 @@ export const usePermissions = () => {
     return employee?.department_name === departmentName;
   };
 
+  const canViewFinancials = () => {
+    if (employee?.role === "super_admin" || employee?.role === "admin") return true;
+    if (permissions.includes("system.admin")) return true;
+    // Si tiene roles custom: solo ve financiero si ningún rol lo tiene bloqueado
+    if (roles.length > 0) {
+      return !roles.some(r => r.block_financial_info === true);
+    }
+    // Fallback legacy: admin ve todo, otros no ven financiero
+    return employee?.role === "admin" || employee?.role === "super_admin";
+  };
+
   const canAccessEmployee = (targetEmployeeId) => {
     // El empleado puede ver sus propios datos
     if (employee?.id === targetEmployeeId) return true;
@@ -323,6 +334,7 @@ export const usePermissions = () => {
     canAccessDepartment,
     canAccessEmployee,
     getAccessibleEmployeeIds,
+    canViewFinancials,
   };
 };
 
