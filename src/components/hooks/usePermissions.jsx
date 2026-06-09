@@ -264,6 +264,8 @@ export const usePermissions = () => {
   };
 
   const canViewFinancials = () => {
+    // Mientras carga, denegar acceso por defecto (evita parpadeo)
+    if (loading) return false;
     // Super admin siempre ve todo
     if (employee?.role === "super_admin") return true;
     // Si tiene roles custom asignados, son los que mandan (incluso para admin legacy)
