@@ -144,14 +144,8 @@ export const usePermissions = () => {
           const emp = employees[0];
           setEmployee(emp);
 
-          // Super Admin tiene acceso total inmediato
-          if (emp.role === "super_admin") {
-            setPermissions(Object.keys(AVAILABLE_PERMISSIONS));
-            setRoles([{ name: "Super Admin", permissions: Object.keys(AVAILABLE_PERMISSIONS), priority: 1000 }]);
-            setFallbackSiteRestriction(null);
-            setLoading(false);
-            return;
-          }
+          // Super Admin: carga sus roles asignados igual que cualquier otro usuario.
+          // No tiene bypass automático — debe tener employees.view_financials en su rol para verlo.
 
           // Obtener roles asignados al usuario
           const userRoles = await base44.entities.UserRole.filter({ 
@@ -266,10 +260,9 @@ export const usePermissions = () => {
   const canViewFinancials = () => {
     // Mientras carga, denegar siempre (evita parpadeo)
     if (loading) return false;
-    // Super admin siempre ve todo
-    if (employee?.role === "super_admin") return true;
-    // Usar exactamente el mismo mecanismo que cualquier otro permiso
-    return hasPermission("employees.view_financials");
+    // Solo se permite si el permiso está explícitamente asignado en el rol.
+    // No hay excepciones: ni super_admin ni system.admin otorgan este permiso automáticamente.
+    return permissions.includes("employees.view_financials");
   };
 
   const canAccessEmployee = (targetEmployeeId) => {
