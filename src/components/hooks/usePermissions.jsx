@@ -264,13 +264,15 @@ export const usePermissions = () => {
   };
 
   const canViewFinancials = () => {
-    if (employee?.role === "super_admin" || employee?.role === "admin") return true;
-    if (permissions.includes("system.admin")) return true;
-    // Si tiene roles custom: solo ve financiero si ningún rol lo tiene bloqueado
+    // Super admin siempre ve todo
+    if (employee?.role === "super_admin") return true;
+    // Si tiene roles custom asignados, son los que mandan (incluso para admin legacy)
     if (roles.length > 0) {
-      return !roles.some(r => r.block_financial_info === true);
+      // Si algún rol bloquea financiero, no puede ver
+      if (roles.some(r => r.block_financial_info === true)) return false;
+      return true;
     }
-    // Fallback legacy: admin ve todo, otros no ven financiero
+    // Fallback legacy sin roles custom: solo admin y super_admin ven financiero
     return employee?.role === "admin" || employee?.role === "super_admin";
   };
 
