@@ -758,6 +758,15 @@ export default function AttendanceManagement() {
       const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
       const workedHours = emp.record?.worked_hours || 0;
 
+      // Horario programado para este empleado y fecha
+      const schedForRow = getEmployeeScheduleForDate(emp.id, rowDate);
+      const dowForRow = new Date(rowDate + "T00:00:00").getDay();
+      const stMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+      const enMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+      const horarioProg = schedForRow
+        ? `${schedForRow[stMap[dowForRow]] || '--'}–${schedForRow[enMap[dowForRow]] || '--'}`
+        : 'Sin horario';
+
       // Buscar TODOS los incidentes para este empleado y fecha
       const incidentsForRow = freshIncidents.filter(
         i => i.employee_id === emp.id && i.incident_date === rowDate
@@ -813,6 +822,7 @@ export default function AttendanceManagement() {
       }
 
       return {
+        'Horario Programado': horarioProg,
         'Fecha': rowDate,
         'Tipo Doc': emp.document_type,
         'DNI': emp.document_number,
@@ -1256,21 +1266,33 @@ export default function AttendanceManagement() {
                               </td>
                               {/* Tardanza */}
                               <td className="px-2 py-2 text-center">
-                                <span className={`text-sm font-bold ${!vacation && emp.record?.late_minutes > 0 ? 'text-orange-600' : 'text-slate-400'}`}>
-                                  {vacation ? "0" : (emp.record?.late_minutes || 0)}m
-                                </span>
+                                {(() => {
+                                  const lateMin = vacation ? 0 : (emp.record?.late_minutes || 0);
+                                  const lh = Math.floor(lateMin / 60);
+                                  const lm = lateMin % 60;
+                                  const lateStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
+                                  return <span className={`text-sm font-bold ${!vacation && lateMin > 0 ? 'text-orange-600' : 'text-slate-400'}`}>{lateStr}</span>;
+                                })()}
                               </td>
                               {/* HE 25% */}
                               <td className="px-2 py-2 text-center">
-                                <span className={`text-sm font-bold ${!vacation && (emp.record?.overtime_hours_25 > 0) ? 'text-blue-600' : 'text-slate-300'}`}>
-                                  {vacation ? "0.00" : (emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h
-                                </span>
+                                {(() => {
+                                  const heMin = vacation ? 0 : Math.round((emp.record?.overtime_hours_25 ?? 0) * 60);
+                                  const hh = Math.floor(heMin / 60);
+                                  const hm = heMin % 60;
+                                  const heStr = hh > 0 ? `${hh}h ${hm}m` : `${hm}m`;
+                                  return <span className={`text-sm font-bold ${!vacation && heMin > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{heStr}</span>;
+                                })()}
                               </td>
                               {/* HE 35% */}
                               <td className="px-2 py-2 text-center">
-                                <span className={`text-sm font-bold ${!vacation && (emp.record?.overtime_hours_35 > 0) ? 'text-purple-600' : 'text-slate-300'}`}>
-                                  {vacation ? "0.00" : (emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h
-                                </span>
+                                {(() => {
+                                  const heMin = vacation ? 0 : Math.round((emp.record?.overtime_hours_35 ?? 0) * 60);
+                                  const hh = Math.floor(heMin / 60);
+                                  const hm = heMin % 60;
+                                  const heStr = hh > 0 ? `${hh}h ${hm}m` : `${hm}m`;
+                                  return <span className={`text-sm font-bold ${!vacation && heMin > 0 ? 'text-purple-600' : 'text-slate-300'}`}>{heStr}</span>;
+                                })()}
                               </td>
                               {/* Acciones — ancho fijo 340px para acomodar todos los botones posibles */}
                               <td className="px-2 py-2">
