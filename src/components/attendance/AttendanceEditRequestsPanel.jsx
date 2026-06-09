@@ -69,7 +69,14 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
         reviewed_at: new Date().toISOString(),
       });
 
-      toast.success("Solicitud aprobada y cambios aplicados");
+      // Recalcular tardanzas y HE con el horario programado del empleado
+      await base44.functions.invoke("recalcularAsistencia", {
+        employee_id: req.employee_id,
+        date_from: req.attendance_date,
+        date_to: req.attendance_date,
+      });
+
+      toast.success("Solicitud aprobada, cambios aplicados y métricas recalculadas");
       onApproved?.();
     } catch (e) {
       toast.error("Error al aprobar: " + e.message);
