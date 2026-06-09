@@ -28,7 +28,6 @@ export default function RoleManagement() {
     department_restricted: false,
     site_restricted: false,
     allowed_sites: [],
-    block_financial_info: true,
   });
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -204,7 +203,6 @@ export default function RoleManagement() {
       department_restricted: role.department_restricted || false,
       site_restricted: role.site_restricted || false,
       allowed_sites: role.allowed_sites || [],
-      block_financial_info: role.block_financial_info !== false, // default true si no está definido
     });
     setShowRoleForm(true);
   };
@@ -227,7 +225,6 @@ export default function RoleManagement() {
       department_restricted: false,
       site_restricted: false,
       allowed_sites: [],
-      block_financial_info: true,
     });
     setEditingRole(null);
     setShowRoleForm(false);
@@ -430,13 +427,13 @@ export default function RoleManagement() {
                                   {role.allowed_sites?.length > 0 ? `${role.allowed_sites.length} sede(s)` : "Sede propia"}
                                 </Badge>
                               )}
-                              {role.block_financial_info !== false ? (
-                                <Badge className="bg-red-100 text-red-700 flex items-center gap-1">
-                                  <Lock className="w-3 h-3" />Info financiera bloqueada
-                                </Badge>
-                              ) : (
+                              {role.permissions?.includes("employees.view_financials") ? (
                                 <Badge className="bg-emerald-100 text-emerald-700 flex items-center gap-1">
                                   <DollarSign className="w-3 h-3" />Ve info financiera
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-red-100 text-red-700 flex items-center gap-1">
+                                  <Lock className="w-3 h-3" />Info financiera bloqueada
                                 </Badge>
                               )}
                             </div>
@@ -675,42 +672,52 @@ export default function RoleManagement() {
                     )}
                   </div>
 
-                  {/* Bloqueo de información financiera */}
-                  <div className={`p-4 border-2 rounded-lg transition-all ${roleFormData.block_financial_info ? "border-red-200 bg-red-50" : "border-emerald-200 bg-emerald-50"}`}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          {roleFormData.block_financial_info
-                            ? <Lock className="w-4 h-4 text-red-600" />
-                            : <DollarSign className="w-4 h-4 text-emerald-600" />
-                          }
-                          <span className={`text-sm font-semibold ${roleFormData.block_financial_info ? "text-red-800" : "text-emerald-800"}`}>
-                            Información Financiera de Empleados
-                          </span>
+                  {/* Acceso a información financiera — controlado por el permiso employees.view_financials */}
+                  {(() => {
+                    const hasFinancials = roleFormData.permissions.includes("employees.view_financials");
+                    return (
+                      <div className={`p-4 border-2 rounded-lg transition-all ${hasFinancials ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              {hasFinancials
+                                ? <DollarSign className="w-4 h-4 text-emerald-600" />
+                                : <Lock className="w-4 h-4 text-red-600" />
+                              }
+                              <span className={`text-sm font-semibold ${hasFinancials ? "text-emerald-800" : "text-red-800"}`}>
+                                Información Financiera de Empleados
+                              </span>
+                            </div>
+                            <p className={`text-xs ${hasFinancials ? "text-emerald-700" : "text-red-700"}`}>
+                              {hasFinancials
+                                ? "✅ Este rol SÍ puede ver salarios, cuentas bancarias, CCI, AFP y datos económicos."
+                                : "🔒 Este rol NO puede ver salarios, cuentas bancarias, CCI, AFP ni datos económicos."
+                              }
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setRoleFormData(prev => ({
+                              ...prev,
+                              permissions: prev.permissions.includes("employees.view_financials")
+                                ? prev.permissions.filter(p => p !== "employees.view_financials")
+                                : [...prev.permissions, "employees.view_financials"]
+                            }))}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shrink-0 ${hasFinancials ? "bg-emerald-500" : "bg-red-500"}`}
+                          >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${hasFinancials ? "translate-x-6" : "translate-x-1"}`} />
+                          </button>
                         </div>
-                        <p className={`text-xs ${roleFormData.block_financial_info ? "text-red-700" : "text-emerald-700"}`}>
-                          {roleFormData.block_financial_info
-                            ? "🔒 Este rol NO puede ver salarios, cuentas bancarias, CCI, AFP ni datos económicos de empleados."
-                            : "✅ Este rol SÍ puede ver toda la información financiera de los empleados (salarios, cuentas, AFP, etc.)."
-                          }
-                        </p>
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {["Salario base", "Cuenta bancaria", "CCI", "AFP / ONP", "Préstamos"].map(item => (
+                            <span key={item} className={`text-xs px-2 py-0.5 rounded-full border ${hasFinancials ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-700 border-red-200 line-through opacity-60"}`}>
+                              {item}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setRoleFormData(prev => ({ ...prev, block_financial_info: !prev.block_financial_info }))}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shrink-0 ${roleFormData.block_financial_info ? "bg-red-500" : "bg-emerald-500"}`}
-                      >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${roleFormData.block_financial_info ? "translate-x-1" : "translate-x-6"}`} />
-                      </button>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {["Salario base", "Cuenta bancaria", "CCI", "AFP / ONP", "Préstamos"].map(item => (
-                        <span key={item} className={`text-xs px-2 py-0.5 rounded-full border ${roleFormData.block_financial_info ? "bg-red-100 text-red-700 border-red-200 line-through opacity-60" : "bg-emerald-100 text-emerald-700 border-emerald-200"}`}>
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   <div>
                     <label className="block text-sm font-semibold text-slate-900 mb-3">

@@ -268,12 +268,8 @@ export const usePermissions = () => {
     if (loading) return false;
     // Super admin siempre ve todo
     if (employee?.role === "super_admin") return true;
-    // Roles custom: bloquear si alguno tiene block_financial_info activo
-    if (roles.length > 0) {
-      return !roles.some(r => r.block_financial_info === true);
-    }
-    // Sin roles custom asignados: denegar por defecto (seguro)
-    return false;
+    // Usar exactamente el mismo mecanismo que cualquier otro permiso
+    return hasPermission("employees.view_financials");
   };
 
   const canAccessEmployee = (targetEmployeeId) => {
@@ -347,7 +343,7 @@ const getBasicPermissionsByRole = (role) => {
     super_admin: Object.keys(AVAILABLE_PERMISSIONS),
     admin: [
       "system.admin", "system.settings",
-      "employees.view", "employees.edit", "employees.create", "employees.delete", "employees.import", "employees.export", "employees.change_status",
+      "employees.view", "employees.view_financials", "employees.edit", "employees.create", "employees.delete", "employees.import", "employees.export", "employees.change_status",
       "attendance.view_all", "attendance.edit", "attendance.approve_edits", "attendance.approve_incidents", "attendance.manage", "attendance.export",
       "vacations.view_all", "vacations.approve", "vacations.manage", "vacations.calendar",
       "payroll.view_all", "payroll.view_amounts", "payroll.edit", "payroll.create", "payroll.delete", "payroll.calculate", "payroll.approve", "payroll.view_department",
