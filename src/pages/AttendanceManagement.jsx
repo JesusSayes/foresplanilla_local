@@ -19,7 +19,6 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { todayLima, todayDateLima, parseDateLima, dateToStringLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
-import PermissionGuard from "../components/PermissionGuard";
 import { usePermissions } from "../components/hooks/usePermissions";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
@@ -903,8 +902,26 @@ export default function AttendanceManagement() {
     );
   }
 
+  // Verificar permisos directamente (sin PermissionGuard para evitar doble instancia del hook)
+  const canAccessAttendance = hasPermission("system.admin") ||
+    hasPermission("attendance.view_all") ||
+    hasPermission("attendance.manage") ||
+    hasPermission("attendance.view_department");
+
+  if (!canAccessAttendance) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 flex items-center justify-center p-6">
+        <Card className="max-w-md w-full border-0 shadow-xl">
+          <CardContent className="p-12 text-center">
+            <p className="text-slate-600">No tienes permisos para acceder a esta sección.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <PermissionGuard employee={effectiveEmployee} requiredAnyPermissions={["attendance.view_all", "attendance.manage", "attendance.view_department", "system.admin"]}>
+    <>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-full mx-auto px-4 py-6">
           <div className="mb-8 flex justify-between items-start">
@@ -1778,6 +1795,6 @@ export default function AttendanceManagement() {
           />
         )}
       </div>
-    </PermissionGuard>
+    </>
   );
 }
