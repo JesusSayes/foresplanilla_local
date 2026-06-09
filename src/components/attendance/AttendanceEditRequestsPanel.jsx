@@ -36,7 +36,10 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
 
   const employee = allEmployees.find(e => e.id === req.employee_id);
   const requestedBy = allEmployees.find(e => e.id === req.requested_by_id);
-  const isSelfRequest = reviewer?.id === req.requested_by_id;
+  // Bloquear aprobación si el revisor ES el empleado cuyo registro se edita,
+  // o si el revisor fue quien solicitó la edición del propio registro.
+  const isSelfRecord = reviewer?.id === req.employee_id;
+  const isSelfRequest = reviewer?.id === req.requested_by_id && isSelfRecord;
   const isPending = req.status === "Pendiente";
 
   const handleApprove = async () => {
@@ -186,8 +189,8 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
             </Button>
           )}
 
-          {/* Aprobadores pueden aprobar/rechazar (no a sí mismos) */}
-          {canApprove && !isSelfRequest && (
+          {/* Aprobadores pueden aprobar/rechazar, excepto su propio registro */}
+          {canApprove && !isSelfRecord && (
             <>
               {!showReject ? (
                 <div className="flex gap-2">
@@ -217,9 +220,9 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
             </>
           )}
 
-          {canApprove && isSelfRequest && (
+          {canApprove && isSelfRecord && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-              ⚠️ No puedes aprobar o rechazar tu propia solicitud.
+              ⚠️ No puedes aprobar o rechazar modificaciones de tu propio registro de asistencia.
             </p>
           )}
         </div>
