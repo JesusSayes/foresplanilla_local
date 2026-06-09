@@ -264,18 +264,16 @@ export const usePermissions = () => {
   };
 
   const canViewFinancials = () => {
-    // Mientras carga, denegar acceso por defecto (evita parpadeo)
+    // Mientras carga, denegar siempre (evita parpadeo)
     if (loading) return false;
     // Super admin siempre ve todo
     if (employee?.role === "super_admin") return true;
-    // Si tiene roles custom asignados, son los que mandan (incluso para admin legacy)
+    // Roles custom: bloquear si alguno tiene block_financial_info activo
     if (roles.length > 0) {
-      // Si algún rol bloquea financiero, no puede ver
-      if (roles.some(r => r.block_financial_info === true)) return false;
-      return true;
+      return !roles.some(r => r.block_financial_info === true);
     }
-    // Fallback legacy sin roles custom: solo admin y super_admin ven financiero
-    return employee?.role === "admin" || employee?.role === "super_admin";
+    // Sin roles custom asignados: denegar por defecto (seguro)
+    return false;
   };
 
   const canAccessEmployee = (targetEmployeeId) => {
