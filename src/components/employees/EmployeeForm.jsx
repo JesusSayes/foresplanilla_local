@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Users, Trash2, Plus, Edit, Loader2, Search, AlertTriangle, FileText } from "lucide-react";
+import { Users, Trash2, Plus, Edit, Loader2, Search, AlertTriangle, FileText, Lock } from "lucide-react";
 import UbigeoSelect from "./UbigeoSelect";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -35,7 +35,8 @@ export default function EmployeeForm({
   onDerechohabienteEdit,
   onDerechohabienteDelete,
 }) {
-  const { hasPermission } = usePermissions();
+  const { hasPermission, canViewFinancials } = usePermissions();
+  const showFinancials = canViewFinancials();
 
   // Auto-generar código FPxxxx al abrir para nuevo empleado
   React.useEffect(() => {
@@ -176,8 +177,8 @@ export default function EmployeeForm({
               <TabsTrigger value="personal">Personal</TabsTrigger>
               <TabsTrigger value="contact">Contacto</TabsTrigger>
               <TabsTrigger value="work">Laboral</TabsTrigger>
-              <TabsTrigger value="financial" disabled={!hasPermission("employees.view_financials")}>
-                Financiero{!hasPermission("employees.view_financials") ? " 🔒" : ""}
+              <TabsTrigger value="financial" disabled={!showFinancials}>
+                Financiero{!showFinancials ? " 🔒" : ""}
               </TabsTrigger>
               <TabsTrigger value="emergency">Emergencia</TabsTrigger>
               <TabsTrigger value="derechohabientes" disabled={!editingEmployee}>Derechohabientes</TabsTrigger>
@@ -479,6 +480,18 @@ export default function EmployeeForm({
 
             {/* FINANCIAL */}
             <TabsContent value="financial" className="space-y-4">
+              {!showFinancials && (
+                <div className="flex flex-col items-center justify-center py-16 gap-4">
+                  <div className="p-4 bg-red-100 rounded-full">
+                    <Lock className="w-8 h-8 text-red-500" />
+                  </div>
+                  <div className="text-center">
+                    <h3 className="text-lg font-bold text-slate-800 mb-1">Información Restringida</h3>
+                    <p className="text-sm text-slate-500">Tu rol no tiene acceso a la información financiera de los empleados.</p>
+                  </div>
+                </div>
+              )}
+              {showFinancials && (<>
 
               {/* Información del Contrato Vigente */}
               <div className="mb-4">
@@ -626,6 +639,7 @@ export default function EmployeeForm({
                   </Select>
                 </div>
               </div>
+              </>)}
             </TabsContent>
 
             {/* EMERGENCY */}

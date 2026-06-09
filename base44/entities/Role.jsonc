@@ -44,6 +44,11 @@
       },
       "description": "Lista de nombres de sedes que este rol puede visualizar (vac\u00edo = todas)"
     },
+    "block_financial_info": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si es true, oculta informaci\u00f3n financiera sensible (salarios, cuentas bancarias, CCI, AFP, etc.)"
+    },
     "priority": {
       "type": "integer",
       "default": 0,

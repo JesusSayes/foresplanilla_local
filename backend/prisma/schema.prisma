@@ -613,6 +613,7 @@ model role {
   is_sample             Boolean?  @default(false)
   allowed_sites         Json?     @db.Json
   site_restricted       Boolean?  @default(false)
+  block_financial_info  Boolean?  @default(true)
 }
 
 model site {

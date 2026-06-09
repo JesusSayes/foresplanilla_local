@@ -54,7 +54,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
 
   const dateFrom = startDate
     ? new Date(startDate)
-    : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    : new Date(Date.now() - 1 * 24 * 60 * 60 * 1000);
 
   const dateTo = endDate ? new Date(`${endDate}T23:59:59.999`) : new Date();
 
