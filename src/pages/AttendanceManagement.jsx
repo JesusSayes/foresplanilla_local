@@ -62,7 +62,7 @@ export default function AttendanceManagement() {
     full_day_justification: true,
   });
 
-  const { getAccessibleSites, hasPermission, loading: permissionsLoading } = usePermissions();
+  const { getAccessibleSites, hasPermission, loading: permissionsLoading, employee: permEmployee } = usePermissions();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -162,7 +162,7 @@ export default function AttendanceManagement() {
 
   useEffect(() => {
     const generateExemptClockings = async () => {
-      if (!employee || employee.role !== "admin") return;
+      if (!effectiveEmployee || effectiveEmployee.role !== "admin") return;
       const result = await generateAutoClockings(selectedDate);
       if (result.success && result.recordsCreated > 0) {
         queryClient.invalidateQueries(["todayAttendance"]);
@@ -170,7 +170,7 @@ export default function AttendanceManagement() {
       }
     };
     generateExemptClockings();
-  }, [selectedDate, employee]);
+  }, [selectedDate, effectiveEmployee]);
 
   const { data: employeeIncidents = [] } = useQuery({
     queryKey: ["employeeIncidents", historyEmployeeId], 
@@ -441,7 +441,7 @@ export default function AttendanceManagement() {
       id: incident.id,
       data: {
         status: "Aprobada",
-        reviewed_by: `${employee.first_name} ${employee.last_name}`,
+        reviewed_by: `${effectiveEmployee?.first_name} ${effectiveEmployee?.last_name}`,
         review_date: todayLima(),
         review_comments: reviewComments || "Aprobada",
       }
@@ -457,7 +457,7 @@ export default function AttendanceManagement() {
       id: incident.id,
       data: {
         status: "Rechazada",
-        reviewed_by: `${employee.first_name} ${employee.last_name}`,
+        reviewed_by: `${effectiveEmployee?.first_name} ${effectiveEmployee?.last_name}`,
         review_date: todayLima(),
         review_comments: reviewComments,
       }
@@ -881,7 +881,10 @@ export default function AttendanceManagement() {
     return configs[status] || configs["Incompleto"];
   };
 
-  if (!employee) {
+  // Usar employee del hook de permisos si el local aún no cargó
+  const effectiveEmployee = employee || permEmployee;
+
+  if (permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Card><CardContent className="p-8"><p>Cargando...</p></CardContent></Card>
@@ -889,8 +892,19 @@ export default function AttendanceManagement() {
     );
   }
 
+  if (!effectiveEmployee) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Card><CardContent className="p-8 text-center">
+          <p className="text-slate-600">No se encontró un empleado vinculado a tu cuenta.</p>
+          <p className="text-sm text-slate-400 mt-2">Contacta al administrador del sistema.</p>
+        </CardContent></Card>
+      </div>
+    );
+  }
+
   return (
-    <PermissionGuard employee={employee} requiredAnyPermissions={["attendance.view_all", "attendance.manage", "attendance.view_department", "system.admin"]}>
+    <PermissionGuard employee={effectiveEmployee} requiredAnyPermissions={["attendance.view_all", "attendance.manage", "attendance.view_department", "system.admin"]}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-full mx-auto px-4 py-6">
           <div className="mb-8 flex justify-between items-start">
@@ -1748,7 +1762,7 @@ export default function AttendanceManagement() {
             employeeSchedule={justifyingSchedule}
             attendanceRecord={todayRecords.find(r => r.employee_id === justifyingEmployee.id && r.date === (justifyingDate ? format(justifyingDate, "yyyy-MM-dd") : dateToStringLima(selectedDate)))}
             todayRecords={todayRecords}
-            employee={employee}
+            employee={effectiveEmployee}
             existingIncident={existingIncident}
             onClose={() => { setShowJustifyModal(false); setJustifyingEmployee(null); setExistingIncident(null); setJustifyingDate(null); setJustifyingSchedule(null); }}
             onSuccess={() => {
