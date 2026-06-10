@@ -7,6 +7,7 @@ import { Search, ChevronDown, ChevronRight } from "lucide-react";
 const PERMISSION_GROUPS = {
   "Empleados": [
     { key: "employees.view", label: "Ver empleados" },
+    { key: "employees.view_financials", label: "Ver información financiera (salarios, cuentas, AFP)" },
     { key: "employees.create", label: "Crear empleados" },
     { key: "employees.edit", label: "Editar empleados" },
     { key: "employees.delete", label: "Eliminar empleados" },

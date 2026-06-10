@@ -47,7 +47,7 @@ export default function EmployeeManagement() {
   const [formErrors, setFormErrors] = useState([]);
   const [showImportDH, setShowImportDH] = useState(false);
 
-  const { hasPermission, getAccessibleSites, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, getAccessibleSites, canViewFinancials, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -1108,6 +1108,7 @@ export default function EmployeeManagement() {
           allEmployees={allEmployees}
           formErrors={formErrors}
           derechohabientes={derechohabientes}
+          showFinancials={canViewFinancials()}
           onDerechohabienteAdd={(data) => createDerechohabienteMutation.mutate(data)}
           onDerechohabienteEdit={(id, data) => updateDerechohabienteMutation.mutate({ id, data })}
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}

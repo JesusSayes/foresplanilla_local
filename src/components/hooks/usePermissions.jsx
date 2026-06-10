@@ -19,6 +19,7 @@ export const AVAILABLE_PERMISSIONS = {
   "attendance.view_all": "Ver asistencia de todos",
   "attendance.view_department": "Ver asistencia del departamento",
   "attendance.edit": "Editar registros de asistencia",
+  "attendance.approve_edits": "Aprobar/rechazar edición de registros de asistencia",
   "attendance.approve_incidents": "Aprobar/rechazar incidencias",
   "attendance.manage_schedules": "Gestionar horarios de trabajo",
   "attendance.view_reports": "Ver reportes de asistencia",
@@ -134,14 +135,8 @@ export const usePermissions = () => {
         if (emp) {
           setEmployee(emp);
 
-          // Super Admin tiene acceso total inmediato
-          if (emp.role === "super_admin") {
-            setPermissions(Object.keys(AVAILABLE_PERMISSIONS));
-            setRoles([{ name: "Super Admin", permissions: Object.keys(AVAILABLE_PERMISSIONS), priority: 1000 }]);
-            setFallbackSiteRestriction(null);
-            setLoading(false);
-            return;
-          }
+          // Super Admin: carga sus roles asignados igual que cualquier otro usuario.
+          // No tiene bypass automático — debe tener employees.view_financials en su rol para verlo.
 
           // Obtener roles asignados al usuario
           // Buscar roles asignados al empleado
@@ -262,6 +257,7 @@ export const usePermissions = () => {
   };
 
   const canViewFinancials = () => {
+<<<<<<< HEAD
     if (employee?.role === "super_admin" || employee?.role === "admin") return true;
     if (permissions.includes("system.admin")) return true;
     // Si tiene roles custom: solo ve financiero si ningún rol lo tiene bloqueado
@@ -270,6 +266,13 @@ export const usePermissions = () => {
     }
     // Fallback legacy: admin ve todo, otros no ven financiero
     return employee?.role === "admin" || employee?.role === "super_admin";
+=======
+    // Mientras carga, denegar siempre (evita parpadeo)
+    if (loading) return false;
+    // Solo se permite si el permiso está explícitamente asignado en el rol.
+    // No hay excepciones: ni super_admin ni system.admin otorgan este permiso automáticamente.
+    return permissions.includes("employees.view_financials");
+>>>>>>> main
   };
 
   const canAccessEmployee = (targetEmployeeId) => {
@@ -343,8 +346,8 @@ const getBasicPermissionsByRole = (role) => {
     super_admin: Object.keys(AVAILABLE_PERMISSIONS),
     admin: [
       "system.admin", "system.settings",
-      "employees.view", "employees.edit", "employees.create", "employees.delete", "employees.import", "employees.export", "employees.change_status",
-      "attendance.view_all", "attendance.edit", "attendance.approve_incidents", "attendance.manage", "attendance.export",
+      "employees.view", "employees.view_financials", "employees.edit", "employees.create", "employees.delete", "employees.import", "employees.export", "employees.change_status",
+      "attendance.view_all", "attendance.edit", "attendance.approve_edits", "attendance.approve_incidents", "attendance.manage", "attendance.export",
       "vacations.view_all", "vacations.approve", "vacations.manage", "vacations.calendar",
       "payroll.view_all", "payroll.view_amounts", "payroll.edit", "payroll.create", "payroll.delete", "payroll.calculate", "payroll.approve", "payroll.view_department",
       "certificates.view_all", "certificates.approve", "certificates.create", "certificates.request",
