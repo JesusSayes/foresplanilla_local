@@ -55,28 +55,35 @@ model attendance_incident {
 }
 
 model attendance_record {
-  employee_id         String
-  date                DateTime  @db.Date
-  clock_in            String?
-  clock_out           String?
-  scheduled_start     String?
-  scheduled_end       String?
-  worked_hours        Decimal?  @db.Decimal(18, 2)
-  is_late             Boolean?
-  late_minutes        Int?
-  is_absent           Boolean?
-  status              String?
-  notes               String?
-  id                  String    @id(map: "attendancerecord_pkey") @db.VarChar(255)
-  created_date        DateTime? @db.Timestamp(6)
-  updated_date        DateTime? @db.Timestamp(6)
-  created_by_id       String?
-  created_by          String?
-  is_sample           Boolean?
-  regular_hours       Decimal?  @db.Decimal(18, 2)
-  overtime_hours_25   Decimal?  @db.Decimal(18, 2)
-  overtime_hours_35   Decimal?  @db.Decimal(18, 2)
-  overtime_authorized Boolean?
+  employee_id                                                                              String
+  date                                                                                     DateTime                  @db.Date
+  clock_in                                                                                 String?
+  clock_out                                                                                String?
+  scheduled_start                                                                          String?
+  scheduled_end                                                                            String?
+  worked_hours                                                                             Decimal?                  @db.Decimal(18, 2)
+  is_late                                                                                  Boolean?
+  late_minutes                                                                             Int?
+  is_absent                                                                                Boolean?
+  status                                                                                   String?
+  notes                                                                                    String?
+  id                                                                                       String                    @id(map: "attendancerecord_pkey") @db.VarChar(255)
+  created_date                                                                             DateTime?                 @db.Timestamp(6)
+  updated_date                                                                             DateTime?                 @db.Timestamp(6)
+  created_by_id                                                                            String?
+  created_by                                                                               String?
+  is_sample                                                                                Boolean?
+  regular_hours                                                                            Decimal?                  @db.Decimal(18, 2)
+  overtime_hours_25                                                                        Decimal?                  @db.Decimal(18, 2)
+  overtime_hours_35                                                                        Decimal?                  @db.Decimal(18, 2)
+  overtime_authorized                                                                      Boolean?
+  manually_protected_fields                                                                Json                      @default("[]")
+  last_approved_edit_id                                                                    String?                   @db.VarChar(255)
+  manually_modified_by_id                                                                  String?                   @db.VarChar(255)
+  manually_modified_by                                                                     String?                   @db.VarChar(255)
+  manually_modified_at                                                                     DateTime?                 @db.Timestamp(6)
+  attendance_edit_request_attendance_edit_request_attendance_record_idToattendance_record  attendance_edit_request[] @relation("attendance_edit_request_attendance_record_idToattendance_record")
+  attendance_edit_request_attendance_record_last_approved_edit_idToattendance_edit_request attendance_edit_request?  @relation("attendance_record_last_approved_edit_idToattendance_edit_request", fields: [last_approved_edit_id], references: [id], onUpdate: NoAction, map: "fk_attendance_record_last_approved_edit")
 
   @@unique([employee_id, date], map: "attendance_record_employee_date_unique")
   @@index([date], map: "idx_attendance_date")
@@ -362,7 +369,7 @@ model employee {
   document_number                String?
   first_name                     String
   last_name                      String?
-  birth_date                     DateTime?         @db.Date
+  birth_date                     DateTime?                 @db.Date
   gender                         String?
   personal_email                 String?
   work_email                     String?
@@ -379,10 +386,10 @@ model employee {
   department_name                String?
   work_unit                      String?
   site                           String?
-  hire_date                      DateTime?         @db.Date
-  termination_date               DateTime?         @db.Date
+  hire_date                      DateTime?                 @db.Date
+  termination_date               DateTime?                 @db.Date
   contract_type                  String?
-  base_salary                    Decimal?          @db.Decimal(18, 2)
+  base_salary                    Decimal?                  @db.Decimal(18, 2)
   bank_name                      String?
   bank_account                   String?
   cci_account                    String?
@@ -391,26 +398,27 @@ model employee {
   cts_currency                   String?
   pension_system                 String?
   afp_id                         String?
-  afp_affiliation_date           DateTime?         @db.Date
+  afp_affiliation_date           DateTime?                 @db.Date
   cuspp                          String?
   worker_type                    String?
   tax_residence                  String?
   photo_url                      String?
   status                         String?
   role                           String?
-  managed_team_ids               Json?             @db.Json
+  managed_team_ids               Json?                     @db.Json
   supervisor_id                  String?
   supervisor_name                String?
   emergency_contact_name         String?
   emergency_contact_phone        String?
   emergency_contact_relationship String?
-  id                             String            @id @db.VarChar(255)
-  created_date                   DateTime?         @db.Timestamp(6)
-  updated_date                   DateTime?         @db.Timestamp(6)
+  id                             String                    @id @db.VarChar(255)
+  created_date                   DateTime?                 @db.Timestamp(6)
+  updated_date                   DateTime?                 @db.Timestamp(6)
   created_by_id                  String?
   created_by                     String?
   is_sample                      Boolean?
   attendance_method              String?
+  attendance_edit_request        attendance_edit_request[]
   attendance_logs                attendance_logs[]
 }
 
@@ -1061,4 +1069,33 @@ model attendance_logs_duplicates_backup_20260521 {
   updated_date            DateTime? @db.Timestamp(6)
 
   @@ignore
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model attendance_edit_request {
+  id                                                                                 String              @id @db.VarChar(255)
+  attendance_record_id                                                               String              @db.VarChar(255)
+  employee_id                                                                        String              @db.VarChar(255)
+  attendance_date                                                                    DateTime            @db.Date
+  original_values                                                                    Json                @default("{}")
+  requested_values                                                                   Json
+  edit_reason                                                                        String
+  status                                                                             String              @default("Pendiente") @db.VarChar(20)
+  requested_by_id                                                                    String              @db.VarChar(255)
+  requested_by_name                                                                  String              @db.VarChar(255)
+  requested_at                                                                       DateTime            @default(now()) @db.Timestamp(6)
+  reviewed_by_id                                                                     String?             @db.VarChar(255)
+  reviewed_by_name                                                                   String?             @db.VarChar(255)
+  reviewed_at                                                                        DateTime?           @db.Timestamp(6)
+  review_comment                                                                     String?
+  created_date                                                                       DateTime            @default(now()) @db.Timestamp(6)
+  updated_date                                                                       DateTime            @default(now()) @db.Timestamp(6)
+  employee                                                                           employee            @relation(fields: [employee_id], references: [id], onUpdate: NoAction, map: "fk_attendance_edit_request_employee")
+  attendance_record_attendance_edit_request_attendance_record_idToattendance_record  attendance_record   @relation("attendance_edit_request_attendance_record_idToattendance_record", fields: [attendance_record_id], references: [id], onUpdate: NoAction, map: "fk_attendance_edit_request_record")
+  attendance_record_attendance_record_last_approved_edit_idToattendance_edit_request attendance_record[] @relation("attendance_record_last_approved_edit_idToattendance_edit_request")
+
+  @@index([employee_id], map: "idx_attendance_edit_request_employee")
+  @@index([attendance_record_id], map: "idx_attendance_edit_request_record")
+  @@index([requested_at(sort: Desc)], map: "idx_attendance_edit_request_requested_at")
+  @@index([status], map: "idx_attendance_edit_request_status")
 }

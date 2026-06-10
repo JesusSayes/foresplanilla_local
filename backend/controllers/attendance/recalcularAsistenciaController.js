@@ -159,6 +159,10 @@ const recalcularAsistencia = async (req, res) => {
       } else if (!record.clock_in) {
         status = record.status === "Justificado" ? "Justificado" : "Ausente";
       }
+      if (Array.isArray(record.manually_protected_fields) &&
+          record.manually_protected_fields.includes("status")) {
+        status = record.status;
+      }
 
       await prisma.attendance_record.update({
         where: { id: record.id },

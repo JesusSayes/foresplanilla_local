@@ -26,13 +26,10 @@ import { generateAutoClockings } from "../components/attendance/AutoClockingJob"
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 import JustifyModal from "../components/attendance/JustifyModal";
 import AssignScheduleModal from "../components/attendance/AssignScheduleModal";
-<<<<<<< HEAD
 import AttendanceValidationModal from "../components/attendance/AttendanceValidationModal";
-import recalcularAsistenciaService from '@/services/recalcularAsistenciaService';
-=======
 import AttendanceEditRequestModal from "../components/attendance/AttendanceEditRequestModal";
 import AttendanceEditRequestsPanel from "../components/attendance/AttendanceEditRequestsPanel";
->>>>>>> main
+import recalcularAsistenciaService from '@/services/recalcularAsistenciaService';
 
 export default function AttendanceManagement() {
   const { user: currentUser } = useAuth();
@@ -57,16 +54,13 @@ export default function AttendanceManagement() {
   const [justifyingDate, setJustifyingDate] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [schedulingEmployee, setSchedulingEmployee] = useState(null);
-<<<<<<< HEAD
   // === CUSTOM BLOCK: Validación manual RRHH ===
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validatingRecord, setValidatingRecord] = useState(null);
   const [validationLogs, setValidationLogs] = useState([]);
-=======
   const [showEditRequestModal, setShowEditRequestModal] = useState(false);
   const [editRequestRecord, setEditRequestRecord] = useState(null);
   const [editRequestEmployee, setEditRequestEmployee] = useState(null);
->>>>>>> main
   const [incidentSearchTerm, setIncidentSearchTerm] = useState("");
   const [overtimeSearchTerm, setOvertimeSearchTerm] = useState("");
   const [pageSize, setPageSize] = useState(300);
@@ -81,13 +75,11 @@ export default function AttendanceManagement() {
   });
 
   const { getAccessibleSites, hasPermission, loading: permissionsLoading, employee: permEmployee } = usePermissions();
-<<<<<<< HEAD
   const canEditAttendance = hasPermission("attendance.edit") || hasPermission("system.admin");
   const canApproveIncidents = hasPermission("attendance.approve_incidents") || hasPermission("system.admin");
+  const canApproveEdits = hasPermission("attendance.approve_edits") || hasPermission("system.admin");
   const canManageSchedules = hasPermission("attendance.manage_schedules") || hasPermission("system.admin");
   const canExportAttendance = hasPermission("attendance.export") || hasPermission("system.admin");
-=======
->>>>>>> main
   const queryClient = useQueryClient();
 
   // Definir aquí para que esté disponible en todos los useEffect y handlers
@@ -110,6 +102,7 @@ export default function AttendanceManagement() {
         "attendance.view_all",
         "attendance.view_department",
         "attendance.manage",
+        "attendance.approve_edits",
       ]);
     },
   });
@@ -174,8 +167,8 @@ export default function AttendanceManagement() {
   });
 
   const { data: pendingEditRequests = [] } = useQuery({
-    queryKey: ["attendanceEditRequests"],
-    queryFn: async () => await base44.entities.AttendanceEditRequest.filter({ status: "Pendiente" }, "-requested_at", 500),
+    queryKey: ["attendanceEditRequests", "Pendiente"],
+    queryFn: async () => entitiesAPI.AttendanceEditRequest.filter({ status: "Pendiente" }, "-requested_at"),
   });
 
   const { data: workSchedules = [] } = useQuery({
@@ -213,11 +206,7 @@ export default function AttendanceManagement() {
       }
     };
     generateExemptClockings();
-<<<<<<< HEAD
   }, [selectedDate, effectiveEmployee, queryClient]);
-=======
-  }, [selectedDate, effectiveEmployee]);
->>>>>>> main
 
   const { data: employeeIncidents = [] } = useQuery({
     queryKey: ["employeeIncidents", historyEmployeeId],
@@ -314,7 +303,6 @@ export default function AttendanceManagement() {
   const getEmployeeSchedule = (empId) => getEmployeeScheduleForDate(empId, dateToStringLima(selectedDate));
   const isOvertimeAuthorized = (empId) => getEmployeeSchedule(empId)?.overtime_authorized || false;
 
-<<<<<<< HEAD
   // === CUSTOM BLOCK: abrir validación manual ===
   const handleOpenValidationModal = async (record) => {
     try {
@@ -338,29 +326,15 @@ export default function AttendanceManagement() {
     }
   };
 
-  const handleEditRecord = (record) => {
-    setEditingRecord({
-      ...record,
-      clock_in: record.clock_in || "",
-      clock_out: record.clock_out || "",
-      notes: record.notes || "",
-      status: record.status || "Incompleto",
-    });
-    setShowEditModal(true);
-=======
-  const handleEditRecord = (record, empOverride) => {
-    // Buscar el empleado del registro
-    const emp = empOverride || allEmployees.find(e => e.id === record.employee_id);
-    // Verificar si hay solicitud pendiente para este registro
-    const existingPending = pendingEditRequests.find(r => r.attendance_record_id === record.id);
+  const handleEditRecord = (record, employeeOverride) => {
+    const existingPending = pendingEditRequests.find(request => request.attendance_record_id === record.id);
     if (existingPending) {
-      toast.warning("Ya existe una solicitud de edición pendiente para este registro. Espera a que sea revisada.");
+      toast.warning("Ya existe una solicitud de edición pendiente para este registro");
       return;
     }
     setEditRequestRecord(record);
-    setEditRequestEmployee(emp);
+    setEditRequestEmployee(employeeOverride || allEmployees.find(item => item.id === record.employee_id));
     setShowEditRequestModal(true);
->>>>>>> main
   };
 
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -692,6 +666,7 @@ export default function AttendanceManagement() {
     "attendance.view_all",
     "attendance.view_department",
     "attendance.manage",
+    "attendance.approve_edits",
   ]);
   const isSiteRestricted = accessibleSites !== null && accessibleSites !== undefined;
   const hasSingleSite = isSiteRestricted && Array.isArray(accessibleSites) && accessibleSites.length === 1;
@@ -703,17 +678,9 @@ export default function AttendanceManagement() {
     }
   }, [hasSingleSite, Array.isArray(accessibleSites) ? accessibleSites.join(",") : ""]);
 
-<<<<<<< HEAD
   // El backend ya aplica el alcance autorizado por sede/departamento/equipo.
   const siteAllowedEmployees = permissionsLoading ? [] : allEmployees;
   const normalizeSite = value => String(value || "").trim().toLocaleLowerCase();
-=======
-  const siteAllowedEmployees = accessibleSites === undefined
-    ? [] // cargando permisos
-    : accessibleSites === null
-      ? allEmployees // acceso total
-      : allEmployees.filter(emp => accessibleSites.includes(emp.site));
->>>>>>> main
 
   const filteredEmployees = siteAllowedEmployees.filter(emp => {
     const term = searchTerm.toLowerCase().trim();
@@ -844,7 +811,6 @@ export default function AttendanceManagement() {
 
   const handleExportToExcel = async () => {
     const dataToExport = employeesWithRecords.map(emp => {
-<<<<<<< HEAD
       const rowDate = emp.displayDate || dateToStringLima(selectedDate);
       const vacation = approvedVacations.find(
         v => v.employee_id === emp.id && String(v.start_date).slice(0, 10) <= rowDate && String(v.end_date).slice(0, 10) >= rowDate
@@ -852,23 +818,6 @@ export default function AttendanceManagement() {
       const isVacation = emp.record?.status === "Vacaciones" || !!vacation;
       const incidentsForRow = allIncidents.filter(
         i => i.employee_id === emp.id && String(i.incident_date).slice(0, 10) === rowDate
-=======
-      const rowDate = emp.displayDate || format(selectedDate, "yyyy-MM-dd");
-      const workedHours = emp.record?.worked_hours || 0;
-
-      // Horario programado para este empleado y fecha
-      const schedForRow = getEmployeeScheduleForDate(emp.id, rowDate);
-      const dowForRow = new Date(rowDate + "T00:00:00").getDay();
-      const stMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
-      const enMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-      const horarioProg = schedForRow
-        ? `${schedForRow[stMap[dowForRow]] || '--'}–${schedForRow[enMap[dowForRow]] || '--'}`
-        : 'Sin horario';
-
-      // Buscar TODOS los incidentes para este empleado y fecha
-      const incidentsForRow = freshIncidents.filter(
-        i => i.employee_id === emp.id && i.incident_date === rowDate
->>>>>>> main
       );
       const incident = incidentsForRow.find(i => i.status === 'Aprobada')
         || incidentsForRow[0]
@@ -893,7 +842,6 @@ export default function AttendanceManagement() {
 
       const scheduledTimes = isVacation ? getScheduledTimes(emp.id, rowDate) : null;
       return {
-        'Horario Programado': horarioProg,
         'Fecha': rowDate,
         'Tipo Doc': emp.document_type,
         'DNI': emp.document_number,
@@ -1003,6 +951,7 @@ export default function AttendanceManagement() {
   const canAccessAttendance = hasPermission("system.admin") ||
     hasPermission("attendance.view_all") ||
     hasPermission("attendance.manage") ||
+    hasPermission("attendance.approve_edits") ||
     hasPermission("attendance.view_department");
 
   if (!canAccessAttendance) {
@@ -1294,7 +1243,6 @@ export default function AttendanceManagement() {
                           const ends = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
                           const schedSt = sched ? sched[starts[dow2]] : null;
                           const schedEn = sched ? sched[ends[dow2]] : null;
-                          const hasPendingEdit = emp.record && pendingEditRequests.some(r => r.attendance_record_id === emp.record?.id);
 
                           return (
                             <tr key={rowKey} className={`border-b last:border-b-0 hover:bg-slate-50 transition-colors ${isVacation ? "bg-amber-50/40" : "bg-white"}`}>
@@ -1340,33 +1288,21 @@ export default function AttendanceManagement() {
                               </td>
                               {/* Tardanza */}
                               <td className="px-2 py-2 text-center">
-                                {(() => {
-                                  const lateMin = vacation ? 0 : (emp.record?.late_minutes || 0);
-                                  const lh = Math.floor(lateMin / 60);
-                                  const lm = lateMin % 60;
-                                  const lateStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
-                                  return <span className={`text-sm font-bold ${!vacation && lateMin > 0 ? 'text-orange-600' : 'text-slate-400'}`}>{lateStr}</span>;
-                                })()}
+                                <span className={`text-sm font-bold ${!vacation && emp.record?.late_minutes > 0 ? 'text-orange-600' : 'text-slate-400'}`}>
+                                  {vacation ? "0" : (emp.record?.late_minutes || 0)}m
+                                </span>
                               </td>
                               {/* HE 25% */}
                               <td className="px-2 py-2 text-center">
-                                {(() => {
-                                  const heMin = vacation ? 0 : Math.round((emp.record?.overtime_hours_25 ?? 0) * 60);
-                                  const hh = Math.floor(heMin / 60);
-                                  const hm = heMin % 60;
-                                  const heStr = hh > 0 ? `${hh}h ${hm}m` : `${hm}m`;
-                                  return <span className={`text-sm font-bold ${!vacation && heMin > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{heStr}</span>;
-                                })()}
+                                <span className={`text-sm font-bold ${!vacation && (emp.record?.overtime_hours_25 > 0) ? 'text-blue-600' : 'text-slate-300'}`}>
+                                  {vacation ? "0.00" : (emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h
+                                </span>
                               </td>
                               {/* HE 35% */}
                               <td className="px-2 py-2 text-center">
-                                {(() => {
-                                  const heMin = vacation ? 0 : Math.round((emp.record?.overtime_hours_35 ?? 0) * 60);
-                                  const hh = Math.floor(heMin / 60);
-                                  const hm = heMin % 60;
-                                  const heStr = hh > 0 ? `${hh}h ${hm}m` : `${hm}m`;
-                                  return <span className={`text-sm font-bold ${!vacation && heMin > 0 ? 'text-purple-600' : 'text-slate-300'}`}>{heStr}</span>;
-                                })()}
+                                <span className={`text-sm font-bold ${!vacation && (emp.record?.overtime_hours_35 > 0) ? 'text-purple-600' : 'text-slate-300'}`}>
+                                  {vacation ? "0.00" : (emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h
+                                </span>
                               </td>
                               {/* Acciones — ancho fijo 340px para acomodar todos los botones posibles */}
                               <td className="px-2 py-2">
@@ -1374,7 +1310,6 @@ export default function AttendanceManagement() {
                                   <Badge className={`${statusConfig.color} text-xs shrink-0 whitespace-nowrap`} style={{minWidth: "80px", justifyContent: "center"}}>
                                     <StatusIcon className="w-3 h-3 mr-1" />{statusConfig.text}
                                   </Badge>
-<<<<<<< HEAD
 
                                   {/* === CUSTOM BLOCK: validación manual RRHH === */}
                                   {canEditAttendance && (
@@ -1392,21 +1327,15 @@ export default function AttendanceManagement() {
                                   )}
 
                                   {canEditAttendance && !vacation && emp.record && (
-                                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs shrink-0 whitespace-nowrap" onClick={() => handleEditRecord(emp.record)}>
-                                      <Edit className="w-3 h-3 mr-1" />Editar
-                                    </Button>
-=======
-                                  {!vacation && emp.record && (
-                                    hasPendingEdit ? (
-                                      <Badge className="h-7 px-2 text-xs shrink-0 whitespace-nowrap bg-indigo-100 text-indigo-700 border border-indigo-300 flex items-center gap-1">
-                                        <Clock className="w-3 h-3" />Edición pendiente
+                                    pendingEditRequests.some(request => request.attendance_record_id === emp.record.id) ? (
+                                      <Badge className="h-7 px-2 text-xs shrink-0 whitespace-nowrap bg-indigo-100 text-indigo-700 border border-indigo-300">
+                                        <Clock className="w-3 h-3 mr-1" />Edición pendiente
                                       </Badge>
                                     ) : (
                                       <Button size="sm" variant="outline" className="h-7 px-2 text-xs shrink-0 whitespace-nowrap" onClick={() => handleEditRecord(emp.record, emp)}>
                                         <Edit className="w-3 h-3 mr-1" />Editar
                                       </Button>
                                     )
->>>>>>> main
                                   )}
                                   {!vacation && !emp.record && (
                                     <div style={{width: "62px", height: "28px", flexShrink: 0}} />
@@ -1502,19 +1431,9 @@ export default function AttendanceManagement() {
                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
                              <p className="text-sm text-yellow-900">⚠️ Este empleado <strong>no está autorizado</strong> para realizar horas extras de forma permanente. Puede corregir la marcación, descartar la alerta o <strong>aceptar las HE únicamente para este día</strong> sin modificar su autorización general.</p>
                            </div>
-<<<<<<< HEAD
                            {canEditAttendance && <div className="flex gap-2 flex-wrap">
                               <Button size="sm" variant="outline" className="flex-1" onClick={() => record && handleEditRecord(record)}>
                                 <Edit className="w-4 h-4 mr-2" />Corregir Marcación
-=======
-                           <div className="flex gap-2 flex-wrap">
-                              <Button size="sm" variant="outline" className="flex-1" onClick={() => {
-                                if (!record) return;
-                                const empForAlert = allEmployees.find(e => e.id === alert.employee_id);
-                                handleEditRecord(record, empForAlert);
-                              }}>
-                                <Edit className="w-4 h-4 mr-2" />Solicitar Corrección
->>>>>>> main
                               </Button>
                               <Button
                                 size="sm"
@@ -1744,38 +1663,34 @@ export default function AttendanceManagement() {
                                   </Card>
                                   </TabsContent>
                                   </Tabs>
-                                  </TabsContent>
+            </TabsContent>
 
-<<<<<<< HEAD
-=======
-                                  {/* Edit Requests Tab */}
-                                  <TabsContent value="edit-requests" className="space-y-6">
-                                  <AttendanceEditRequestsPanel
-                                  allEmployees={allEmployees}
-                                  reviewer={effectiveEmployee}
-                                  canApprove={hasPermission("attendance.approve_edits") || hasPermission("system.admin")}
-                                  />
-                                  </TabsContent>
+            <TabsContent value="edit-requests" className="space-y-6">
+              <AttendanceEditRequestsPanel
+                allEmployees={allEmployees}
+                reviewer={effectiveEmployee}
+                canApprove={canApproveEdits}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
 
-                                  </Tabs>
-                                  </div>
-
-        {/* Edit Request Modal */}
         {showEditRequestModal && editRequestRecord && (
           <AttendanceEditRequestModal
             record={editRequestRecord}
             employee={editRequestEmployee}
-            requester={effectiveEmployee}
-            onClose={() => { setShowEditRequestModal(false); setEditRequestRecord(null); setEditRequestEmployee(null); }}
+            onClose={() => {
+              setShowEditRequestModal(false);
+              setEditRequestRecord(null);
+              setEditRequestEmployee(null);
+            }}
             onSuccess={() => {
-              queryClient.invalidateQueries(["attendanceEditRequests"]);
-              queryClient.invalidateQueries(["todayAttendance"]);
+              queryClient.invalidateQueries({ queryKey: ["attendanceEditRequests"] });
+              queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
             }}
           />
         )}
 
-        {/* Edit Record Modal (legacy — kept for overtime alerts correction) */}
->>>>>>> main
         {showEditModal && editingRecord && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" onClick={() => setShowEditModal(false)}>
             <Card className="max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>

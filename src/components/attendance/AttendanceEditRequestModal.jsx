@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import React, { useState } from "react";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Clock, ArrowRight, X } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -24,7 +23,6 @@ const STATUS_OPTIONS = ["Completo", "Incompleto", "Ausente", "Justificado", "Vac
 export default function AttendanceEditRequestModal({
   record,
   employee,
-  requester,
   onClose,
   onSuccess,
 }) {
@@ -73,23 +71,14 @@ export default function AttendanceEditRequestModal({
     try {
       // Solo guardar campos que cambiaron
       const requestedValues = {};
-      const origValues = {};
       changedFields.forEach((k) => {
         requestedValues[k] = formValues[k];
-        origValues[k] = originalValues[k];
       });
 
-      await base44.entities.AttendanceEditRequest.create({
+      await entitiesAPI.AttendanceEditRequest.create({
         attendance_record_id: record.id,
-        employee_id: record.employee_id,
-        attendance_date: record.date,
-        original_values: origValues,
         requested_values: requestedValues,
         edit_reason: reason.trim(),
-        status: "Pendiente",
-        requested_by_id: requester.id,
-        requested_by_name: `${requester.first_name} ${requester.last_name}`,
-        requested_at: new Date().toISOString(),
       });
 
       toast.success("Solicitud de edición enviada correctamente");

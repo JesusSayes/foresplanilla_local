@@ -505,6 +505,11 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
         scheduled_end: hasSchedule ? scheduledEnd : null,
       },
     });
+    const protectedFields = new Set(
+      Array.isArray(record.manually_protected_fields) ? record.manually_protected_fields : []
+    );
+    const finalClockIn = protectedFields.has("clock_in") ? record.clock_in : result.clock_in;
+    const finalClockOut = protectedFields.has("clock_out") ? record.clock_out : result.clock_out;
 
     const overtimeAuth =
       (record.overtime_authorized === true || schedule?.overtime_authorized === true) &&
@@ -513,8 +518,8 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
     const metrics = calcularMetricas(
       {
         ...record,
-        clock_in: result.clock_in,
-        clock_out: result.clock_out,
+        clock_in: finalClockIn,
+        clock_out: finalClockOut,
         status: result.status,
       },
       schedule,
@@ -538,11 +543,14 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
     else if (hasApprovedIncident) {
       finalStatus = "Justificado";
     }
-    else if (!result.clock_in) {
+    else if (!finalClockIn) {
       finalStatus = "Ausente";
     }
-    else if (result.clock_in && !result.clock_out) {
+    else if (finalClockIn && !finalClockOut) {
       finalStatus = "Incompleto";
+    }
+    if (protectedFields.has("status")) {
+      finalStatus = record.status;
     }
 
     /**
@@ -600,8 +608,8 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
     await prisma.attendance_record.update({
       where: { id: record.id },
       data: {
-        clock_in: result.clock_in,
-        clock_out: result.clock_out,
+        clock_in: finalClockIn,
+        clock_out: finalClockOut,
 
         worked_hours: metrics.worked_hours,
         regular_hours: metrics.regular_hours,
@@ -616,7 +624,7 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
         scheduled_end: hasSchedule ? scheduledEnd : null,
 
         status: finalStatus,
-        notes: result.notes ?? record.notes,
+        notes: protectedFields.has("notes") ? record.notes : (result.notes ?? record.notes),
 
         updated_date: new Date(),
       },

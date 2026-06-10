@@ -8,6 +8,7 @@ const ALLOWED_ACCESS_PERMISSIONS = new Set([
   'attendance.view_own',
   'attendance.edit',
   'attendance.approve_incidents',
+  'attendance.approve_edits',
   'attendance.manage',
   'roles.assign',
   'roles.manage',

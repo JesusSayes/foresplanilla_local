@@ -170,6 +170,11 @@ export async function syncExternalAttendance(options = {}) {
         });
 
         if (existingRecord) {
+          const protectedFields = new Set(
+            Array.isArray(existingRecord.manually_protected_fields)
+              ? existingRecord.manually_protected_fields
+              : []
+          );
           const existingClockIn = existingRecord.clock_in;
           const existingClockOut = existingRecord.clock_out;
           const newClockIn = normalizeExternalTime(record.hora_entrada);
@@ -359,8 +364,8 @@ export async function syncExternalAttendance(options = {}) {
               data: {
                 employee_id: attendanceData.employee_id,
                 date: attendanceData.date,
-                clock_in: attendanceData.clock_in ?? existingRecord.clock_in,
-                clock_out: attendanceData.clock_out ?? existingRecord.clock_out,
+                clock_in: protectedFields.has("clock_in") ? existingRecord.clock_in : (attendanceData.clock_in ?? existingRecord.clock_in),
+                clock_out: protectedFields.has("clock_out") ? existingRecord.clock_out : (attendanceData.clock_out ?? existingRecord.clock_out),
                 scheduled_start: attendanceData.scheduled_start,
                 scheduled_end: attendanceData.scheduled_end,
                 worked_hours: attendanceData.worked_hours,
@@ -371,8 +376,8 @@ export async function syncExternalAttendance(options = {}) {
                 is_late: attendanceData.is_late,
                 late_minutes: attendanceData.late_minutes,
                 is_absent: attendanceData.is_absent,
-                status: attendanceData.status,
-                notes: attendanceData.notes,
+                status: protectedFields.has("status") ? existingRecord.status : attendanceData.status,
+                notes: protectedFields.has("notes") ? existingRecord.notes : attendanceData.notes,
                 updated_date: attendanceData.updated_date,
                 created_by: 'external_sync'
               }

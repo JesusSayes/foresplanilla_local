@@ -10,12 +10,8 @@ import { Users, Trash2, Plus, Edit, Loader2, Search, AlertTriangle, FileText, Lo
 import UbigeoSelect from "./UbigeoSelect";
 import { format } from "date-fns";
 import { toast } from "sonner";
-<<<<<<< HEAD
 import { usePermissions } from "../hooks/usePermissions";
 import { uploadFile } from "@/services/uploadService";
-=======
-import { base44 } from "@/api/base44Client";
->>>>>>> main
 
 export default function EmployeeForm({
   editingEmployee,
@@ -38,13 +34,10 @@ export default function EmployeeForm({
   onDerechohabienteAdd,
   onDerechohabienteEdit,
   onDerechohabienteDelete,
-  showFinancials = false,
+  showFinancials: showFinancialsProp,
 }) {
-<<<<<<< HEAD
-  const { hasPermission, canViewFinancials } = usePermissions();
-  const showFinancials = canViewFinancials();
-=======
->>>>>>> main
+  const { canViewFinancials } = usePermissions();
+  const showFinancials = showFinancialsProp ?? canViewFinancials();
 
   // Auto-generar código FPxxxx al abrir para nuevo empleado
   React.useEffect(() => {

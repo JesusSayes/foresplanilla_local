@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  CheckCircle, XCircle, Clock, Search, ArrowRight, X, AlertCircle, Ban
+  CheckCircle, XCircle, Clock, Search, ArrowRight, AlertCircle, Ban
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -35,48 +35,20 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
   const [loading, setLoading] = useState(false);
 
   const employee = allEmployees.find(e => e.id === req.employee_id);
-  const requestedBy = allEmployees.find(e => e.id === req.requested_by_id);
-  // No hay restricción por autogestión: si tiene el rol, puede aprobar cualquier solicitud
-  const isSelfRequest = false;
+  const isSelfRequest = reviewer?.id === req.requested_by_id;
   const isPending = req.status === "Pendiente";
 
   const handleApprove = async () => {
     if (!window.confirm("¿Aprobar esta solicitud de edición? Se aplicarán los cambios al registro de asistencia.")) return;
     setLoading(true);
     try {
-      // Verificar que sigue Pendiente
-      const fresh = await base44.entities.AttendanceEditRequest.filter({ id: req.id });
-      if (!fresh?.[0] || fresh[0].status !== "Pendiente") {
-        toast.error("La solicitud ya no está pendiente");
-        onApproved?.();
-        return;
+      const result = await entitiesAPI.AttendanceEditRequest.approve(req.id);
+
+      if (result.warning) {
+        toast.warning(result.warning);
+      } else {
+        toast.success("Solicitud aprobada, cambios aplicados y métricas recalculadas");
       }
-
-      // Aplicar cambios al registro
-      await base44.entities.AttendanceRecord.update(req.attendance_record_id, {
-        ...req.requested_values,
-        manually_protected_fields: Object.keys(req.requested_values),
-        last_approved_edit_id: req.id,
-        manually_modified_by: `${reviewer.first_name} ${reviewer.last_name}`,
-        manually_modified_at: new Date().toISOString(),
-      });
-
-      // Marcar solicitud como aprobada
-      await base44.entities.AttendanceEditRequest.update(req.id, {
-        status: "Aprobada",
-        reviewed_by_id: reviewer.id,
-        reviewed_by_name: `${reviewer.first_name} ${reviewer.last_name}`,
-        reviewed_at: new Date().toISOString(),
-      });
-
-      // Recalcular tardanzas y HE con el horario programado del empleado
-      await base44.functions.invoke("recalcularAsistencia", {
-        employee_id: req.employee_id,
-        date_from: req.attendance_date,
-        date_to: req.attendance_date,
-      });
-
-      toast.success("Solicitud aprobada, cambios aplicados y métricas recalculadas");
       onApproved?.();
     } catch (e) {
       toast.error("Error al aprobar: " + e.message);
@@ -93,11 +65,7 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
     if (!window.confirm("¿Rechazar esta solicitud de edición?")) return;
     setLoading(true);
     try {
-      await base44.entities.AttendanceEditRequest.update(req.id, {
-        status: "Rechazada",
-        reviewed_by_id: reviewer.id,
-        reviewed_by_name: `${reviewer.first_name} ${reviewer.last_name}`,
-        reviewed_at: new Date().toISOString(),
+      await entitiesAPI.AttendanceEditRequest.reject(req.id, {
         review_comment: rejectComment.trim(),
       });
       toast.success("Solicitud rechazada");
@@ -114,13 +82,7 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
     if (!window.confirm("¿Cancelar esta solicitud de edición?")) return;
     setLoading(true);
     try {
-      await base44.entities.AttendanceEditRequest.update(req.id, {
-        status: "Cancelada",
-        reviewed_by_id: reviewer.id,
-        reviewed_by_name: `${reviewer.first_name} ${reviewer.last_name}`,
-        reviewed_at: new Date().toISOString(),
-        review_comment: "Cancelada por el solicitante",
-      });
+      await entitiesAPI.AttendanceEditRequest.cancel(req.id);
       toast.success("Solicitud cancelada");
       onCancelled?.();
     } catch (e) {
@@ -239,15 +201,15 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
   const { data: requests = [], refetch } = useQuery({
     queryKey: ["attendanceEditRequests"],
     queryFn: async () => {
-      const all = await base44.entities.AttendanceEditRequest.list("-requested_at", 500);
+      const all = await entitiesAPI.AttendanceEditRequest.list("-requested_at");
       return all;
     },
   });
 
   const refresh = () => {
     refetch();
-    queryClient.invalidateQueries(["todayAttendance"]);
-    queryClient.invalidateQueries(["attendanceEditRequests"]);
+    queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+    queryClient.invalidateQueries({ queryKey: ["attendanceEditRequests"] });
   };
 
   const filtered = (status) =>

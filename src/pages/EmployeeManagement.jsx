@@ -6,18 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Users, Plus, Edit, Eye, UserX, UserCheck, Search,
-  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History, Loader2, Trash2, Upload
+  Briefcase, Shield, History, Upload
 } from "lucide-react";
 import { createPageUrl } from "../utils";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import EmployeeHistory from "../components/employees/EmployeeHistory";
