@@ -28,14 +28,16 @@ const ENTITY_SCHEMAS = {
     personal_email: "TEXT", work_email: "TEXT", phone: "TEXT", mobile: "TEXT",
     address: "TEXT", district: "TEXT", province: "TEXT", department: "TEXT",
     company: "TEXT", position: "TEXT", position_level: "TEXT", profession: "TEXT",
-    department_name: "TEXT", work_unit: "TEXT", site: "TEXT",
+    department_name: "TEXT", area_trabajo: "TEXT", unidad_trabajo: "TEXT", work_unit: "TEXT", site: "TEXT",
     hire_date: "DATE", termination_date: "DATE", contract_type: "TEXT",
-    base_salary: "DECIMAL(18,2)", bank_name: "TEXT", bank_account: "TEXT",
+    base_salary: "DECIMAL(18,2)", activity_cost: "DECIMAL(18,2)", food_cost: "DECIMAL(18,2)", transport_cost: "DECIMAL(18,2)",
+    bank_name: "TEXT", bank_account: "TEXT",
     cci_account: "TEXT", cts_bank: "TEXT", cts_account_number: "TEXT", cts_currency: "TEXT",
     pension_system: "TEXT", afp_id: "TEXT", afp_affiliation_date: "DATE", cuspp: "TEXT",
     worker_type: "TEXT", tax_residence: "TEXT", photo_url: "TEXT", status: "TEXT", role: "TEXT",
     managed_team_ids: "JSON", supervisor_id: "TEXT", supervisor_name: "TEXT",
-    emergency_contact_name: "TEXT", emergency_contact_phone: "TEXT", emergency_contact_relationship: "TEXT"
+    emergency_contact_name: "TEXT", emergency_contact_phone: "TEXT", emergency_contact_relationship: "TEXT",
+    attendance_method: "TEXT"
   },
   EmployeeChangeLog: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
@@ -51,7 +53,7 @@ const ENTITY_SCHEMAS = {
   Contract: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     employee_id: "TEXT", contract_number: "TEXT", contract_type: "TEXT", template_id: "TEXT",
-    start_date: "DATE", end_date: "DATE", position: "TEXT", department: "TEXT",
+    start_date: "DATE", end_date: "DATE", position: "TEXT", area_trabajo: "TEXT", unidad_trabajo: "TEXT", department: "TEXT",
     work_location: "TEXT", salary: "DECIMAL(18,2)", activity_cost: "DECIMAL(18,2)",
     food_cost: "DECIMAL(18,2)", transport_cost: "DECIMAL(18,2)",
     work_schedule: "TEXT", weekly_hours: "INTEGER", functions: "TEXT", benefits: "TEXT",
@@ -95,7 +97,18 @@ const ENTITY_SCHEMAS = {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     employee_id: "TEXT", date: "DATE", clock_in: "TEXT", clock_out: "TEXT",
     scheduled_start: "TEXT", scheduled_end: "TEXT", worked_hours: "DECIMAL(18,2)",
-    is_late: "BOOLEAN", late_minutes: "INTEGER", is_absent: "BOOLEAN", status: "TEXT", notes: "TEXT"
+    regular_hours: "DECIMAL(18,2)", overtime_hours_25: "DECIMAL(18,2)", overtime_hours_35: "DECIMAL(18,2)",
+    overtime_authorized: "BOOLEAN", is_late: "BOOLEAN", late_minutes: "INTEGER",
+    is_absent: "BOOLEAN", status: "TEXT", notes: "TEXT",
+    manually_protected_fields: "JSON", last_approved_edit_id: "TEXT",
+    manually_modified_by: "TEXT", manually_modified_at: "TIMESTAMP"
+  },
+  AttendanceEditRequest: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    attendance_record_id: "TEXT", employee_id: "TEXT", attendance_date: "DATE",
+    original_values: "JSON", requested_values: "JSON", edit_reason: "TEXT",
+    status: "TEXT", requested_by_id: "TEXT", requested_by_name: "TEXT", requested_at: "TIMESTAMP",
+    reviewed_by_id: "TEXT", reviewed_by_name: "TEXT", reviewed_at: "TIMESTAMP", review_comment: "TEXT"
   },
   AttendanceIncident: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
@@ -231,6 +244,19 @@ const ENTITY_SCHEMAS = {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     elemento: "TEXT", cuenta: "TEXT", nombre: "TEXT", is_active: "BOOLEAN"
   },
+  CuentaContable: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    cuenta: "TEXT", descripcion: "TEXT", tipo: "TEXT", is_active: "BOOLEAN"
+  },
+  AreaUnidadCargo: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    area: "TEXT", unidad: "TEXT", cargo: "TEXT", is_active: "BOOLEAN"
+  },
+  PayrollConfig: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    config_type: "TEXT", quincenal_percentage: "DECIMAL(18,2)", quincenal_cutoff_day: "INTEGER",
+    is_active: "BOOLEAN", notes: "TEXT"
+  },
   Holiday: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     name: "TEXT", date: "DATE", type: "TEXT", is_mandatory: "BOOLEAN", description: "TEXT"
@@ -345,12 +371,13 @@ const ENTITY_SCHEMAS = {
 const ENTITY_GROUPS = [
   { label: "Usuarios y Empleados", entities: ["User", "UserInvitation", "UserRole", "Employee", "EmployeeChangeLog", "Derechohabiente"] },
   { label: "Contratos", entities: ["Contract", "ContractTemplate", "ContractClause", "ContractRenewalRule"] },
-  { label: "Asistencia", entities: ["AttendanceRecord", "AttendanceIncident", "OvertimeAlert", "WorkSchedule", "AccessDevice", "EmployeeAccessMapping", "DeviceEvent", "DatabaseConnection", "SyncLog"] },
+  { label: "Asistencia", entities: ["AttendanceRecord", "AttendanceEditRequest", "AttendanceIncident", "OvertimeAlert", "WorkSchedule", "AccessDevice", "EmployeeAccessMapping", "DeviceEvent", "DatabaseConnection", "SyncLog"] },
   { label: "Vacaciones", entities: ["VacationRequest", "VacationBalance"] },
   { label: "Planillas y Remuneración", entities: ["Payslip", "PayrollConcept", "LoanType", "Loan", "LoanInstallment"] },
   { label: "Centros de Costo", entities: ["CostCenter", "CostCenterAssignment", "CostCenterChangeLog", "CostCenterCategory", "AccountingAccount"] },
-  { label: "Contabilidad", entities: ["AsientoContable"] },
-  { label: "Datos Maestros", entities: ["Holiday", "Position", "Department", "Bank", "Site", "AFP", "Profession", "Ubigeo", "RMV", "UIT", "SeguroVidaLey"] },
+  { label: "Contabilidad", entities: ["AsientoContable", "CuentaContable"] },
+  { label: "Datos Maestros", entities: ["Holiday", "Position", "Department", "Bank", "Site", "AFP", "Profession", "Ubigeo", "RMV", "UIT", "SeguroVidaLey", "AreaUnidadCargo"] },
+  { label: "Configuración Planillas", entities: ["PayrollConfig"] },
   { label: "Roles y Permisos", entities: ["Role"] },
   { label: "Certificados", entities: ["Certificate"] },
   { label: "Configuración de Empresa", entities: ["CompanyInfo", "PayslipTemplate", "ReportConfiguration"] },
