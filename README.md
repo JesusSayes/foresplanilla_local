@@ -41,14 +41,14 @@ Consultar marcaciones directamente desde BioTime por número de documento:
 
 ```bash
 cd backend
-node --env-file=.env scripts/getEmployeeAttendance.js --document_number=<NÚMERO_DOCUMENTO> --date=2026-06-10
+node scripts/getEmployeeAttendance.js --document_number=<NÚMERO_DOCUMENTO> --date=2026-06-10
 ```
 
 Para consultar varios días:
 
 ```bash
 cd backend
-node --env-file=.env scripts/getEmployeeAttendance.js --document_number=<NÚMERO_DOCUMENTO> --date_from=2026-06-01 --date_to=2026-06-10
+node scripts/getEmployeeAttendance.js --document_number=<NÚMERO_DOCUMENTO> --date_from=2026-06-01 --date_to=2026-06-10
 ```
 
 backfillAsistenciaEmpleado:
