@@ -563,7 +563,9 @@ export default function AttendanceManagement() {
         employee_id: emp.id,
         incident_date: dateStr,
       });
-      prevIncident = fetched?.[0] || null;
+      prevIncident = fetched?.find(
+        i => i.employee_id === emp.id && String(i.incident_date).slice(0, 10) === dateStr
+      ) || null;
     }
 
     if (prevIncident) {

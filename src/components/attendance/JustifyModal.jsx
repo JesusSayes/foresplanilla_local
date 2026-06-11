@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { FileText, AlertCircle, CalendarIcon, CheckCircle, Clock, ExternalLink } from "lucide-react";
+import { FileText, AlertCircle, CalendarIcon, CheckCircle, Clock } from "lucide-react";
 import { format, eachDayOfInterval } from "date-fns";
 import { es } from "date-fns/locale";
 import { todayLima, parseDateLima } from "@/lib/dateUtils";
@@ -19,6 +19,12 @@ import recalcularAsistenciaService from '@/services/recalcularAsistenciaService'
 // ── helpers ─────────────────────────────────────────────────────────────────
 const toMin = (t) => { if (!t) return 0; const [h, m] = t.split(":").map(Number); return h * 60 + m; };
 const fromMin = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+const toDateStr = value => {
+  if (!value) return "";
+  if (typeof value === "string") return value.slice(0, 10);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+};
 
 /**
  * Dados el registro de asistencia, las justificaciones aprobadas del día y el
@@ -143,12 +149,26 @@ export default function JustifyModal({
   const dateStr = format(selectedDate, "yyyy-MM-dd");
 
   useEffect(() => {
+    let cancelled = false;
+    setDayIncidents([]);
+
     entitiesAPI.AttendanceIncident.filter({
       employee_id: justifyingEmployee.id,
       incident_date: dateStr,
     }).then((incidents) => {
-      setDayIncidents(incidents.filter(i => i.status === "Aprobada"));
-    }).catch(() => {});
+      if (cancelled) return;
+      setDayIncidents(incidents.filter(i =>
+        i.employee_id === justifyingEmployee.id &&
+        toDateStr(i.incident_date) === dateStr &&
+        i.status === "Aprobada"
+      ));
+    }).catch(() => {
+      if (!cancelled) setDayIncidents([]);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [justifyingEmployee.id, dateStr]);
 
   // Construir lista de incidentes activos para el cálculo (existentes + el actual)

@@ -2,6 +2,7 @@ import prisma from "../../config/prisma.js";
 
 import { generate24HexId } from '../../utils/idGenerator.js';
 import { canAccessEmployee } from "../../middleware/authorization.js";
+import { toDateString } from "../../utils/employmentDate.js";
 
 export const getAll = async (req, res) => {
   try {
@@ -37,8 +38,14 @@ export const filter = async (req, res) => {
       where.incident_type = filters.incident_type;
     }
 
+    if (filters.incident_date) {
+      const incidentDate = toDateString(filters.incident_date);
+      if (!incidentDate) return res.status(400).json({ error: 'Fecha de incidente inválida' });
+      where.incident_date = new Date(incidentDate);
+    }
+
     // rango de fechas (ajusta nombres de campos a tu schema)
-    if (filters.date_from || filters.date_to) {
+    if (!filters.incident_date && (filters.date_from || filters.date_to)) {
       where.incident_date = {};
       if (filters.date_from) where.incident_date.gte = new Date(filters.date_from);
       if (filters.date_to)   where.incident_date.lte = new Date(filters.date_to);
