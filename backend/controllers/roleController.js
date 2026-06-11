@@ -41,7 +41,7 @@ export const getRoleById = async (req, res) => {
 
 export const createRole = async (req, res) => {
   try {
-    const { name, description, permissions, is_system_role, department_restricted, team_restricted, site_restricted, allowed_sites, block_financial_info, priority } = req.body;
+    const { name, description, permissions, is_system_role, department_restricted, team_restricted, site_restricted, allowed_sites, priority } = req.body;
     if (isPrivilegedRole({ permissions, is_system_role }) && !canManagePrivilegedRoles(req)) {
       return res.status(403).json({ error: 'Solo un administrador del sistema puede crear roles privilegiados' });
     }
@@ -57,7 +57,6 @@ export const createRole = async (req, res) => {
         team_restricted: team_restricted || false,
         site_restricted: site_restricted || false,
         allowed_sites: allowed_sites || [],
-        block_financial_info: block_financial_info ?? true,
         priority: priority || 0,
         created_by_id: req.user?.id,
         created_by: req.user?.full_name,
@@ -76,7 +75,7 @@ export const createRole = async (req, res) => {
 export const updateRole = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, permissions, is_system_role, department_restricted, team_restricted, site_restricted, allowed_sites, block_financial_info, priority } = req.body;
+    const { name, description, permissions, is_system_role, department_restricted, team_restricted, site_restricted, allowed_sites, priority } = req.body;
     const existing = await prisma.role.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ error: 'Rol no encontrado' });
     if ((isPrivilegedRole(existing) || isPrivilegedRole({ permissions, is_system_role })) && !canManagePrivilegedRoles(req)) {
@@ -94,7 +93,6 @@ export const updateRole = async (req, res) => {
         team_restricted,
         site_restricted,
         allowed_sites: allowed_sites ?? [],
-        block_financial_info,
         priority,
         updated_date: new Date()
       }
