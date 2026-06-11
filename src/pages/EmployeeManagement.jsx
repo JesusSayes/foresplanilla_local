@@ -113,6 +113,14 @@ export default function EmployeeManagement() {
     },
   });
 
+  const { data: areaUnidadCargos = [] } = useQuery({
+    queryKey: ["areaUnidadCargos"],
+    queryFn: async () => {
+      const all = await entitiesAPI.AreaUnidadCargo.list("area");
+      return all.filter(a => a.is_active !== false);
+    },
+  });
+
   const { data: derechohabientes = [] } = useQuery({
     queryKey: ["derechohabientes", editingEmployee?.id],
     queryFn: async () => {
@@ -611,6 +619,8 @@ export default function EmployeeManagement() {
       status: emp?.status || "Activo",
       role: emp?.role || "empleado",
       supervisor_name: emp?.supervisor_name || "",
+      area_trabajo: emp?.area_trabajo || "",
+      unidad_trabajo: emp?.unidad_trabajo || "",
       attendance_method: emp?.attendance_method || "",
       emergency_contact_name: emp?.emergency_contact_name || "",
       emergency_contact_phone: emp?.emergency_contact_phone || "",
@@ -1104,6 +1114,7 @@ export default function EmployeeManagement() {
           formErrors={formErrors}
           derechohabientes={derechohabientes}
           showFinancials={canViewFinancials()}
+          areaUnidadCargos={areaUnidadCargos}
           onDerechohabienteAdd={(data) => createDerechohabienteMutation.mutate(data)}
           onDerechohabienteEdit={(id, data) => updateDerechohabienteMutation.mutate({ id, data })}
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}

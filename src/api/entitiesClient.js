@@ -44,6 +44,7 @@ export const entitiesAPI = {
   },
   Position: createEntityAPI('/api/master-data/positions'),
   Department: createEntityAPI('/api/master-data/departments'),
+  AreaUnidadCargo: createEntityAPI('/api/master-data/area-unidad-cargos'),
   Bank: createEntityAPI('/api/master-data/banks'),
   Site: createEntityAPI('/api/master-data/sites'),
   AFP: createEntityAPI('/api/master-data/afps'),
