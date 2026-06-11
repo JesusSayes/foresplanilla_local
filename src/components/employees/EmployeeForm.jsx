@@ -34,6 +34,7 @@ export default function EmployeeForm({
   onDerechohabienteEdit,
   onDerechohabienteDelete,
   showFinancials = false,
+  areaUnidadCargos = [],
 }) {
 
   // Auto-generar código FPxxxx al abrir para nuevo empleado
