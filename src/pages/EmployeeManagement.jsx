@@ -135,7 +135,8 @@ export default function EmployeeManagement() {
   const { data: areaUnidadCargos = [] } = useQuery({
     queryKey: ["areaUnidadCargos"],
     queryFn: async () => {
-      return await base44.entities.AreaUnidadCargo.filter({ is_active: true }, "area");
+      const all = await base44.entities.AreaUnidadCargo.list("area");
+      return all.filter(a => a.is_active !== false);
     },
   });
 
