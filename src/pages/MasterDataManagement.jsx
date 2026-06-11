@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
+import MasterDataFormModal from "../components/master/MasterDataFormModal";
 
 export default function MasterDataManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -104,6 +105,11 @@ export default function MasterDataManagement() {
     queryFn: async () => await base44.entities.AccountingAccount.list("cuenta"),
   });
 
+  const { data: areaUnidadCargos = [] } = useQuery({
+    queryKey: ["areaunidadcargos"],
+    queryFn: async () => await base44.entities.AreaUnidadCargo.list("area"),
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ entity, data }) => {
       return await base44.entities[entity].create(data);
@@ -159,6 +165,18 @@ export default function MasterDataManagement() {
     }
   };
 
+  const filteredAreaUnidadCargo = areaUnidadCargos.filter(a =>
+    a.area?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.unidad?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.cargo?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleSoftDelete = (item, entity) => {
+    if (confirm(`¿Desactivar este registro?`)) {
+      updateMutation.mutate({ entity, id: item.id, data: { is_active: false } });
+    }
+  };
+
   const handleSubmit = async () => {
     const entityMap = {
       sites: "Site",
@@ -172,6 +190,7 @@ export default function MasterDataManagement() {
       segurovida: "SeguroVidaLey",
       uit: "UIT",
       accountingaccounts: "AccountingAccount",
+      areaunidadcargo: "AreaUnidadCargo",
     };
     const entity = entityMap[activeTab];
 
@@ -457,10 +476,25 @@ export default function MasterDataManagement() {
               <p className="text-slate-600 text-sm">Cuentas</p>
             </CardContent>
           </Card>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-3 bg-violet-100 rounded-xl">
+                  <Briefcase className="w-6 h-6 text-violet-600" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-slate-900 mb-1">
+                {areaUnidadCargos.filter(a => a.is_active !== false).length}
+              </div>
+              <p className="text-slate-600 text-sm">Área/Unidad/Cargo</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-7xl grid-cols-11">
+          <TabsList className="grid w-full max-w-7xl grid-cols-12">
+            <TabsTrigger value="areaunidadcargo">Área/Unidad</TabsTrigger>
             <TabsTrigger value="sites">Sedes</TabsTrigger>
             <TabsTrigger value="positions">Cargos</TabsTrigger>
             <TabsTrigger value="departments">Departamentos</TabsTrigger>
@@ -473,6 +507,54 @@ export default function MasterDataManagement() {
             <TabsTrigger value="uit">UIT</TabsTrigger>
             <TabsTrigger value="accountingaccounts">Cuentas</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="areaunidadcargo" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Área / Unidad / Cargo</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">Tabla maestra jerárquica. La eliminación es lógica (desactiva el registro).</p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button onClick={() => handleCreate("areaunidadcargo")} className="bg-indigo-600 hover:bg-indigo-700"><Plus className="w-4 h-4 mr-2" />Nuevo</Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar área, unidad o cargo..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
+                {[...new Set(filteredAreaUnidadCargo.map(a => a.area))].sort().map(area => (
+                  <div key={area} className="mb-5">
+                    <h3 className="text-sm font-bold text-indigo-700 mb-2 pb-1 border-b border-indigo-100 flex items-center gap-2">
+                      <Building className="w-4 h-4" />{area} <span className="text-xs font-normal text-slate-400">({filteredAreaUnidadCargo.filter(a=>a.area===area).length})</span>
+                    </h3>
+                    <div className="space-y-1.5">
+                      {filteredAreaUnidadCargo.filter(a => a.area === area).map(item => (
+                        <div key={item.id} className="p-2.5 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
+                          <div className="flex items-center gap-3">
+                            <Badge className="bg-violet-100 text-violet-700 text-xs">{item.unidad}</Badge>
+                            <span className="text-sm font-medium text-slate-900">{item.cargo}</span>
+                            {item.is_active === false && <Badge className="bg-red-100 text-red-700 text-xs">Inactivo</Badge>}
+                          </div>
+                          <div className="flex gap-1.5">
+                            {hasAnyPermission(["system.admin"]) && (
+                              <Button size="sm" variant="outline" onClick={() => handleEdit(item, "areaunidadcargo")}><Edit className="w-3.5 h-3.5" /></Button>
+                            )}
+                            {hasAnyPermission(["system.admin"]) && item.is_active !== false && (
+                              <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleSoftDelete(item, "AreaUnidadCargo")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                            )}
+                            {hasAnyPermission(["system.admin"]) && item.is_active === false && (
+                              <Button size="sm" variant="outline" className="text-green-600 text-xs px-2" onClick={() => updateMutation.mutate({ entity: "AreaUnidadCargo", id: item.id, data: { is_active: true } })}>Reactivar</Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="sites" className="space-y-6">
             <Card className="border-0 shadow-lg">
@@ -1370,38 +1452,12 @@ export default function MasterDataManagement() {
           </Tabs>
           </div>
 
-      {/* Form Modal */}
-      {showForm && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
-          onClick={resetForm}
-        >
-          <Card 
-            className="max-w-2xl w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader className="border-b">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl font-bold">
-                  {editingItem ? "Editar" : "Nuevo"} {
-                    activeTab === "sites" ? "Sede" : 
-                    activeTab === "positions" ? "Cargo" : 
-                    activeTab === "departments" ? "Departamento" : 
-                    activeTab === "banks" ? "Banco" : 
-                    activeTab === "rmv" ? "RMV" : 
-                    activeTab === "afp" ? "AFP" : 
-                    activeTab === "professions" ? "Profesión" :
-                    activeTab === "costcenters" ? "Centro de Costos" :
-                    activeTab === "segurovida" ? "Seguro Vida Ley" :
-                    activeTab === "uit" ? "UIT" :
-                    activeTab === "accountingaccounts" ? "Cuenta Contable" : ""
-                  }
-                </CardTitle>
-                <Button variant="ghost" size="icon" onClick={resetForm}>✕</Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-4">
+      {/* Form Modal — rendered via extracted component */}
+      {showForm && <MasterDataFormModal activeTab={activeTab} editingItem={editingItem} formData={formData} setFormData={setFormData} onSubmit={handleSubmit} onCancel={resetForm} isSaving={createMutation.isPending || updateMutation.isPending} />}
+
+      {false && (
+        <div>
+          <div className="space-y-4">
                 {activeTab === "sites" && (
                   <>
                     <div>
@@ -1898,6 +1954,27 @@ export default function MasterDataManagement() {
                   </>
                 )}
 
+                {activeTab === "areaunidadcargo" && (
+                  <>
+                    <div>
+                      <Label>Área *</Label>
+                      <Input value={formData.area || ""} onChange={(e) => setFormData({ ...formData, area: e.target.value })} placeholder="Ej: ADMINISTRACION" />
+                    </div>
+                    <div>
+                      <Label>Unidad de Trabajo *</Label>
+                      <Input value={formData.unidad || ""} onChange={(e) => setFormData({ ...formData, unidad: e.target.value })} placeholder="Ej: CONTABILIDAD" />
+                    </div>
+                    <div>
+                      <Label>Cargo *</Label>
+                      <Input value={formData.cargo || ""} onChange={(e) => setFormData({ ...formData, cargo: e.target.value })} placeholder="Ej: ANALISTA" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="is_active_auc" checked={formData.is_active !== false} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} className="w-4 h-4 rounded" />
+                      <label htmlFor="is_active_auc" className="text-sm">Activo</label>
+                    </div>
+                  </>
+                )}
+
                 <div className="flex gap-3 pt-4">
                   <Button variant="outline" className="flex-1" onClick={resetForm}>
                     Cancelar
@@ -1910,11 +1987,11 @@ export default function MasterDataManagement() {
                     {editingItem ? "Actualizar" : "Crear"}
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+                </div>
+                </div>
+                </div>
+                </div>
+                )}
     </div>
   );
 }

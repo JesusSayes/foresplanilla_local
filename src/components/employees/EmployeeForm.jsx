@@ -50,6 +50,16 @@ export default function EmployeeForm({
     }
   }, []);
 
+  // AreaUnidadCargo: cascada área → unidad → cargo
+  const activeAUC = areaUnidadCargos.filter(a => a.is_active !== false);
+  const areas = [...new Set(activeAUC.map(a => a.area))].sort();
+  const unidadesForArea = formData.area_trabajo
+    ? [...new Set(activeAUC.filter(a => a.area === formData.area_trabajo).map(a => a.unidad))].sort()
+    : [];
+  const cargosForUnidad = formData.area_trabajo && formData.unidad_trabajo
+    ? [...new Set(activeAUC.filter(a => a.area === formData.area_trabajo && a.unidad === formData.unidad_trabajo).map(a => a.cargo))].sort()
+    : [];
+
   const [positionSearchTerm, setPositionSearchTerm] = React.useState("");
   const [departmentSearchTerm, setDepartmentSearchTerm] = React.useState("");
   const [professionSearchTerm, setProfessionSearchTerm] = React.useState("");
@@ -383,43 +393,41 @@ export default function EmployeeForm({
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              {/* Fila 1: Área / Unidad / Cargo (desde AreaUnidadCargo) */}
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label>Área/Departamento</Label>
-                  <Select value={formData.department_name} onValueChange={(v) => setFormData({ ...formData, department_name: v, position: "" })}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <Select value={formData.area_trabajo || ""} onValueChange={(v) => setFormData({ ...formData, area_trabajo: v, unidad_trabajo: "", position: "", department_name: v })}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar área" /></SelectTrigger>
                     <SelectContent>
-                      <div className="p-2 border-b sticky top-0 bg-white z-10"><Input placeholder="Buscar..." value={departmentSearchTerm} onChange={(e) => setDepartmentSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} /></div>
-                      {departments.filter(d => d.name.toLowerCase().includes(departmentSearchTerm.toLowerCase())).map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
+                      {areas.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Unidad de Trabajo</Label>
+                  <Select value={formData.unidad_trabajo || ""} onValueChange={(v) => setFormData({ ...formData, unidad_trabajo: v, position: "" })} disabled={!formData.area_trabajo}>
+                    <SelectTrigger><SelectValue placeholder={formData.area_trabajo ? "Seleccionar unidad" : "Selecciona primero un área"} /></SelectTrigger>
+                    <SelectContent>
+                      {unidadesForArea.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label>Cargo</Label>
-                  <Select value={formData.position} onValueChange={(v) => setFormData({ ...formData, position: v })} disabled={!formData.department_name}>
-                    <SelectTrigger><SelectValue placeholder={formData.department_name ? "Seleccionar cargo" : "Selecciona primero un área"} /></SelectTrigger>
+                  <Select value={formData.position || ""} onValueChange={(v) => setFormData({ ...formData, position: v })} disabled={!formData.unidad_trabajo}>
+                    <SelectTrigger><SelectValue placeholder={formData.unidad_trabajo ? "Seleccionar cargo" : "Selecciona primero una unidad"} /></SelectTrigger>
                     <SelectContent>
-                      <div className="p-2 border-b sticky top-0 bg-white z-10"><Input placeholder="Buscar..." value={positionSearchTerm} onChange={(e) => setPositionSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} /></div>
-                      {positions
-                        .filter(p => {
-                          const matchesDept = !formData.department_name || p.department === formData.department_name;
-                          const matchesSearch = p.name.toLowerCase().includes(positionSearchTerm.toLowerCase());
-                          return matchesDept && matchesSearch;
-                        })
-                        .map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
-                      {positions.filter(p => p.department === formData.department_name).length === 0 && formData.department_name && (
-                        <div className="px-3 py-4 text-sm text-slate-400 text-center">No hay cargos para este departamento</div>
-                      )}
+                      {cargosForUnidad.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  {formData.department_name && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      {positions.filter(p => p.department === formData.department_name).length} cargo(s) disponible(s)
-                    </p>
-                  )}
                 </div>
               </div>
+
+              {/* Fila 2: Supervisor / Nivel / Tipo de Contrato */}
               <div className="grid grid-cols-3 gap-4">
+                <div><Label>Supervisor Directo</Label><Input value={formData.supervisor_name} onChange={(e) => setFormData({ ...formData, supervisor_name: e.target.value })} /></div>
                 <div><Label>Nivel</Label><Input value={formData.position_level} onChange={(e) => setFormData({ ...formData, position_level: e.target.value })} /></div>
                 <div>
                   <Label>Tipo de Contrato</Label>
@@ -435,10 +443,9 @@ export default function EmployeeForm({
                   </Select>
                   {vigentContract ? <p className="text-xs text-indigo-600 mt-1">Contrato vigente: {vigentContract.contract_type}</p> : <p className="text-xs text-amber-600 mt-1">Sin contrato vigente</p>}
                 </div>
-                <div><Label>Unidad de Trabajo</Label><Input value={formData.work_unit} onChange={(e) => setFormData({ ...formData, work_unit: e.target.value })} /></div>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
-                <div><Label>Supervisor Directo</Label><Input value={formData.supervisor_name} onChange={(e) => setFormData({ ...formData, supervisor_name: e.target.value })} /></div>
                 <div>
                   <Label>Tipo de Marcación <span className="text-red-600">*</span></Label>
                   <Select

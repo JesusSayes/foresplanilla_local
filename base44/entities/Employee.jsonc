@@ -71,7 +71,7 @@
     },
     "department": {
       "type": "string",
-      "description": "Departamento"
+      "description": "Departamento (ubicaci\u00f3n geogr\u00e1fica)"
     },
     "company": {
       "type": "string",
@@ -91,11 +91,19 @@
     },
     "department_name": {
       "type": "string",
-      "description": "\u00c1rea/Departamento"
+      "description": "\u00c1rea/Departamento (laboral)"
+    },
+    "area_trabajo": {
+      "type": "string",
+      "description": "\u00c1rea de trabajo (de AreaUnidadCargo)"
+    },
+    "unidad_trabajo": {
+      "type": "string",
+      "description": "Unidad de trabajo (de AreaUnidadCargo)"
     },
     "work_unit": {
       "type": "string",
-      "description": "Unidad de trabajo"
+      "description": "Unidad de trabajo (campo libre)"
     },
     "site": {
       "type": "string",
@@ -179,11 +187,11 @@
         "Ninguno"
       ],
       "default": "Ninguno",
-      "description": "Sistema de pensiones al que est\u00e1 afiliado"
+      "description": "Sistema de pensiones"
     },
     "afp_id": {
       "type": "string",
-      "description": "ID de la AFP a la que est\u00e1 afiliado"
+      "description": "ID de la AFP"
     },
     "afp_affiliation_date": {
       "type": "string",
@@ -192,7 +200,7 @@
     },
     "cuspp": {
       "type": "string",
-      "description": "C\u00f3digo \u00danico de Identificaci\u00f3n del Sistema Privado de Pensiones"
+      "description": "C\u00f3digo CUSPP"
     },
     "worker_type": {
       "type": "string",
@@ -238,14 +246,14 @@
         "hr_readonly"
       ],
       "default": "empleado",
-      "description": "Rol del empleado en el sistema"
+      "description": "Rol del empleado"
     },
     "managed_team_ids": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "description": "IDs de empleados que este manager supervisa"
+      "description": "IDs de empleados supervisados"
     },
     "supervisor_id": {
       "type": "string",
@@ -266,6 +274,10 @@
     "emergency_contact_relationship": {
       "type": "string",
       "description": "Relaci\u00f3n con contacto de emergencia"
+    },
+    "attendance_method": {
+      "type": "string",
+      "description": "Tipo de marcaci\u00f3n"
     }
   },
   "required": [
