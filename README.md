@@ -37,6 +37,20 @@ $ node scripts/generarAsistenciaDiaria.js --mode=backfill --date_from=2025-01-01
 recalcularAsistencia:
 $ node scripts/recalcularAsistencia.js --employee_id=<ID> --date_from=2025-01-01 --date_to=2025-03-31
 
+Consultar marcaciones directamente desde BioTime por número de documento:
+
+```bash
+cd backend
+node --env-file=.env scripts/getEmployeeAttendance.js --document_number=<NÚMERO_DOCUMENTO> --date=2026-06-10
+```
+
+Para consultar varios días:
+
+```bash
+cd backend
+node --env-file=.env scripts/getEmployeeAttendance.js --document_number=<NÚMERO_DOCUMENTO> --date_from=2026-06-01 --date_to=2026-06-10
+```
+
 backfillAsistenciaEmpleado:
 $ node scripts/backfillAsistenciaEmpleado.js --employee_id=<ID> --date_from=2025-01-01
 
