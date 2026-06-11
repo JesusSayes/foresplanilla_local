@@ -59,6 +59,7 @@ import { syncBiotimeAttendance } from './controllers/sync/biotimeSyncController.
 import uploadRoutes from "./routes/uploadRoutes.js";
 import derechohabientesRoutes from './routes/derechohabientes.js';
 import { generarAsistenciaDiaria } from './scripts/generarAsistenciaDiaria.js';
+import { updateTerminatedEmployeeStatuses } from './scripts/updateTerminatedEmployeeStatuses.js';
 import { calcularAsistenciaDesdeLogs } from './scripts/calcularAsistenciaDesdeLogs.js';
 import { syncExternalAttendance } from './services/externalAttendanceSync.js';
 import asientosContablesRoutes from './routes/asientosContables.js';
@@ -195,7 +196,10 @@ cron.schedule('0 * * * *', () => {
 // Cron: generar asistencia diaria a las 00:00 (medianoche hora local)
 cron.schedule('0 0 * * *', () => {
   console.log('[Cron] Ejecutando generarAsistenciaDiaria...');
-  generarAsistenciaDiaria({ mode: 'cron' }).catch(err => console.error('[Cron] Error en generarAsistenciaDiaria:', err.message));
+  updateTerminatedEmployeeStatuses()
+    .then(result => console.log(`[Cron] Empleados actualizados a Cesado: ${result.updated}`))
+    .then(() => generarAsistenciaDiaria({ mode: 'cron' }))
+    .catch(err => console.error('[Cron] Error en generación diaria de asistencia:', err.message));
 }, { timezone: CRON_TIMEZONE });
 
 // Cron: sincronización de asistencias externas cada hora en minuto 15

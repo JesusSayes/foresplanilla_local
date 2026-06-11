@@ -1,5 +1,6 @@
 import { entitiesAPI } from "@/api/entitiesClient";
 import { format } from "date-fns";
+import { isEmploymentDateValid } from "@/lib/employmentDate";
 
 /**
  * Genera automáticamente marcaciones para empleados con horarios exonerados
@@ -27,6 +28,8 @@ export const generateAutoClockings = async (targetDate = new Date()) => {
     let recordsCreated = 0;
 
     for (const employee of employees) {
+      if (!isEmploymentDateValid(employee, dateStr)) continue;
+
       // Verificar si ya tiene marcación
       const hasRecord = existingRecords.some(r => r.employee_id === employee.id);
       if (hasRecord) continue;

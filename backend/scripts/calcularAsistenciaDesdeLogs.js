@@ -8,6 +8,7 @@ import {
   getProtectedFields,
   protectValue,
 } from "../utils/manualAttendanceProtection.js";
+import { isEmploymentDateValid } from "../utils/employmentDate.js";
 
 /**
  * CONFIG
@@ -360,13 +361,28 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
   const logEmployeeIds = [
     ...new Set(logs.map(log => log.employee_id).filter(Boolean)),
   ];
+  const candidateEmployeeIds = [
+    ...new Set([
+      ...logEmployeeIds,
+      ...records.map(record => record.employee_id).filter(Boolean),
+    ]),
+  ];
+  const candidateEmployees = await prisma.employee.findMany({
+    where: { id: { in: candidateEmployeeIds } },
+    select: { id: true, hire_date: true, termination_date: true },
+  });
+  const validEmployeeIds = new Set(
+    candidateEmployees
+      .filter(employee => isEmploymentDateValid(employee, dateStr))
+      .map(employee => employee.id)
+  );
 
   const existingRecordEmployeeIds = new Set(
     records.map(record => record.employee_id).filter(Boolean)
   );
 
   const missingEmployeeIds = logEmployeeIds.filter(
-    employeeId => !existingRecordEmployeeIds.has(employeeId)
+    employeeId => validEmployeeIds.has(employeeId) && !existingRecordEmployeeIds.has(employeeId)
   );
 
   if (missingEmployeeIds.length > 0) {
@@ -457,6 +473,9 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
    * 4. Procesar cada empleado
    */
   for (const record of recordsToProcess) {
+    if (!validEmployeeIds.has(record.employee_id)) {
+      continue;
+    }
     const recordDate = toPeruDateString(record.date);
     const today = toPeruDateString(new Date());
 

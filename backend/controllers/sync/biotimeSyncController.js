@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "../../config/prisma.js";
 import { calcularAsistenciaDesdeLogs } from "../../scripts/calcularAsistenciaDesdeLogs.js";
 import { generate24HexId } from "../../utils/idGenerator.js";
+import { isEmploymentDateValid } from "../../utils/employmentDate.js";
 
 const { Pool } = pg;
 
@@ -136,6 +137,8 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
       select: {
         id: true,
         document_number: true,
+        hire_date: true,
+        termination_date: true,
       },
     });
 
@@ -177,7 +180,7 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
         continue;
       }
 
-      employeeMap.set(normalizedDocument, emp.id);
+      employeeMap.set(normalizedDocument, emp);
 
     }
 
@@ -219,7 +222,8 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
           continue;
         }
 
-        const employeeId = employeeMap.get(empCode);
+        const employee = employeeMap.get(empCode);
+        const employeeId = employee?.id;
 
         // console.log("[BiotimeSync][LOOKUP]", {
           // raw_emp_code: tx.emp_code,
@@ -247,6 +251,19 @@ export async function syncBiotimeAttendance({ startDate, endDate } = {}) {
             terminal: tx.terminal_alias,
           });
 
+          skipped++;
+          continue;
+        }
+
+        const punchDate = punchTime.toLocaleDateString("sv-SE", {
+          timeZone: "America/Lima",
+        });
+        if (!isEmploymentDateValid(employee, punchDate)) {
+          console.log("[BiotimeSync][OUTSIDE EMPLOYMENT PERIOD]", {
+            employeeId,
+            punchDate,
+            termination_date: employee.termination_date,
+          });
           skipped++;
           continue;
         }

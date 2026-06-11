@@ -9,6 +9,7 @@ import {
   manualModifierData,
   mergeProtectedFields,
 } from "../../utils/manualAttendanceProtection.js";
+import { isEmploymentDateValid } from "../../utils/employmentDate.js";
 
 const serializeRecord = (r) => ({
   ...r,
@@ -58,6 +59,11 @@ export const create = async (req, res) => {
 
     const data = req.body || {};
     if (!canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    const employee = await prisma.employee.findUnique({ where: { id: data.employee_id } });
+    if (!employee) return res.status(404).json({ error: 'Empleado no encontrado' });
+    if (!isEmploymentDateValid(employee, data.date)) {
+      return res.status(409).json({ error: 'No se puede crear asistencia fuera del período laboral del empleado' });
+    }
     const now = new Date();
 
     const shouldProtectInitialValues = data.status === "Justificado" || data.status === "Vacaciones";
@@ -103,6 +109,16 @@ export const update = async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Record not found' });
     if (!canAccessEmployee(req, existing.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     if (data.employee_id && !canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
+
+    if (data.employee_id || data.date) {
+      const targetEmployee = await prisma.employee.findUnique({
+        where: { id: data.employee_id || existing.employee_id },
+      });
+      if (!targetEmployee) return res.status(404).json({ error: 'Empleado no encontrado' });
+      if (!isEmploymentDateValid(targetEmployee, data.date || existing.date)) {
+        return res.status(409).json({ error: 'No se puede mover la asistencia fuera del período laboral del empleado' });
+      }
+    }
 
     for (const field of MANUAL_PROTECTION_METADATA_FIELDS) {
       delete data[field];

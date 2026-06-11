@@ -219,8 +219,8 @@ export default function EmployeeManagement() {
         const termDate = new Date(cleanData.termination_date);
         termDate.setHours(0, 0, 0, 0);
 
-        // Si la fecha de cese es hoy o anterior, cambiar automáticamente a Cesado
-        if (termDate <= today) {
+        // La fecha de cese es el último día laboral; cambiar a Cesado al día siguiente.
+        if (termDate < today) {
           cleanData.status = "Cesado";
         }
       }

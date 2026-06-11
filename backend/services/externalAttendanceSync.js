@@ -9,6 +9,7 @@ import {
   getProtectedFields,
   protectValue,
 } from "../utils/manualAttendanceProtection.js";
+import { isEmploymentDateValid } from "../utils/employmentDate.js";
 import fs from 'fs';
 import path from 'path';
 
@@ -165,6 +166,11 @@ export async function syncExternalAttendance(options = {}) {
         }
 
         const recordDate = new Date(record.fecha);
+        if (!isEmploymentDateValid(employee, recordDate)) {
+          totalSkipped++;
+          log(`[OMITIDO] ID ${record.id} - ${record.numero_documento}: Fecha fuera del período laboral`);
+          continue;
+        }
 
         const existingRecord = await prisma.attendance_record.findFirst({
           where: {

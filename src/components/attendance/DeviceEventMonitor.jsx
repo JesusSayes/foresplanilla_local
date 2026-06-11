@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  CheckCircle, XCircle, AlertTriangle, Activity,
+  CheckCircle, XCircle, Activity,
   Play, Square, Clock
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import { isEmploymentDateValid } from "@/lib/employmentDate";
 
 export default function DeviceEventMonitor({ deviceId }) {
   const { user: currentUser } = useAuth();
@@ -80,6 +81,13 @@ export default function DeviceEventMonitor({ deviceId }) {
 
       // Buscar o crear registro de asistencia para hoy
       const today = new Date().toISOString().split("T")[0];
+      if (!isEmploymentDateValid(employee, today)) {
+        await entitiesAPI.DeviceEvent.update(event.id, {
+          processing_status: "Fallido",
+          error_message: "Fecha fuera del período laboral del empleado"
+        });
+        throw new Error("Fecha fuera del período laboral del empleado");
+      }
       const existingRecords = await entitiesAPI.AttendanceRecord.filter({
         employee_id: employee.id,
         date: today

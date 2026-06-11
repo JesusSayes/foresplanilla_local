@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "sync:biotime": "node scripts/runBiotimeSync.js"
+    "sync:biotime": "node scripts/runBiotimeSync.js",
+    "attendance:clean-post-termination": "node --env-file=.env scripts/cleanPostTerminationAttendance.js",
+    "attendance:clean-post-termination:apply": "node --env-file=.env scripts/cleanPostTerminationAttendance.js --apply=true"
   },
   "author": "Jesús Sayes",
   "dependencies": {
