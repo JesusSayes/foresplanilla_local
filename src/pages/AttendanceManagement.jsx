@@ -497,15 +497,22 @@ export default function AttendanceManagement() {
     const attendanceRecord = todayRecords.find(r =>
       r.employee_id === incident.employee_id && r.date === incident.incident_date
     );
-    if (attendanceRecord && incident.hours_to_adjust > 0) {
-      const adjustedWorkedHours = (attendanceRecord.worked_hours || 0) + incident.hours_to_adjust;
-      const adjustedLateMinutes = Math.max(0, (attendanceRecord.late_minutes || 0) - incident.late_minutes_to_adjust);
-      await entitiesAPI.AttendanceRecord.update(attendanceRecord.id, {
-        worked_hours: Math.min(adjustedWorkedHours, 8),
-        late_minutes: adjustedLateMinutes,
-        is_late: adjustedLateMinutes > 0,
-        status: adjustedLateMinutes === 0 && adjustedWorkedHours >= 8 ? "Completo" : "Incompleto",
-      });
+    if (attendanceRecord) {
+      const attendanceUpdate = {
+        status: "Justificado",
+        is_absent: false,
+      };
+      if (incident.hours_to_adjust > 0) {
+        const adjustedWorkedHours = (attendanceRecord.worked_hours || 0) + incident.hours_to_adjust;
+        const adjustedLateMinutes = Math.max(
+          0,
+          (attendanceRecord.late_minutes || 0) - (incident.late_minutes_to_adjust || 0)
+        );
+        attendanceUpdate.worked_hours = Math.min(adjustedWorkedHours, 8);
+        attendanceUpdate.late_minutes = adjustedLateMinutes;
+        attendanceUpdate.is_late = adjustedLateMinutes > 0;
+      }
+      await entitiesAPI.AttendanceRecord.update(attendanceRecord.id, attendanceUpdate);
     }
     reviewIncidentMutation.mutate({
       id: incident.id,
