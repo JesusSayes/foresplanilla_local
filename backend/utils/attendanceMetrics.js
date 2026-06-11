@@ -1,4 +1,9 @@
+import { toDateString } from "./employmentDate.js";
+
 export function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
+  const targetDate = toDateString(dateStr);
+  if (!targetDate) return null;
+
   const candidates = schedules.filter(s => {
     if (!s.is_active) return false;
 
@@ -20,15 +25,15 @@ export function getScheduleForDate(employeeId, departmentName, schedules, dateSt
 
   const findBest = (list) => {
     const valid = list.filter(s => {
-      const from = s.effective_from || "0000-01-01";
-      const to = s.effective_to || "9999-12-31";
+      const from = toDateString(s.effective_from) || "0000-01-01";
+      const to = toDateString(s.effective_to) || "9999-12-31";
 
-      return from <= dateStr && to >= dateStr;
+      return from <= targetDate && to >= targetDate;
     });
 
     valid.sort((a, b) =>
-      (b.effective_from || "0000-01-01")
-        .localeCompare(a.effective_from || "0000-01-01")
+      (toDateString(b.effective_from) || "0000-01-01")
+        .localeCompare(toDateString(a.effective_from) || "0000-01-01")
     );
 
     return valid[0] || null;

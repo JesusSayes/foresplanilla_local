@@ -288,11 +288,14 @@ export default function AttendanceManagement() {
 
     const findBest = (list) => {
       const valid = list.filter(s => {
-        const from = s.effective_from || "0000-01-01";
-        const to = s.effective_to || "9999-12-31";
+        const from = String(s.effective_from || "0000-01-01").slice(0, 10);
+        const to = String(s.effective_to || "9999-12-31").slice(0, 10);
         return from <= dStr && to >= dStr;
       });
-      valid.sort((a, b) => (b.effective_from || "0000-01-01").localeCompare(a.effective_from || "0000-01-01"));
+      valid.sort((a, b) =>
+        String(b.effective_from || "0000-01-01").slice(0, 10)
+          .localeCompare(String(a.effective_from || "0000-01-01").slice(0, 10))
+      );
       return valid[0] || null;
     };
 
