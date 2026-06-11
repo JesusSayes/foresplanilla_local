@@ -1,6 +1,13 @@
 import prisma from "../../config/prisma.js";
 
 import { generate24HexId } from '../../utils/idGenerator.js';
+import { toDateString } from '../../utils/employmentDate.js';
+
+const serializeSchedule = schedule => ({
+  ...schedule,
+  effective_from: toDateString(schedule.effective_from),
+  effective_to: toDateString(schedule.effective_to),
+});
 
 const filterSchedulesForAccess = async (req, schedules) => {
   if (req.accessibleEmployeeIds === null) return schedules;
@@ -28,7 +35,8 @@ export const getAll = async (req, res) => {
     const schedules = await prisma.work_schedule.findMany({
       orderBy: { schedule_name: 'asc' }
     });
-    res.json(await filterSchedulesForAccess(req, schedules));
+    const accessibleSchedules = await filterSchedulesForAccess(req, schedules);
+    res.json(accessibleSchedules.map(serializeSchedule));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -41,7 +49,7 @@ export const getById =  async (req, res) => {
     });
     if (!schedule) return res.status(404).json({ error: 'Schedule not found' });
     if (!(await filterSchedulesForAccess(req, [schedule])).length) return res.status(403).json({ error: 'Acceso denegado al horario' });
-    res.json(schedule);
+    res.json(serializeSchedule(schedule));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -59,7 +67,7 @@ export const create = async (req, res) => {
         effective_to: effective_to ? new Date(effective_to) : null,
       }
     });
-    res.status(201).json(schedule);
+    res.status(201).json(serializeSchedule(schedule));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -81,7 +89,7 @@ export const update = async (req, res) => {
         effective_to: effective_to ? new Date(effective_to) : null,
       }
     });
-    res.json(schedule);
+    res.json(serializeSchedule(schedule));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -138,7 +146,8 @@ export const filter = async (req, res) => {
       orderBy: { [field]: desc ? 'desc' : 'asc' },
     });
 
-    res.json(await filterSchedulesForAccess(req, schedules));
+    const accessibleSchedules = await filterSchedulesForAccess(req, schedules);
+    res.json(accessibleSchedules.map(serializeSchedule));
   } catch (error) {
     console.error('Error filtering schedules:', error);
     res.status(500).json({ error: error.message });

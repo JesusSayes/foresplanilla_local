@@ -74,7 +74,8 @@
         "Completo",
         "Incompleto",
         "Ausente",
-        "Justificado"
+        "Justificado",
+        "Vacaciones"
       ],
       "default": "Completo",
       "description": "Estado del registro"
@@ -82,6 +83,26 @@
     "notes": {
       "type": "string",
       "description": "Observaciones"
+    },
+    "manually_protected_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Lista de campos protegidos de sobrescritura autom\u00e1tica (ej: ['clock_in', 'clock_out'])"
+    },
+    "last_approved_edit_id": {
+      "type": "string",
+      "description": "ID de la \u00faltima solicitud de edici\u00f3n aprobada"
+    },
+    "manually_modified_by": {
+      "type": "string",
+      "description": "Nombre de quien realiz\u00f3 la \u00faltima modificaci\u00f3n manual aprobada"
+    },
+    "manually_modified_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de la \u00faltima modificaci\u00f3n manual aprobada"
     }
   },
   "required": [

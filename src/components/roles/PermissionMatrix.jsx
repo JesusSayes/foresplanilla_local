@@ -7,6 +7,7 @@ import { Search, ChevronDown, ChevronRight } from "lucide-react";
 const PERMISSION_GROUPS = {
   "Empleados": [
     { key: "employees.view", label: "Ver empleados" },
+    { key: "employees.view_financials", label: "Ver información financiera (salarios, cuentas, AFP)" },
     { key: "employees.create", label: "Crear empleados" },
     { key: "employees.edit", label: "Editar empleados" },
     { key: "employees.delete", label: "Eliminar empleados" },
@@ -19,6 +20,7 @@ const PERMISSION_GROUPS = {
     { key: "attendance.view_department", label: "Ver asistencia del departamento" },
     { key: "attendance.view_all", label: "Ver asistencia de todos" },
     { key: "attendance.edit", label: "Editar registros de asistencia" },
+    { key: "attendance.approve_edits", label: "Aprobar/rechazar edición de registros de asistencia" },
     { key: "attendance.approve_incidents", label: "Aprobar/rechazar incidencias" },
     { key: "attendance.manage", label: "Gestión completa de asistencia" },
     { key: "attendance.export", label: "Exportar reportes de asistencia" },

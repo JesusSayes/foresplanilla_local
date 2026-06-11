@@ -31,6 +31,7 @@ import overtimeAlertRoutes from './routes/attendance/overtimeAlerts.js';
 import schedulesRoutes from './routes/attendance/schedules.js';
 import attendanceIncidentsRoutes from './routes/attendance/incidents.js';
 import attendanceLogsRoutes from './routes/attendance/logs.js';
+import attendanceEditRequestsRoutes from './routes/attendance/editRequests.js';
 import recalcularAsistenciaRoutes from './routes/attendance/recalcularAsistencia.js';
 import externalAttendanceRoutes from './routes/attendance/externalAttendanceRoutes.js';
 import requestsRoutes from './routes/vacations/requests.js';
@@ -58,6 +59,7 @@ import { syncBiotimeAttendance } from './controllers/sync/biotimeSyncController.
 import uploadRoutes from "./routes/uploadRoutes.js";
 import derechohabientesRoutes from './routes/derechohabientes.js';
 import { generarAsistenciaDiaria } from './scripts/generarAsistenciaDiaria.js';
+import { updateTerminatedEmployeeStatuses } from './scripts/updateTerminatedEmployeeStatuses.js';
 import { calcularAsistenciaDesdeLogs } from './scripts/calcularAsistenciaDesdeLogs.js';
 import { syncExternalAttendance } from './services/externalAttendanceSync.js';
 import asientosContablesRoutes from './routes/asientosContables.js';
@@ -131,6 +133,7 @@ app.use('/api/attendance/incidents', attendanceIncidentsRoutes);
 app.use('/api/attendance/recalcular', recalcularAsistenciaRoutes);
 app.use('/api/attendance/external', externalAttendanceRoutes);
 app.use('/api/attendance/logs', attendanceLogsRoutes);
+app.use('/api/attendance/edit-requests', attendanceEditRequestsRoutes);
 app.use('/api/vacations/requests', requestsRoutes);
 app.use('/api/vacations/balances', balancesRoutes);
 app.use('/api/payroll/payslips', payrollRoutes);
@@ -193,7 +196,10 @@ cron.schedule('0 * * * *', () => {
 // Cron: generar asistencia diaria a las 00:00 (medianoche hora local)
 cron.schedule('0 0 * * *', () => {
   console.log('[Cron] Ejecutando generarAsistenciaDiaria...');
-  generarAsistenciaDiaria({ mode: 'cron' }).catch(err => console.error('[Cron] Error en generarAsistenciaDiaria:', err.message));
+  updateTerminatedEmployeeStatuses()
+    .then(result => console.log(`[Cron] Empleados actualizados a Cesado: ${result.updated}`))
+    .then(() => generarAsistenciaDiaria({ mode: 'cron' }))
+    .catch(err => console.error('[Cron] Error en generación diaria de asistencia:', err.message));
 }, { timezone: CRON_TIMEZONE });
 
 // Cron: sincronización de asistencias externas cada hora en minuto 15

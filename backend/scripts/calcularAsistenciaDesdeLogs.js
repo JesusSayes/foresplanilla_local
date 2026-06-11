@@ -4,6 +4,11 @@ import {
   getScheduleForDate,
   calcularMetricas,
 } from "../utils/attendanceMetrics.js";
+import {
+  getProtectedFields,
+  protectValue,
+} from "../utils/manualAttendanceProtection.js";
+import { isEmploymentDateValid } from "../utils/employmentDate.js";
 
 /**
  * CONFIG
@@ -356,13 +361,28 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
   const logEmployeeIds = [
     ...new Set(logs.map(log => log.employee_id).filter(Boolean)),
   ];
+  const candidateEmployeeIds = [
+    ...new Set([
+      ...logEmployeeIds,
+      ...records.map(record => record.employee_id).filter(Boolean),
+    ]),
+  ];
+  const candidateEmployees = await prisma.employee.findMany({
+    where: { id: { in: candidateEmployeeIds } },
+    select: { id: true, hire_date: true, termination_date: true },
+  });
+  const validEmployeeIds = new Set(
+    candidateEmployees
+      .filter(employee => isEmploymentDateValid(employee, dateStr))
+      .map(employee => employee.id)
+  );
 
   const existingRecordEmployeeIds = new Set(
     records.map(record => record.employee_id).filter(Boolean)
   );
 
   const missingEmployeeIds = logEmployeeIds.filter(
-    employeeId => !existingRecordEmployeeIds.has(employeeId)
+    employeeId => validEmployeeIds.has(employeeId) && !existingRecordEmployeeIds.has(employeeId)
   );
 
   if (missingEmployeeIds.length > 0) {
@@ -453,6 +473,9 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
    * 4. Procesar cada empleado
    */
   for (const record of recordsToProcess) {
+    if (!validEmployeeIds.has(record.employee_id)) {
+      continue;
+    }
     const recordDate = toPeruDateString(record.date);
     const today = toPeruDateString(new Date());
 
@@ -505,6 +528,9 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
         scheduled_end: hasSchedule ? scheduledEnd : null,
       },
     });
+    const protectedFields = getProtectedFields(record);
+    const finalClockIn = protectedFields.has("clock_in") ? record.clock_in : result.clock_in;
+    const finalClockOut = protectedFields.has("clock_out") ? record.clock_out : result.clock_out;
 
     const overtimeAuth =
       (record.overtime_authorized === true || schedule?.overtime_authorized === true) &&
@@ -513,8 +539,8 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
     const metrics = calcularMetricas(
       {
         ...record,
-        clock_in: result.clock_in,
-        clock_out: result.clock_out,
+        clock_in: finalClockIn,
+        clock_out: finalClockOut,
         status: result.status,
       },
       schedule,
@@ -538,11 +564,14 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
     else if (hasApprovedIncident) {
       finalStatus = "Justificado";
     }
-    else if (!result.clock_in) {
+    else if (!finalClockIn) {
       finalStatus = "Ausente";
     }
-    else if (result.clock_in && !result.clock_out) {
+    else if (finalClockIn && !finalClockOut) {
       finalStatus = "Incompleto";
+    }
+    if (protectedFields.has("status")) {
+      finalStatus = record.status;
     }
 
     /**
@@ -600,23 +629,23 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
     await prisma.attendance_record.update({
       where: { id: record.id },
       data: {
-        clock_in: result.clock_in,
-        clock_out: result.clock_out,
+        clock_in: finalClockIn,
+        clock_out: finalClockOut,
 
-        worked_hours: metrics.worked_hours,
-        regular_hours: metrics.regular_hours,
-        overtime_hours_25: metrics.overtime_hours_25,
-        overtime_hours_35: metrics.overtime_hours_35,
+        worked_hours: protectValue(protectedFields, "worked_hours", record.worked_hours, metrics.worked_hours),
+        regular_hours: protectValue(protectedFields, "regular_hours", record.regular_hours, metrics.regular_hours),
+        overtime_hours_25: protectValue(protectedFields, "overtime_hours_25", record.overtime_hours_25, metrics.overtime_hours_25),
+        overtime_hours_35: protectValue(protectedFields, "overtime_hours_35", record.overtime_hours_35, metrics.overtime_hours_35),
 
-        is_late: metrics.is_late,
-        late_minutes: metrics.late_minutes,
-        is_absent: metrics.is_absent,
+        is_late: protectValue(protectedFields, "is_late", record.is_late, metrics.is_late),
+        late_minutes: protectValue(protectedFields, "late_minutes", record.late_minutes, metrics.late_minutes),
+        is_absent: protectValue(protectedFields, "is_absent", record.is_absent, metrics.is_absent),
 
         scheduled_start: hasSchedule ? scheduledStart : null,
         scheduled_end: hasSchedule ? scheduledEnd : null,
 
         status: finalStatus,
-        notes: result.notes ?? record.notes,
+        notes: protectedFields.has("notes") ? record.notes : (result.notes ?? record.notes),
 
         updated_date: new Date(),
       },

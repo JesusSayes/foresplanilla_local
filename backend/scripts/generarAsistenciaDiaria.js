@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { generate24HexId } from '../utils/idGenerator.js';
+import { employmentEndDate, isEmploymentDateValid } from '../utils/employmentDate.js';
 
 const prisma = new PrismaClient();
 
@@ -140,8 +141,12 @@ export async function generarAsistenciaDiaria({ date_from = null, employee_id = 
       const startStr = isBackfill
         ? ((forcedDateFrom > contractStart) ? forcedDateFrom : contractStart)
         : todayStr;
+      const endStr = employmentEndDate(emp, todayStr);
 
-      if (startStr > todayStr) { totalSkipped++; continue; }
+      if (!endStr || startStr > endStr || !isEmploymentDateValid(emp, startStr)) {
+        totalSkipped++;
+        continue;
+      }
 
       // Paginación con cursor sobre registros existentes del empleado
       const existingDates = new Set();
@@ -161,7 +166,7 @@ export async function generarAsistenciaDiaria({ date_from = null, employee_id = 
         cursorRecord = page[page.length - 1].id;
       }
 
-      const allDates        = dateRange(startStr, todayStr);
+      const allDates        = dateRange(startStr, endStr);
       const recordsToCreate = [];
 
       for (const dateStr of allDates) {

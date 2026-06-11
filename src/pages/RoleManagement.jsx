@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Shield, Plus, Edit, Trash2, Users, CheckSquare,
-  Search, UserPlus, X
+  Search, UserPlus
 } from "lucide-react";
 import { toast } from "sonner";
 import { AVAILABLE_PERMISSIONS, usePermissions } from "../components/hooks/usePermissions";
@@ -255,12 +255,12 @@ export default function RoleManagement() {
 
   const permissionCategories = {
     "Empleados": [
-      "employees.view", "employees.edit", "employees.create", "employees.delete",
+      "employees.view", "employees.view_financials", "employees.edit", "employees.create", "employees.delete",
       "employees.import", "employees.export", "employees.change_status"
     ],
     "Asistencia": [
       "attendance.view_own", "attendance.view_all", "attendance.view_department",
-      "attendance.edit", "attendance.approve_incidents", "attendance.manage", "attendance.export"
+      "attendance.edit", "attendance.approve_edits", "attendance.approve_incidents", "attendance.manage", "attendance.export"
     ],
     "Vacaciones": [
       "vacations.view_own", "vacations.view_all", "vacations.view_department",

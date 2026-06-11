@@ -1,4 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import {
+  getProtectedFields,
+  protectValue,
+} from "../utils/manualAttendanceProtection.js";
 
 const prisma = new PrismaClient();
 
@@ -166,6 +170,7 @@ export async function recalcularAsistencia({ employee_id, date_from, date_to } =
     const schedule = getScheduleForDate(employee_id, emp.department_name, allSchedules, dateStr);
     const overtimeAuth = record.overtime_authorized ?? schedule?.overtime_authorized ?? false;
     const metrics = calcularMetricas(record, schedule, dateStr, overtimeAuth);
+    const protectedFields = getProtectedFields(record);
 
     const hasApprovedIncident = !!approvedIncidentsByDate[dateStr];
 
@@ -179,17 +184,20 @@ export async function recalcularAsistencia({ employee_id, date_from, date_to } =
     } else {
       status = "Ausente";
     }
+    if (protectedFields.has("status")) {
+      status = record.status;
+    }
 
     await prisma.attendance_record.update({
       where: { id: record.id },
       data: {
-        worked_hours: metrics.worked_hours,
-        regular_hours: metrics.regular_hours,
-        overtime_hours_25: metrics.overtime_hours_25,
-        overtime_hours_35: metrics.overtime_hours_35,
-        is_late: metrics.is_late,
-        late_minutes: metrics.late_minutes,
-        is_absent: metrics.is_absent,
+        worked_hours: protectValue(protectedFields, "worked_hours", record.worked_hours, metrics.worked_hours),
+        regular_hours: protectValue(protectedFields, "regular_hours", record.regular_hours, metrics.regular_hours),
+        overtime_hours_25: protectValue(protectedFields, "overtime_hours_25", record.overtime_hours_25, metrics.overtime_hours_25),
+        overtime_hours_35: protectValue(protectedFields, "overtime_hours_35", record.overtime_hours_35, metrics.overtime_hours_35),
+        is_late: protectValue(protectedFields, "is_late", record.is_late, metrics.is_late),
+        late_minutes: protectValue(protectedFields, "late_minutes", record.late_minutes, metrics.late_minutes),
+        is_absent: protectValue(protectedFields, "is_absent", record.is_absent, metrics.is_absent),
         scheduled_start: metrics.scheduled_start || record.scheduled_start,
         scheduled_end: metrics.scheduled_end || record.scheduled_end,
         status,

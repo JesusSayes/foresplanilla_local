@@ -8,7 +8,12 @@ import {
   requireAnyPermission,
 } from '../../middleware/authorization.js';
 
-const VIEW_PERMISSIONS = ['attendance.view_all', 'attendance.view_department', 'attendance.view_own'];
+const VIEW_PERMISSIONS = [
+  'attendance.view_all',
+  'attendance.view_department',
+  'attendance.view_own',
+  'attendance.approve_edits',
+];
 
 router.use(authenticateToken, loadAccessContext);
 

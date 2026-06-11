@@ -19,6 +19,7 @@ export const AVAILABLE_PERMISSIONS = {
   "attendance.view_all": "Ver asistencia de todos",
   "attendance.view_department": "Ver asistencia del departamento",
   "attendance.edit": "Editar registros de asistencia",
+  "attendance.approve_edits": "Aprobar/rechazar edición de registros de asistencia",
   "attendance.approve_incidents": "Aprobar/rechazar incidencias",
   "attendance.manage_schedules": "Gestionar horarios de trabajo",
   "attendance.view_reports": "Ver reportes de asistencia",
@@ -261,6 +262,11 @@ export const usePermissions = () => {
     return employee?.department_name === departmentName;
   };
 
+  const canViewFinancials = () => {
+    if (permissions.includes("system.admin")) return true;
+    return permissions.includes("employees.view_financials");
+  };
+
   const canAccessEmployee = (targetEmployeeId) => {
     // El empleado puede ver sus propios datos
     if (employee?.id === targetEmployeeId) return true;
@@ -322,6 +328,7 @@ export const usePermissions = () => {
     canAccessDepartment,
     canAccessEmployee,
     getAccessibleEmployeeIds,
+    canViewFinancials,
   };
 };
 
@@ -332,7 +339,7 @@ const getBasicPermissionsByRole = (role) => {
     admin: [
       "system.admin", "system.settings",
       "employees.view", "employees.edit", "employees.create", "employees.delete", "employees.import", "employees.export", "employees.change_status",
-      "attendance.view_all", "attendance.edit", "attendance.approve_incidents", "attendance.manage", "attendance.export",
+      "attendance.view_all", "attendance.edit", "attendance.approve_edits", "attendance.approve_incidents", "attendance.manage", "attendance.export",
       "vacations.view_all", "vacations.approve", "vacations.manage", "vacations.calendar",
       "payroll.view_all", "payroll.view_amounts", "payroll.edit", "payroll.create", "payroll.delete", "payroll.calculate", "payroll.approve", "payroll.view_department",
       "certificates.view_all", "certificates.approve", "certificates.create", "certificates.request",

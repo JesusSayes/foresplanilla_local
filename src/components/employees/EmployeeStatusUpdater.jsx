@@ -30,8 +30,8 @@ export const updateEmployeeStatuses = async () => {
       const termDate = new Date(employee.termination_date);
       termDate.setHours(0, 0, 0, 0);
 
-      // Si la fecha de cese es hoy o anterior, actualizar a Cesado
-      if (termDate <= today) {
+      // La fecha de cese es el último día laboral; cambiar a Cesado al día siguiente.
+      if (termDate < today) {
         await entitiesAPI.Employee.update(employee.id, { status: "Cesado" });
 
         // Registrar el cambio en el historial

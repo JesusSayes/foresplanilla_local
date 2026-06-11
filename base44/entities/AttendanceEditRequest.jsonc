@@ -1,0 +1,80 @@
+{
+  "name": "AttendanceEditRequest",
+  "type": "object",
+  "properties": {
+    "attendance_record_id": {
+      "type": "string",
+      "description": "ID del registro de asistencia relacionado"
+    },
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado del registro"
+    },
+    "attendance_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de asistencia del registro"
+    },
+    "original_values": {
+      "type": "object",
+      "description": "Valores originales del registro antes de la edici\u00f3n (solo campos modificados)"
+    },
+    "requested_values": {
+      "type": "object",
+      "description": "Valores solicitados para el registro (solo campos modificados)"
+    },
+    "edit_reason": {
+      "type": "string",
+      "description": "Motivo de la edici\u00f3n solicitada"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pendiente",
+        "Aprobada",
+        "Rechazada",
+        "Cancelada"
+      ],
+      "default": "Pendiente",
+      "description": "Estado de la solicitud"
+    },
+    "requested_by_id": {
+      "type": "string",
+      "description": "ID del empleado que solicit\u00f3 la edici\u00f3n"
+    },
+    "requested_by_name": {
+      "type": "string",
+      "description": "Nombre del solicitante"
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de la solicitud"
+    },
+    "reviewed_by_id": {
+      "type": "string",
+      "description": "ID del empleado que revis\u00f3 la solicitud"
+    },
+    "reviewed_by_name": {
+      "type": "string",
+      "description": "Nombre del revisor"
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de la revisi\u00f3n"
+    },
+    "review_comment": {
+      "type": "string",
+      "description": "Comentario de la revisi\u00f3n (requerido al rechazar)"
+    }
+  },
+  "required": [
+    "attendance_record_id",
+    "employee_id",
+    "attendance_date",
+    "requested_values",
+    "edit_reason",
+    "requested_by_id"
+  ]
+}

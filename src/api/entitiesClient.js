@@ -61,6 +61,21 @@ export const entitiesAPI = {
   ContractRenewalRule: createEntityAPI('/api/contracts/renewal-rules'),
   AttendanceRecord: createEntityAPI('/api/attendance/records'),
   AttendanceIncident: createEntityAPI('/api/attendance/incidents'),
+  AttendanceEditRequest: {
+    ...createEntityAPI('/api/attendance/edit-requests'),
+    approve: async (id, data = {}) => {
+      const response = await localClient.post(`/api/attendance/edit-requests/${id}/approve`, data);
+      return response.data;
+    },
+    reject: async (id, data) => {
+      const response = await localClient.post(`/api/attendance/edit-requests/${id}/reject`, data);
+      return response.data;
+    },
+    cancel: async (id) => {
+      const response = await localClient.post(`/api/attendance/edit-requests/${id}/cancel`);
+      return response.data;
+    },
+  },
   OvertimeAlert: createEntityAPI('/api/attendance/overtime-alerts'),
   WorkSchedule: createEntityAPI('/api/attendance/schedules'),
   // AttendanceLog: createEntityAPI('/api/attendance/logs'),

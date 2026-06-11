@@ -6,18 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Users, Plus, Edit, Eye, UserX, UserCheck, Search,
-  Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History, Loader2, Trash2, Upload
+  Briefcase, Shield, History, Upload
 } from "lucide-react";
 import { createPageUrl } from "../utils";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import EmployeeHistory from "../components/employees/EmployeeHistory";
@@ -47,7 +42,7 @@ export default function EmployeeManagement() {
   const [formErrors, setFormErrors] = useState([]);
   const [showImportDH, setShowImportDH] = useState(false);
 
-  const { hasPermission, getAccessibleSites, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, getAccessibleSites, canViewFinancials, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -224,8 +219,8 @@ export default function EmployeeManagement() {
         const termDate = new Date(cleanData.termination_date);
         termDate.setHours(0, 0, 0, 0);
 
-        // Si la fecha de cese es hoy o anterior, cambiar automáticamente a Cesado
-        if (termDate <= today) {
+        // La fecha de cese es el último día laboral; cambiar a Cesado al día siguiente.
+        if (termDate < today) {
           cleanData.status = "Cesado";
         }
       }
@@ -1108,6 +1103,7 @@ export default function EmployeeManagement() {
           allEmployees={allEmployees}
           formErrors={formErrors}
           derechohabientes={derechohabientes}
+          showFinancials={canViewFinancials()}
           onDerechohabienteAdd={(data) => createDerechohabienteMutation.mutate(data)}
           onDerechohabienteEdit={(id, data) => updateDerechohabienteMutation.mutate({ id, data })}
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}

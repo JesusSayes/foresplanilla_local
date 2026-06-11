@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { generate24HexId } from '../utils/idGenerator.js';
+import { employmentEndDate, isEmploymentDateValid } from '../utils/employmentDate.js';
 
 const prisma = new PrismaClient();
 
@@ -106,12 +107,13 @@ export async function backfillAsistenciaEmpleado({ employee_id, date_from = "202
 
   const contractStart = startDateRaw.toISOString().slice(0, 10);
   const startStr      = date_from > contractStart ? date_from : contractStart;
+  const endStr        = employmentEndDate(emp, todayStr);
 
-  if (startStr > todayStr) {
-    return { success: true, records_created: 0, message: "La fecha de inicio es futura" };
+  if (!endStr || startStr > endStr || !isEmploymentDateValid(emp, startStr)) {
+    return { success: true, records_created: 0, message: "El rango está fuera del período laboral" };
   }
 
-  const allDates        = dateRange(startStr, todayStr);
+  const allDates        = dateRange(startStr, endStr);
   const recordsToCreate = [];
 
   for (const dateStr of allDates) {
@@ -169,7 +171,7 @@ export async function backfillAsistenciaEmpleado({ employee_id, date_from = "202
     employee_id,
     employee_name:   `${emp.first_name} ${emp.last_name}`,
     date_from:       startStr,
-    date_to:         todayStr,
+    date_to:         endStr,
     records_created: recordsToCreate.length,
     already_existed: existingDates.size - recordsToCreate.length,
   };
