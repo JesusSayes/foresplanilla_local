@@ -3,6 +3,7 @@ import { authenticateToken } from '../middleware/auth.js';
 import {
   listPositions, createPosition, updatePosition, deletePosition,
   listDepartments, createDepartment, updateDepartment, deleteDepartment,
+  listAreaUnidadCargos, createAreaUnidadCargo, updateAreaUnidadCargo, deleteAreaUnidadCargo,
   listBanks, createBank,
   listSites, createSite,
   listAFPs, createAFP,
@@ -29,6 +30,11 @@ router.get('/departments', listDepartments);
 router.post('/departments', createDepartment);
 router.put('/departments/:id', updateDepartment);
 router.delete('/departments/:id', deleteDepartment);
+
+router.get('/area-unidad-cargos', listAreaUnidadCargos);
+router.post('/area-unidad-cargos', createAreaUnidadCargo);
+router.put('/area-unidad-cargos/:id', updateAreaUnidadCargo);
+router.delete('/area-unidad-cargos/:id', deleteAreaUnidadCargo);
 
 router.get('/banks', listBanks);
 router.post('/banks', createBank);

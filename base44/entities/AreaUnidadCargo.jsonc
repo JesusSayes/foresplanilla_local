@@ -1,0 +1,28 @@
+{
+  "name": "AreaUnidadCargo",
+  "type": "object",
+  "properties": {
+    "area": {
+      "type": "string",
+      "description": "\u00c1rea de trabajo"
+    },
+    "unidad": {
+      "type": "string",
+      "description": "Unidad de trabajo"
+    },
+    "cargo": {
+      "type": "string",
+      "description": "Cargo"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Registro activo (eliminaci\u00f3n l\u00f3gica)"
+    }
+  },
+  "required": [
+    "area",
+    "unidad",
+    "cargo"
+  ]
+}

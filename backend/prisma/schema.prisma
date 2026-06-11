@@ -168,6 +168,8 @@ model contract {
   digital_signature_image_url String?
   digital_signature_name      String?
   digital_signature_by        String?
+  area_trabajo                String?
+  unidad_trabajo              String?
 }
 
 model contract_clause {
@@ -418,6 +420,8 @@ model employee {
   created_by                     String?
   is_sample                      Boolean?
   attendance_method              String?
+  area_trabajo                   String?
+  unidad_trabajo                 String?
   attendance_edit_request        attendance_edit_request[]
   attendance_logs                attendance_logs[]
 }
@@ -578,6 +582,21 @@ model position {
   created_by_id String?
   created_by    String?
   is_sample     Boolean?
+}
+
+model area_unidad_cargo {
+  id            String    @id @db.VarChar(255)
+  area          String
+  unidad        String
+  cargo         String
+  is_active     Boolean?  @default(true)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id String?
+  created_by    String?
+  is_sample     Boolean?
+
+  @@index([area, unidad, cargo], map: "area_unidad_cargo_area_idx")
 }
 
 model profession {

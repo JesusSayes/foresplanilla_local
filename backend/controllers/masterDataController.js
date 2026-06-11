@@ -36,7 +36,7 @@ const updateMasterData = async (tableName, id, data) => {
   let paramIndex = 1;
 
   Object.entries(data).forEach(([key, value]) => {
-    if (key !== 'id' && key !== 'created_date' && key !== 'created_by_id' && key !== 'created_by') {
+    if (key !== 'id' && key !== 'created_date' && key !== 'updated_date' && key !== 'created_by_id' && key !== 'created_by') {
       fields.push(`${key} = $${paramIndex}`);
       values.push(value);
       paramIndex++;
@@ -148,6 +148,49 @@ export const deleteDepartment = async (req, res) => {
   } catch (error) {
     console.error('Error deleting department:', error);
     res.status(500).json({ error: 'Error al eliminar departamento' });
+  }
+};
+
+export const listAreaUnidadCargos = async (req, res) => {
+  try {
+    const { sort = 'area' } = req.query;
+    const data = await listMasterData('area_unidad_cargo', sort);
+    res.json(data);
+  } catch (error) {
+    console.error('Error listing area/unidad/cargos:', error);
+    res.status(500).json({ error: 'Error al listar áreas, unidades y cargos' });
+  }
+};
+
+export const createAreaUnidadCargo = async (req, res) => {
+  try {
+    const data = await createMasterData('area_unidad_cargo', req.body, req.user.id, req.user.email);
+    res.status(201).json(data);
+  } catch (error) {
+    console.error('Error creating area/unidad/cargo:', error);
+    res.status(500).json({ error: 'Error al crear área, unidad y cargo' });
+  }
+};
+
+export const updateAreaUnidadCargo = async (req, res) => {
+  try {
+    const data = await updateMasterData('area_unidad_cargo', req.params.id, req.body);
+    if (!data) return res.status(404).json({ error: 'Área, unidad y cargo no encontrado' });
+    res.json(data);
+  } catch (error) {
+    console.error('Error updating area/unidad/cargo:', error);
+    res.status(500).json({ error: 'Error al actualizar área, unidad y cargo' });
+  }
+};
+
+export const deleteAreaUnidadCargo = async (req, res) => {
+  try {
+    const deleted = await deleteMasterData('area_unidad_cargo', req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Área, unidad y cargo no encontrado' });
+    res.json({ success: true, message: 'Área, unidad y cargo eliminado' });
+  } catch (error) {
+    console.error('Error deleting area/unidad/cargo:', error);
+    res.status(500).json({ error: 'Error al eliminar área, unidad y cargo' });
   }
 };
 
