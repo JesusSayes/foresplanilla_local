@@ -31,8 +31,9 @@ export default function ContractManagement() {
   const [signatureFilter, setSignatureFilter] = useState("all"); // all | signed | pending
   const [expiryFilter, setExpiryFilter] = useState("all"); // all | 15days | 30days
   const [formData, setFormData] = useState({});
-  const [positionSearchTerm, setPositionSearchTerm] = useState("");
-  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
+  const [areaSearchTerm, setAreaSearchTerm] = useState("");
+  const [unidadSearchTerm, setUnidadSearchTerm] = useState("");
+  const [cargoSearchTerm, setCargoSearchTerm] = useState("");
   const [siteSearchTerm, setSiteSearchTerm] = useState("");
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [conflictingContract, setConflictingContract] = useState(null);
@@ -57,14 +58,12 @@ export default function ContractManagement() {
     queryFn: () => base44.entities.Employee.filter({ status: "Activo" }),
   });
 
-  const { data: positions = [] } = useQuery({
-    queryKey: ["positions"],
-    queryFn: async () => (await base44.entities.Position.list("name")).filter(p => p.is_active),
-  });
-
-  const { data: departments = [] } = useQuery({
-    queryKey: ["departments"],
-    queryFn: async () => (await base44.entities.Department.list("name")).filter(d => d.is_active),
+  const { data: areaUnidadCargos = [] } = useQuery({
+    queryKey: ["areaUnidadCargos"],
+    queryFn: async () => {
+      const all = await base44.entities.AreaUnidadCargo.list("area");
+      return all.filter(a => a.is_active !== false);
+    },
   });
 
   const { data: sites = [] } = useQuery({
@@ -164,6 +163,8 @@ export default function ContractManagement() {
       start_date: normalizeDate(contract?.start_date),
       end_date: normalizeDate(contract?.end_date),
       position: contract?.position || emp?.position || "",
+      area_trabajo: contract?.area_trabajo || emp?.area_trabajo || "",
+      unidad_trabajo: contract?.unidad_trabajo || emp?.unidad_trabajo || "",
       department: contract?.department || emp?.department_name || "",
       work_location: contract?.work_location || emp?.site || "",
       salary: contract?.salary || emp?.base_salary || "",
@@ -182,15 +183,24 @@ export default function ContractManagement() {
     });
   };
 
+  // AreaUnidadCargo cascada
+  const areas = [...new Set(areaUnidadCargos.map(a => a.area))].sort();
+  const unidadesForArea = formData.area_trabajo
+    ? [...new Set(areaUnidadCargos.filter(a => a.area === formData.area_trabajo).map(a => a.unidad))].sort()
+    : [];
+  const cargosForUnidad = formData.area_trabajo && formData.unidad_trabajo
+    ? [...new Set(areaUnidadCargos.filter(a => a.area === formData.area_trabajo && a.unidad === formData.unidad_trabajo).map(a => a.cargo))].sort()
+    : [];
+
   const handleCreate = () => {
-    setEmployeeSearchTerm(""); setPositionSearchTerm(""); setDepartmentSearchTerm(""); setSiteSearchTerm("");
+    setEmployeeSearchTerm(""); setAreaSearchTerm(""); setUnidadSearchTerm(""); setCargoSearchTerm(""); setSiteSearchTerm("");
     initializeForm();
     setEditingContract(null);
     setShowForm(true);
   };
 
   const handleEdit = (contract) => {
-    setEmployeeSearchTerm(""); setPositionSearchTerm(""); setDepartmentSearchTerm(""); setSiteSearchTerm("");
+    setEmployeeSearchTerm(""); setAreaSearchTerm(""); setUnidadSearchTerm(""); setCargoSearchTerm(""); setSiteSearchTerm("");
     initializeForm(contract);
     setEditingContract(contract);
     setShowForm(true);
@@ -280,7 +290,7 @@ export default function ContractManagement() {
 
   const resetForm = () => {
     setFormData({}); setEditingContract(null); setShowForm(false); setConflictingContract(null);
-    setEmployeeSearchTerm(""); setPositionSearchTerm(""); setDepartmentSearchTerm(""); setSiteSearchTerm("");
+    setEmployeeSearchTerm(""); setAreaSearchTerm(""); setUnidadSearchTerm(""); setCargoSearchTerm(""); setSiteSearchTerm("");
   };
 
   const pendingSignContracts = contracts.filter(c => !c.is_digitally_signed && c.status === "Vigente");
@@ -734,46 +744,42 @@ export default function ContractManagement() {
                 </TabsContent>
 
                 <TabsContent value="work" className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <Label>Departamento/Área</Label>
-                      <Select value={formData.department} onValueChange={(v) => setFormData({ ...formData, department: v, position: "" })}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
+                      <Label>Área/Departamento</Label>
+                      <Select value={formData.area_trabajo || ""} onValueChange={(v) => { setAreaSearchTerm(""); setFormData({ ...formData, area_trabajo: v, unidad_trabajo: "", position: "", department: v }); }}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar área" /></SelectTrigger>
                         <SelectContent>
-                          <div className="p-2 border-b"><Input placeholder="Buscar..." value={departmentSearchTerm} onChange={(e) => setDepartmentSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} /></div>
-                          {departments.filter(d => d.name.toLowerCase().includes(departmentSearchTerm.toLowerCase())).map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
+                          <div className="p-2 border-b sticky top-0 bg-white z-10">
+                            <Input placeholder="Buscar..." value={areaSearchTerm} onChange={(e) => setAreaSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
+                          </div>
+                          {areas.filter(a => a.toLowerCase().includes(areaSearchTerm.toLowerCase())).map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Unidad de Trabajo</Label>
+                      <Select value={formData.unidad_trabajo || ""} onValueChange={(v) => { setUnidadSearchTerm(""); setFormData({ ...formData, unidad_trabajo: v, position: "" }); }} disabled={!formData.area_trabajo}>
+                        <SelectTrigger><SelectValue placeholder={formData.area_trabajo ? "Seleccionar unidad" : "Selecciona primero un área"} /></SelectTrigger>
+                        <SelectContent>
+                          <div className="p-2 border-b sticky top-0 bg-white z-10">
+                            <Input placeholder="Buscar..." value={unidadSearchTerm} onChange={(e) => setUnidadSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
+                          </div>
+                          {unidadesForArea.filter(u => u.toLowerCase().includes(unidadSearchTerm.toLowerCase())).map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
                       <Label>Cargo *</Label>
-                      <Select
-                        value={formData.position}
-                        onValueChange={(v) => setFormData({ ...formData, position: v })}
-                        disabled={!formData.department}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={formData.department ? "Seleccionar cargo" : "Selecciona primero un departamento"} />
-                        </SelectTrigger>
+                      <Select value={formData.position || ""} onValueChange={(v) => { setCargoSearchTerm(""); setFormData({ ...formData, position: v }); }} disabled={!formData.unidad_trabajo}>
+                        <SelectTrigger><SelectValue placeholder={formData.unidad_trabajo ? "Seleccionar cargo" : "Selecciona primero una unidad"} /></SelectTrigger>
                         <SelectContent>
-                          <div className="p-2 border-b"><Input placeholder="Buscar..." value={positionSearchTerm} onChange={(e) => setPositionSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} /></div>
-                          {positions
-                            .filter(p => {
-                              const matchesDept = !formData.department || p.department === formData.department;
-                              const matchesSearch = p.name.toLowerCase().includes(positionSearchTerm.toLowerCase());
-                              return matchesDept && matchesSearch;
-                            })
-                            .map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
-                          {positions.filter(p => p.department === formData.department).length === 0 && formData.department && (
-                            <div className="px-3 py-4 text-sm text-slate-400 text-center">No hay cargos para este departamento</div>
-                          )}
+                          <div className="p-2 border-b sticky top-0 bg-white z-10">
+                            <Input placeholder="Buscar..." value={cargoSearchTerm} onChange={(e) => setCargoSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
+                          </div>
+                          {cargosForUnidad.filter(c => c.toLowerCase().includes(cargoSearchTerm.toLowerCase())).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                      {formData.department && (
-                        <p className="text-xs text-slate-500 mt-1">
-                          {positions.filter(p => p.department === formData.department).length} cargo(s) disponible(s)
-                        </p>
-                      )}
                     </div>
                   </div>
                   <div>
