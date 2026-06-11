@@ -119,7 +119,9 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess, init
     queryFn: () => entitiesAPI.WorkSchedule.list("-effective_from"),
   });
 
-  const templateSchedules = allSchedules.filter(s => !s.employee_id && s.is_active);
+  const templateSchedules = allSchedules.filter(
+    s => !s.employee_id && !s.departments?.length && !s.department_name && s.is_active
+  );
   const empSchedules = allSchedules.filter(s => s.employee_id === employee.id && s.is_active);
 
   const today = format(new Date(), "yyyy-MM-dd");
