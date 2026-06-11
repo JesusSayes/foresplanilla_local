@@ -1455,9 +1455,7 @@ export default function MasterDataManagement() {
       {/* Form Modal — rendered via extracted component */}
       {showForm && <MasterDataFormModal activeTab={activeTab} editingItem={editingItem} formData={formData} setFormData={setFormData} onSubmit={handleSubmit} onCancel={resetForm} isSaving={createMutation.isPending || updateMutation.isPending} />}
 
-      {false && (
-        <div>
-          <div className="space-y-4">
+      {false && (<div><div>
                 {activeTab === "sites" && (
                   <>
                     <div>
@@ -1986,8 +1984,6 @@ export default function MasterDataManagement() {
                   >
                     {editingItem ? "Actualizar" : "Crear"}
                   </Button>
-                </div>
-                </div>
                 </div>
                 </div>
                 </div>
