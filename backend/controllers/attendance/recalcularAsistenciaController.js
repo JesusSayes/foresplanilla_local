@@ -1,5 +1,9 @@
 import prisma from "../../config/prisma.js";
 import { canAccessEmployee } from "../../middleware/authorization.js";
+import {
+  getProtectedFields,
+  protectValue,
+} from "../../utils/manualAttendanceProtection.js";
 
 function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
   const candidates = schedules.filter(s => {
@@ -150,6 +154,7 @@ const recalcularAsistencia = async (req, res) => {
       const schedule = getScheduleForDate(employee_id, employee.department_name, allSchedules, dateStr);
       const overtimeAuth = record.overtime_authorized ?? schedule?.overtime_authorized ?? false;
       const metrics = calcularMetricas(record, schedule, dateStr, overtimeAuth);
+      const protectedFields = getProtectedFields(record);
 
       let status = record.status;
       if (record.clock_in && record.clock_out) {
@@ -159,21 +164,20 @@ const recalcularAsistencia = async (req, res) => {
       } else if (!record.clock_in) {
         status = record.status === "Justificado" ? "Justificado" : "Ausente";
       }
-      if (Array.isArray(record.manually_protected_fields) &&
-          record.manually_protected_fields.includes("status")) {
+      if (protectedFields.has("status")) {
         status = record.status;
       }
 
       await prisma.attendance_record.update({
         where: { id: record.id },
         data: {
-          worked_hours: metrics.worked_hours,
-          regular_hours: metrics.regular_hours,
-          overtime_hours_25: metrics.overtime_hours_25,
-          overtime_hours_35: metrics.overtime_hours_35,
-          is_late: metrics.is_late,
-          late_minutes: metrics.late_minutes,
-          is_absent: metrics.is_absent,
+          worked_hours: protectValue(protectedFields, "worked_hours", record.worked_hours, metrics.worked_hours),
+          regular_hours: protectValue(protectedFields, "regular_hours", record.regular_hours, metrics.regular_hours),
+          overtime_hours_25: protectValue(protectedFields, "overtime_hours_25", record.overtime_hours_25, metrics.overtime_hours_25),
+          overtime_hours_35: protectValue(protectedFields, "overtime_hours_35", record.overtime_hours_35, metrics.overtime_hours_35),
+          is_late: protectValue(protectedFields, "is_late", record.is_late, metrics.is_late),
+          late_minutes: protectValue(protectedFields, "late_minutes", record.late_minutes, metrics.late_minutes),
+          is_absent: protectValue(protectedFields, "is_absent", record.is_absent, metrics.is_absent),
           scheduled_start: metrics.scheduled_start || record.scheduled_start,
           scheduled_end: metrics.scheduled_end || record.scheduled_end,
           status,

@@ -2,6 +2,13 @@ import prisma from "../../config/prisma.js";
 
 import crypto from 'crypto';
 import { canAccessEmployee } from "../../middleware/authorization.js";
+import {
+  AUTO_CALCULATED_ATTENDANCE_FIELDS,
+  MANUAL_PROTECTION_METADATA_FIELDS,
+  changedAutoCalculatedFields,
+  manualModifierData,
+  mergeProtectedFields,
+} from "../../utils/manualAttendanceProtection.js";
 
 const serializeRecord = (r) => ({
   ...r,
@@ -53,6 +60,11 @@ export const create = async (req, res) => {
     if (!canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     const now = new Date();
 
+    const shouldProtectInitialValues = data.status === "Justificado" || data.status === "Vacaciones";
+    const protectedFields = shouldProtectInitialValues
+      ? [...AUTO_CALCULATED_ATTENDANCE_FIELDS].filter(field => Object.hasOwn(data, field))
+      : [];
+
     const record = await prisma.attendance_record.create({
       data: {
         id: data.id || generateId(), // id similar a los existentes
@@ -73,6 +85,8 @@ export const create = async (req, res) => {
         created_by_id: data.created_by_id ?? null,
         created_by: data.created_by ?? null,
         is_sample: data.is_sample ?? false,
+        manually_protected_fields: protectedFields,
+        ...(protectedFields.length > 0 ? manualModifierData(req.access?.employee) : {}),
       },
     });
     res.status(201).json(serializeRecord(record));
@@ -90,12 +104,23 @@ export const update = async (req, res) => {
     if (!canAccessEmployee(req, existing.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     if (data.employee_id && !canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
 
+    for (const field of MANUAL_PROTECTION_METADATA_FIELDS) {
+      delete data[field];
+    }
+
     // Solo incluir date si viene en el request
     if (req.body.date) {
       data.date = new Date(req.body.date);
     } else {
       delete data.date;
     }
+
+    const changedFields = changedAutoCalculatedFields(existing, data);
+    if (changedFields.length > 0) {
+      data.manually_protected_fields = mergeProtectedFields(existing, changedFields);
+      Object.assign(data, manualModifierData(req.access?.employee));
+    }
+    data.updated_date = new Date();
 
     const record = await prisma.attendance_record.update({
       where: { id: req.params.id },

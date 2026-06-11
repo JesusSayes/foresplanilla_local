@@ -5,6 +5,10 @@ import {
   getScheduleForDate,
   calcularMetricas,
 } from "../utils/attendanceMetrics.js";
+import {
+  getProtectedFields,
+  protectValue,
+} from "../utils/manualAttendanceProtection.js";
 import fs from 'fs';
 import path from 'path';
 
@@ -170,11 +174,7 @@ export async function syncExternalAttendance(options = {}) {
         });
 
         if (existingRecord) {
-          const protectedFields = new Set(
-            Array.isArray(existingRecord.manually_protected_fields)
-              ? existingRecord.manually_protected_fields
-              : []
-          );
+          const protectedFields = getProtectedFields(existingRecord);
           const existingClockIn = existingRecord.clock_in;
           const existingClockOut = existingRecord.clock_out;
           const newClockIn = normalizeExternalTime(record.hora_entrada);
@@ -246,6 +246,12 @@ export async function syncExternalAttendance(options = {}) {
             updateFields.notes = `${existingRecord.notes || ''}\nActualizado desde duplicado (ID externo: ${record.id}) - ${updatedFields.join(', ')}`.trim();
             updateFields.updated_date = new Date();
             updateFields.created_by = 'external_sync';
+
+            for (const field of protectedFields) {
+              if (Object.hasOwn(updateFields, field)) {
+                updateFields[field] = existingRecord[field];
+              }
+            }
 
             log(`[ACTUALIZAR DUPLICADO] ID ${record.id} - ${employee.first_name} ${employee.last_name} (${record.numero_documento}) - ${record.fecha} - Campos actualizados: ${updatedFields.join(', ')} - Horas trabajadas: ${Number(existingRecord.worked_hours || 0).toFixed(2)} → ${Number(metrics.worked_hours || 0).toFixed(2)}, Estado: ${existingRecord.status || 'N/A'} → ${status}`);
 
@@ -368,14 +374,14 @@ export async function syncExternalAttendance(options = {}) {
                 clock_out: protectedFields.has("clock_out") ? existingRecord.clock_out : (attendanceData.clock_out ?? existingRecord.clock_out),
                 scheduled_start: attendanceData.scheduled_start,
                 scheduled_end: attendanceData.scheduled_end,
-                worked_hours: attendanceData.worked_hours,
-                regular_hours: attendanceData.regular_hours,
-                overtime_hours_25: attendanceData.overtime_hours_25,
-                overtime_hours_35: attendanceData.overtime_hours_35,
+                worked_hours: protectValue(protectedFields, "worked_hours", existingRecord.worked_hours, attendanceData.worked_hours),
+                regular_hours: protectValue(protectedFields, "regular_hours", existingRecord.regular_hours, attendanceData.regular_hours),
+                overtime_hours_25: protectValue(protectedFields, "overtime_hours_25", existingRecord.overtime_hours_25, attendanceData.overtime_hours_25),
+                overtime_hours_35: protectValue(protectedFields, "overtime_hours_35", existingRecord.overtime_hours_35, attendanceData.overtime_hours_35),
                 overtime_authorized: attendanceData.overtime_authorized,
-                is_late: attendanceData.is_late,
-                late_minutes: attendanceData.late_minutes,
-                is_absent: attendanceData.is_absent,
+                is_late: protectValue(protectedFields, "is_late", existingRecord.is_late, attendanceData.is_late),
+                late_minutes: protectValue(protectedFields, "late_minutes", existingRecord.late_minutes, attendanceData.late_minutes),
+                is_absent: protectValue(protectedFields, "is_absent", existingRecord.is_absent, attendanceData.is_absent),
                 status: protectedFields.has("status") ? existingRecord.status : attendanceData.status,
                 notes: protectedFields.has("notes") ? existingRecord.notes : attendanceData.notes,
                 updated_date: attendanceData.updated_date,

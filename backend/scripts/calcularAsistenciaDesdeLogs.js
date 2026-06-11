@@ -4,6 +4,10 @@ import {
   getScheduleForDate,
   calcularMetricas,
 } from "../utils/attendanceMetrics.js";
+import {
+  getProtectedFields,
+  protectValue,
+} from "../utils/manualAttendanceProtection.js";
 
 /**
  * CONFIG
@@ -505,9 +509,7 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
         scheduled_end: hasSchedule ? scheduledEnd : null,
       },
     });
-    const protectedFields = new Set(
-      Array.isArray(record.manually_protected_fields) ? record.manually_protected_fields : []
-    );
+    const protectedFields = getProtectedFields(record);
     const finalClockIn = protectedFields.has("clock_in") ? record.clock_in : result.clock_in;
     const finalClockOut = protectedFields.has("clock_out") ? record.clock_out : result.clock_out;
 
@@ -611,14 +613,14 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
         clock_in: finalClockIn,
         clock_out: finalClockOut,
 
-        worked_hours: metrics.worked_hours,
-        regular_hours: metrics.regular_hours,
-        overtime_hours_25: metrics.overtime_hours_25,
-        overtime_hours_35: metrics.overtime_hours_35,
+        worked_hours: protectValue(protectedFields, "worked_hours", record.worked_hours, metrics.worked_hours),
+        regular_hours: protectValue(protectedFields, "regular_hours", record.regular_hours, metrics.regular_hours),
+        overtime_hours_25: protectValue(protectedFields, "overtime_hours_25", record.overtime_hours_25, metrics.overtime_hours_25),
+        overtime_hours_35: protectValue(protectedFields, "overtime_hours_35", record.overtime_hours_35, metrics.overtime_hours_35),
 
-        is_late: metrics.is_late,
-        late_minutes: metrics.late_minutes,
-        is_absent: metrics.is_absent,
+        is_late: protectValue(protectedFields, "is_late", record.is_late, metrics.is_late),
+        late_minutes: protectValue(protectedFields, "late_minutes", record.late_minutes, metrics.late_minutes),
+        is_absent: protectValue(protectedFields, "is_absent", record.is_absent, metrics.is_absent),
 
         scheduled_start: hasSchedule ? scheduledStart : null,
         scheduled_end: hasSchedule ? scheduledEnd : null,
