@@ -60,6 +60,9 @@ export default function EmployeeForm({
     ? [...new Set(activeAUC.filter(a => a.area === formData.area_trabajo && a.unidad === formData.unidad_trabajo).map(a => a.cargo))].sort()
     : [];
 
+  const [areaSearchTerm, setAreaSearchTerm] = React.useState("");
+  const [unidadSearchTerm, setUnidadSearchTerm] = React.useState("");
+  const [cargoSearchTerm, setCargoSearchTerm] = React.useState("");
   const [positionSearchTerm, setPositionSearchTerm] = React.useState("");
   const [departmentSearchTerm, setDepartmentSearchTerm] = React.useState("");
   const [professionSearchTerm, setProfessionSearchTerm] = React.useState("");
@@ -383,7 +386,8 @@ export default function EmployeeForm({
 
             {/* WORK */}
             <TabsContent value="work" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              {/* Fila 0: Empresa / Sede / Tipo de Marcación */}
+              <div className="grid grid-cols-3 gap-4">
                 <div><Label>Empresa</Label><Input value={formData.company} onChange={(e) => setFormData({ ...formData, company: e.target.value })} /></div>
                 <div>
                   <Label>Sede</Label>
@@ -392,34 +396,56 @@ export default function EmployeeForm({
                     <SelectContent>{sites.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
+                <div>
+                  <Label>Tipo de Marcación <span className="text-red-600">*</span></Label>
+                  <Select value={formData.attendance_method || ""} onValueChange={(v) => setFormData({ ...formData, attendance_method: v })}>
+                    <SelectTrigger className={!formData.attendance_method ? "border-red-400 bg-red-50" : ""}>
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="API FORESPAMA">API FORESPAMA</SelectItem>
+                      <SelectItem value="MARCADOR">MARCADOR</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {!formData.attendance_method && <p className="text-xs text-red-600 mt-1">⚠ Obligatorio</p>}
+                </div>
               </div>
 
               {/* Fila 1: Área / Unidad / Cargo (desde AreaUnidadCargo) */}
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label>Área/Departamento</Label>
-                  <Select value={formData.area_trabajo || ""} onValueChange={(v) => setFormData({ ...formData, area_trabajo: v, unidad_trabajo: "", position: "", department_name: v })}>
+                  <Select value={formData.area_trabajo || ""} onValueChange={(v) => { setAreaSearchTerm(""); setFormData({ ...formData, area_trabajo: v, unidad_trabajo: "", position: "", department_name: v }); }}>
                     <SelectTrigger><SelectValue placeholder="Seleccionar área" /></SelectTrigger>
                     <SelectContent>
-                      {areas.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                      <div className="p-2 border-b sticky top-0 bg-white z-10">
+                        <Input placeholder="Buscar..." value={areaSearchTerm} onChange={(e) => setAreaSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
+                      </div>
+                      {areas.filter(a => a.toLowerCase().includes(areaSearchTerm.toLowerCase())).map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label>Unidad de Trabajo</Label>
-                  <Select value={formData.unidad_trabajo || ""} onValueChange={(v) => setFormData({ ...formData, unidad_trabajo: v, position: "" })} disabled={!formData.area_trabajo}>
+                  <Select value={formData.unidad_trabajo || ""} onValueChange={(v) => { setUnidadSearchTerm(""); setFormData({ ...formData, unidad_trabajo: v, position: "" }); }} disabled={!formData.area_trabajo}>
                     <SelectTrigger><SelectValue placeholder={formData.area_trabajo ? "Seleccionar unidad" : "Selecciona primero un área"} /></SelectTrigger>
                     <SelectContent>
-                      {unidadesForArea.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      <div className="p-2 border-b sticky top-0 bg-white z-10">
+                        <Input placeholder="Buscar..." value={unidadSearchTerm} onChange={(e) => setUnidadSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
+                      </div>
+                      {unidadesForArea.filter(u => u.toLowerCase().includes(unidadSearchTerm.toLowerCase())).map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label>Cargo</Label>
-                  <Select value={formData.position || ""} onValueChange={(v) => setFormData({ ...formData, position: v })} disabled={!formData.unidad_trabajo}>
+                  <Select value={formData.position || ""} onValueChange={(v) => { setCargoSearchTerm(""); setFormData({ ...formData, position: v }); }} disabled={!formData.unidad_trabajo}>
                     <SelectTrigger><SelectValue placeholder={formData.unidad_trabajo ? "Seleccionar cargo" : "Selecciona primero una unidad"} /></SelectTrigger>
                     <SelectContent>
-                      {cargosForUnidad.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      <div className="p-2 border-b sticky top-0 bg-white z-10">
+                        <Input placeholder="Buscar..." value={cargoSearchTerm} onChange={(e) => setCargoSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
+                      </div>
+                      {cargosForUnidad.filter(c => c.toLowerCase().includes(cargoSearchTerm.toLowerCase())).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -442,27 +468,6 @@ export default function EmployeeForm({
                     </SelectContent>
                   </Select>
                   {vigentContract ? <p className="text-xs text-indigo-600 mt-1">Contrato vigente: {vigentContract.contract_type}</p> : <p className="text-xs text-amber-600 mt-1">Sin contrato vigente</p>}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Tipo de Marcación <span className="text-red-600">*</span></Label>
-                  <Select
-                    value={formData.attendance_method || ""}
-                    onValueChange={(v) => setFormData({ ...formData, attendance_method: v })}
-                  >
-                    <SelectTrigger className={!formData.attendance_method ? "border-red-400 bg-red-50" : ""}>
-                      <SelectValue placeholder="Seleccionar..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="API FORESPAMA">API FORESPAMA</SelectItem>
-                      <SelectItem value="MARCADOR">MARCADOR</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {!formData.attendance_method && (
-                    <p className="text-xs text-red-600 mt-1">⚠ Obligatorio</p>
-                  )}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
