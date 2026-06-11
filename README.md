@@ -43,3 +43,21 @@ $ node scripts/backfillAsistenciaEmpleado.js --employee_id=<ID> --date_from=2025
 syncAttendanceCLI (external):
 $ node backend/syncAttendanceCLI.js --help
 $ node backend/syncAttendanceCLI.js --dry-run --limit 50
+
+## Limpieza de asistencias posteriores al cese
+
+Para revisar las asistencias existentes posteriores a la fecha de cese, sin modificar datos:
+
+```bash
+cd backend
+npm run attendance:clean-post-termination
+```
+
+Para respaldarlas en `attendance_record_backup` y eliminarlas:
+
+```bash
+cd backend
+npm run attendance:clean-post-termination:apply
+```
+
+El comando con `:apply` es destructivo: primero crea el respaldo y luego elimina las asistencias posteriores a la fecha de cese.
