@@ -747,7 +747,17 @@ export default function ContractManagement() {
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label>Área/Departamento</Label>
-                      <Select value={formData.area_trabajo || ""} onValueChange={(v) => { setAreaSearchTerm(""); setFormData({ ...formData, area_trabajo: v, unidad_trabajo: "", position: "", department: v }); }}>
+                      <Select value={formData.area_trabajo || ""} onValueChange={(v) => {
+                        setAreaSearchTerm("");
+                        // Solo resetear unidad y cargo si el área realmente cambia
+                        setFormData(prev => ({
+                          ...prev,
+                          area_trabajo: v,
+                          department: v,
+                          unidad_trabajo: prev.area_trabajo === v ? prev.unidad_trabajo : "",
+                          position: prev.area_trabajo === v ? prev.position : "",
+                        }));
+                      }}>
                         <SelectTrigger><SelectValue placeholder="Seleccionar área" /></SelectTrigger>
                         <SelectContent>
                           <div className="p-2 border-b sticky top-0 bg-white z-10">
@@ -759,7 +769,18 @@ export default function ContractManagement() {
                     </div>
                     <div>
                       <Label>Unidad de Trabajo</Label>
-                      <Select value={formData.unidad_trabajo || ""} onValueChange={(v) => { setUnidadSearchTerm(""); setFormData({ ...formData, unidad_trabajo: v, position: "" }); }} disabled={!formData.area_trabajo}>
+                      <Select
+                        value={formData.unidad_trabajo || ""}
+                        onValueChange={(v) => {
+                          setUnidadSearchTerm("");
+                          setFormData(prev => ({
+                            ...prev,
+                            unidad_trabajo: v,
+                            position: prev.unidad_trabajo === v ? prev.position : "",
+                          }));
+                        }}
+                        disabled={!formData.area_trabajo}
+                      >
                         <SelectTrigger><SelectValue placeholder={formData.area_trabajo ? "Seleccionar unidad" : "Selecciona primero un área"} /></SelectTrigger>
                         <SelectContent>
                           <div className="p-2 border-b sticky top-0 bg-white z-10">
@@ -771,7 +792,11 @@ export default function ContractManagement() {
                     </div>
                     <div>
                       <Label>Cargo *</Label>
-                      <Select value={formData.position || ""} onValueChange={(v) => { setCargoSearchTerm(""); setFormData({ ...formData, position: v }); }} disabled={!formData.unidad_trabajo}>
+                      <Select
+                        value={formData.position || ""}
+                        onValueChange={(v) => { setCargoSearchTerm(""); setFormData(prev => ({ ...prev, position: v })); }}
+                        disabled={!formData.unidad_trabajo}
+                      >
                         <SelectTrigger><SelectValue placeholder={formData.unidad_trabajo ? "Seleccionar cargo" : "Selecciona primero una unidad"} /></SelectTrigger>
                         <SelectContent>
                           <div className="p-2 border-b sticky top-0 bg-white z-10">
