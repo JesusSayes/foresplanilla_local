@@ -1277,7 +1277,13 @@ export default function AttendanceManagement() {
                               </td>
                               {/* Horas */}
                               <td className="px-2 py-2 text-center">
-                                <span className="text-sm font-bold text-slate-900">{vacation ? "8.00" : (emp.record?.worked_hours?.toFixed(2) || "0.00")}h</span>
+                                {(() => {
+                                  const wh = vacation ? 8 : (emp.record?.worked_hours || 0);
+                                  const totalMin = Math.round(wh * 60);
+                                  const hh = Math.floor(totalMin / 60);
+                                  const mm = totalMin % 60;
+                                  return <span className="text-sm font-bold text-slate-900">{hh}h {mm}m</span>;
+                                })()}
                               </td>
                               {/* Tardanza */}
                               <td className="px-2 py-2 text-center">
