@@ -40,6 +40,7 @@ export default function AttendanceManagement() {
   const [isRangeMode, setIsRangeMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSite, setSelectedSite] = useState("all");
+  const [selectedArea, setSelectedArea] = useState("all");
   const [attendanceFilter, setAttendanceFilter] = useState("all");
   const [editingRecord, setEditingRecord] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -497,15 +498,22 @@ export default function AttendanceManagement() {
     const attendanceRecord = todayRecords.find(r =>
       r.employee_id === incident.employee_id && r.date === incident.incident_date
     );
-    if (attendanceRecord && incident.hours_to_adjust > 0) {
-      const adjustedWorkedHours = (attendanceRecord.worked_hours || 0) + incident.hours_to_adjust;
-      const adjustedLateMinutes = Math.max(0, (attendanceRecord.late_minutes || 0) - incident.late_minutes_to_adjust);
-      await entitiesAPI.AttendanceRecord.update(attendanceRecord.id, {
-        worked_hours: Math.min(adjustedWorkedHours, 8),
-        late_minutes: adjustedLateMinutes,
-        is_late: adjustedLateMinutes > 0,
-        status: adjustedLateMinutes === 0 && adjustedWorkedHours >= 8 ? "Completo" : "Incompleto",
-      });
+    if (attendanceRecord) {
+      const attendanceUpdate = {
+        status: "Justificado",
+        is_absent: false,
+      };
+      if (incident.hours_to_adjust > 0) {
+        const adjustedWorkedHours = (attendanceRecord.worked_hours || 0) + incident.hours_to_adjust;
+        const adjustedLateMinutes = Math.max(
+          0,
+          (attendanceRecord.late_minutes || 0) - (incident.late_minutes_to_adjust || 0)
+        );
+        attendanceUpdate.worked_hours = Math.min(adjustedWorkedHours, 8);
+        attendanceUpdate.late_minutes = adjustedLateMinutes;
+        attendanceUpdate.is_late = adjustedLateMinutes > 0;
+      }
+      await entitiesAPI.AttendanceRecord.update(attendanceRecord.id, attendanceUpdate);
     }
     reviewIncidentMutation.mutate({
       id: incident.id,
@@ -700,7 +708,8 @@ export default function AttendanceManagement() {
       selectedSite === "all" ||
       normalizeSite(emp.site) === normalizeSite(selectedSite) ||
       (selectedSite === "sin_sede" && !emp.site);
-    return matchesSearch && matchesSite;
+    const matchesArea = selectedArea === "all" || emp.area_trabajo === selectedArea || (selectedArea === "sin_area" && !emp.area_trabajo);
+    return matchesSearch && matchesSite && matchesArea;
   });
 
   // IDs de empleados accesibles para filtrar incidentes y alertas
@@ -1120,6 +1129,19 @@ export default function AttendanceManagement() {
                         <span className="absolute -top-5 left-0 text-xs text-amber-600 font-medium whitespace-nowrap">🔒 Sede restringida</span>
                       )}
                     </div>
+                    <Select value={selectedArea} onValueChange={(v) => { setSelectedArea(v); setCurrentPage(1); }}>
+                      <SelectTrigger className="w-44">
+                        <SelectValue placeholder="Área" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas las áreas</SelectItem>
+                        <SelectItem value="sin_area">Sin área</SelectItem>
+                        {[...new Set(siteAllowedEmployees.map(e => e.area_trabajo).filter(Boolean))].sort().map(area => (
+                          <SelectItem key={area} value={area}>{area}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
                     <Select value={attendanceFilter} onValueChange={(v) => { setAttendanceFilter(v); setCurrentPage(1); }}>
                       <SelectTrigger className="w-44"><SelectValue placeholder="Filtro" /></SelectTrigger>
                       <SelectContent>

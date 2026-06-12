@@ -46,10 +46,6 @@ function getPeruDayBounds(dateStr) {
   return { start, end };
 }
 
-function diffHours(a, b) {
-  return (b - a) / 3600000;
-}
-
 function deduplicateLogs(logs) {
   const seen = new Set();
 
@@ -87,7 +83,7 @@ function buildWindow(date, startTime, endTime) {
  * CORE LOGIC
  */
 
-function computeAttendance({ logs, record }) {
+export function computeAttendance({ logs, record }) {
   const punches = logs.map(l => l.punch_time);
 
   /**
@@ -128,40 +124,15 @@ function computeAttendance({ logs, record }) {
     const clockIn = firstLog.punch_time;
     const clockOut = lastLog.punch_time;
 
-    const worked = diffHours(clockIn, clockOut);
-
-    /**
-     * EXACTAMENTE 2 marcaciones
-     */
-    if (logs.length === 2) {
-      const status =
-        worked >= 6
-          ? "Completo"
-          : "Revisar";
-
-      return {
-        status,
-        clock_in: toHHMM(clockIn),
-        clock_out: toHHMM(clockOut),
-        worked_hours: 0,
-        notes:
-          worked >= 6
-            ? "Calculado sin horario definido"
-            : "Sin horario definido con menos de 6 horas",
-        usedLogIds: [firstLog.id, lastLog.id],
-      };
-    }
-
-    /**
-     * MÁS DE 2 marcaciones
-     * siempre Revisar
-     */
     return {
-      status: "Revisar",
+      status: "Completo",
       clock_in: toHHMM(clockIn),
       clock_out: toHHMM(clockOut),
       worked_hours: 0,
-      notes: "Sin horario definido con múltiples marcaciones",
+      notes: [
+        "Calculado sin horario definido",
+        logs.length > 2 ? `${logs.length - 2} marcación(es) intermedia(s) ignorada(s)` : null,
+      ].filter(Boolean).join(". "),
       usedLogIds: [firstLog.id, lastLog.id],
     };
   }
@@ -184,55 +155,12 @@ function computeAttendance({ logs, record }) {
       log.punch_time <= end;
   }
 
-  console.log("WINDOW DEBUG", {
-    employee: record.employee_id,
-    date: record.date,
-    start,
-    end,
-    logs: logs.map(l => ({
-      id: l.id,
-      punch_time: l.punch_time,
-      peru: toHHMM(l.punch_time),
-    })),
-  });
-
   const inWindowLogs = logs.filter(
     l => l._is_within_window
   );
 
-  const outWindowLogs = logs.filter(
-    l => !l._is_within_window
-  );
-
   /**
-   * 6. Exactamente 2 marcaciones dentro de ventana
-   */
-  if (
-    logs.length === 2 &&
-    inWindowLogs.length === 2
-  ) {
-    const firstLog = inWindowLogs[0];
-    const lastLog = inWindowLogs[1];
-
-    const worked = diffHours(
-      firstLog.punch_time,
-      lastLog.punch_time
-    );
-
-    const status = worked >= 6 ? "Completo" : "Revisar";
-
-    return {
-      status,
-      clock_in: toHHMM(firstLog.punch_time),
-      clock_out: toHHMM(lastLog.punch_time),
-      worked_hours: 0,
-      notes: worked >= 6 ? null : "Jornada incompleta",
-      usedLogIds: [firstLog.id, lastLog.id],
-    };
-  }
-
-  /**
-   * 7. Menos de 2 válidas
+   * 6. Menos de 2 válidas
    */
   if (inWindowLogs.length < 2) {
     const firstLog = logs[0] || null;
@@ -268,28 +196,24 @@ function computeAttendance({ logs, record }) {
   }
 
   /**
-   * 8. Primera y última válida
+   * 7. Primera y última válida
    */
   const firstLog = inWindowLogs[0];
   const lastLog = inWindowLogs[inWindowLogs.length - 1];
 
   const clockIn = firstLog.punch_time;
   const clockOut = lastLog.punch_time;
-
-  let status = "Completo";
-  let notes = null;
-
-  if (outWindowLogs.length > 0) {
-    status = "Revisar";
-    notes = "Marcaciones fuera de ventana";
-  }
+  const ignoredLogs = logs.length - inWindowLogs.length;
 
   return {
-    status,
+    status: "Completo",
     clock_in: toHHMM(clockIn),
     clock_out: toHHMM(clockOut),
     worked_hours: 0,
-    notes,
+    notes: [
+      ignoredLogs > 0 ? `${ignoredLogs} marcación(es) fuera de ventana ignorada(s)` : null,
+      inWindowLogs.length > 2 ? `${inWindowLogs.length - 2} marcación(es) intermedia(s) ignorada(s)` : null,
+    ].filter(Boolean).join(". ") || null,
     usedLogIds: [firstLog.id, lastLog.id],
   };
 }
@@ -645,7 +569,7 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
         scheduled_end: hasSchedule ? scheduledEnd : null,
 
         status: finalStatus,
-        notes: protectedFields.has("notes") ? record.notes : (result.notes ?? record.notes),
+        notes: protectedFields.has("notes") ? record.notes : result.notes,
 
         updated_date: new Date(),
       },
@@ -666,7 +590,7 @@ export async function calcularAsistenciaDesdeLogs({ date, force = false } = {}) 
 /**
  * CLI
  */
-if (process.argv[1].includes("calcularAsistenciaDesdeLogs")) {
+if (process.argv[1]?.includes("calcularAsistenciaDesdeLogs")) {
   const args = {};
   for (let i = 2; i < process.argv.length; i++) {
     const [k, v] = process.argv[i].split("=");
@@ -688,9 +612,8 @@ if (process.argv[1].includes("calcularAsistenciaDesdeLogs")) {
 // Caso	                          Resultado
 // 0 marcaciones	                Sin marcar
 // 1 marcación	                  Incompleto
-// sin horario	                  Revisar
-// marcaciones fuera de ventana	  Revisar
-// correcto	                      Completo
+// 2+ marcaciones confiables	      Completo
+// sin par confiable según horario	Revisar
 //
 // for d in $(seq 0 $(( ( $(date -d "$(date +%F)" +%s) - $(date -d "2026-04-21" +%s) ) / 86400 ))); do
 //  day=$(date -d "2026-04-21 +$d day" +%F)
