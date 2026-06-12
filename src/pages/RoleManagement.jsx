@@ -266,12 +266,12 @@ export default function RoleManagement() {
 
   const permissionCategories = {
     "Empleados": [
-      "employees.view", "employees.edit", "employees.create", "employees.delete", 
+      "employees.view", "employees.view_financials", "employees.edit", "employees.create", "employees.delete", 
       "employees.import", "employees.export", "employees.change_status"
     ],
     "Asistencia": [
       "attendance.view_own", "attendance.view_all", "attendance.view_department", 
-      "attendance.edit", "attendance.approve_incidents", "attendance.manage", "attendance.export"
+      "attendance.edit", "attendance.approve_edits", "attendance.approve_incidents", "attendance.manage", "attendance.export"
     ],
     "Vacaciones": [
       "vacations.view_own", "vacations.view_all", "vacations.view_department", 
