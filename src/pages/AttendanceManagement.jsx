@@ -495,26 +495,9 @@ export default function AttendanceManagement() {
   };
 
   const handleApproveIncident = async (incident) => {
-    const attendanceRecord = todayRecords.find(r =>
-      r.employee_id === incident.employee_id && r.date === incident.incident_date
-    );
-    if (attendanceRecord) {
-      const attendanceUpdate = {
-        status: "Justificado",
-        is_absent: false,
-      };
-      if (incident.hours_to_adjust > 0) {
-        const adjustedWorkedHours = (attendanceRecord.worked_hours || 0) + incident.hours_to_adjust;
-        const adjustedLateMinutes = Math.max(
-          0,
-          (attendanceRecord.late_minutes || 0) - (incident.late_minutes_to_adjust || 0)
-        );
-        attendanceUpdate.worked_hours = Math.min(adjustedWorkedHours, 8);
-        attendanceUpdate.late_minutes = adjustedLateMinutes;
-        attendanceUpdate.is_late = adjustedLateMinutes > 0;
-      }
-      await entitiesAPI.AttendanceRecord.update(attendanceRecord.id, attendanceUpdate);
-    }
+    // No modificar clock_in, clock_out, worked_hours ni regular_hours del AttendanceRecord.
+    // Las horas justificadas viven en attendance_incident.hours_to_adjust.
+    // Solo actualizamos el status del incidente vía reviewIncidentMutation.
     reviewIncidentMutation.mutate({
       id: incident.id,
       data: {
@@ -1222,15 +1205,18 @@ export default function AttendanceManagement() {
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse" style={{tableLayout: "fixed"}}>
                       <colgroup>
-                        <col style={{width: "220px"}} />
-                        <col style={{width: "72px"}} />
-                        <col style={{width: "80px"}} />
-                        <col style={{width: "80px"}} />
-                        <col style={{width: "70px"}} />
-                        <col style={{width: "78px"}} />
+                        <col style={{width: "200px"}} />
+                        <col style={{width: "60px"}} />
                         <col style={{width: "70px"}} />
                         <col style={{width: "70px"}} />
-                        <col style={{width: "340px"}} />
+                        <col style={{width: "65px"}} />
+                        <col style={{width: "70px"}} />
+                        <col style={{width: "60px"}} />
+                        <col style={{width: "60px"}} />
+                        <col style={{width: "70px"}} />
+                        <col style={{width: "110px"}} />
+                        <col style={{width: "90px"}} />
+                        <col style={{width: "300px"}} />
                       </colgroup>
                       <thead>
                         <tr className="bg-slate-100 rounded-lg">
@@ -1242,6 +1228,9 @@ export default function AttendanceManagement() {
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">Tardanza</th>
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">HE 25%</th>
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">HE 35%</th>
+                          <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2 text-green-700">H. Just.</th>
+                          <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">Justificación</th>
+                          <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">Est. Just.</th>
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2 rounded-r-lg">Acciones</th>
                         </tr>
                       </thead>
@@ -1309,15 +1298,26 @@ export default function AttendanceManagement() {
                                   : <span className={`text-sm font-bold ${emp.record?.clock_out ? 'text-slate-900' : 'text-slate-300'}`}>{emp.record?.clock_out ? emp.record.clock_out.slice(0, 5) : "--:--"}</span>
                                 }
                               </td>
-                              {/* Horas */}
+                              {/* Horas (regular_hours — dato bruto de marcación dentro de jornada) */}
                               <td className="px-2 py-2 text-center">
-                                <span className="text-sm font-bold text-slate-900">{vacation ? "8.00" : (emp.record?.worked_hours?.toFixed(2) || "0.00")}h</span>
+                                {(() => {
+                                  const rh = vacation ? 8 : Number(emp.record?.regular_hours || 0);
+                                  const totalMin = Math.round(rh * 60);
+                                  const hh = Math.floor(totalMin / 60);
+                                  const mm = totalMin % 60;
+                                  return <span className="text-sm font-bold text-slate-900">{hh}h {mm}m</span>;
+                                })()}
                               </td>
-                              {/* Tardanza */}
+                              {/* Tardanza (neta: late_minutes - late_minutes_to_adjust del incidente aprobado) */}
                               <td className="px-2 py-2 text-center">
-                                <span className={`text-sm font-bold ${!vacation && emp.record?.late_minutes > 0 ? 'text-orange-600' : 'text-slate-400'}`}>
-                                  {vacation ? "0" : (emp.record?.late_minutes || 0)}m
-                                </span>
+                                {(() => {
+                                  const rawLate = vacation ? 0 : (emp.record?.late_minutes || 0);
+                                  const adjustedLate = vacation ? 0 : (rowIncident?.status === "Aprobada" ? Math.max(0, rawLate - (rowIncident?.late_minutes_to_adjust || 0)) : rawLate);
+                                  const lh = Math.floor(adjustedLate / 60);
+                                  const lm = adjustedLate % 60;
+                                  const lateStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
+                                  return <span className={`text-sm font-bold ${!vacation && adjustedLate > 0 ? 'text-orange-600' : 'text-slate-400'}`}>{lateStr}</span>;
+                                })()}
                               </td>
                               {/* HE 25% */}
                               <td className="px-2 py-2 text-center">
@@ -1330,6 +1330,32 @@ export default function AttendanceManagement() {
                                 <span className={`text-sm font-bold ${!vacation && (emp.record?.overtime_hours_35 > 0) ? 'text-purple-600' : 'text-slate-300'}`}>
                                   {vacation ? "0.00" : (emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h
                                 </span>
+                              </td>
+                              {/* H. Justificadas (attendance_incident.hours_to_adjust) */}
+                              <td className="px-2 py-2 text-center">
+                                {(() => {
+                                  const justH = Number(rowIncident?.hours_to_adjust || 0);
+                                  const justMin = Math.round(justH * 60);
+                                  const jh = Math.floor(justMin / 60);
+                                  const jm = justMin % 60;
+                                  return justMin > 0
+                                    ? <span className="text-sm font-bold text-green-600">{jh}h {jm}m</span>
+                                    : <span className="text-sm text-slate-300">—</span>;
+                                })()}
+                              </td>
+                              {/* Justificación (tipo/descripción del incidente) */}
+                              <td className="px-2 py-2 text-center">
+                                {rowIncident
+                                  ? <span className="text-xs text-slate-600 leading-tight block truncate max-w-[105px]" title={rowIncident.incident_type}>{rowIncident.incident_type}</span>
+                                  : <span className="text-xs text-slate-300">—</span>
+                                }
+                              </td>
+                              {/* Estado Justificación */}
+                              <td className="px-2 py-2 text-center">
+                                {rowIncident ? (() => {
+                                  const colors = { Aprobada: "bg-green-100 text-green-700", Pendiente: "bg-orange-100 text-orange-700", Rechazada: "bg-red-100 text-red-700", Cancelada: "bg-slate-100 text-slate-500" };
+                                  return <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${colors[rowIncident.status] || "bg-slate-100 text-slate-500"}`}>{rowIncident.status}</span>;
+                                })() : <span className="text-xs text-slate-300">—</span>}
                               </td>
                               {/* Acciones — ancho fijo 340px para acomodar todos los botones posibles */}
                               <td className="px-2 py-2">
