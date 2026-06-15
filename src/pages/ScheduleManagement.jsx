@@ -409,7 +409,7 @@ export default function ScheduleManagement() {
            `${template.monday_start} - ${template.monday_end}`.includes(searchLower);
   });
 
-  if (!employee || permissionsLoading) {
+  if (permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -418,7 +418,7 @@ export default function ScheduleManagement() {
   }
 
   const hasAccess = hasAnyPermission([
-    "schedules.view", "schedules.manage", "schedules.create", "system.admin"
+    "schedules.view", "schedules.manage", "schedules.create", "schedules.manage", "system.admin"
   ]);
 
   if (!hasAccess) {
