@@ -21,6 +21,7 @@ import { es } from "date-fns/locale";
 import { todayLima, todayDateLima, parseDateLima, dateToStringLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
+import { calcEffectiveMetrics } from "@/lib/attendanceMetrics";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
@@ -807,13 +808,21 @@ export default function AttendanceManagement() {
   };
 
   const handleExportToExcel = async () => {
+    let freshIncidents = allIncidents;
+    try {
+      const fetched = await entitiesAPI.AttendanceIncident.list("-incident_date");
+      if (fetched?.length) freshIncidents = fetched;
+    } catch (_) {
+      // Usa los incidentes ya cargados si falla la actualización.
+    }
+
     const dataToExport = employeesWithRecords.map(emp => {
       const rowDate = emp.displayDate || dateToStringLima(selectedDate);
       const vacation = approvedVacations.find(
         v => v.employee_id === emp.id && String(v.start_date).slice(0, 10) <= rowDate && String(v.end_date).slice(0, 10) >= rowDate
       ) || null;
       const isVacation = emp.record?.status === "Vacaciones" || !!vacation;
-      const incidentsForRow = allIncidents.filter(
+      const incidentsForRow = freshIncidents.filter(
         i => i.employee_id === emp.id && String(i.incident_date).slice(0, 10) === rowDate
       );
       const incident = incidentsForRow.find(i => i.status === 'Aprobada')
@@ -823,22 +832,64 @@ export default function AttendanceManagement() {
         ? 'Vacaciones'
         : getStatusConfig(emp.record?.status, emp.record?.clock_in, incident).text;
 
-      let tiempoPapeleta = '';
-      if (incident) {
-        if (incident.full_day_justification) {
-          tiempoPapeleta = '8.00 h';
-        } else {
-          const ts = incident.justified_time_start || '09:00';
-          const te = incident.justified_time_end || '18:00';
-          const [sh, sm] = ts.split(':').map(Number);
-          const [eh, em] = te.split(':').map(Number);
-          const hrs = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
-          tiempoPapeleta = `${hrs.toFixed(2)} h`;
-        }
+      // Calcular métricas efectivas con unión de intervalos (sin duplicar horas)
+      const schedForRowEx = getEmployeeScheduleForDate(emp.id, rowDate);
+      const dowForRow2  = new Date(rowDate + "T00:00:00").getDay();
+      const stMap2 = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+      const enMap2 = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+      const schedStartEx = schedForRowEx?.[stMap2[dowForRow2]] || "09:00";
+      const schedEndEx   = schedForRowEx?.[enMap2[dowForRow2]] || "18:00";
+      const breakMinEx   = schedForRowEx?.break_duration_minutes ?? 60;
+      const breakStEx    = schedForRowEx?.break_start || null;
+
+      const approvedIncsEx = freshIncidents.filter(
+        i => i.employee_id === emp.id && String(i.incident_date).slice(0, 10) === rowDate && i.status === 'Aprobada'
+      );
+
+      let excelHours, excelLate;
+      if (estadoMarcacion === 'Vacaciones') {
+        excelHours = schedForRowEx ? Math.max(0, (
+          (parseInt(schedEndEx.split(':')[0]) * 60 + parseInt(schedEndEx.split(':')[1])) -
+          (parseInt(schedStartEx.split(':')[0]) * 60 + parseInt(schedStartEx.split(':')[1])) - breakMinEx
+        ) / 60) : 8;
+        excelLate = 0;
+      } else {
+        const excelMetrics = calcEffectiveMetrics({
+          record: emp.record,
+          approvedIncidents: approvedIncsEx,
+          schedStart: schedStartEx,
+          schedEnd: schedEndEx,
+          breakMinutes: breakMinEx,
+          breakStart: breakStEx,
+        });
+        excelHours = excelMetrics.totalWorkedHours;
+        excelLate  = excelMetrics.remainingLateMinutes;
       }
 
-      const scheduledTimes = isVacation ? getScheduledTimes(emp.id, rowDate) : null;
+      // Calcular horas justificadas (solo de incidentes aprobados)
+      let tiempoPapeleta = '';
+      if (approvedIncsEx.length > 0) {
+        const justMetrics = calcEffectiveMetrics({
+          record: null,
+          approvedIncidents: approvedIncsEx,
+          schedStart: schedStartEx,
+          schedEnd: schedEndEx,
+          breakMinutes: breakMinEx,
+          breakStart: breakStEx,
+        });
+        tiempoPapeleta = `${justMetrics.totalWorkedHours.toFixed(2)} h`;
+      }
+
+      // Para vacaciones: mostrar horario programado como marcación
+      let entradaExcel = emp.record?.clock_in || '--:--';
+      let salidaExcel  = emp.record?.clock_out || '--:--';
+      if (estadoMarcacion === 'Vacaciones') {
+        entradaExcel = schedStartEx;
+        salidaExcel  = schedEndEx;
+      }
+
       return {
+        'Horario Programado': schedForRowEx ? `${schedStartEx}-${schedEndEx}` : 'Sin horario',
         'Fecha': rowDate,
         'Tipo Doc': emp.document_type,
         'DNI': emp.document_number,
@@ -847,19 +898,20 @@ export default function AttendanceManagement() {
         'Cargo': emp.position,
         'Departamento': emp.department_name,
         'Sede': emp.site || 'Sin sede',
-        'Entrada': isVacation ? scheduledTimes?.start : emp.record?.clock_in?.slice(0, 5) || '--:--',
-        'Salida': vacation ? scheduledTimes?.end : emp.record?.clock_out?.slice(0, 5) || '--:--',
-        'Horas Trabajadas': vacation ? '8.00' : (emp.record?.worked_hours?.toFixed(2) || '0.00'),
-        'Tardanza (min)': vacation ? 0 : (emp.record?.late_minutes || 0),
-        'HE 25%': vacation ? '0.00' : (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
-        'HE 35%': vacation ? '0.00' : (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
+        'Entrada': entradaExcel,
+        'Salida': salidaExcel,
+        'Horas Marcadas': (emp.record?.regular_hours ?? emp.record?.worked_hours ?? 0).toFixed(2),
+        'Horas Efectivas (marcadas+justificadas)': excelHours.toFixed(2),
+        'Tardanza Efectiva (min)': excelLate,
+        'HE 25%': isVacation ? '0.00' : (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
+        'HE 35%': isVacation ? '0.00' : (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
         'Estado Marcación': estadoMarcacion,
-        'Tiene Justificación': incident ? 'Sí' : 'No',
+        'Tiene Justificación': approvedIncsEx.length > 0 ? 'Sí' : 'No',
         'Tipo Incidente': incident ? incident.incident_type : '',
         'Estado Papeleta': incident ? incident.status : '',
         'Período Justificado': incident
           ? (incident.full_day_justification
-              ? `Día completo (${incident.justified_time_start || '09:00'} - ${incident.justified_time_end || '18:00'})`
+              ? `Día completo (${incident.justified_time_start || schedStartEx} - ${incident.justified_time_end || schedEndEx})`
               : `${incident.justified_time_start || ''} - ${incident.justified_time_end || ''}`)
           : '',
         'Horas Justificadas': tiempoPapeleta,
@@ -888,6 +940,39 @@ export default function AttendanceManagement() {
     const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>DNI</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; return `<tr><td>${emp.document_number}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${emp.record?.clock_in || '--:--'}</td><td>${emp.record?.clock_out || '--:--'}</td><td>${wh.toFixed(2)}h</td><td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h</td><td>${(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
     printWindow.document.write(printContent);
     printWindow.document.close();
+  };
+
+  /**
+   * Calcula las métricas efectivas de una fila (asistencia + justificaciones aprobadas)
+   * sin modificar el AttendanceRecord. Usa union de intervalos para evitar duplicados.
+   */
+  const getRowMetrics = (emp, rowDate) => {
+    const record = emp.record || null;
+    const schedForRow = getEmployeeScheduleForDate(emp.id, rowDate);
+    const dow = new Date(rowDate + "T00:00:00").getDay();
+    const stMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+    const enMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+    const schedStart = schedForRow?.[stMap[dow]] || "09:00";
+    const schedEnd   = schedForRow?.[enMap[dow]] || "18:00";
+    const breakMin   = schedForRow?.break_duration_minutes ?? 60;
+    const breakSt    = schedForRow?.break_start || null;
+
+    const approvedIncs = allIncidents.filter(
+      i => i.employee_id === emp.id && i.incident_date === rowDate && i.status === "Aprobada"
+    );
+
+    return {
+      ...calcEffectiveMetrics({
+        record,
+        approvedIncidents: approvedIncs,
+        schedStart,
+        schedEnd,
+        breakMinutes: breakMin,
+        breakStart: breakSt,
+      }),
+      schedStart,
+      schedEnd,
+    };
   };
 
   // Obtener horario programado de entrada/salida para mostrar en vacaciones
@@ -1305,14 +1390,22 @@ export default function AttendanceManagement() {
                                   : <span className={`text-sm font-bold ${emp.record?.clock_out ? 'text-slate-900' : 'text-slate-300'}`}>{emp.record?.clock_out ? emp.record.clock_out.slice(0, 5) : "--:--"}</span>
                                 }
                               </td>
-                              {/* Horas (regular_hours — dato bruto de marcación dentro de jornada) */}
+                              {/* Horas — cobertura real: asistencia + justificadas aprobadas (sin duplicar) */}
                               <td className="px-2 py-2 text-center">
                                 {(() => {
-                                  const rh = vacation ? 8 : Number(emp.record?.regular_hours || 0);
-                                  const totalMin = Math.round(rh * 60);
+                                  if (vacation) {
+                                    return <span className="text-sm font-bold text-slate-900">8h 0m</span>;
+                                  }
+                                  const metrics = getRowMetrics(emp, rowDate);
+                                  const totalMin = Math.round(metrics.totalWorkedHours * 60);
                                   const hh = Math.floor(totalMin / 60);
                                   const mm = totalMin % 60;
-                                  return <span className="text-sm font-bold text-slate-900">{hh}h {mm}m</span>;
+                                  const hasJust = metrics.justifiedHours > 0;
+                                  return (
+                                    <span className={`text-sm font-bold ${hasJust ? "text-indigo-700" : "text-slate-900"}`}>
+                                      {hh}h {mm}m
+                                    </span>
+                                  );
                                 })()}
                               </td>
                               {/* H. Just. Inicio — solo si hay incidente aprobado */}
@@ -1375,16 +1468,16 @@ export default function AttendanceManagement() {
                                   return <span className="text-xs font-bold text-green-700">{jh}h {jm}m</span>;
                                 })()}
                               </td>
-                              {/* Tardanza neta (raw - ajuste del incidente aprobado) */}
+                              {/* Tardanza neta — calculada con union de intervalos */}
                               <td className="px-2 py-2 text-center">
                                 {(() => {
-                                  const rawLate = vacation ? 0 : (emp.record?.late_minutes || 0);
-                                  const approvedInc = vacation ? null : approvedIncident;
-                                  const adjustedLate = approvedInc ? Math.max(0, rawLate - (approvedInc.late_minutes_to_adjust || 0)) : rawLate;
+                                  if (vacation) return <span className="text-xs font-bold text-slate-400">0m</span>;
+                                  const metrics = getRowMetrics(emp, rowDate);
+                                  const adjustedLate = metrics.remainingLateMinutes;
                                   const lh = Math.floor(adjustedLate / 60);
                                   const lm = adjustedLate % 60;
                                   const lateStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
-                                  return <span className={`text-xs font-bold ${!vacation && adjustedLate > 0 ? 'text-orange-600' : 'text-slate-400'}`}>{lateStr}</span>;
+                                  return <span className={`text-xs font-bold ${adjustedLate > 0 ? 'text-orange-600' : 'text-slate-400'}`}>{lateStr}</span>;
                                 })()}
                               </td>
                               {/* HE 25% */}

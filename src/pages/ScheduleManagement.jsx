@@ -22,19 +22,14 @@ import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUp
 
 export default function ScheduleManagement() {
   const { user: currentUser } = useAuth();
-  const employee = currentUser?.employee || null;
-
-  // Estado de formularios (combina ambos mundos)
-  // const [showForm, setShowForm] = useState(false);
-  // const [editingSchedule, setEditingSchedule] = useState(null);
-
-  // Nuevos estados de main para plantillas / asignaciones
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [editingAssignment, setEditingAssignment] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterSite, setFilterSite] = useState("all");
+  const [filterActive, setFilterActive] = useState("all");
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
@@ -71,7 +66,13 @@ export default function ScheduleManagement() {
     effective_from: new Date(),
   });
 
-  const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
+  const {
+    hasAnyPermission,
+    getAccessibleSites,
+    employee: permissionEmployee,
+    loading: permissionsLoading,
+  } = usePermissions();
+  const effectiveEmployee = currentUser?.employee || permissionEmployee || null;
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -393,9 +394,23 @@ export default function ScheduleManagement() {
     return emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido";
   };
 
-  const filteredTemplates = templates.filter(t =>
-    t.schedule_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filtrar plantillas según sedes accesibles del usuario
+  // getAccessibleSites() devuelve: undefined (cargando), null (todas), array (restringido)
+  const accessibleSites = getAccessibleSites();
+  const siteFilteredTemplates = (!accessibleSites || accessibleSites === null)
+    ? templates
+    : templates.filter(t => !t.site || accessibleSites.includes(t.site));
+
+  const filteredTemplates = siteFilteredTemplates.filter(t => {
+    if (!t.schedule_name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (filterSite !== "all") {
+      if (filterSite === "__none__" && t.site) return false;
+      if (filterSite !== "__none__" && t.site !== filterSite) return false;
+    }
+    if (filterActive === "active" && t.is_active === false) return false;
+    if (filterActive === "inactive" && t.is_active !== false) return false;
+    return true;
+  });
 
   const filteredIndividual = individualAssignments.filter(s => {
     const empName = getEmployeeName(s.employee_id).toLowerCase();
@@ -418,13 +433,13 @@ export default function ScheduleManagement() {
            emp.employee_code.toLowerCase().includes(searchLower);
   });
 
-  const filteredTemplatesForAssignment = templates.filter(template => {
+  const filteredTemplatesForAssignment = siteFilteredTemplates.filter(template => {
     const searchLower = templateSearch.toLowerCase();
     return template.schedule_name.toLowerCase().includes(searchLower) ||
            `${template.monday_start} - ${template.monday_end}`.includes(searchLower);
   });
 
-  if (!employee || permissionsLoading) {
+  if (permissionsLoading || !effectiveEmployee) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -433,7 +448,7 @@ export default function ScheduleManagement() {
   }
 
   const hasAccess = hasAnyPermission([
-    "schedules.view", "schedules.manage", "schedules.create", "system.admin"
+    "schedules.view", "schedules.manage", "schedules.create", "schedules.manage", "system.admin"
   ]);
 
   if (!hasAccess) {
@@ -571,6 +586,31 @@ export default function ScheduleManagement() {
             </CardHeader>
             <CardContent className="p-6">
               <TabsContent value="templates" className="mt-0">
+                {/* Filtros de la pestaña plantillas */}
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <Select value={filterSite} onValueChange={setFilterSite}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filtrar por sede" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las sedes</SelectItem>
+                      <SelectItem value="__none__">Sin sede</SelectItem>
+                      {((!accessibleSites || accessibleSites === null) ? allSites : allSites.filter(s => accessibleSites.includes(s.name)))
+                        .filter(s => s.is_active !== false)
+                        .map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterActive} onValueChange={setFilterActive}>
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="active">Solo activas</SelectItem>
+                      <SelectItem value="inactive">Solo inactivas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 {filteredTemplates.length === 0 ? (
                   <div className="text-center py-12">
                     <Calendar className="w-16 h-16 text-slate-300 mx-auto mb-4" />
