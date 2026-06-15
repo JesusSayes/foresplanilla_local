@@ -8,109 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { FileText, AlertCircle, CalendarIcon, CheckCircle, Clock, ExternalLink } from "lucide-react";
+import { FileText, AlertCircle, CalendarIcon, CheckCircle, Clock } from "lucide-react";
 import { format, eachDayOfInterval } from "date-fns";
 import { es } from "date-fns/locale";
 import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
-
-// ── helpers ─────────────────────────────────────────────────────────────────
-const toMin = (t) => { if (!t) return 0; const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-const fromMin = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-
-/**
- * Dados el registro de asistencia, las justificaciones aprobadas del día y el
- * horario programado, calcula cuántas horas "reales + justificadas" tiene el
- * empleado y cuántos minutos de tardanza quedan.
- *
- * Regla de tardanza: si alguna justificación cubre el período schedStart→clock_in,
- * la tardanza queda en 0. Si solo cubre parte, se reduce proporcionalmente.
- */
-function calcEffectiveMetrics({ record, approvedIncidents, schedStart, schedEnd, breakMinutes = 60 }) {
-  const clockIn  = record?.clock_in;
-  const clockOut = record?.clock_out;
-
-  const schedStartMin = toMin(schedStart);
-  const schedEndMin   = toMin(schedEnd);
-  const fullDayMins   = Math.max(0, schedEndMin - schedStartMin - breakMinutes);
-
-  // Tardanza base del registro real (antes de justificaciones)
-  const baseLateMin = clockIn ? Math.max(0, toMin(clockIn) - schedStartMin) : 0;
-
-  // Horas trabajadas del registro real (sin justificaciones)
-  let rawWorkedMin = 0;
-  if (clockIn && clockOut) {
-    rawWorkedMin = Math.max(0, toMin(clockOut) - toMin(clockIn) - breakMinutes);
-  }
-
-  // Calcular clock_in y clock_out efectivos considerando todas las justificaciones
-  // (si una justificación adelanta la entrada o atrasa la salida, se recalcula)
-  let effectiveClockInMin  = clockIn  ? toMin(clockIn)  : null;
-  let effectiveClockOutMin = clockOut ? toMin(clockOut) : null;
-  let lateMinutesJustified = 0;
-  let justifiedMins = 0;
-  let fullDayJustified = false;
-
-  for (const inc of approvedIncidents) {
-    if (inc.full_day_justification) {
-      fullDayJustified = true;
-      effectiveClockInMin  = schedStartMin;
-      effectiveClockOutMin = schedEndMin;
-      lateMinutesJustified = baseLateMin;
-      break;
-    }
-    const jStart = toMin(inc.justified_time_start || schedStart);
-    const jEnd   = toMin(inc.justified_time_end   || schedEnd);
-
-    // Adelantar clock_in efectivo si la justificación empieza antes
-    if (effectiveClockInMin === null || jStart < effectiveClockInMin) {
-      effectiveClockInMin = jStart;
-    }
-    // Atrasar clock_out efectivo si la justificación termina después
-    if (effectiveClockOutMin === null || jEnd > effectiveClockOutMin) {
-      effectiveClockOutMin = jEnd;
-    }
-
-    // Minutos de tardanza cubiertos por esta justificación
-    if (clockIn && baseLateMin > 0) {
-      const overlapStart = Math.max(schedStartMin, jStart);
-      const overlapEnd   = Math.min(toMin(clockIn), jEnd);
-      if (overlapEnd > overlapStart) {
-        lateMinutesJustified += (overlapEnd - overlapStart);
-      }
-    }
-  }
-
-  // Calcular horas efectivas con los clock_in/out ajustados
-  let effectiveWorkedMin = rawWorkedMin;
-  if (!fullDayJustified && effectiveClockInMin !== null && effectiveClockOutMin !== null) {
-    effectiveWorkedMin = Math.max(0, effectiveClockOutMin - effectiveClockInMin - breakMinutes);
-    // Las "justifiedMins" son la diferencia respecto a las marcadas reales
-    justifiedMins = Math.max(0, effectiveWorkedMin - rawWorkedMin);
-  } else if (fullDayJustified) {
-    effectiveWorkedMin = fullDayMins;
-    justifiedMins = Math.max(0, fullDayMins - rawWorkedMin);
-  }
-
-  const totalWorkedMins  = Math.min(effectiveWorkedMin, fullDayMins);
-  const totalWorkedHours = totalWorkedMins / 60;
-  const remainingLate    = Math.max(0, baseLateMin - Math.min(lateMinutesJustified, baseLateMin));
-
-  // Si el clock_in efectivo ya es igual o anterior al schedStart, tardanza = 0
-  const effectiveLate = effectiveClockInMin !== null
-    ? Math.max(0, effectiveClockInMin - schedStartMin)
-    : baseLateMin;
-
-  return {
-    rawWorkedHours: rawWorkedMin / 60,
-    justifiedHours: justifiedMins / 60,
-    totalWorkedHours,
-    fullDayHours: fullDayMins / 60,
-    baseLateMinutes: baseLateMin,
-    remainingLateMinutes: effectiveLate,
-    lateMinutesJustified: baseLateMin - effectiveLate,
-  };
-}
+import { calcEffectiveMetrics, toMin } from "@/lib/attendanceMetrics";
 
 // ── Component ────────────────────────────────────────────────────────────────
 export default function JustifyModal({
@@ -280,7 +183,7 @@ export default function JustifyModal({
       allRecordsInRange.forEach(r => { recordsByDate[r.date] = r; });
 
       for (const dStr of targetDates) {
-        // ── Guardar incidente ──────────────────────────────────────────────
+        // ── Guardar incidente SOLAMENTE — no tocar el AttendanceRecord ─────
         const incidentPayload = {
           employee_id: justifyingEmployee.id,
           incident_date: dStr,
@@ -304,71 +207,10 @@ export default function JustifyModal({
         } else {
           await base44.entities.AttendanceIncident.create(incidentPayload);
         }
-
-        // ── Recalcular métricas del registro usando TODAS las justificaciones ──
-        const existingRecord = recordsByDate[dStr];
-
-        // Obtener todas las justificaciones aprobadas del día (incluyendo la recién guardada)
-        const updatedIncidents = allIncidentsInRange
-          .filter(i => i.incident_date === dStr && i.status === "Aprobada" && i.id !== existingInc?.id)
-          .concat([{ ...incidentPayload, status: "Aprobada" }]);
-
-        const metrics = calcEffectiveMetrics({
-          record: existingRecord,
-          approvedIncidents: updatedIncidents,
-          schedStart,
-          schedEnd,
-          breakMinutes,
-        });
-
-        // Calcular clock_in y clock_out efectivos tras la justificación
-        let finalClockIn  = existingRecord?.clock_in  || null;
-        let finalClockOut = existingRecord?.clock_out || null;
-
-        if (justificationData.full_day_justification) {
-          // Día completo: usar siempre el horario programado
-          finalClockIn  = schedStart;
-          finalClockOut = schedEnd;
-        } else if (timeStart && timeEnd) {
-          const justStartMin = toMin(timeStart);
-          const justEndMin   = toMin(timeEnd);
-          // Si la justificación empieza ANTES del clock_in actual → adelantar clock_in
-          if (!finalClockIn || justStartMin < toMin(finalClockIn)) {
-            finalClockIn = timeStart;
-          }
-          // Si la justificación termina DESPUÉS del clock_out actual → atrasar clock_out
-          if (!finalClockOut || justEndMin > toMin(finalClockOut)) {
-            finalClockOut = timeEnd;
-          }
-        }
-
-        const recordUpdate = {
-          worked_hours: Math.round(metrics.totalWorkedHours * 100) / 100,
-          late_minutes: metrics.remainingLateMinutes,
-          is_late: metrics.remainingLateMinutes > 0,
-          is_absent: false,
-          status: "Justificado",
-          clock_in:  finalClockIn,
-          clock_out: finalClockOut,
-        };
-
-        if (existingRecord) {
-          await base44.entities.AttendanceRecord.update(existingRecord.id, recordUpdate);
-        } else {
-          await base44.entities.AttendanceRecord.create({
-            employee_id: justifyingEmployee.id,
-            date: dStr,
-            ...recordUpdate,
-          });
-        }
+        // El AttendanceRecord original no se modifica.
+        // Las métricas combinadas (asistencia + justificación) se calculan
+        // en pantalla y en el Excel usando calcEffectiveMetrics, sin persistir.
       }
-
-      // Recalcular métricas completas (HE 25%, HE 35%, etc.)
-      await base44.functions.invoke("recalcularAsistencia", {
-        employee_id: justifyingEmployee.id,
-        date_from: minDate,
-        date_to: maxDate,
-      });
 
       toast.success(
         targetDates.length === 1
