@@ -111,7 +111,7 @@ export default function ScheduleManagement() {
 
   const { data: allSites = [] } = useQuery({
     queryKey: ["allSites"],
-    queryFn: async () => await base44.entities.Site.list(),
+    queryFn: async () => await entitiesAPI.Site.list(),
   });
 
   const createTemplateMutation = useMutation({
