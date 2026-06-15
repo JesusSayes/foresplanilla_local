@@ -1210,6 +1210,9 @@ export default function AttendanceManagement() {
                         <col style={{width: "70px"}} />
                         <col style={{width: "70px"}} />
                         <col style={{width: "65px"}} />
+                        <col style={{width: "65px"}} />
+                        <col style={{width: "65px"}} />
+                        <col style={{width: "70px"}} />
                         <col style={{width: "70px"}} />
                         <col style={{width: "60px"}} />
                         <col style={{width: "60px"}} />
@@ -1225,10 +1228,13 @@ export default function AttendanceManagement() {
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">Entrada</th>
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">Salida</th>
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">Horas</th>
+                          <th className="text-center text-xs font-semibold text-green-600 uppercase tracking-wide px-2 py-2">H.Just. Ini</th>
+                          <th className="text-center text-xs font-semibold text-green-600 uppercase tracking-wide px-2 py-2">H.Just. Fin</th>
+                          <th className="text-center text-xs font-semibold text-green-600 uppercase tracking-wide px-2 py-2">H.Just.</th>
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">Tardanza</th>
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">HE 25%</th>
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">HE 35%</th>
-                          <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2 text-green-700">H. Just.</th>
+                          <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2 text-green-700">H. Ajust.</th>
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">Justificación</th>
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">Est. Just.</th>
                           <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2 rounded-r-lg">Acciones</th>
@@ -1241,9 +1247,10 @@ export default function AttendanceManagement() {
                           const isVacation = emp.record?.status === "Vacaciones" || !!vacation;
                           const scheduledTimes = isVacation ? getScheduledTimes(emp.id, rowDate) : null;
                           // Buscar incidente aprobado para esta fila
-                          const rowIncident = allIncidents.find(
+                          const approvedIncident = allIncidents.find(
                             i => i.employee_id === emp.id && String(i.incident_date).slice(0, 10) === rowDate && i.status === "Aprobada"
-                          ) || allIncidents.find(
+                          ) || null;
+                          const rowIncident = approvedIncident || allIncidents.find(
                             i => i.employee_id === emp.id && String(i.incident_date).slice(0, 10) === rowDate
                           ) || null;
 
@@ -1308,22 +1315,87 @@ export default function AttendanceManagement() {
                                   return <span className="text-sm font-bold text-slate-900">{hh}h {mm}m</span>;
                                 })()}
                               </td>
-                              {/* Tardanza (neta: late_minutes - late_minutes_to_adjust del incidente aprobado) */}
+                              {/* H. Just. Inicio — solo si hay incidente aprobado */}
+                              <td className="px-2 py-2 text-center">
+                                {(() => {
+                                  if (!approvedIncident) return <span className="text-xs text-slate-300">—</span>;
+                                  return <span className="text-xs font-semibold text-green-700">{approvedIncident.justified_time_start || "—"}</span>;
+                                })()}
+                              </td>
+                              {/* H. Just. Fin — solo si hay incidente aprobado */}
+                              <td className="px-2 py-2 text-center">
+                                {(() => {
+                                  if (!approvedIncident) return <span className="text-xs text-slate-300">—</span>;
+                                  return <span className="text-xs font-semibold text-green-700">{approvedIncident.justified_time_end || "—"}</span>;
+                                })()}
+                              </td>
+                              {/* H. Just. — horas justificadas aprobadas (considerando jornada y refrigerio) */}
+                              <td className="px-2 py-2 text-center">
+                                {(() => {
+                                  const approvedInc = approvedIncident;
+                                  if (!approvedInc) return <span className="text-xs text-slate-300">—</span>;
+                                  let justMins = 0;
+                                  if (approvedInc.full_day_justification) {
+                                    // Día completo: usar jornada del horario menos refrigerio
+                                    const s = getEmployeeScheduleForDate(emp.id, rowDate);
+                                    const dow3 = new Date(rowDate + "T00:00:00").getDay();
+                                    const st = s?.[["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"][dow3]] || "09:00";
+                                    const en = s?.[["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"][dow3]] || "18:00";
+                                    const brk = s?.break_duration_minutes ?? 60;
+                                    const [sh2, sm2] = st.split(":").map(Number);
+                                    const [eh2, em2] = en.split(":").map(Number);
+                                    justMins = Math.max(0, (eh2 * 60 + em2) - (sh2 * 60 + sm2) - brk);
+                                  } else {
+                                    const ts = approvedInc.justified_time_start || "09:00";
+                                    const te = approvedInc.justified_time_end || "09:00";
+                                    const [sh2, sm2] = ts.split(":").map(Number);
+                                    const [eh2, em2] = te.split(":").map(Number);
+                                    const rawMins = (eh2 * 60 + em2) - (sh2 * 60 + sm2);
+                                    // Descontar refrigerio solo si el período cubre la hora del break del horario
+                                    const s = getEmployeeScheduleForDate(emp.id, rowDate);
+                                    const breakMin = s?.break_duration_minutes ?? 0;
+                                    const breakStart = s?.break_start || null;
+                                    if (breakStart && breakMin > 0) {
+                                      const [bh, bm] = breakStart.split(":").map(Number);
+                                      const breakStartMins = bh * 60 + bm;
+                                      const justStartMins = sh2 * 60 + sm2;
+                                      const justEndMins = eh2 * 60 + em2;
+                                      // Si el período justificado cubre el break, descontarlo
+                                      if (justStartMins <= breakStartMins && justEndMins >= breakStartMins + breakMin) {
+                                        justMins = Math.max(0, rawMins - breakMin);
+                                      } else {
+                                        justMins = Math.max(0, rawMins);
+                                      }
+                                    } else {
+                                      justMins = Math.max(0, rawMins);
+                                    }
+                                  }
+                                  const jh = Math.floor(justMins / 60);
+                                  const jm = justMins % 60;
+                                  return <span className="text-xs font-bold text-green-700">{jh}h {jm}m</span>;
+                                })()}
+                              </td>
+                              {/* Tardanza neta (raw - ajuste del incidente aprobado) */}
                               <td className="px-2 py-2 text-center">
                                 {(() => {
                                   const rawLate = vacation ? 0 : (emp.record?.late_minutes || 0);
-                                  const adjustedLate = vacation ? 0 : (rowIncident?.status === "Aprobada" ? Math.max(0, rawLate - (rowIncident?.late_minutes_to_adjust || 0)) : rawLate);
+                                  const approvedInc = vacation ? null : approvedIncident;
+                                  const adjustedLate = approvedInc ? Math.max(0, rawLate - (approvedInc.late_minutes_to_adjust || 0)) : rawLate;
                                   const lh = Math.floor(adjustedLate / 60);
                                   const lm = adjustedLate % 60;
                                   const lateStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
-                                  return <span className={`text-sm font-bold ${!vacation && adjustedLate > 0 ? 'text-orange-600' : 'text-slate-400'}`}>{lateStr}</span>;
+                                  return <span className={`text-xs font-bold ${!vacation && adjustedLate > 0 ? 'text-orange-600' : 'text-slate-400'}`}>{lateStr}</span>;
                                 })()}
                               </td>
                               {/* HE 25% */}
                               <td className="px-2 py-2 text-center">
-                                <span className={`text-sm font-bold ${!vacation && (emp.record?.overtime_hours_25 > 0) ? 'text-blue-600' : 'text-slate-300'}`}>
-                                  {vacation ? "0.00" : (emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h
-                                </span>
+                                {(() => {
+                                  const heMin = vacation ? 0 : Math.round((emp.record?.overtime_hours_25 ?? 0) * 60);
+                                  const hh = Math.floor(heMin / 60);
+                                  const hm = heMin % 60;
+                                  const heStr = hh > 0 ? `${hh}h ${hm}m` : `${hm}m`;
+                                  return <span className={`text-xs font-bold ${!vacation && heMin > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{heStr}</span>;
+                                })()}
                               </td>
                               {/* HE 35% */}
                               <td className="px-2 py-2 text-center">
@@ -1357,10 +1429,10 @@ export default function AttendanceManagement() {
                                   return <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${colors[rowIncident.status] || "bg-slate-100 text-slate-500"}`}>{rowIncident.status}</span>;
                                 })() : <span className="text-xs text-slate-300">—</span>}
                               </td>
-                              {/* Acciones — ancho fijo 340px para acomodar todos los botones posibles */}
+                              {/* Acciones */}
                               <td className="px-2 py-2">
-                                <div className="flex items-center gap-1 flex-nowrap justify-start" style={{width: "330px"}}>
-                                  <Badge className={`${statusConfig.color} text-xs shrink-0 whitespace-nowrap`} style={{minWidth: "80px", justifyContent: "center"}}>
+                                <div className="flex items-center gap-1 flex-wrap justify-start">
+                                  <Badge className={`${statusConfig.color} text-xs shrink-0 whitespace-nowrap`} style={{minWidth: "78px", justifyContent: "center"}}>
                                     <StatusIcon className="w-3 h-3 mr-1" />{statusConfig.text}
                                   </Badge>
 
