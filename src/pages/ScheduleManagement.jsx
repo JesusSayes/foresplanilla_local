@@ -368,7 +368,8 @@ export default function ScheduleManagement() {
   // Filtrar plantillas según sedes accesibles del usuario
   // getAccessibleSites() devuelve: undefined (cargando), null (todas), array (restringido)
   const accessibleSites = getAccessibleSites();
-  const siteFilteredTemplates = (!accessibleSites || accessibleSites === null)
+  // null = acceso total, undefined = aún cargando (tratar como total), array = restringido
+  const siteFilteredTemplates = (accessibleSites === null || accessibleSites === undefined)
     ? templates
     : templates.filter(t => !t.site || accessibleSites.includes(t.site));
 
@@ -404,7 +405,12 @@ export default function ScheduleManagement() {
            emp.employee_code.toLowerCase().includes(searchLower);
   });
 
-  const filteredTemplatesForAssignment = siteFilteredTemplates.filter(template => {
+  // En el modal de asignación mostrar TODAS las plantillas accesibles por sede (sin filtro de estado)
+  const allAccessibleTemplates = (accessibleSites === null || accessibleSites === undefined)
+    ? templates
+    : templates.filter(t => !t.site || accessibleSites.includes(t.site));
+
+  const filteredTemplatesForAssignment = allAccessibleTemplates.filter(template => {
     const searchLower = templateSearch.toLowerCase();
     return template.schedule_name.toLowerCase().includes(searchLower) ||
            `${template.monday_start} - ${template.monday_end}`.includes(searchLower);
@@ -545,43 +551,42 @@ export default function ScheduleManagement() {
 
           <Card className="border-0 shadow-lg">
             <CardHeader className="border-b bg-slate-50/50">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <Input
-                  placeholder="Buscar..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <Input
+                    placeholder="Buscar..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Select value={filterSite} onValueChange={setFilterSite}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Filtrar por sede" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las sedes</SelectItem>
+                    <SelectItem value="__none__">Sin sede</SelectItem>
+                    {(accessibleSites === null || accessibleSites === undefined ? allSites : allSites.filter(s => accessibleSites.includes(s.name)))
+                      .filter(s => s.is_active !== false)
+                      .map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterActive} onValueChange={setFilterActive}>
+                  <SelectTrigger className="w-44">
+                    <SelectValue placeholder="Estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="active">Solo activas</SelectItem>
+                    <SelectItem value="inactive">Solo inactivas</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardHeader>
             <CardContent className="p-6">
               <TabsContent value="templates" className="mt-0">
-                {/* Filtros de la pestaña plantillas */}
-                <div className="flex flex-wrap gap-3 mb-4">
-                  <Select value={filterSite} onValueChange={setFilterSite}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Filtrar por sede" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas las sedes</SelectItem>
-                      <SelectItem value="__none__">Sin sede</SelectItem>
-                      {((!accessibleSites || accessibleSites === null) ? allSites : allSites.filter(s => accessibleSites.includes(s.name)))
-                        .filter(s => s.is_active !== false)
-                        .map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Select value={filterActive} onValueChange={setFilterActive}>
-                    <SelectTrigger className="w-44">
-                      <SelectValue placeholder="Estado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="active">Solo activas</SelectItem>
-                      <SelectItem value="inactive">Solo inactivas</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
                 {filteredTemplates.length === 0 ? (
                   <div className="text-center py-12">
                     <Calendar className="w-16 h-16 text-slate-300 mx-auto mb-4" />
