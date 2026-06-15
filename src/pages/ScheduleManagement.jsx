@@ -62,7 +62,7 @@ export default function ScheduleManagement() {
     effective_from: new Date(),
   });
 
-  const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
+  const { hasAnyPermission, getAccessibleSites, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -386,7 +386,13 @@ export default function ScheduleManagement() {
     return emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido";
   };
 
-  const filteredTemplates = templates.filter(t => 
+  // Filtrar plantillas según sedes accesibles del usuario
+  const accessibleSites = getAccessibleSites(); // null = todas, array = restringido
+  const siteFilteredTemplates = accessibleSites === null
+    ? templates
+    : templates.filter(t => !t.site || accessibleSites.includes(t.site));
+
+  const filteredTemplates = siteFilteredTemplates.filter(t => 
     t.schedule_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -411,7 +417,7 @@ export default function ScheduleManagement() {
            emp.employee_code.toLowerCase().includes(searchLower);
   });
 
-  const filteredTemplatesForAssignment = templates.filter(template => {
+  const filteredTemplatesForAssignment = siteFilteredTemplates.filter(template => {
     const searchLower = templateSearch.toLowerCase();
     return template.schedule_name.toLowerCase().includes(searchLower) ||
            `${template.monday_start} - ${template.monday_end}`.includes(searchLower);
