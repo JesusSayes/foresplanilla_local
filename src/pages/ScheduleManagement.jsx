@@ -43,6 +43,7 @@ export default function ScheduleManagement() {
 
   const [templateFormData, setTemplateFormData] = useState({
     schedule_name: "",
+    site: "",
     monday_start: "09:00",
     monday_end: "18:00",
     tuesday_start: "09:00",
@@ -108,6 +109,11 @@ export default function ScheduleManagement() {
     },
   });
 
+  const { data: allSites = [] } = useQuery({
+    queryKey: ["allSites"],
+    queryFn: async () => await base44.entities.Site.list(),
+  });
+
   const createTemplateMutation = useMutation({
     mutationFn: async (data) => {
       return await entitiesAPI.WorkSchedule.create(data);
@@ -171,6 +177,7 @@ export default function ScheduleManagement() {
     setEditingTemplate(null);
     setTemplateFormData({
       schedule_name: "",
+      site: "",
       monday_start: "09:00",
       monday_end: "18:00",
       tuesday_start: "09:00",
@@ -330,6 +337,7 @@ export default function ScheduleManagement() {
   const resetTemplateForm = () => {
     setTemplateFormData({
       schedule_name: "",
+      site: "",
       monday_start: "09:00",
       monday_end: "18:00",
       tuesday_start: "09:00",
@@ -583,6 +591,9 @@ export default function ScheduleManagement() {
                                 {template.schedule_name}
                               </h4>
                               <Badge className="bg-green-100 text-green-700">Plantilla</Badge>
+                              {template.site && (
+                                <Badge className="bg-indigo-100 text-indigo-700">{template.site}</Badge>
+                              )}
                               {!template.is_active && (
                                 <Badge className="bg-red-100 text-red-700">Inactiva</Badge>
                               )}
@@ -897,13 +908,32 @@ export default function ScheduleManagement() {
                   </p>
                 </div>
 
-                <div>
-                  <Label>Nombre de la Plantilla *</Label>
-                  <Input
-                    value={templateFormData.schedule_name}
-                    onChange={(e) => setTemplateFormData({ ...templateFormData, schedule_name: e.target.value })}
-                    placeholder="Ej: Horario Administrativo, Horario Operativo, etc."
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Nombre de la Plantilla *</Label>
+                    <Input
+                      value={templateFormData.schedule_name}
+                      onChange={(e) => setTemplateFormData({ ...templateFormData, schedule_name: e.target.value })}
+                      placeholder="Ej: Horario Administrativo, Horario Operativo, etc."
+                    />
+                  </div>
+                  <div>
+                    <Label>Sede</Label>
+                    <Select
+                      value={templateFormData.site || ""}
+                      onValueChange={(v) => setTemplateFormData({ ...templateFormData, site: v === "__none__" ? "" : v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar sede..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Sin sede específica</SelectItem>
+                        {allSites.filter(s => s.is_active !== false).map(s => (
+                          <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
