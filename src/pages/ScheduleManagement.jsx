@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,13 +19,13 @@ import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 
 export default function ScheduleManagement() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [editingAssignment, setEditingAssignment] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterSite, setFilterSite] = useState("all");
+  const [filterActive, setFilterActive] = useState("all");
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
@@ -62,29 +62,8 @@ export default function ScheduleManagement() {
     effective_from: new Date(),
   });
 
-  const { hasAnyPermission, getAccessibleSites, loading: permissionsLoading } = usePermissions();
+  const { hasAnyPermission, getAccessibleSites, employee, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = await base44.auth.me();
-        setCurrentUser(user);
-
-        const employees = await base44.entities.Employee.filter({ 
-          work_email: user.email 
-        });
-        
-        if (employees && employees.length > 0) {
-          setEmployee(employees[0]);
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-      }
-    };
-
-    loadUserData();
-  }, []);
 
   const { data: schedules = [] } = useQuery({
     queryKey: ["workSchedules"],
@@ -392,9 +371,16 @@ export default function ScheduleManagement() {
     ? templates
     : templates.filter(t => !t.site || accessibleSites.includes(t.site));
 
-  const filteredTemplates = siteFilteredTemplates.filter(t => 
-    t.schedule_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTemplates = siteFilteredTemplates.filter(t => {
+    if (!t.schedule_name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (filterSite !== "all") {
+      if (filterSite === "__none__" && t.site) return false;
+      if (filterSite !== "__none__" && t.site !== filterSite) return false;
+    }
+    if (filterActive === "active" && t.is_active === false) return false;
+    if (filterActive === "inactive" && t.is_active !== false) return false;
+    return true;
+  });
 
   const filteredIndividual = individualAssignments.filter(s => {
     const empName = getEmployeeName(s.employee_id).toLowerCase();
@@ -570,6 +556,31 @@ export default function ScheduleManagement() {
             </CardHeader>
             <CardContent className="p-6">
               <TabsContent value="templates" className="mt-0">
+                {/* Filtros de la pestaña plantillas */}
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <Select value={filterSite} onValueChange={setFilterSite}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filtrar por sede" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las sedes</SelectItem>
+                      <SelectItem value="__none__">Sin sede</SelectItem>
+                      {(accessibleSites === null ? allSites : allSites.filter(s => accessibleSites.includes(s.name)))
+                        .filter(s => s.is_active !== false)
+                        .map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterActive} onValueChange={setFilterActive}>
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="active">Solo activas</SelectItem>
+                      <SelectItem value="inactive">Solo inactivas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 {filteredTemplates.length === 0 ? (
                   <div className="text-center py-12">
                     <Calendar className="w-16 h-16 text-slate-300 mx-auto mb-4" />
