@@ -366,8 +366,9 @@ export default function ScheduleManagement() {
   };
 
   // Filtrar plantillas según sedes accesibles del usuario
-  const accessibleSites = getAccessibleSites(); // null = todas, array = restringido
-  const siteFilteredTemplates = accessibleSites === null
+  // getAccessibleSites() devuelve: undefined (cargando), null (todas), array (restringido)
+  const accessibleSites = getAccessibleSites();
+  const siteFilteredTemplates = (!accessibleSites || accessibleSites === null)
     ? templates
     : templates.filter(t => !t.site || accessibleSites.includes(t.site));
 
@@ -565,7 +566,7 @@ export default function ScheduleManagement() {
                     <SelectContent>
                       <SelectItem value="all">Todas las sedes</SelectItem>
                       <SelectItem value="__none__">Sin sede</SelectItem>
-                      {(accessibleSites === null ? allSites : allSites.filter(s => accessibleSites.includes(s.name)))
+                      {((!accessibleSites || accessibleSites === null) ? allSites : allSites.filter(s => accessibleSites.includes(s.name)))
                         .filter(s => s.is_active !== false)
                         .map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                     </SelectContent>
