@@ -31,6 +31,10 @@
       "type": "string",
       "description": "Nombre del horario"
     },
+    "site": {
+      "type": "string",
+      "description": "Sede a la que pertenece esta plantilla de horario"
+    },
     "monday_start": {
       "type": "string",
       "description": "Hora de entrada lunes (HH:mm)"
@@ -91,6 +95,10 @@
       "type": "integer",
       "default": 60,
       "description": "Duraci\u00f3n del break/almuerzo en minutos"
+    },
+    "break_start": {
+      "type": "string",
+      "description": "Hora de inicio del break (HH:mm)"
     },
     "tolerance_minutes": {
       "type": "integer",

@@ -773,6 +773,8 @@ model work_schedule {
   is_sample              Boolean?
   effective_from         DateTime? @db.Date
   effective_to           DateTime? @db.Date
+  site                   String?
+  break_start            String?
 }
 
 model vacation_request {
