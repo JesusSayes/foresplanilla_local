@@ -397,10 +397,18 @@ export default function ScheduleManagement() {
   // Filtrar plantillas según sedes accesibles del usuario
   // getAccessibleSites() devuelve: undefined (cargando), null (todas), array (restringido)
   const accessibleSites = getAccessibleSites();
-  // null = acceso total, undefined = aún cargando (tratar como total), array = restringido
+
+  // Comparación normalizada para evitar problemas de mayúsculas/espacios
+  const siteMatch = (templateSite, siteList) => {
+    if (!templateSite) return true; // plantilla sin sede → siempre visible
+    const normalized = templateSite.trim().toLowerCase();
+    return siteList.some(s => s.trim().toLowerCase() === normalized);
+  };
+
+  // null = acceso total, undefined = aún cargando (mostrar todo mientras carga)
   const siteFilteredTemplates = (accessibleSites === null || accessibleSites === undefined)
     ? templates
-    : templates.filter(t => !t.site || accessibleSites.includes(t.site));
+    : templates.filter(t => siteMatch(t.site, accessibleSites));
 
   const filteredTemplates = siteFilteredTemplates.filter(t => {
     if (!t.schedule_name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
@@ -437,7 +445,7 @@ export default function ScheduleManagement() {
   // En el modal de asignación mostrar TODAS las plantillas accesibles por sede (sin filtro de estado)
   const allAccessibleTemplates = (accessibleSites === null || accessibleSites === undefined)
     ? templates
-    : templates.filter(t => !t.site || accessibleSites.includes(t.site));
+    : templates.filter(t => siteMatch(t.site, accessibleSites));
 
   const filteredTemplatesForAssignment = allAccessibleTemplates.filter(template => {
     const searchLower = templateSearch.toLowerCase();
