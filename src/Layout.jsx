@@ -5,9 +5,7 @@ import { createPageUrl } from "./utils";
 import { useAuth } from "@/lib/AuthContext";
 import { authAPI } from "@/api/localClient";
 import { entitiesAPI } from "@/api/entitiesClient";
-import localClient from "@/api/localClient";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   LayoutDashboard, FileText, Calendar, Clock,
   User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown, KeyRound, Eye, EyeOff, AlertCircle
@@ -246,10 +244,10 @@ export default function Layout({ children, currentPageName }) {
       });
     }
 
-    // Asistencia - solo quien puede ver asistencia de todos o del departamento
-    if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.manage"])) {
+    // Asistencia - incluye aprobadores de edición aunque no tengan permisos de vista generales
+    if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.manage", "attendance.approve_edits"])) {
       const submenu = [];
-      if (hasAnyPermission(["attendance.view_all", "attendance.view_department"])) submenu.push({ name: "Ver Asistencia", path: "AttendanceManagement" });
+      if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.approve_edits"])) submenu.push({ name: "Ver Asistencia", path: "AttendanceManagement" });
       if (hasAnyPermission(["reports.attendance", "attendance.view_reports", "attendance.export"])) submenu.push({ name: "Reportes Asistencia", path: "AttendanceReports" });
       if (hasAnyPermission(["schedules.view", "attendance.manage_schedules"])) submenu.push({ name: "Gestión Horarios", path: "ScheduleManagement" });
       if (isAdmin) {

@@ -173,7 +173,17 @@ export const updateEmployee = async (req, res) => {
     const { id } = req.params;
     const data = req.body;
     if (!canAccessEmployee(req, id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
-    if (Object.prototype.hasOwnProperty.call(data, 'role') && !hasPermission(req.access, 'system.admin')) {
+
+    const existing = await query('SELECT role FROM employee WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Empleado no encontrado' });
+    }
+
+    if (
+      Object.prototype.hasOwnProperty.call(data, 'role') &&
+      data.role !== existing.rows[0].role &&
+      !hasPermission(req.access, 'system.admin')
+    ) {
       return res.status(403).json({ error: 'Solo un administrador del sistema puede cambiar el rol legacy' });
     }
 
