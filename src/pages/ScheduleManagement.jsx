@@ -375,8 +375,7 @@ export default function ScheduleManagement() {
 
   const filteredTemplates = siteFilteredTemplates.filter(t => {
     if (!t.schedule_name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    // Solo aplicar filtro de sede adicional si el usuario tiene acceso a todas las sedes
-    if (filterSite !== "all" && (accessibleSites === null || accessibleSites === undefined)) {
+    if (filterSite !== "all") {
       if (filterSite === "__none__" && t.site) return false;
       if (filterSite !== "__none__" && t.site !== filterSite) return false;
     }
@@ -562,19 +561,18 @@ export default function ScheduleManagement() {
                     className="pl-10"
                   />
                 </div>
-                {(accessibleSites === null || accessibleSites === undefined) && (
-                  <Select value={filterSite} onValueChange={setFilterSite}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Filtrar por sede" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas las sedes</SelectItem>
-                      <SelectItem value="__none__">Sin sede</SelectItem>
-                      {allSites.filter(s => s.is_active !== false)
-                        .map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )}
+                <Select value={filterSite} onValueChange={setFilterSite}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Filtrar por sede" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las sedes</SelectItem>
+                    <SelectItem value="__none__">Sin sede</SelectItem>
+                    {(accessibleSites === null || accessibleSites === undefined ? allSites : allSites.filter(s => accessibleSites.includes(s.name)))
+                      .filter(s => s.is_active !== false)
+                      .map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <Select value={filterActive} onValueChange={setFilterActive}>
                   <SelectTrigger className="w-44">
                     <SelectValue placeholder="Estado" />
