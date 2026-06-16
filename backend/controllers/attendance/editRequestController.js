@@ -157,9 +157,6 @@ export const approve = async (req, res) => {
       if (!request) throw new Error("Solicitud no encontrada");
       if (!canAccessEmployee(req, request.employee_id)) throw new Error("Acceso denegado al empleado");
       if (request.status !== "Pendiente") throw new Error("La solicitud ya no está pendiente");
-      if (request.requested_by_id === reviewer.id && !hasPermission(req.access, "system.admin")) {
-        throw new Error("No puede aprobar su propia solicitud");
-      }
 
       const record = await tx.attendance_record.findUnique({ where: { id: request.attendance_record_id } });
       if (!record) throw new Error("Registro de asistencia no encontrado");

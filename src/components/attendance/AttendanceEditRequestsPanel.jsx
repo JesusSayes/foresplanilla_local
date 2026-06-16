@@ -156,8 +156,8 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
             </Button>
           )}
 
-          {/* Aprobadores pueden aprobar/rechazar, excepto solicitudes propias sobre su propio registro */}
-          {canApprove && !isSelfRequest && (
+          {/* Aprobadores pueden aprobar/rechazar solicitudes pendientes */}
+          {canApprove && (
             <>
               {!showReject ? (
                 <div className="flex gap-2">
