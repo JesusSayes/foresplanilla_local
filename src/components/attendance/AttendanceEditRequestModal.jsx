@@ -85,7 +85,8 @@ export default function AttendanceEditRequestModal({
       onSuccess?.();
       onClose();
     } catch (e) {
-      toast.error("Error al crear la solicitud: " + e.message);
+      const message = e.response?.data?.error || e.message;
+      toast.error("Error al crear la solicitud: " + message);
     } finally {
       setSubmitting(false);
     }
@@ -204,7 +205,7 @@ export default function AttendanceEditRequestModal({
             <Button
               className="flex-1 bg-indigo-600 hover:bg-indigo-700"
               onClick={handleSubmit}
-              disabled={submitting || changedFields.length === 0}
+              disabled={submitting}
             >
               {submitting ? "Enviando..." : "Enviar Solicitud"}
             </Button>
