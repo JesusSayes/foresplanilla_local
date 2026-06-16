@@ -9,17 +9,30 @@ const serializeSchedule = schedule => ({
   effective_to: toDateString(schedule.effective_to),
 });
 
+const normalizeSite = value => String(value || '').trim().toLocaleLowerCase();
+
+const isTemplateSchedule = schedule => (
+  !schedule.employee_id &&
+  !schedule.department_name &&
+  !(Array.isArray(schedule.departments) && schedule.departments.length > 0)
+);
+
 const filterSchedulesForAccess = async (req, schedules) => {
   if (req.accessibleEmployeeIds === null) return schedules;
 
   const employees = await prisma.employee.findMany({
     where: { id: { in: req.accessibleEmployeeIds || [] } },
-    select: { id: true, department_name: true },
+    select: { id: true, department_name: true, site: true },
   });
   const employeeIds = new Set(employees.map(employee => employee.id));
   const departments = new Set(employees.map(employee => employee.department_name).filter(Boolean));
+  const sites = new Set(employees.map(employee => normalizeSite(employee.site)).filter(Boolean));
 
   return schedules.filter(schedule => {
+    if (isTemplateSchedule(schedule)) {
+      const templateSite = normalizeSite(schedule.site);
+      return !templateSite || sites.has(templateSite);
+    }
     if (schedule.employee_id) return employeeIds.has(schedule.employee_id);
     if (schedule.department_name && departments.has(schedule.department_name)) return true;
     return Array.isArray(schedule.departments) && schedule.departments.some(department => departments.has(department));
