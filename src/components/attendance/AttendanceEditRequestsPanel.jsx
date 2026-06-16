@@ -35,9 +35,6 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
   const [loading, setLoading] = useState(false);
 
   const employee = allEmployees.find(e => e.id === req.employee_id);
-  const requestedBy = allEmployees.find(e => e.id === req.requested_by_id);
-  // No hay restricción por autogestión: si tiene el rol, puede aprobar cualquier solicitud
-  const isSelfRequest = false;
   const isPending = req.status === "Pendiente";
 
   const handleApprove = async () => {
@@ -187,15 +184,13 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
       {/* Acciones */}
       {isPending && (
         <div className="flex flex-col gap-2">
-          {/* El solicitante puede cancelar */}
-          {isSelfRequest && (
-            <Button size="sm" variant="outline" className="text-slate-600" onClick={handleCancel} disabled={loading}>
-              <Ban className="w-3 h-3 mr-1" />Cancelar mi solicitud
-            </Button>
-          )}
+          {/* Cancelar siempre disponible para pendientes */}
+          <Button size="sm" variant="outline" className="text-slate-600" onClick={handleCancel} disabled={loading}>
+            <Ban className="w-3 h-3 mr-1" />Cancelar solicitud
+          </Button>
 
-          {/* Aprobadores pueden aprobar/rechazar, excepto solicitudes propias sobre su propio registro */}
-          {canApprove && !isSelfRequest && (
+          {/* Aprobadores pueden aprobar/rechazar cualquier solicitud */}
+          {canApprove && (
             <>
               {!showReject ? (
                 <div className="flex gap-2">
