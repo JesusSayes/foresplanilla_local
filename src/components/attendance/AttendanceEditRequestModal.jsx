@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, X } from "lucide-react";
+import { AlertCircle, ArrowRight, X } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -26,18 +26,22 @@ export default function AttendanceEditRequestModal({
   onClose,
   onSuccess,
 }) {
+  // Normalizar horas a HH:mm (recortar segundos si vienen como HH:mm:ss)
+  const normalizeTime = (t) => t ? t.slice(0, 5) : "";
+
   const [formValues, setFormValues] = useState({
-    clock_in: record?.clock_in || "",
-    clock_out: record?.clock_out || "",
+    clock_in: normalizeTime(record?.clock_in),
+    clock_out: normalizeTime(record?.clock_out),
     status: record?.status || "Completo",
     notes: record?.notes || "",
   });
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const originalValues = {
-    clock_in: record?.clock_in || "",
-    clock_out: record?.clock_out || "",
+    clock_in: normalizeTime(record?.clock_in),
+    clock_out: normalizeTime(record?.clock_out),
     status: record?.status || "Completo",
     notes: record?.notes || "",
   };
@@ -50,20 +54,21 @@ export default function AttendanceEditRequestModal({
   const validateTime = (t) => !t || /^\d{2}:\d{2}$/.test(t);
 
   const handleSubmit = async () => {
+    setErrorMsg("");
     if (changedFields.length === 0) {
-      toast.error("No hay cambios para solicitar");
+      setErrorMsg("No hay cambios para solicitar. Modifica al menos un campo.");
       return;
     }
     if (!reason.trim()) {
-      toast.error("El motivo de la edición es obligatorio");
+      setErrorMsg("El motivo de la edición es obligatorio.");
       return;
     }
     if (!validateTime(formValues.clock_in) || !validateTime(formValues.clock_out)) {
-      toast.error("Formato de hora inválido (HH:mm)");
+      setErrorMsg("Formato de hora inválido. Usa el formato HH:mm.");
       return;
     }
     if (formValues.clock_in && formValues.clock_out && formValues.clock_in >= formValues.clock_out) {
-      toast.error("La hora de salida debe ser posterior a la de entrada");
+      setErrorMsg("La hora de salida debe ser posterior a la de entrada.");
       return;
     }
 
@@ -85,8 +90,8 @@ export default function AttendanceEditRequestModal({
       onSuccess?.();
       onClose();
     } catch (e) {
-      const message = e.response?.data?.error || e.message;
-      toast.error("Error al crear la solicitud: " + message);
+      const message = e.response?.data?.error || e.message || "Error desconocido. Contacta al administrador.";
+      setErrorMsg("Error al crear la solicitud: " + message);
     } finally {
       setSubmitting(false);
     }
@@ -111,6 +116,14 @@ export default function AttendanceEditRequestModal({
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
+          {/* Banner de error visible dentro del modal */}
+          {errorMsg && (
+            <div className="flex items-start gap-3 bg-red-50 border border-red-300 rounded-lg p-4">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-red-800 font-medium">{errorMsg}</p>
+            </div>
+          )}
+
           {/* Formulario de valores nuevos */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -119,7 +132,7 @@ export default function AttendanceEditRequestModal({
                 <Input
                   type="time"
                   value={formValues.clock_in}
-                  onChange={(e) => setFormValues({ ...formValues, clock_in: e.target.value })}
+                  onChange={(e) => { setFormValues({ ...formValues, clock_in: e.target.value }); setErrorMsg(""); }}
                 />
                 {formValues.clock_in && (
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400"
@@ -135,7 +148,7 @@ export default function AttendanceEditRequestModal({
                 <Input
                   type="time"
                   value={formValues.clock_out}
-                  onChange={(e) => setFormValues({ ...formValues, clock_out: e.target.value })}
+                  onChange={(e) => { setFormValues({ ...formValues, clock_out: e.target.value }); setErrorMsg(""); }}
                 />
                 {formValues.clock_out && (
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400"
