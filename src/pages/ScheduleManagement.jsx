@@ -399,10 +399,12 @@ export default function ScheduleManagement() {
   const accessibleSites = getAccessibleSites();
 
   // Comparación normalizada para evitar problemas de mayúsculas/espacios
+  const normalizeSite = (site) => (site || "").trim().toLowerCase();
+
   const siteMatch = (templateSite, siteList) => {
-    if (!templateSite) return true; // plantilla sin sede → siempre visible
-    const normalized = templateSite.trim().toLowerCase();
-    return siteList.some(s => s.trim().toLowerCase() === normalized);
+    const normalized = normalizeSite(templateSite);
+    if (!normalized) return true; // plantilla sin sede → siempre visible
+    return siteList.some(s => normalizeSite(s) === normalized);
   };
 
   // null = acceso total, undefined = aún cargando (mostrar todo mientras carga)
@@ -413,8 +415,8 @@ export default function ScheduleManagement() {
   const filteredTemplates = siteFilteredTemplates.filter(t => {
     if (!t.schedule_name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     if (filterSite !== "all") {
-      if (filterSite === "__none__" && t.site) return false;
-      if (filterSite !== "__none__" && t.site !== filterSite) return false;
+      if (filterSite === "__none__" && normalizeSite(t.site)) return false;
+      if (filterSite !== "__none__" && normalizeSite(t.site) !== normalizeSite(filterSite)) return false;
     }
     if (filterActive === "active" && t.is_active === false) return false;
     if (filterActive === "inactive" && t.is_active !== false) return false;
@@ -605,7 +607,7 @@ export default function ScheduleManagement() {
                   <SelectContent>
                     <SelectItem value="all">Todas las sedes</SelectItem>
                     <SelectItem value="__none__">Sin sede</SelectItem>
-                    {(accessibleSites === null || accessibleSites === undefined ? allSites : allSites.filter(s => accessibleSites.includes(s.name)))
+                    {(accessibleSites === null || accessibleSites === undefined ? allSites : allSites.filter(s => siteMatch(s.name, accessibleSites)))
                       .filter(s => s.is_active !== false)
                       .map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                   </SelectContent>
