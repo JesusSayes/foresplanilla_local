@@ -4,6 +4,7 @@ import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePermissions } from "@/components/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -28,7 +29,7 @@ export default function VacationRequest() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
-  const { permissions: userPermissions = [], loading: permissionsLoading } = usePermissions();
+  const { permissions: userPermissions = [], loading: permissionsLoading, getAccessibleSites } = usePermissions();
   const [formData, setFormData] = useState({
     request_type: "Vacaciones",
     is_full_day: true,
@@ -221,7 +222,11 @@ export default function VacationRequest() {
 
   const selectedDays = calculateDaysIfSelected();
 
+  const accessibleSites = getAccessibleSites ? getAccessibleSites() : null;
+  const isSiteRestricted = accessibleSites !== null && accessibleSites !== undefined;
+
   const filteredEmployees = allEmployees.filter(emp => {
+    if (isSiteRestricted && Array.isArray(accessibleSites) && !accessibleSites.includes(emp.site)) return false;
     const searchLower = employeeSearchTerm.toLowerCase();
     return emp.first_name.toLowerCase().includes(searchLower) ||
            emp.last_name.toLowerCase().includes(searchLower) ||
@@ -434,15 +439,6 @@ export default function VacationRequest() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Vacaciones">Vacaciones</SelectItem>
-                          <SelectItem value="Descanso Médico">Descanso Médico</SelectItem>
-                          <SelectItem value="Descanso Vacacional">Descanso Vacacional</SelectItem>
-                          <SelectItem value="Cita Médica">Cita Médica</SelectItem>
-                          <SelectItem value="Onomástico">Onomástico</SelectItem>
-                          <SelectItem value="Licencia sin Goce de Haber">Licencia sin Goce de Haber</SelectItem>
-                          <SelectItem value="Permiso con goce">Permiso con goce</SelectItem>
-                          <SelectItem value="Permiso sin goce">Permiso sin goce</SelectItem>
-                          <SelectItem value="Licencia médica">Licencia médica</SelectItem>
-                          <SelectItem value="Otro">Otro</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

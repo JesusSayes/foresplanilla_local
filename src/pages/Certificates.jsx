@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePermissions } from "@/components/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,12 +17,11 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
-import { usePermissions } from "../components/hooks/usePermissions";
 
 export default function Certificates() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
-  const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
+  const { getAccessibleSites, hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const canSelectEmployee = hasAnyPermission([
     "certificates.view_all",
     "certificates.create",
@@ -48,17 +48,22 @@ export default function Certificates() {
     enabled: !permissionsLoading && canSelectEmployee,
   });
 
+  const accessibleSites = getAccessibleSites ? getAccessibleSites() : null;
+  const isSiteRestricted = accessibleSites !== null && accessibleSites !== undefined;
+  const siteFilteredEmployees = isSiteRestricted && Array.isArray(accessibleSites)
+    ? allEmployees.filter(emp => accessibleSites.includes(emp.site))
+    : allEmployees;
+
   const targetEmployeeId = canSelectEmployee ? selectedEmployeeId : employee?.id;
 
   const { data: certificates = [], isLoading } = useQuery({
     queryKey: ["certificates", targetEmployeeId],
     queryFn: async () => {
       if (!targetEmployeeId) return [];
-      // return await entitiesAPI.Certificate.filter(
-        // { employee_id: targetEmployeeId },
-        // "-created_date"
-      // );
-      return await entitiesAPI.Certificate.list({ sort: "-created_date", ...filters })
+      return await entitiesAPI.Certificate.filter(
+        { employee_id: targetEmployeeId },
+        "-created_date"
+      );
     },
     enabled: !!targetEmployeeId,
   });
@@ -290,7 +295,7 @@ export default function Certificates() {
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </div>
-                            {allEmployees
+                            {siteFilteredEmployees
                               .filter(emp => {
                                 const searchLower = employeeSearchTerm.toLowerCase();
                                 return String(emp.first_name || "").toLowerCase().includes(searchLower) ||
