@@ -80,7 +80,7 @@ export default function AttendanceManagement() {
   const canEditAttendance = hasPermission("attendance.edit") || hasPermission("system.admin");
   const canApproveIncidents = hasPermission("attendance.approve_incidents") || hasPermission("system.admin");
   const canApproveEdits = hasPermission("attendance.approve_edits") || hasPermission("system.admin");
-  const canManageSchedules = hasPermission("attendance.manage_schedules") || hasPermission("system.admin");
+  const canManageSchedules = hasPermission("schedules.edit") || hasPermission("schedules.assign") || hasPermission("system.admin");
   const canExportAttendance = hasPermission("attendance.export") || hasPermission("system.admin");
   const queryClient = useQueryClient();
 
@@ -1010,10 +1010,10 @@ export default function AttendanceManagement() {
     return configs[status] || configs["Incompleto"];
   };
 
-  if (permissionsLoading && !effectiveEmployee) {
+  if (permissionsLoading || (!effectiveEmployee && permissionsLoading)) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Card><CardContent className="p-8"><p>Cargando...</p></CardContent></Card>
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }

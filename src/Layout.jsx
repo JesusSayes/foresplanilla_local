@@ -249,7 +249,7 @@ export default function Layout({ children, currentPageName }) {
       const submenu = [];
       if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.approve_edits"])) submenu.push({ name: "Ver Asistencia", path: "AttendanceManagement" });
       if (hasAnyPermission(["reports.attendance", "attendance.view_reports", "attendance.export"])) submenu.push({ name: "Reportes Asistencia", path: "AttendanceReports" });
-      if (hasAnyPermission(["schedules.view", "attendance.manage_schedules"])) submenu.push({ name: "Gestión Horarios", path: "ScheduleManagement" });
+      if (hasAnyPermission(["schedules.view"])) submenu.push({ name: "Gestión Horarios", path: "ScheduleManagement" });
       if (isAdmin) {
         submenu.push({ name: "Base de Datos Externa", path: "DatabaseConfig" });
         submenu.push({ name: "Control de Acceso Físico", path: "AccessDeviceConfig" });

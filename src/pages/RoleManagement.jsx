@@ -14,14 +14,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AVAILABLE_PERMISSIONS, usePermissions } from "../components/hooks/usePermissions";
-import PermissionGuard from "../components/PermissionGuard";
 import PermissionMatrix from "../components/roles/PermissionMatrix";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function RoleManagement() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
-  const { hasPermission } = usePermissions();
+  const { hasPermission, hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const canCreateRoles = hasPermission("roles.create") || hasPermission("roles.manage");
   const canEditRoles = hasPermission("roles.edit") || hasPermission("roles.manage");
   const canDeleteRoles = hasPermission("roles.delete") || hasPermission("roles.manage");
@@ -312,16 +311,28 @@ export default function RoleManagement() {
     ],
   };
 
-  if (!employee) {
+  if (!employee || permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Card><CardContent className="p-8"><p>Cargando...</p></CardContent></Card>
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!hasAnyPermission(["roles.view", "roles.manage", "system.admin"])) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
+            <p className="text-slate-600">No tienes permisos para ver roles y permisos</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <PermissionGuard employee={employee} requiredAnyPermissions={["roles.view", "roles.manage", "system.admin"]}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-8">
@@ -773,6 +784,5 @@ export default function RoleManagement() {
           </div>
         )}
       </div>
-    </PermissionGuard>
   );
 }

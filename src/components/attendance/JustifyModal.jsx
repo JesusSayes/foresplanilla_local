@@ -15,6 +15,7 @@ import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { uploadFile } from "@/services/uploadService";
 import { calcEffectiveMetrics, toMin } from "@/lib/attendanceMetrics";
+import { ATTENDANCE_INCIDENT_TYPES } from "@/constants/attendanceIncidentTypes";
 
 const toDateStr = value => {
   if (!value) return "";
@@ -123,15 +124,7 @@ export default function JustifyModal({
   const [dateRangeEnd, setDateRangeEnd]     = useState(null);
   const [extraDates, setExtraDates]         = useState([]);
 
-  const INCIDENT_TYPES = [
-    "Comisión de Servicio","Capacitación","Descanso Médico","Omisión de Marcación",
-    "Cita Médica","Confirmación de Asistencia (Limitación de Sistema)",
-    "Licencia por Maternidad","Licencia por Paternidad","Otro","Onomástico",
-    "Descanso Vacacional","Licencia sin Goce de Haber","Feriado",
-    "Justificación de Tardanza","Tardanza","Falta","Salida Temprana",
-  ];
-
-  const filteredIncidentTypes = INCIDENT_TYPES.filter(t =>
+  const filteredIncidentTypes = ATTENDANCE_INCIDENT_TYPES.filter(t =>
     t.toLowerCase().includes(incidentSearch.toLowerCase())
   );
 

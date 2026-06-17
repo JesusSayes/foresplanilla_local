@@ -1,12 +1,5 @@
 import prisma from '../config/prisma.js';
-
-const LEGACY_PERMISSIONS = {
-  super_admin: ['system.admin'],
-  admin: ['system.admin'],
-  hr_readonly: ['employees.view', 'attendance.view_all', 'roles.view'],
-  manager: ['employees.view', 'attendance.view_department', 'attendance.approve_incidents'],
-  empleado: ['attendance.view_own'],
-};
+import { LEGACY_ROLE_PERMISSIONS, LOCAL_PERMISSION_ALIASES } from '../config/permissions.js';
 
 const normalizeJsonArray = (value) => Array.isArray(value) ? value : [];
 const normalizeSite = value => String(value || '').trim().toLocaleLowerCase();
@@ -35,7 +28,7 @@ export const loadAccessContext = async (req, res, next) => {
     } else if (roles.length > 0) {
       roles.forEach(role => normalizeJsonArray(role.permissions).forEach(permission => permissions.add(permission)));
     } else {
-      (LEGACY_PERMISSIONS[employee.role] || LEGACY_PERMISSIONS.empleado).forEach(permission => permissions.add(permission));
+      (LEGACY_ROLE_PERMISSIONS[employee.role] || LEGACY_ROLE_PERMISSIONS.empleado).forEach(permission => permissions.add(permission));
     }
 
     req.access = { employee, roles, permissions, hasCustomRoles: roles.length > 0 };
@@ -45,9 +38,15 @@ export const loadAccessContext = async (req, res, next) => {
   }
 };
 
-export const hasPermission = (access, permission) => (
-  access?.permissions?.has('system.admin') || access?.permissions?.has(permission)
-);
+export const hasPermission = (access, permission) => {
+  if (access?.permissions?.has('system.admin') || access?.permissions?.has(permission)) {
+    return true;
+  }
+
+  return Object.entries(LOCAL_PERMISSION_ALIASES).some(([alias, grantedPermissions]) =>
+    access?.permissions?.has(alias) && grantedPermissions.includes(permission)
+  );
+};
 
 export const requireAnyPermission = (...requiredPermissions) => (req, res, next) => {
   if (requiredPermissions.some(permission => hasPermission(req.access, permission))) {
@@ -62,7 +61,11 @@ export const requireAnyPermission = (...requiredPermissions) => (req, res, next)
 
 const roleGrantsPermission = (role, permission) => {
   const permissions = normalizeJsonArray(role.permissions);
-  return permissions.includes('system.admin') || permissions.includes(permission);
+  if (permissions.includes('system.admin') || permissions.includes(permission)) return true;
+
+  return Object.entries(LOCAL_PERMISSION_ALIASES).some(([alias, grantedPermissions]) =>
+    permissions.includes(alias) && grantedPermissions.includes(permission)
+  );
 };
 
 const getRoleEmployeeIds = async (access, role, permission) => {

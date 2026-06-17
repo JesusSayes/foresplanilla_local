@@ -745,9 +745,9 @@ export default function ContractManagement() {
                             (Array.isArray(accessibleSites) && accessibleSites.includes(emp.site))
                           )
                           .filter(emp =>
-                            emp.first_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-                            emp.last_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-                            emp.employee_code.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+                            String(emp.first_name || "").toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+                            String(emp.last_name || "").toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+                            String(emp.employee_code || "").toLowerCase().includes(employeeSearchTerm.toLowerCase())
                           )
                           .map(emp => (
                             <SelectItem key={emp.id} value={emp.id}>
