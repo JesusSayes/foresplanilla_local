@@ -809,7 +809,7 @@ export default function EmployeeManagement() {
     );
   }
 
-  if (!hasPermission("employees.view")) {
+  if (!permissionsLoading && !hasPermission("employees.view")) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <Card className="max-w-md">
