@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePermissions } from "@/components/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,7 @@ export default function VacationRequest() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
-  const { permissions: userPermissions = [], loading: permissionsLoading } = usePermissions();
+  const { permissions: userPermissions = [], loading: permissionsLoading, getAccessibleSites } = usePermissions();
   const [formData, setFormData] = useState({
     request_type: "Vacaciones",
     is_full_day: true,
@@ -241,7 +242,11 @@ export default function VacationRequest() {
 
   const selectedDays = calculateDaysIfSelected();
 
+  const accessibleSites = getAccessibleSites ? getAccessibleSites() : null;
+  const isSiteRestricted = accessibleSites !== null && accessibleSites !== undefined;
+
   const filteredEmployees = allEmployees.filter(emp => {
+    if (isSiteRestricted && Array.isArray(accessibleSites) && !accessibleSites.includes(emp.site)) return false;
     const searchLower = employeeSearchTerm.toLowerCase();
     return emp.first_name.toLowerCase().includes(searchLower) ||
            emp.last_name.toLowerCase().includes(searchLower) ||

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePermissions } from "@/components/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import { toast } from "sonner";
 export default function Certificates() {
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
+  const { getAccessibleSites, loading: permissionsLoading } = usePermissions();
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestType, setRequestType] = useState("Certificado de Trabajo");
   const [requestDescription, setRequestDescription] = useState("");
@@ -55,6 +57,12 @@ export default function Certificates() {
     },
     enabled: employee?.role === "admin",
   });
+
+  const accessibleSites = getAccessibleSites ? getAccessibleSites() : null;
+  const isSiteRestricted = accessibleSites !== null && accessibleSites !== undefined;
+  const siteFilteredEmployees = isSiteRestricted && Array.isArray(accessibleSites)
+    ? allEmployees.filter(emp => accessibleSites.includes(emp.site))
+    : allEmployees;
 
   const targetEmployeeId = employee?.role === "admin" ? selectedEmployeeId : employee?.id;
 
@@ -297,7 +305,7 @@ export default function Certificates() {
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </div>
-                            {allEmployees
+                            {siteFilteredEmployees
                               .filter(emp => {
                                 const searchLower = employeeSearchTerm.toLowerCase();
                                 return emp.first_name.toLowerCase().includes(searchLower) ||
