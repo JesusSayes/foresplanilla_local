@@ -101,11 +101,10 @@ export default function JustifyModal({
   const [extraDates, setExtraDates]         = useState([]);
 
   const INCIDENT_TYPES = [
-    "Comisión de Servicio","Capacitación","Descanso Médico","Omisión de Marcación",
+    "Descanso Médico",
     "Cita Médica","Confirmación de Asistencia (Limitación de Sistema)",
     "Licencia por Maternidad","Licencia por Paternidad","Otro","Onomástico",
-    "Descanso Vacacional","Licencia sin Goce de Haber","Feriado",
-    "Justificación de Tardanza","Tardanza","Falta","Salida Temprana",
+    "Licencia sin Goce de Haber","Feriado",
   ];
 
   const filteredIncidentTypes = INCIDENT_TYPES.filter(t =>

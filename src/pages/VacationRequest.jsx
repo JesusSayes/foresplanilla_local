@@ -457,15 +457,6 @@ export default function VacationRequest() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Vacaciones">Vacaciones</SelectItem>
-                          <SelectItem value="Descanso Médico">Descanso Médico</SelectItem>
-                          <SelectItem value="Descanso Vacacional">Descanso Vacacional</SelectItem>
-                          <SelectItem value="Cita Médica">Cita Médica</SelectItem>
-                          <SelectItem value="Onomástico">Onomástico</SelectItem>
-                          <SelectItem value="Licencia sin Goce de Haber">Licencia sin Goce de Haber</SelectItem>
-                          <SelectItem value="Permiso con goce">Permiso con goce</SelectItem>
-                          <SelectItem value="Permiso sin goce">Permiso sin goce</SelectItem>
-                          <SelectItem value="Licencia médica">Licencia médica</SelectItem>
-                          <SelectItem value="Otro">Otro</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
