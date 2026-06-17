@@ -1,28 +1,9 @@
 import { query } from '../config/database.js';
 import { buildFilterQuery, buildSortQuery } from '../utils/queryBuilder.js';
 import { canAccessEmployee, hasPermission, resolveAccessibleEmployeeIds } from '../middleware/authorization.js';
+import { ACCESSIBLE_EMPLOYEE_PERMISSION_KEYS } from '../config/permissions.js';
 
-const ALLOWED_ACCESS_PERMISSIONS = new Set([
-  'attendance.view_all',
-  'attendance.view_department',
-  'attendance.view_own',
-  'attendance.edit',
-  'attendance.approve_incidents',
-  'attendance.approve_edits',
-  'attendance.manage',
-  'roles.assign',
-  'roles.manage',
-  'certificates.view_all',
-  'certificates.create',
-  'certificates.approve',
-  'schedules.view',
-  'schedules.create',
-  'schedules.edit',
-  'schedules.assign',
-  'schedules.delete',
-  'schedules.manage',
-  'attendance.manage_schedules',
-]);
+const ALLOWED_ACCESS_PERMISSIONS = new Set(ACCESSIBLE_EMPLOYEE_PERMISSION_KEYS);
 
 export const listAccessibleEmployees = async (req, res) => {
   try {
