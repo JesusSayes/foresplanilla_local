@@ -688,7 +688,10 @@ export default function ContractManagement() {
                         <div className="p-2 border-b sticky top-0 bg-white z-10">
                           <Input placeholder="Buscar empleado..." value={employeeSearchTerm} onChange={(e) => setEmployeeSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
                         </div>
-                        {allEmployees.filter(e => e.first_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || e.last_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || e.employee_code.toLowerCase().includes(employeeSearchTerm.toLowerCase())).map(e => (
+                        {allEmployees
+                          .filter(e => !isSiteRestricted || (Array.isArray(accessibleSites) && accessibleSites.includes(e.site)))
+                          .filter(e => e.first_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || e.last_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || e.employee_code.toLowerCase().includes(employeeSearchTerm.toLowerCase()))
+                          .map(e => (
                           <SelectItem key={e.id} value={e.id}>{e.employee_code} - {e.first_name} {e.last_name}</SelectItem>
                         ))}
                       </SelectContent>
