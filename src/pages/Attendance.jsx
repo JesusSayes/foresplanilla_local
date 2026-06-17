@@ -12,16 +12,17 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Clock, Calendar as CalendarIcon, AlertCircle, CheckCircle,
-  XCircle, TrendingUp, FileText, Upload, Filter, ChevronDown, History
+  XCircle, TrendingUp, FileText, Upload, Filter, History
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
-import { parseDateLima, dateToStringLima, todayLima } from "@/lib/dateUtils";
+import { parseDateLima, todayLima } from "@/lib/dateUtils";
 import ClockInOutWidget from "../components/attendance/ClockInOutWidget";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 import { uploadFile } from "@/services/uploadService";
+import { ATTENDANCE_INCIDENT_TYPES } from "@/constants/attendanceIncidentTypes";
 
 export default function Attendance() {
   const { user: currentUser } = useAuth();
@@ -31,7 +32,7 @@ export default function Attendance() {
   const [showJustifyForm, setShowJustifyForm] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [justificationForm, setJustificationForm] = useState({
-    incident_type: "Tardanza",
+    incident_type: ATTENDANCE_INCIDENT_TYPES[0],
     justification: "",
     supporting_document_url: null,
   });
@@ -183,7 +184,7 @@ export default function Attendance() {
 
   const resetForm = () => {
     setJustificationForm({
-      incident_type: "Tardanza",
+      incident_type: ATTENDANCE_INCIDENT_TYPES[0],
       justification: "",
       supporting_document_url: null,
     });
@@ -711,10 +712,9 @@ export default function Attendance() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Tardanza">Tardanza</SelectItem>
-                        <SelectItem value="Falta">Falta</SelectItem>
-                        <SelectItem value="Salida Temprana">Salida Temprana</SelectItem>
-                        <SelectItem value="Olvido de Marcación">Olvido de Marcación</SelectItem>
+                        {ATTENDANCE_INCIDENT_TYPES.map(type => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

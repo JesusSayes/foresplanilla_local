@@ -103,8 +103,6 @@ export default function ScheduleManagement() {
         "schedules.edit",
         "schedules.assign",
         "schedules.delete",
-        "schedules.manage",
-        "attendance.manage_schedules",
       ]);
       return employees.filter(employee => employee.status === "Activo");
     },
@@ -464,7 +462,7 @@ export default function ScheduleManagement() {
   }
 
   const hasAccess = hasAnyPermission([
-    "schedules.view", "schedules.manage", "schedules.create", "schedules.manage", "system.admin"
+    "schedules.view", "schedules.create", "schedules.edit", "schedules.assign", "schedules.delete", "system.admin"
   ]);
 
   if (!hasAccess) {
@@ -567,7 +565,7 @@ export default function ScheduleManagement() {
                 </TabsTrigger>
               </TabsList>
 
-              {hasAnyPermission(["schedules.create", "schedules.manage", "system.admin"]) && (
+              {hasAnyPermission(["schedules.create", "schedules.assign", "system.admin"]) && (
                 <div className="flex gap-2">
                   <Button
                     onClick={handleCreateTemplate}
@@ -669,7 +667,7 @@ export default function ScheduleManagement() {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            {hasAnyPermission(["schedules.edit", "schedules.manage", "system.admin"]) && (
+                            {hasAnyPermission(["schedules.edit", "schedules.assign", "system.admin"]) && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -678,7 +676,7 @@ export default function ScheduleManagement() {
                                 <Edit className="w-4 h-4" />
                               </Button>
                             )}
-                            {hasAnyPermission(["schedules.delete", "schedules.manage", "system.admin"]) && (
+                            {hasAnyPermission(["schedules.delete", "system.admin"]) && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -741,7 +739,7 @@ export default function ScheduleManagement() {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            {hasAnyPermission(["schedules.edit", "schedules.manage", "system.admin"]) && (
+                            {hasAnyPermission(["schedules.edit", "schedules.assign", "system.admin"]) && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -801,7 +799,7 @@ export default function ScheduleManagement() {
                               </div>
                               </div>
                               <div className="flex gap-2">
-                              {hasAnyPermission(["schedules.edit", "schedules.manage", "system.admin"]) && (
+                              {hasAnyPermission(["schedules.edit", "schedules.assign", "system.admin"]) && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -810,7 +808,7 @@ export default function ScheduleManagement() {
                                   <Edit className="w-4 h-4" />
                                 </Button>
                               )}
-                              {hasAnyPermission(["schedules.delete", "schedules.manage", "system.admin"]) && (
+                              {hasAnyPermission(["schedules.delete", "system.admin"]) && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -866,7 +864,7 @@ export default function ScheduleManagement() {
                               <Badge className="bg-amber-100 text-amber-700 border-amber-300">
                               Sin Horario
                               </Badge>
-                              {hasAnyPermission(["schedules.create", "schedules.manage", "system.admin"]) && (
+                              {hasAnyPermission(["schedules.create", "schedules.assign", "system.admin"]) && (
                               <Button
                                 size="sm"
                                 onClick={() => {

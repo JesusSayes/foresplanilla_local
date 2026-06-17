@@ -80,7 +80,7 @@ export default function AttendanceManagement() {
   const canEditAttendance = hasPermission("attendance.edit") || hasPermission("system.admin");
   const canApproveIncidents = hasPermission("attendance.approve_incidents") || hasPermission("system.admin");
   const canApproveEdits = hasPermission("attendance.approve_edits") || hasPermission("system.admin");
-  const canManageSchedules = hasPermission("attendance.manage_schedules") || hasPermission("system.admin");
+  const canManageSchedules = hasPermission("schedules.edit") || hasPermission("schedules.assign") || hasPermission("system.admin");
   const canExportAttendance = hasPermission("attendance.export") || hasPermission("system.admin");
   const queryClient = useQueryClient();
 

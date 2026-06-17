@@ -21,7 +21,6 @@ export const AVAILABLE_PERMISSIONS = {
   "attendance.edit": "Editar registros de asistencia",
   "attendance.approve_edits": "Aprobar/rechazar edición de registros de asistencia",
   "attendance.approve_incidents": "Aprobar/rechazar incidencias",
-  "attendance.manage_schedules": "Gestionar horarios de trabajo",
   "attendance.view_reports": "Ver reportes de asistencia",
   "attendance.export": "Exportar datos de asistencia",
 
