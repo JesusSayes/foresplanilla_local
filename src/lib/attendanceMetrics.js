@@ -2,6 +2,8 @@
  * Utilitarios de cálculo de métricas de asistencia.
  * Estos métodos NO modifican el AttendanceRecord; solo calculan
  * la cobertura real de la jornada combinando asistencia + justificaciones aprobadas.
+ *
+ * Soporta turnos nocturnos (horarios que cruzan la medianoche, ej: 18:00 a 06:00).
  */
 
 export const toMin = (t) => {
@@ -14,26 +16,22 @@ export const fromMin = (m) =>
   `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
 /**
+ * Calcula duración en minutos entre dos horas HH:mm,
+ * manejando cruce de medianoche (si fin < inicio, suma 24h).
+ */
+export const calcDuration = (startMin, endMin) => {
+  let d = endMin - startMin;
+  if (d < 0) d += 1440;
+  return d;
+};
+
+/**
  * Calcula la cobertura real de la jornada combinando los intervalos de
  * asistencia real y las justificaciones aprobadas, sin duplicar horas superpuestas.
  *
- * Algoritmo:
- *  1. Construir lista de intervalos cubiertos: [clock_in, clock_out] + cada [just_start, just_end]
- *  2. Intersectarlos con [schedStart, schedEnd] (no contar fuera de jornada)
- *  3. Fusionar intervalos solapados (union de segmentos)
- *  4. Restar el break si cae dentro de la cobertura
- *  5. Calcular tardanza efectiva: max(0, min(clock_in_real, primer_inicio_justificado) - schedStart)
- *
- * @param {object} params
- * @param {object|null}   params.record            - AttendanceRecord del día
- * @param {object[]}      params.approvedIncidents  - Incidentes aprobados del día
- * @param {string}        params.schedStart         - "HH:mm" inicio jornada
- * @param {string}        params.schedEnd           - "HH:mm" fin jornada
- * @param {number}        params.breakMinutes        - Minutos de refrigerio
- * @param {string|null}   params.breakStart          - "HH:mm" inicio refrigerio (opcional)
- * @returns {{ rawWorkedHours, justifiedHours, totalWorkedHours, fullDayHours,
- *             baseLateMinutes, remainingLateMinutes, lateMinutesJustified,
- *             coverageMinutes, intervals }}
+ * Soporta turnos nocturnos: cuando schedEnd < schedStart (ej: 18:00–06:00),
+ * normaliza todos los tiempos relativos al inicio del turno para trabajar
+ * en un espacio lineal [0, fullJornada].
  */
 export function calcEffectiveMetrics({
   record,
@@ -45,51 +43,70 @@ export function calcEffectiveMetrics({
 }) {
   const schedStartMin = toMin(schedStart);
   const schedEndMin   = toMin(schedEnd);
-  const fullJornada   = Math.max(0, schedEndMin - schedStartMin);
+  const isNightShift  = schedEndMin < schedStartMin;
 
-  // Minutos de refrigerio que caen dentro de la jornada
+  const fullJornada = isNightShift
+    ? (schedEndMin - schedStartMin + 1440)
+    : Math.max(0, schedEndMin - schedStartMin);
+
+  // Normalize: for night shifts, maps times to shift-relative [0..1440) space
+  const norm = (t) => {
+    if (!isNightShift) return t;
+    return (t - schedStartMin + 1440) % 1440;
+  };
+
+  const normSchedStart = isNightShift ? 0 : schedStartMin;
+  const normSchedEnd   = isNightShift ? fullJornada : schedEndMin;
+
+  // Break handling
   let effectiveBreakMin = 0;
+  let normBreakStartVal = null;
   if (breakMinutes > 0) {
     if (breakStart) {
-      const bsMin = toMin(breakStart);
-      const beMin = bsMin + breakMinutes;
-      // Solo contar la parte del break que cae dentro de la jornada
-      effectiveBreakMin = Math.max(0, Math.min(beMin, schedEndMin) - Math.max(bsMin, schedStartMin));
+      const bsNorm = isNightShift ? norm(toMin(breakStart)) : toMin(breakStart);
+      if (bsNorm <= normSchedEnd) {
+        normBreakStartVal = bsNorm;
+        const beNorm = bsNorm + breakMinutes;
+        effectiveBreakMin = Math.max(0, Math.min(beNorm, normSchedEnd) - Math.max(bsNorm, normSchedStart));
+      }
     } else {
-      // Sin hora de inicio de break: asumir que está incluido en la jornada
       effectiveBreakMin = Math.min(breakMinutes, fullJornada);
     }
   }
   const fullDayMins = Math.max(0, fullJornada - effectiveBreakMin);
 
-  // ── Construir intervalos brutos ──────────────────────────────────────────
+  // ── Build intervals in normalized space ──────────────────────────────────
   const rawIntervals = [];
-
   const clockIn  = record?.clock_in  ? String(record.clock_in).slice(0, 5)  : null;
   const clockOut = record?.clock_out ? String(record.clock_out).slice(0, 5) : null;
 
   if (clockIn && clockOut) {
-    rawIntervals.push([toMin(clockIn), toMin(clockOut)]);
+    let nIn  = norm(toMin(clockIn));
+    let nOut = norm(toMin(clockOut));
+    // Pre-shift clock-in: treat as arriving at shift start
+    if (isNightShift && nIn > fullJornada) nIn = 0;
+    if (nOut >= nIn) rawIntervals.push([nIn, nOut]);
   } else if (clockIn) {
-    // Solo entrada: cuenta hasta el fin de jornada (jornada incompleta)
-    rawIntervals.push([toMin(clockIn), schedEndMin]);
+    let nIn = norm(toMin(clockIn));
+    if (isNightShift && nIn > fullJornada) nIn = 0;
+    rawIntervals.push([nIn, normSchedEnd]);
   }
 
   for (const inc of approvedIncidents) {
     if (inc.full_day_justification) {
-      rawIntervals.push([schedStartMin, schedEndMin]);
+      rawIntervals.push([normSchedStart, normSchedEnd]);
     } else {
-      const jStart = toMin(inc.justified_time_start || schedStart);
-      const jEnd   = toMin(inc.justified_time_end   || schedEnd);
+      let jStart = norm(toMin(inc.justified_time_start || schedStart));
+      let jEnd   = norm(toMin(inc.justified_time_end   || schedEnd));
+      if (isNightShift && jStart > fullJornada) jStart = 0;
       if (jEnd > jStart) rawIntervals.push([jStart, jEnd]);
     }
   }
 
-  // ── Intersectar con jornada y fusionar ──────────────────────────────────
+  // ── Clip to schedule and merge ──────────────────────────────────────────
   const clipped = rawIntervals
-    .map(([s, e]) => [Math.max(s, schedStartMin), Math.min(e, schedEndMin)])
+    .map(([s, e]) => [Math.max(s, normSchedStart), Math.min(e, normSchedEnd)])
     .filter(([s, e]) => e > s);
-
   clipped.sort((a, b) => a[0] - b[0]);
 
   const merged = [];
@@ -101,54 +118,57 @@ export function calcEffectiveMetrics({
     }
   }
 
-  // ── Calcular cobertura neta (restando break) ─────────────────────────────
+  // ── Coverage minus break ────────────────────────────────────────────────
   let coverageMins = 0;
   for (const [s, e] of merged) {
     let segMins = e - s;
-    // Si el break cae dentro de este segmento, descontarlo
-    if (breakStart && breakMinutes > 0) {
-      const bsMin = toMin(breakStart);
-      const beMin = bsMin + breakMinutes;
-      const overlapStart = Math.max(s, bsMin);
-      const overlapEnd   = Math.min(e, beMin);
+    if (normBreakStartVal !== null && breakMinutes > 0) {
+      const overlapStart = Math.max(s, normBreakStartVal);
+      const overlapEnd   = Math.min(e, normBreakStartVal + breakMinutes);
       if (overlapEnd > overlapStart) segMins -= (overlapEnd - overlapStart);
     }
     coverageMins += Math.max(0, segMins);
   }
 
-  // Si no hay hora de inicio de break, el break se descuenta solo si la cobertura supera la media jornada
-  // (simplificación estándar: el break se descuenta si el empleado trabajó más de la mitad de la jornada)
-  if (!breakStart && breakMinutes > 0 && coverageMins > fullJornada / 2) {
+  if (normBreakStartVal === null && breakMinutes > 0 && coverageMins > fullJornada / 2) {
     coverageMins = Math.max(0, coverageMins - effectiveBreakMin);
   }
 
   const totalWorkedMins  = Math.min(coverageMins, fullDayMins);
   const totalWorkedHours = totalWorkedMins / 60;
 
-  // ── Horas marcadas reales (sin justificaciones) ──────────────────────────
+  // ── Raw worked hours (clock-based only) ─────────────────────────────────
   let rawWorkedMin = 0;
   if (clockIn && clockOut) {
-    const rawTotal = toMin(clockOut) - toMin(clockIn);
+    let nIn  = norm(toMin(clockIn));
+    let nOut = norm(toMin(clockOut));
+    if (isNightShift && nIn > fullJornada) nIn = 0;
+    const rawTotal = nOut >= nIn ? nOut - nIn : 0;
     rawWorkedMin = Math.max(0, rawTotal - effectiveBreakMin);
-    // Limitar a la jornada
     rawWorkedMin = Math.min(rawWorkedMin, fullDayMins);
   }
 
-  // ── Horas justificadas (cobertura adicional aportada por justificaciones) ─
   const justifiedHours = Math.max(0, totalWorkedHours - rawWorkedMin / 60);
 
-  // ── Tardanza ─────────────────────────────────────────────────────────────
-  // Tardanza base: cuánto tarde llegó el empleado según su marcación real
-  const baseLateMin = clockIn ? Math.max(0, toMin(clockIn) - schedStartMin) : 0;
+  // ── Lateness ────────────────────────────────────────────────────────────
+  let baseLateMin = 0;
+  if (clockIn) {
+    const nIn = norm(toMin(clockIn));
+    // Only late if within the shift window (pre-shift arrivals = not late)
+    baseLateMin = (nIn <= fullJornada) ? Math.max(0, nIn - normSchedStart) : 0;
+  }
 
-  // Inicio efectivo: el más temprano entre clock_in y cualquier justificación que empiece antes
-  let effectiveStartMin = clockIn ? toMin(clockIn) : null;
+  let effectiveStartMin = clockIn ? norm(toMin(clockIn)) : null;
+  if (effectiveStartMin !== null && isNightShift && effectiveStartMin > fullJornada) {
+    effectiveStartMin = 0;
+  }
   for (const inc of approvedIncidents) {
     if (inc.full_day_justification) {
-      effectiveStartMin = schedStartMin;
+      effectiveStartMin = normSchedStart;
       break;
     }
-    const jStart = toMin(inc.justified_time_start || schedStart);
+    let jStart = norm(toMin(inc.justified_time_start || schedStart));
+    if (isNightShift && jStart > fullJornada) jStart = 0;
     if (effectiveStartMin === null || jStart < effectiveStartMin) {
       effectiveStartMin = jStart;
     }
@@ -156,7 +176,7 @@ export function calcEffectiveMetrics({
 
   const remainingLateMinutes =
     effectiveStartMin !== null
-      ? Math.max(0, effectiveStartMin - schedStartMin)
+      ? Math.max(0, effectiveStartMin - normSchedStart)
       : baseLateMin;
 
   return {

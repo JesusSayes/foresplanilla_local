@@ -621,6 +621,11 @@ export default function ScheduleManagement() {
                               {!template.is_active && (
                                 <Badge className="bg-red-100 text-red-700">Inactiva</Badge>
                               )}
+                              {["monday","tuesday","wednesday","thursday","friday","saturday","sunday"].some(d =>
+                                template[`${d}_start`] && template[`${d}_end`] && template[`${d}_start`] > template[`${d}_end`]
+                              ) && (
+                                <Badge className="bg-purple-100 text-purple-700">🌙 Nocturno</Badge>
+                              )}
                             </div>
                             <div className="space-y-1 text-sm">
                               <p className="text-slate-600">
@@ -997,6 +1002,17 @@ export default function ScheduleManagement() {
                       </div>
                     );
                   })}
+
+                  {["monday","tuesday","wednesday","thursday","friday","saturday","sunday"].some(d =>
+                    templateFormData[`${d}_start`] && templateFormData[`${d}_end`] &&
+                    templateFormData[`${d}_start`] > templateFormData[`${d}_end`]
+                  ) && (
+                    <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                      <p className="text-sm text-purple-800">
+                        <strong>🌙 Turno nocturno detectado:</strong> La hora de salida es menor que la de entrada, indicando un turno que cruza la medianoche. El sistema calculará las horas trabajadas correctamente.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
