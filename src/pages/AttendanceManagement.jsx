@@ -345,6 +345,7 @@ export default function AttendanceManagement() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Calcular preview de métricas en tiempo real para el modal de edición
+  // Soporta turnos nocturnos (schedEnd < schedStart)
   const calcEditPreview = (clockIn, clockOut, recordDate, employeeId) => {
     if (!clockIn) return null;
     const schedule = getEmployeeScheduleForDate(employeeId, recordDate);
@@ -357,23 +358,31 @@ export default function AttendanceManagement() {
     const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
     const overtimeAuthorized = schedule?.overtime_authorized ?? false;
 
-    const [inH, inM]   = clockIn.split(":").map(Number);
-    const inTotal      = inH * 60 + inM;
-    const [schedH, schedM] = scheduledStart.split(":").map(Number);
-    const schedTotal   = schedH * 60 + schedM;
-    const [endH, endM] = scheduledEnd.split(":").map(Number);
-    const schedEndTotal = endH * 60 + endM;
+    const toM = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+    const inTotal       = toM(clockIn);
+    const schedTotal    = toM(scheduledStart);
+    const schedEndTotal = toM(scheduledEnd);
 
-    const rawLate = inTotal - schedTotal;
+    const isNightShift = schedEndTotal < schedTotal;
+    const fullJornada = isNightShift ? (schedEndTotal - schedTotal + 1440) : Math.max(0, schedEndTotal - schedTotal);
+    const norm = (t) => isNightShift ? (t - schedTotal + 1440) % 1440 : t;
+    const normSchedStart = isNightShift ? 0 : schedTotal;
+    const normSchedEnd   = isNightShift ? fullJornada : schedEndTotal;
+
+    const normIn = norm(inTotal);
+    const rawLate = (normIn <= fullJornada) ? Math.max(0, normIn - normSchedStart) : 0;
     const lateMinutes = rawLate > toleranceMinutes ? rawLate : 0;
 
     let workedHours = 0, regularHours = 0, overtimeHours25 = 0, overtimeHours35 = 0;
     if (clockOut) {
-      const [outH, outM] = clockOut.split(":").map(Number);
-      const outTotal = outH * 60 + outM;
-      const totalMinutes = outTotal - inTotal - breakMinutes;
+      const outTotal = toM(clockOut);
+      const normOut = norm(outTotal);
+      const effectiveNormIn = (isNightShift && normIn > fullJornada) ? 0 : normIn;
+
+      const totalMinutes = (normOut >= effectiveNormIn ? normOut - effectiveNormIn : 0) - breakMinutes;
       workedHours = Math.max(0, totalMinutes / 60);
-      const regularMinutes = Math.max(0, schedEndTotal - Math.max(inTotal, schedTotal) - breakMinutes);
+      const effectiveStart = Math.max(effectiveNormIn, normSchedStart);
+      const regularMinutes = Math.max(0, normSchedEnd - effectiveStart - breakMinutes);
       const normalHoursMax = regularMinutes / 60;
       if (workedHours <= normalHoursMax) {
         regularHours = workedHours;

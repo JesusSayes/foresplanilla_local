@@ -28,6 +28,7 @@ function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
 
 // Calcular métricas completas: tardanza, horas regulares, HE 25% y HE 35%
 // Regla Peruana: primeras 2h extra → 25%, a partir de la 3ra → 35%
+// Soporta turnos nocturnos (schedEnd < schedStart, ej: 18:00 a 06:00)
 function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
   const clockIn = record.clock_in;
   const clockOut = record.clock_out;
@@ -45,6 +46,8 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
     };
   }
 
+  const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+
   const dow = new Date(dateStr + "T00:00:00").getDay();
   const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
   const dayEndMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
@@ -54,47 +57,56 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
   const breakMinutes    = schedule?.break_duration_minutes ?? 60;
   const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
 
-  const [inH, inM]     = clockIn.split(":").map(Number);
-  const inTotal        = inH * 60 + inM;
-  const [schedH, schedM] = scheduledStart.split(":").map(Number);
-  const schedTotal     = schedH * 60 + schedM;
-  const [endH, endM]   = scheduledEnd.split(":").map(Number);
-  const schedEndTotal  = endH * 60 + endM;
+  const inTotal       = toMin(clockIn);
+  const schedTotal    = toMin(scheduledStart);
+  const schedEndTotal = toMin(scheduledEnd);
 
-  // Tardanza: se calcula con solo clock_in
-  const rawLate    = inTotal - schedTotal;
+  const isNightShift = schedEndTotal < schedTotal;
+
+  // For night shifts, normalize all times relative to shift start
+  // This transforms the shift into [0, fullJornada] linear space
+  const fullJornada = isNightShift
+    ? (schedEndTotal - schedTotal + 1440)
+    : Math.max(0, schedEndTotal - schedTotal);
+
+  const norm = (t) => isNightShift ? (t - schedTotal + 1440) % 1440 : t;
+
+  const normSchedStart = isNightShift ? 0 : schedTotal;
+  const normSchedEnd   = isNightShift ? fullJornada : schedEndTotal;
+
+  // Lateness
+  const normIn = norm(inTotal);
+  // Only late if arrived within the shift window (not before it)
+  const rawLate = (normIn <= fullJornada) ? Math.max(0, normIn - normSchedStart) : 0;
   const lateMinutes = rawLate > toleranceMinutes ? rawLate : 0;
-  const isLate     = lateMinutes > 0;
+  const isLate = lateMinutes > 0;
 
   let workedHours = 0;
   let regularHours = 0;
   let overtimeHours25 = 0;
   let overtimeHours35 = 0;
 
-  // Horas trabajadas y extras: solo cuando hay clock_out
   if (clockOut) {
-    const [outH, outM] = clockOut.split(":").map(Number);
-    const outTotal     = outH * 60 + outM;
-    const totalMinutes = outTotal - inTotal - breakMinutes;
+    const outTotal = toMin(clockOut);
+    const normOut = norm(outTotal);
+    const effectiveNormIn = (isNightShift && normIn > fullJornada) ? 0 : normIn;
+
+    const totalMinutes = (normOut >= effectiveNormIn ? normOut - effectiveNormIn : 0) - breakMinutes;
     workedHours = Math.max(0, totalMinutes / 60);
 
-    // Minutos efectivos desde la hora de entrada hasta fin de jornada programada
-    const regularMinutes = Math.max(0, schedEndTotal - Math.max(inTotal, schedTotal) - breakMinutes);
+    const effectiveStart = Math.max(effectiveNormIn, normSchedStart);
+    const regularMinutes = Math.max(0, normSchedEnd - effectiveStart - breakMinutes);
     const normalHoursMax = regularMinutes / 60;
 
     if (workedHours <= normalHoursMax) {
-      // Sin horas extras
       regularHours = workedHours;
     } else {
       regularHours = normalHoursMax;
       const extraHours = workedHours - normalHoursMax;
-
       if (overtimeAuthorized) {
-        // Primeras 2h → 25%, resto → 35%
         overtimeHours25 = Math.min(extraHours, 2);
         overtimeHours35 = Math.max(0, extraHours - 2);
       }
-      // Si no están autorizadas, las extras quedan en 0 (no se cuentan para pago)
     }
   }
 
