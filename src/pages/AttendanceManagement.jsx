@@ -287,7 +287,15 @@ export default function AttendanceManagement() {
       toast.warning("Ya existe una solicitud de edición pendiente para este registro. Espera a que sea revisada.");
       return;
     }
-    setEditRequestRecord(record);
+    const schedule = getEmployeeScheduleForDate(record.employee_id, record.date);
+    const dow = new Date(`${record.date}T00:00:00`).getDay();
+    const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+    const dayEndMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+    setEditRequestRecord({
+      ...record,
+      scheduled_start: record.scheduled_start || schedule?.[dayStartMap[dow]] || "",
+      scheduled_end:   record.scheduled_end   || schedule?.[dayEndMap[dow]]   || "",
+    });
     setEditRequestEmployee(emp);
     setShowEditRequestModal(true);
   };
