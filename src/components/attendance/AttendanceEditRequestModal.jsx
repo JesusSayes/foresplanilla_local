@@ -48,6 +48,11 @@ export default function AttendanceEditRequestModal({
     notes: record?.notes || "",
   };
 
+  // Detectar si el horario programado para este día es nocturno (salida < entrada)
+  const scheduledStart = record?.scheduled_start || "";
+  const scheduledEnd   = record?.scheduled_end   || "";
+  const isNightShift   = scheduledStart && scheduledEnd && scheduledEnd < scheduledStart;
+
   // Detectar qué campos cambiaron
   const changedFields = Object.keys(FIELD_LABELS).filter(
     (k) => formValues[k] !== originalValues[k]
@@ -69,9 +74,21 @@ export default function AttendanceEditRequestModal({
       setErrorMsg("Formato de hora inválido. Usa el formato HH:mm.");
       return;
     }
-    if (formValues.clock_in && formValues.clock_out && formValues.clock_in >= formValues.clock_out) {
-      setErrorMsg("La hora de salida debe ser posterior a la de entrada.");
-      return;
+    if (formValues.clock_in && formValues.clock_out) {
+      if (isNightShift) {
+        // Turno nocturno: se permite que salida < entrada (cruza medianoche)
+        // Solo rechazar si son iguales
+        if (formValues.clock_in === formValues.clock_out) {
+          setErrorMsg("La hora de salida no puede ser igual a la de entrada.");
+          return;
+        }
+      } else {
+        // Turno diurno: salida debe ser posterior a entrada
+        if (formValues.clock_in >= formValues.clock_out) {
+          setErrorMsg("La hora de salida debe ser posterior a la de entrada.");
+          return;
+        }
+      }
     }
 
     setSubmitting(true);
@@ -126,6 +143,13 @@ export default function AttendanceEditRequestModal({
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
+          {/* Indicador de turno nocturno */}
+          {isNightShift && (
+            <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 rounded-lg p-3">
+              <span className="text-purple-800 text-sm">🌙 <strong>Turno nocturno detectado</strong> ({scheduledStart}–{scheduledEnd}): La hora de salida puede ser menor que la de entrada ya que el turno cruza la medianoche.</span>
+            </div>
+          )}
+
           {/* Banner de error visible dentro del modal */}
           {errorMsg && (
             <div className="flex items-start gap-3 bg-red-50 border border-red-300 rounded-lg p-4">
