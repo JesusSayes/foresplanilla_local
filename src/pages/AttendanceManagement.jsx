@@ -339,13 +339,12 @@ export default function AttendanceManagement() {
     }
     const schedule = getEmployeeScheduleForDate(record.employee_id, record.date);
     const dow = new Date(`${record.date}T00:00:00`).getDay();
-    const dayStartMap = ["sunday_start", "monday_start", "tuesday_start", "wednesday_start", "thursday_start", "friday_start", "saturday_start"];
-    const dayEndMap = ["sunday_end", "monday_end", "tuesday_end", "wednesday_end", "thursday_end", "friday_end", "saturday_end"];
-
+    const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+    const dayEndMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
     setEditRequestRecord({
       ...record,
       scheduled_start: record.scheduled_start || schedule?.[dayStartMap[dow]] || "",
-      scheduled_end: record.scheduled_end || schedule?.[dayEndMap[dow]] || "",
+      scheduled_end:   record.scheduled_end   || schedule?.[dayEndMap[dow]]   || "",
     });
     setEditRequestEmployee(employeeOverride || allEmployees.find(item => item.id === record.employee_id));
     setShowEditRequestModal(true);
@@ -881,7 +880,10 @@ export default function AttendanceManagement() {
           breakStart: breakStEx,
         });
         excelHours = excelMetrics.totalWorkedHours;
-        excelLate  = excelMetrics.remainingLateMinutes;
+        excelLate  = applyLateTolerance(
+          excelMetrics.remainingLateMinutes,
+          schedForRowEx?.tolerance_minutes ?? 10
+        );
       }
 
       // Calcular horas justificadas (solo de incidentes aprobados)
@@ -990,8 +992,12 @@ export default function AttendanceManagement() {
       }),
       schedStart,
       schedEnd,
+      toleranceMinutes: schedForRow?.tolerance_minutes ?? 10,
     };
   };
+
+  const applyLateTolerance = (remainingLateMinutes, toleranceMinutes = 10) =>
+    remainingLateMinutes > toleranceMinutes ? remainingLateMinutes : 0;
 
   // Obtener horario programado de entrada/salida para mostrar en vacaciones
   const getScheduledTimes = (empId, rowDate) => {
@@ -1491,7 +1497,10 @@ export default function AttendanceManagement() {
                                 {(() => {
                                   if (vacation) return <span className="text-xs font-bold text-slate-400">0m</span>;
                                   const metrics = getRowMetrics(emp, rowDate);
-                                  const adjustedLate = metrics.remainingLateMinutes;
+                                  const adjustedLate = applyLateTolerance(
+                                    metrics.remainingLateMinutes,
+                                    metrics.toleranceMinutes
+                                  );
                                   const lh = Math.floor(adjustedLate / 60);
                                   const lm = adjustedLate % 60;
                                   const lateStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;

@@ -125,6 +125,10 @@ export async function syncExternalAttendance(options = {}) {
     }
 
     const recordsForSync = Array.from(uniqueRecordsMap.values());
+    const activeSchedules = await prisma.work_schedule.findMany({
+      where: { is_active: true },
+      orderBy: { effective_from: 'desc' },
+    });
 
     log(`Procesando ${recordsForSync.length} registros...`);
     log('');
@@ -166,6 +170,14 @@ export async function syncExternalAttendance(options = {}) {
         }
 
         const recordDate = new Date(record.fecha);
+        const dateStr = record.fecha instanceof Date ? record.fecha.toISOString().slice(0, 10) : String(record.fecha).slice(0, 10);
+        const workSchedule = getScheduleForDate(
+          employee.id,
+          employee.department_name,
+          activeSchedules,
+          dateStr
+        );
+
         if (!isEmploymentDateValid(employee, recordDate)) {
           totalSkipped++;
           log(`[OMITIDO] ID ${record.id} - ${record.numero_documento}: Fecha fuera del período laboral`);
@@ -190,20 +202,6 @@ export async function syncExternalAttendance(options = {}) {
           const missingClockOut = (!existingClockOut || (typeof existingClockOut === 'string' && existingClockOut.trim() === '')) && newClockOut && (typeof newClockOut === 'string' && newClockOut.trim() !== '');
 
           if (missingClockIn || missingClockOut) {
-            const workSchedule = await prisma.work_schedule.findFirst({
-              where: {
-                employee_id: employee.id,
-                is_active: true,
-                OR: [
-                  { effective_from: null },
-                  { effective_from: { lte: recordDate } }
-                ]
-              },
-              orderBy: {
-                effective_from: 'desc'
-              }
-            });
-
             const updatedClockIn = existingClockIn || newClockIn;
             const updatedClockOut = existingClockOut || newClockOut;
 
@@ -215,8 +213,6 @@ export async function syncExternalAttendance(options = {}) {
             else if (updatedClockIn && !updatedClockOut) {
               status = "Incompleto";
             }
-
-            const dateStr = record.fecha instanceof Date ? record.fecha.toISOString().slice(0, 10) : String(record.fecha).slice(0, 10);
 
             const metrics = calcularMetricas(
               {
@@ -295,20 +291,6 @@ export async function syncExternalAttendance(options = {}) {
           }
         }
 
-        const workSchedule = await prisma.work_schedule.findFirst({
-          where: {
-            employee_id: employee.id,
-            is_active: true,
-            OR: [
-              { effective_from: null },
-              { effective_from: { lte: recordDate } }
-            ]
-          },
-          orderBy: {
-            effective_from: 'desc'
-          }
-        });
-
         const clockIn = normalizeExternalTime(record.hora_entrada);
         const clockOut = normalizeExternalTime(record.hora_salida);
         const effectiveClockIn = existingRecord?.clock_in || clockIn;
@@ -323,7 +305,6 @@ export async function syncExternalAttendance(options = {}) {
           status = "Incompleto";
         }
 
-        const dateStr = record.fecha instanceof Date ? record.fecha.toISOString().slice(0, 10) : String(record.fecha).slice(0, 10);
         const metrics = calcularMetricas(
           {
             clock_in: effectiveClockIn,
