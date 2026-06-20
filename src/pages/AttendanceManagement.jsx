@@ -828,7 +828,10 @@ export default function AttendanceManagement() {
           breakStart: breakStEx,
         });
         excelHours = excelMetrics.totalWorkedHours;
-        excelLate  = excelMetrics.remainingLateMinutes;
+        excelLate  = applyLateTolerance(
+          excelMetrics.remainingLateMinutes,
+          schedForRowEx?.tolerance_minutes ?? 10
+        );
       }
 
       // Calcular horas justificadas (solo de incidentes aprobados)
@@ -937,8 +940,12 @@ export default function AttendanceManagement() {
       }),
       schedStart,
       schedEnd,
+      toleranceMinutes: schedForRow?.tolerance_minutes ?? 10,
     };
   };
+
+  const applyLateTolerance = (remainingLateMinutes, toleranceMinutes = 10) =>
+    remainingLateMinutes > toleranceMinutes ? remainingLateMinutes : 0;
 
   // Obtener horario programado de entrada/salida para mostrar en vacaciones
   const getScheduledTimes = (empId) => {
@@ -1430,7 +1437,10 @@ export default function AttendanceManagement() {
                                 {(() => {
                                   if (vacation) return <span className="text-xs font-bold text-slate-400">0m</span>;
                                   const metrics = getRowMetrics(emp, rowDate);
-                                  const adjustedLate = metrics.remainingLateMinutes;
+                                  const adjustedLate = applyLateTolerance(
+                                    metrics.remainingLateMinutes,
+                                    metrics.toleranceMinutes
+                                  );
                                   const lh = Math.floor(adjustedLate / 60);
                                   const lm = adjustedLate % 60;
                                   const lateStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
