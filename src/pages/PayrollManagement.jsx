@@ -852,7 +852,102 @@ export default function PayrollManagement() {
           </p>
         </div>
 
-        {/* Stats Cards */}
+        {/* ── Barra de filtros / generación (ancho completo) ── */}
+        <Card className="border-0 shadow-lg mb-6">
+          <CardContent className="p-5">
+            <div className="flex flex-wrap items-end gap-4">
+              {/* Tipo de Planilla */}
+              <div className="flex-1 min-w-[160px]">
+                <Label className="text-xs font-semibold text-slate-600 mb-1 block">Tipo de Planilla</Label>
+                <Select value={payrollType} onValueChange={(v) => { setPayrollType(v); setShowPreview(false); setPreviewData([]); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Quincenal">Quincenal (Adelanto)</SelectItem>
+                    <SelectItem value="Mensual">Mensual (Final)</SelectItem>
+                    <SelectItem value="Adicional">Adicional (Extraordinaria)</SelectItem>
+                    <SelectItem value="SNP">SNP (Servicios No Personales)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {payrollType === "Quincenal" && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    {payrollConfig?.quincenal_percentage ?? 40}% del sueldo base · Hasta el día {payrollConfig?.quincenal_cutoff_day ?? 7}
+                  </p>
+                )}
+                {payrollType === "Mensual" && (
+                  <p className="text-xs text-blue-600 mt-1">Se descontará el adelanto quincenal si existe</p>
+                )}
+              </div>
+
+              {/* Mes */}
+              <div className="min-w-[130px]">
+                <Label className="text-xs font-semibold text-slate-600 mb-1 block">Mes</Label>
+                <Select value={String(selectedMonth)} onValueChange={(v) => { const m = parseInt(v); setSelectedMonth(m); setShowPreview(false); setPreviewData([]); queryClient.invalidateQueries({ queryKey: ["payslips", m, selectedYear] }); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <SelectItem key={i + 1} value={String(i + 1)}>
+                        {format(new Date(2024, i), 'MMMM', { locale: es })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Año */}
+              <div className="min-w-[100px]">
+                <Label className="text-xs font-semibold text-slate-600 mb-1 block">Año</Label>
+                <Select value={String(selectedYear)} onValueChange={(v) => { const y = parseInt(v); setSelectedYear(y); setShowPreview(false); setPreviewData([]); queryClient.invalidateQueries({ queryKey: ["payslips", selectedMonth, y] }); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[2023, 2024, 2025, 2026].map(year => (
+                      <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Departamento */}
+              <div className="min-w-[150px]">
+                <Label className="text-xs font-semibold text-slate-600 mb-1 block">Departamento</Label>
+                <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v); setShowPreview(false); setPreviewData([]); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {departments.map(dept => (
+                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Buscar Empleado */}
+              <div className="flex-1 min-w-[180px]">
+                <Label className="text-xs font-semibold text-slate-600 mb-1 block">Buscar Empleado</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <Input placeholder="Nombre o código..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+                </div>
+              </div>
+
+              {/* Acciones */}
+              <div className="flex gap-2 flex-wrap items-end">
+                {canCreate && (
+                  <Button onClick={() => handleOpenPeriodModal('preview')} className="bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap">
+                    <Eye className="w-4 h-4 mr-2" />Vista Previa
+                  </Button>
+                )}
+                <Button onClick={() => window.location.href = createPageUrl("PayrollConcepts")} variant="outline" className="whitespace-nowrap">
+                  <Edit2 className="w-4 h-4 mr-2" />Gestionar Conceptos
+                </Button>
+                <Button onClick={() => setShowPayrollConfig(true)} variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 whitespace-nowrap">
+                  <Settings className="w-4 h-4 mr-2" />Configurar Quincenal
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Stats Cards ── */}
         <div className="flex flex-wrap gap-4 mb-6">
           <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
             <FileText className="w-5 h-5 text-blue-600" />
@@ -884,131 +979,8 @@ export default function PayrollManagement() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left - Generator */}
-          <div className="lg:col-span-1">
-            <Card className="border-0 shadow-lg sticky top-8">
-              <CardHeader className="border-b">
-                <CardTitle className="text-xl font-bold">Generar Planilla</CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div>
-                  <Label>Tipo de Planilla</Label>
-                  <Select value={payrollType} onValueChange={(v) => { setPayrollType(v); setShowPreview(false); setPreviewData([]); }}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Quincenal">Quincenal (Adelanto)</SelectItem>
-                      <SelectItem value="Mensual">Mensual (Final)</SelectItem>
-                      <SelectItem value="Adicional">Adicional (Extraordinaria)</SelectItem>
-                      <SelectItem value="SNP">SNP (Servicios No Personales)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {payrollType === "Quincenal" && (
-                    <p className="text-xs text-amber-600 mt-1">
-                      Se pagará el {payrollConfig?.quincenal_percentage ?? 40}% del salario base · Solo trabajadores ingresados hasta el día {payrollConfig?.quincenal_cutoff_day ?? 7}
-                    </p>
-                  )}
-                  {payrollType === "Mensual" && (
-                    <p className="text-xs text-blue-600 mt-1">
-                      Se descontará el adelanto quincenal si existe
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <Label>Mes</Label>
-                  <Select value={String(selectedMonth)} onValueChange={(v) => { const m = parseInt(v); setSelectedMonth(m); setShowPreview(false); setPreviewData([]); queryClient.invalidateQueries({ queryKey: ["payslips", m, selectedYear] }); }}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => (
-                        <SelectItem key={i + 1} value={String(i + 1)}>
-                          {format(new Date(2024, i), 'MMMM', { locale: es })}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Año</Label>
-                  <Select value={String(selectedYear)} onValueChange={(v) => { const y = parseInt(v); setSelectedYear(y); setShowPreview(false); setPreviewData([]); queryClient.invalidateQueries({ queryKey: ["payslips", selectedMonth, y] }); }}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[2023, 2024, 2025, 2026].map(year => (
-                        <SelectItem key={year} value={String(year)}>{year}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Departamento</Label>
-                  <Select value={departmentFilter} onValueChange={(v) => { setDepartmentFilter(v); setShowPreview(false); setPreviewData([]); }}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      {departments.map(dept => (
-                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Buscar Empleado</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                    <Input
-                      placeholder="Nombre o código..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                </div>
-
-                {canCreate && (
-                  <Button
-                    onClick={() => handleOpenPeriodModal('preview')}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    Vista Previa
-                  </Button>
-                )}
-
-                <div className="pt-4 border-t space-y-2">
-                  <Button
-                    onClick={() => window.location.href = createPageUrl("PayrollConcepts")}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <Edit2 className="w-4 h-4 mr-2" />
-                    Gestionar Conceptos
-                  </Button>
-                  <Button
-                    onClick={() => setShowPayrollConfig(true)}
-                    variant="outline"
-                    className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-                  >
-                    <Settings className="w-4 h-4 mr-2" />
-                    Configurar Planilla Quincenal
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right - Preview or History */}
-          <div className="lg:col-span-2">
+        {/* ── Contenido principal a ancho completo ── */}
+        <div>
             {showPreview ? (
               <Card className="border-0 shadow-lg">
                 <CardHeader className="border-b">
@@ -1739,7 +1711,6 @@ export default function PayrollManagement() {
             </TabsContent>
           </Tabs>
             )}
-          </div>
         </div>
 
         {/* Modal de Período de Asistencias */}
