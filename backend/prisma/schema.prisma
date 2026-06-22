@@ -422,6 +422,7 @@ model employee {
   attendance_method              String?
   area_trabajo                   String?
   unidad_trabajo                 String?
+  quincenal_amount               Decimal?                  @db.Decimal(18, 2)
   attendance_edit_request        attendance_edit_request[]
   attendance_logs                attendance_logs[]
 }

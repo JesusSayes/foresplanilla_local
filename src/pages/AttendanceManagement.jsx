@@ -1314,7 +1314,7 @@ export default function AttendanceManagement() {
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse" style={{tableLayout: "fixed"}}>
                       <colgroup>
-                        <col style={{width: "200px"}} />
+                        <col style={{width: "270px"}} />
                         <col style={{width: "60px"}} />
                         <col style={{width: "70px"}} />
                         <col style={{width: "70px"}} />
