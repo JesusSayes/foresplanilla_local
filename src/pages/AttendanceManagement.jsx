@@ -12,7 +12,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle, Edit2,
+  Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle,
   AlertCircle, Users, Search, FileText, Download, Database, Printer, Palmtree, CalendarClock
 } from "lucide-react";
 import * as XLSX from 'xlsx';
@@ -1556,18 +1556,11 @@ export default function AttendanceManagement() {
                                     <StatusIcon className="w-3 h-3 mr-1" />{statusConfig.text}
                                   </Badge>
 
-                                  {/* === CUSTOM BLOCK: validación manual RRHH === */}
-                                  {canEditAttendance && (
-                                    (
-                                      [
-                                      "Revisar", "Incompleto"
-                                      ].includes(emp.record?.status) || !emp.record?.clock_in || !emp.record?.clock_out
-                                    ) && emp.record?.created_by !== 'external_sync'
-                                  ) && (
-                                    <Button size="sm" variant="outline" className="text-indigo-700 border-indigo-300 hover:bg-indigo-50"
+                                  {canEditAttendance && !vacation && emp.record && (
+                                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs shrink-0 whitespace-nowrap text-purple-700 border-purple-300 hover:bg-purple-50"
                                       onClick={() => handleOpenValidationModal(emp.record)}
                                     >
-                                      <Edit2 className="w-3 h-3 mr-1" />Validar
+                                      <CheckCircle className="w-3 h-3 mr-1" />Validar
                                     </Button>
                                   )}
 
