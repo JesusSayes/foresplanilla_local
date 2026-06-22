@@ -257,9 +257,26 @@ export function calcularMetricas(record, schedule, dateStr, overtimeAuthorized, 
   let overtimeHours25 = 0;
   let overtimeHours35 = 0;
 
-  if (clockOut) {
-    const rawWorkedMinutes = Math.max(0, calcDuration(toMin(clockIn), toMin(clockOut)) - breakMinutes);
-    const extraHours = Math.max(0, rawWorkedMinutes / 60 - effective.fullDayHours);
+  if (clockIn && clockOut) {
+    const scheduledStartMin = toMin(scheduledStart);
+    const scheduledEndMin = toMin(scheduledEnd);
+    const isNightShift = scheduledEndMin < scheduledStartMin;
+    const fullJornada = isNightShift
+      ? (scheduledEndMin - scheduledStartMin + 1440)
+      : Math.max(0, scheduledEndMin - scheduledStartMin);
+    const norm = (minutes) => isNightShift
+      ? (minutes - scheduledStartMin + 1440) % 1440
+      : minutes;
+    const normSchedStart = isNightShift ? 0 : scheduledStartMin;
+    const normSchedEnd = isNightShift ? fullJornada : scheduledEndMin;
+    const normIn = norm(toMin(clockIn));
+    const normOut = norm(toMin(clockOut));
+    const effectiveNormIn = (isNightShift && normIn > fullJornada) ? 0 : normIn;
+
+    const rawWorkedMinutes = Math.max(0, (normOut >= effectiveNormIn ? normOut - effectiveNormIn : 0) - breakMinutes);
+    const effectiveStart = Math.max(effectiveNormIn, normSchedStart);
+    const regularMinutesMax = Math.max(0, normSchedEnd - effectiveStart - breakMinutes);
+    const extraHours = Math.max(0, rawWorkedMinutes / 60 - regularMinutesMax / 60);
     if (overtimeAuthorized) {
       overtimeHours25 = Math.min(extraHours, 2);
       overtimeHours35 = Math.max(0, extraHours - 2);
