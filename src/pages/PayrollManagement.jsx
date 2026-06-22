@@ -561,9 +561,11 @@ export default function PayrollManagement() {
         yPos = 20;
       }
       
+      const emp = allEmployees.find(e => e.id === payslip.employee_id);
+      const sede = emp?.site ? ` | ${emp.site}` : "";
       doc.setFontSize(10);
       doc.setFont(undefined, 'bold');
-      doc.text(`${payslip.employee_code} - ${payslip.employee_name}`, 14, yPos);
+      doc.text(`${payslip.employee_code} - ${payslip.employee_name}${sede}`, 14, yPos);
       doc.setFont(undefined, 'normal');
       
       doc.text(`Salario Base: S/ ${payslip.base_salary.toFixed(2)}`, 14, yPos + 6);
@@ -756,8 +758,10 @@ export default function PayrollManagement() {
   };
 
   // Exportar planilla a Excel (formato lineal)
-  const exportToExcel = (payslipsData, filename) => {
-    const rows = payslipsData.map((p, idx) => {
+  const exportToExcel = (payslipsData, filename, filterType) => {
+    // Si se pasa filterType, filtrar solo las boletas de ese tipo
+    const data = filterType ? payslipsData.filter(p => p.payroll_type === filterType) : payslipsData;
+    const rows = data.map((p, idx) => {
       const emp = allEmployees.find(e => e.id === p.employee_id);
       // Periodo legible: usar los campos month/year de la boleta (no del estado global)
       const periodoLabel = p.period && p.period.trim()
@@ -768,6 +772,7 @@ export default function PayrollManagement() {
         "Tipo Doc": emp?.document_type || "",
         "DNI": emp?.document_number || "",
         "Apellidos y Nombres": p.employee_name || (emp ? `${emp.first_name} ${emp.last_name}` : ""),
+        "Sede": emp?.site || "",
         "Área / Departamento": p.department || emp?.department_name || "",
         "Cargo": emp?.position || "",
         "Tipo Contrato": emp?.contract_type || "",
@@ -795,6 +800,7 @@ export default function PayrollManagement() {
       wch: Math.max(key.length, ...rows.map(r => String(r[key] ?? "").length)) + 2
     }));
     ws["!cols"] = colWidths;
+    if (rows.length === 0) { toast.error("No hay datos para exportar"); return; }
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Planilla");
@@ -1017,7 +1023,7 @@ export default function PayrollManagement() {
                       Descargar PDF
                     </Button>
                     <Button
-                      onClick={() => exportToExcel(previewData, `Planilla_${payrollType}_${selectedMonth}_${selectedYear}`)}
+                      onClick={() => exportToExcel(previewData, `Planilla_${payrollType}_${selectedMonth}_${selectedYear}`, payrollType)}
                       variant="outline"
                       className="flex-1 border-green-300 text-green-700 hover:bg-green-50"
                     >
@@ -1328,7 +1334,8 @@ export default function PayrollManagement() {
                                       className="border-green-300 text-green-700 hover:bg-green-50"
                                       onClick={() => exportToExcel(
                                         planillasDelTipo,
-                                        `Planilla_${tipo}_${selectedMonth}_${selectedYear}`
+                                        `Planilla_${tipo}_${selectedMonth}_${selectedYear}`,
+                                        tipo
                                       )}
                                     >
                                       <Download className="w-4 h-4 mr-1" />
@@ -1637,19 +1644,21 @@ export default function PayrollManagement() {
                                       size="sm"
                                       variant="outline"
                                       onClick={() => {
-                                        const doc = new jsPDF();
-                                        doc.text(`Planilla ${group.type}`, 14, 20);
-                                        doc.text(`${format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })}`, 14, 28);
-                                        let y = 40;
-                                        allGroupPayslips.forEach(p => {
-                                           const emp = allEmployees.find(e => e.id === p.employee_id);
-                                           if (emp) {
-                                             doc.text(`${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}`, 14, y);
-                                             doc.text(`S/ ${p.net_pay.toFixed(2)}`, 160, y, { align: "right" });
-                                             y += 7;
-                                           }
-                                         });
-                                        doc.save(`Planilla_${group.type}_${group.year}_${group.month}.pdf`);
+                                       const doc = new jsPDF();
+                                       doc.text(`Planilla ${group.type}`, 14, 20);
+                                       doc.text(`${format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })}`, 14, 28);
+                                       let y = 40;
+                                       allGroupPayslips.forEach(p => {
+                                          const emp = allEmployees.find(e => e.id === p.employee_id);
+                                          if (emp) {
+                                            const sede = emp.site ? ` | ${emp.site}` : "";
+                                            doc.text(`${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}${sede}`, 14, y);
+                                            doc.text(`S/ ${p.net_pay.toFixed(2)}`, 195, y, { align: "right" });
+                                            y += 7;
+                                            if (y > 270) { doc.addPage(); y = 20; }
+                                          }
+                                        });
+                                       doc.save(`Planilla_${group.type}_${group.year}_${group.month}.pdf`);
                                       }}
                                     >
                                       <FileText className="w-3 h-3 mr-1" />
