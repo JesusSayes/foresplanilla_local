@@ -606,9 +606,19 @@ export default function PayrollManagement() {
   // Obtener empleados no incluidos en la planilla actual
   const getExcludedEmployeesData = () => {
     const includedIds = previewData.map(p => p.employee_id);
-    
-    // Empleados que están en el filtro pero no en la preview
-    let baseEmployees = allEmployees;
+    const periodStart = new Date(selectedYear, selectedMonth - 1, 1);
+    const periodEnd = new Date(selectedYear, selectedMonth, 0);
+
+    // Solo empleados que trabajaron en el periodo (Activos o Cesados dentro del periodo)
+    let baseEmployees = allEmployees.filter(emp => {
+      if (emp.status === "Suspendido") return false;
+      if (emp.status === "Cesado") {
+        if (!emp.termination_date) return false;
+        const termDate = new Date(emp.termination_date.split("T")[0]);
+        return termDate >= periodStart;
+      }
+      return true;
+    });
     
     if (searchTerm) {
       baseEmployees = baseEmployees.filter(emp => 

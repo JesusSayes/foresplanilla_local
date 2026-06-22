@@ -714,17 +714,6 @@ export default function ScheduleManagement() {
                              )}
                             </div>
                           </div>
-                          <div className="flex gap-2">
-                            {hasAnyPermission(["schedules.edit", "schedules.manage", "system.admin"]) && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEditAssignment(schedule)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
                         </div>
                       </div>
                     ))}
