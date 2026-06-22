@@ -843,13 +843,19 @@ export default function PayrollManagement() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">
-            Gestión de Planillas
-          </h1>
-          <p className="text-slate-600 text-lg">
-            Generar y administrar planillas quincenales, mensuales y adicionales
-          </p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold text-slate-900 mb-2">Gestión de Planillas</h1>
+            <p className="text-slate-600 text-lg">Generar y administrar planillas quincenales, mensuales y adicionales</p>
+          </div>
+          <div className="flex gap-2 shrink-0 pt-2">
+            <Button onClick={() => window.location.href = createPageUrl("PayrollConcepts")} variant="outline" className="whitespace-nowrap">
+              <Edit2 className="w-4 h-4 mr-2" />Gestionar Conceptos
+            </Button>
+            <Button onClick={() => setShowPayrollConfig(true)} variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 whitespace-nowrap">
+              <Settings className="w-4 h-4 mr-2" />Configurar Quincenal
+            </Button>
+          </div>
         </div>
 
         {/* ── Barra de filtros / generación (ancho completo) ── */}
@@ -929,20 +935,14 @@ export default function PayrollManagement() {
                 </div>
               </div>
 
-              {/* Acciones */}
-              <div className="flex gap-2 flex-wrap items-end">
-                {canCreate && (
+              {/* Vista Previa */}
+              {canCreate && (
+                <div className="flex items-end">
                   <Button onClick={() => handleOpenPeriodModal('preview')} className="bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap">
                     <Eye className="w-4 h-4 mr-2" />Vista Previa
                   </Button>
-                )}
-                <Button onClick={() => window.location.href = createPageUrl("PayrollConcepts")} variant="outline" className="whitespace-nowrap">
-                  <Edit2 className="w-4 h-4 mr-2" />Gestionar Conceptos
-                </Button>
-                <Button onClick={() => setShowPayrollConfig(true)} variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 whitespace-nowrap">
-                  <Settings className="w-4 h-4 mr-2" />Configurar Quincenal
-                </Button>
-              </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
