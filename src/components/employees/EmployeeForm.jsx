@@ -590,6 +590,20 @@ export default function EmployeeForm({
                 <p className="text-xs text-slate-500 mt-2">Estos montos se añaden automáticamente como ingresos adicionales al calcular la planilla.</p>
               </div>
               <hr className="border-slate-200" />
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div>
+                  <Label className="text-xs font-medium text-slate-700">Monto Quincena (S/)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.quincenal_amount ?? ""}
+                    onChange={(e) => setFormData({ ...formData, quincenal_amount: e.target.value === "" ? null : parseFloat(e.target.value) || 0 })}
+                    placeholder="Dejar vacío para usar % configurado"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Si se ingresa, este monto se usa en lugar del porcentaje quincenal</p>
+                </div>
+              </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label>Sistema de Pensiones</Label>

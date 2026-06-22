@@ -440,9 +440,12 @@ export default function PayrollManagement() {
 
       let conceptsForCalc;
       if (payrollType === "Quincenal") {
-        // Para planilla quincenal: calcular el adelanto SIEMPRE como base_salary * porcentaje configurado.
-        // No usar fórmulas dinámicas ni conceptos adicionales para evitar errores de evaluación.
-        const adelantoAmount = Math.round((emp.base_salary || 0) * quincenalPct * 100) / 100;
+        // Para planilla quincenal: si el empleado tiene monto_quincena fijo, usarlo;
+        // si no, calcular como base_salary * porcentaje configurado.
+        const hasFixedQuincenal = emp.quincenal_amount != null && parseFloat(emp.quincenal_amount) > 0;
+        const adelantoAmount = hasFixedQuincenal
+          ? Math.round(parseFloat(emp.quincenal_amount) * 100) / 100
+          : Math.round((emp.base_salary || 0) * quincenalPct * 100) / 100;
         conceptsForCalc = [
           {
             employee_id: emp.id,
