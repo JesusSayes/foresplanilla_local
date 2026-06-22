@@ -27,6 +27,8 @@ import JustifyModal from "../components/attendance/JustifyModal";
 import AssignScheduleModal from "../components/attendance/AssignScheduleModal";
 import AttendanceEditRequestModal from "../components/attendance/AttendanceEditRequestModal";
 import AttendanceEditRequestsPanel from "../components/attendance/AttendanceEditRequestsPanel";
+import AttendanceValidationModal from "../components/attendance/AttendanceValidationModal";
+
 
 export default function AttendanceManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -489,6 +491,9 @@ export default function AttendanceManagement() {
   };
 
   const [justifyingSchedule, setJustifyingSchedule] = useState(null);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationRecord, setValidationRecord] = useState(null);
+  const [validationLogs, setValidationLogs] = useState([]);
 
   const handleJustifyClick = async (emp, record, overrideDate) => {
     setJustifyingEmployee(emp);
@@ -1499,6 +1504,13 @@ export default function AttendanceManagement() {
                                     onClick={() => { setSchedulingEmployee({ ...emp, _rowDate: rowDate }); setShowScheduleModal(true); }}>
                                     <CalendarClock className="w-3 h-3" />
                                   </Button>
+                                  {!vacation && emp.record && (
+                                    <Button size="sm" variant="outline"
+                                      className="h-7 px-2 text-xs shrink-0 whitespace-nowrap text-purple-700 border-purple-300 hover:bg-purple-50"
+                                      onClick={() => { setValidationRecord(emp.record); setValidationLogs([]); setShowValidationModal(true); }}>
+                                      <CheckCircle className="w-3 h-3 mr-1" />Validar
+                                    </Button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -2008,6 +2020,21 @@ export default function AttendanceManagement() {
             onClose={() => { setShowScheduleModal(false); setSchedulingEmployee(null); }}
             onSuccess={() => {
               queryClient.invalidateQueries(["workSchedules"]);
+              queryClient.invalidateQueries(["todayAttendance"]);
+            }}
+          />
+        )}
+
+        {/* Validation Modal */}
+        {showValidationModal && validationRecord && (
+          <AttendanceValidationModal
+            record={validationRecord}
+            logs={validationLogs}
+            onClose={() => { setShowValidationModal(false); setValidationRecord(null); setValidationLogs([]); }}
+            onSave={() => {
+              setShowValidationModal(false);
+              setValidationRecord(null);
+              setValidationLogs([]);
               queryClient.invalidateQueries(["todayAttendance"]);
             }}
           />

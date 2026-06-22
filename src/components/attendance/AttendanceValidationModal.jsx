@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { entitiesAPI } from "@/api/entitiesClient";
+import { base44 } from "@/api/base44Client";
+const entitiesAPI = base44.entities;
 import { Clock, CheckCircle, XCircle, AlertTriangle, Loader2, X, Info, ShieldCheck } from "lucide-react";
 import { format, parse, differenceInMinutes, addHours, subHours, isValid } from "date-fns";
 import { es } from "date-fns/locale";
@@ -165,13 +166,13 @@ export default function AttendanceValidationModal({ record, logs = [], onClose, 
 
   // ── Guardar corrección manual ────────────────────────────────────────────
   const handleSave = async () => {
-    if (!selectedIn) {
-      toast.error("Debes seleccionar al menos la marcación de entrada.");
+    if (!selectedIn && !selectedOut) {
+      toast.error("Debes seleccionar al menos una marcación.");
       return;
     }
 
     // Caso: solo 1 marcación y RRHH acepta mantener Incompleto
-    if (keepIncomplete && !selectedOut) {
+    if ((keepIncomplete || !selectedOut) && selectedIn && !selectedOut) {
       setSaving(true);
       try {
         const payload = {
@@ -184,6 +185,28 @@ export default function AttendanceValidationModal({ record, logs = [], onClose, 
         };
         const updated = await entitiesAPI.AttendanceRecord.update(record.id, payload);
         toast.success("Registro guardado como Incompleto.");
+        onSave(updated);
+        onClose();
+      } catch (err) {
+        console.error(err);
+        toast.error("Error al guardar. Intenta nuevamente.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Caso: solo salida seleccionada (sin entrada)
+    if (!selectedIn && selectedOut) {
+      setSaving(true);
+      try {
+        const payload = {
+          clock_out: selectedOut,
+          status: "Incompleto",
+          notes: `Validado manualmente por RRHH: Solo salida registrada: ${selectedOut}`,
+        };
+        const updated = await entitiesAPI.AttendanceRecord.update(record.id, payload);
+        toast.success("Salida registrada correctamente.");
         onSave(updated);
         onClose();
       } catch (err) {
@@ -545,7 +568,7 @@ export default function AttendanceValidationModal({ record, logs = [], onClose, 
           </Button>
           <Button
             onClick={handleSave}
-            disabled={saving || savingApprove || !selectedIn || (!selectedOut && !keepIncomplete) || (selectedIn && selectedOut && !calculatedDuration)}
+            disabled={saving || savingApprove || (!selectedIn && !selectedOut) || (selectedIn && selectedOut && !calculatedDuration)}
             className="bg-indigo-600 hover:bg-indigo-700"
           >
             {saving ? (
