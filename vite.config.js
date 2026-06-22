@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    logLevel: 'error', // Suppress warnings, only show errors
+    logLevel: 'info',
     plugins: [
       base44({
         // Support for legacy code that imports the base44 SDK with @/integrations, @/entities, etc.
