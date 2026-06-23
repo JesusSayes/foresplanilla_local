@@ -11,6 +11,7 @@ const TAB_LABELS = {
   rmv: "RMV", afp: "AFP", professions: "Profesión", costcenters: "Centro de Costos",
   segurovida: "Seguro Vida Ley", uit: "UIT", accountingaccounts: "Cuenta Contable",
   areaunidadcargo: "Área/Unidad/Cargo", incidenttypes: "Tipo de Incidente",
+  loantypes: "Tipo de Préstamo", costcentercategories: "Categoría de Centro de Costo",
 };
 
 export default function MasterDataFormModal({ activeTab, editingItem, formData, setFormData, onSubmit, onCancel, isSaving }) {
@@ -153,6 +154,19 @@ export default function MasterDataFormModal({ activeTab, editingItem, formData, 
                 </Select>
               </div>
               {checkbox("is_active", "is_active_incidenttype")}
+            </>)}
+
+            {activeTab === "loantypes" && (<>
+              <div><Label>Nombre *</Label><Input {...F("name")} placeholder="Ej: Préstamo Personal" /></div>
+              <div><Label>Descripción</Label><Textarea {...F("description")} rows={3} placeholder="Descripción del tipo de préstamo..." /></div>
+              {checkbox("is_active", "is_active_loantype")}
+            </>)}
+
+            {activeTab === "costcentercategories" && (<>
+              <div><Label>Código</Label><Input {...F("code")} placeholder="Ej: ADM" /></div>
+              <div><Label>Nombre *</Label><Input {...F("name")} placeholder="Ej: Administración" /></div>
+              <div><Label>Descripción</Label><Textarea {...F("description")} rows={3} placeholder="Descripción de la categoría..." /></div>
+              {checkbox("is_active", "is_active_ccc")}
             </>)}
 
             <div className="flex gap-3 pt-4">
