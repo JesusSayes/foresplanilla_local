@@ -596,6 +596,18 @@ export default function EmployeeForm({
               <hr className="border-slate-200" />
               <div className="grid grid-cols-3 gap-4">
                 <div>
+                  <Label className="text-xs font-medium text-slate-700">Monto Quincena (S/)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.quincenal_amount ?? ""}
+                    onChange={(e) => setFormData({ ...formData, quincenal_amount: e.target.value === "" ? null : parseFloat(e.target.value) || 0 })}
+                    placeholder="Dejar vacío para usar % configurado"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Si se ingresa, reemplaza el % quincenal</p>
+                </div>
+                <div>
                   <Label>Sistema de Pensiones</Label>
                   <Select value={formData.pension_system || "Ninguno"} onValueChange={(v) => setFormData({ ...formData, pension_system: v, afp_id: v === "AFP" ? formData.afp_id : "" })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>

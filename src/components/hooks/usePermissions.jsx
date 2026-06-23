@@ -42,13 +42,16 @@ export const AVAILABLE_PERMISSIONS = {
   "payroll.approve": "Aprobar planilla",
   "payroll.export": "Exportar datos de planilla",
   "payroll.manage_concepts": "Gestionar conceptos de planilla",
+  "payroll.view_amounts": "Ver montos en planillas",
 
   // Contratos
   "contracts.view": "Ver contratos",
+  "contracts.view_amounts": "Ver montos de contratos",
   "contracts.create": "Crear contratos",
   "contracts.edit": "Editar contratos",
   "contracts.delete": "Eliminar contratos",
   "contracts.approve": "Aprobar contratos",
+  "contracts.sign": "Firmar contratos digitalmente",
   "contracts.manage_templates": "Gestionar plantillas de contratos",
   "contracts.manage_renewals": "Gestionar renovaciones automáticas",
 
@@ -74,18 +77,6 @@ export const AVAILABLE_PERMISSIONS = {
   "cost_centers.delete": "Eliminar centros de costo",
   "cost_centers.assign": "Asignar centros de costo",
   "cost_centers.view_amounts": "Ver montos de centros de costo",
-
-  // Planillas
-  "payroll.view_amounts": "Ver montos en planillas",
-  "payroll.view_department": "Ver planillas del departamento",
-
-  // Contratos
-  "contracts.view": "Ver contratos",
-  "contracts.view_amounts": "Ver montos de contratos",
-  "contracts.create": "Crear contratos",
-  "contracts.edit": "Editar contratos",
-  "contracts.delete": "Eliminar contratos",
-  "contracts.sign": "Firmar contratos digitalmente",
 
   // Administración
   "roles.view": "Ver roles",

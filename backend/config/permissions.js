@@ -16,6 +16,7 @@ export const BASE44_PERMISSIONS = Object.freeze({
   'attendance.edit': 'Editar registros de asistencia',
   'attendance.approve_edits': 'Aprobar/rechazar edición de registros de asistencia',
   'attendance.approve_incidents': 'Aprobar/rechazar incidencias',
+  'attendance.view_reports': 'Ver reportes de asistencia',
   'attendance.manage': 'Gestión completa de asistencia',
   'attendance.export': 'Exportar reportes de asistencia',
 
@@ -23,22 +24,29 @@ export const BASE44_PERMISSIONS = Object.freeze({
   'vacations.view_own': 'Ver propias vacaciones',
   'vacations.view_all': 'Ver vacaciones de todos',
   'vacations.view_department': 'Ver vacaciones del departamento',
+  'vacations.request': 'Solicitar vacaciones',
   'vacations.approve': 'Aprobar solicitudes de vacaciones',
+  'vacations.manage_balances': 'Gestionar saldos de vacaciones',
+  'vacations.view_calendar': 'Ver calendario de vacaciones',
   'vacations.manage': 'Gestión completa de vacaciones',
   'vacations.calendar': 'Ver calendario de vacaciones',
 
   // Nómina
   'payroll.view_own': 'Ver propias boletas',
   'payroll.view_all': 'Ver todas las boletas',
+  'payroll.process': 'Procesar planilla',
   'payroll.edit': 'Editar boletas',
   'payroll.create': 'Crear boletas',
   'payroll.delete': 'Eliminar boletas',
   'payroll.calculate': 'Calcular nómina',
   'payroll.approve': 'Aprobar nómina',
+  'payroll.export': 'Exportar datos de planilla',
+  'payroll.manage_concepts': 'Gestionar conceptos de planilla',
 
   // Certificados
   'certificates.view_own': 'Ver propios certificados',
   'certificates.view_all': 'Ver todos los certificados',
+  'certificates.generate': 'Generar certificados',
   'certificates.approve': 'Aprobar certificados',
   'certificates.create': 'Crear certificados',
   'certificates.request': 'Solicitar certificados',
@@ -87,6 +95,7 @@ export const BASE44_PERMISSIONS = Object.freeze({
   // Reportes
   'reports.view': 'Ver reportes',
   'reports.export': 'Exportar reportes',
+  'reports.advanced': 'Acceso a reportes avanzados',
   'reports.attendance': 'Ver reportes de asistencia',
   'reports.payroll': 'Ver reportes de nómina',
   'reports.vacations': 'Ver reportes de vacaciones',
@@ -110,10 +119,16 @@ export const BASE44_PERMISSIONS = Object.freeze({
   'contracts.create': 'Crear contratos',
   'contracts.edit': 'Editar contratos',
   'contracts.delete': 'Eliminar contratos',
+  'contracts.approve': 'Aprobar contratos',
   'contracts.sign': 'Firmar contratos digitalmente',
+  'contracts.manage_templates': 'Gestionar plantillas de contratos',
+  'contracts.manage_renewals': 'Gestionar renovaciones automáticas',
 
   // Administración
   'roles.view': 'Ver roles',
+  'roles.create': 'Crear roles',
+  'roles.edit': 'Editar roles',
+  'roles.delete': 'Eliminar roles',
   'roles.manage': 'Gestionar roles y permisos',
   'roles.assign': 'Asignar roles a usuarios',
   'system.admin': 'Acceso administrativo completo',
@@ -125,6 +140,10 @@ export const BASE44_PERMISSION_KEYS = Object.freeze(Object.keys(BASE44_PERMISSIO
 // Permisos que nacieron durante la migración local. No son fuente de verdad
 // Base44, pero se aceptan para no invalidar roles ya guardados en BD.
 export const LOCAL_PERMISSION_ALIASES = Object.freeze({
+  'attendance.view_reports': [
+    'reports.attendance',
+    'attendance.export',
+  ],
   'attendance.manage_schedules': [
     'schedules.view',
     'schedules.create',
@@ -138,6 +157,34 @@ export const LOCAL_PERMISSION_ALIASES = Object.freeze({
     'schedules.edit',
     'schedules.assign',
     'schedules.delete',
+  ],
+  'vacations.request': [
+    'vacations.view_own',
+  ],
+  'vacations.manage_balances': [
+    'vacations.manage',
+  ],
+  'vacations.view_calendar': [
+    'vacations.calendar',
+  ],
+  'payroll.process': [
+    'payroll.calculate',
+    'payroll.create',
+  ],
+  'payroll.manage_concepts': [
+    'payroll.edit',
+    'payroll.create',
+    'payroll.delete',
+  ],
+  'certificates.generate': [
+    'certificates.create',
+  ],
+  'contracts.manage_templates': [
+    'contracts.create',
+    'contracts.edit',
+  ],
+  'contracts.manage_renewals': [
+    'contracts.edit',
   ],
 });
 

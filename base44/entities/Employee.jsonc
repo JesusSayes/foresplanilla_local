@@ -135,6 +135,10 @@
       "type": "number",
       "description": "Salario base mensual"
     },
+    "quincenal_amount": {
+      "type": "number",
+      "description": "Monto fijo de planilla quincenal. Si se ingresa, se usa en lugar del porcentaje configurado."
+    },
     "activity_cost": {
       "type": "number",
       "default": 0,

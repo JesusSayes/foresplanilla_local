@@ -108,7 +108,7 @@ export const createEmployee = async (req, res) => {
         birth_date, gender, personal_email, work_email, phone, mobile, address,
         district, province, department, company, position, position_level,
         profession, department_name, area_trabajo, work_unit, unidad_trabajo, site, hire_date, termination_date,
-        contract_type, base_salary, bank_name, bank_account, cci_account,
+        contract_type, base_salary, quincenal_amount, bank_name, bank_account, cci_account,
         cts_bank, cts_account_number, cts_currency, pension_system, afp_id,
         afp_affiliation_date, cuspp, worker_type, tax_residence, photo_url,
         status, role, managed_team_ids, supervisor_id, supervisor_name,
@@ -118,7 +118,7 @@ export const createEmployee = async (req, res) => {
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
         $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
         $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44,
-        $45, $46, $47, $48, $49, $50, $51, $52, $53, $54
+        $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55
       ) RETURNING *
     `;
 
@@ -131,7 +131,7 @@ export const createEmployee = async (req, res) => {
       data.department_name, data.area_trabajo, data.work_unit, data.unidad_trabajo,
       data.site, cleanData.hire_date,
       cleanData.termination_date, data.contract_type, data.base_salary,
-      data.bank_name, data.bank_account, data.cci_account, data.cts_bank,
+      data.quincenal_amount ?? null, data.bank_name, data.bank_account, data.cci_account, data.cts_bank,
       data.cts_account_number, data.cts_currency, data.pension_system,
       data.afp_id, cleanData.afp_affiliation_date, data.cuspp, data.worker_type,
       data.tax_residence, data.photo_url, data.status || 'Activo',
