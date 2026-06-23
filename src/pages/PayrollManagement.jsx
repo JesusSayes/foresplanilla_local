@@ -641,6 +641,7 @@ export default function PayrollManagement() {
   const filteredPayslips = existingPayslips.filter(p => {
     const emp = allEmployees.find(e => e.id === p.employee_id);
     if (!emp) return false;
+    const matchesPeriod = Number(p.month) === selectedMonth && Number(p.year) === selectedYear;
     const matchesType = p.payroll_type === payrollType;
     const matchesSearch = searchTerm ? (
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -648,7 +649,7 @@ export default function PayrollManagement() {
       emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase())
     ) : true;
     const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
-    return matchesType && matchesSearch && matchesDept;
+    return matchesPeriod && matchesType && matchesSearch && matchesDept;
   });
 
   // Helper para parsear números seguros (evita Infinity/NaN)
@@ -1534,8 +1535,8 @@ export default function PayrollManagement() {
 
                   {(() => {
                     const filtered = allPayslips.filter(p => {
-                      if (p.year !== historyYearFilter) return false;
-                      if (historyMonthFilter !== "all" && p.month !== parseInt(historyMonthFilter)) return false;
+                      if (Number(p.year) !== historyYearFilter) return false;
+                      if (historyMonthFilter !== "all" && Number(p.month) !== parseInt(historyMonthFilter)) return false;
                       if (historyTypeFilter !== "all" && p.payroll_type !== historyTypeFilter) return false;
                       const emp = allEmployees.find(e => e.id === p.employee_id);
                       if (!emp) return false;
