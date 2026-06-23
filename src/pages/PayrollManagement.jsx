@@ -25,6 +25,7 @@ import PayrollConfigModal from "../components/payroll/PayrollConfigModal";
 import { createPageUrl } from "../utils";
 import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
+import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/lib/payrollUtils";
 
 export default function PayrollManagement() {
   const { hasPermission, canAccessDepartment, loading: permissionsLoading } = usePermissions();
@@ -472,10 +473,11 @@ export default function PayrollManagement() {
       // Calcular descuentos por asistencia (solo para planillas NO quincenales)
       const lateRecords = empAttendance.filter(r => r.is_late && r.late_minutes > 10);
       const absentRecords = empAttendance.filter(r => r.is_absent);
-      const baseSalaryForCalc = emp.base_salary || 0; // Siempre usar el salario del contrato
+      const baseSalaryForCalc = safePayrollNumber(emp.base_salary); // Siempre usar el salario del contrato
+      const dailyRate = baseSalaryForCalc > 0 ? roundMoney(baseSalaryForCalc / 30) : 0;
       // Regla quincenal: NO aplicar descuentos por inasistencias/tardanzas
-      const tardinessDiscount = payrollType === "Quincenal" ? 0 : lateRecords.length * (baseSalaryForCalc / 30);
-      const absenceDiscount = payrollType === "Quincenal" ? 0 : absentRecords.length * (baseSalaryForCalc / 30);
+      const tardinessDiscount = payrollType === "Quincenal" ? 0 : roundMoney(lateRecords.length * dailyRate);
+      const absenceDiscount = payrollType === "Quincenal" ? 0 : roundMoney(absentRecords.length * dailyRate);
 
       // Buscar adelanto quincenal si es mensual
       let advanceDeduction = 0;
@@ -488,16 +490,18 @@ export default function PayrollManagement() {
           p.year === selectedYear
         );
         if (quincenalPayslip) {
-          advanceDeduction = quincenalPayslip.net_pay || 0;
+          advanceDeduction = safePayrollNumber(quincenalPayslip.net_pay); // sanitizar adelanto
           advancePaymentId = quincenalPayslip.id;
         }
       }
 
-      // Ajustar totales con descuentos adicionales
-      const adjustedDeductions = result.totals.totalDeductions + tardinessDiscount + absenceDiscount + advanceDeduction;
-      const adjustedNetPay = result.totals.totalIncome - adjustedDeductions;
+      // Ajustar totales con descuentos adicionales — sanitizar cada término
+      const adjustedDeductions = roundMoney(
+        safePayrollNumber(result.totals.totalDeductions) + tardinessDiscount + absenceDiscount + advanceDeduction
+      );
+      const adjustedNetPay = roundMoney(safePayrollNumber(result.totals.totalIncome) - adjustedDeductions);
 
-      return {
+      const rawPayslip = {
         employee_id: emp.id,
         employee_name: `${emp.first_name} ${emp.last_name}`,
         employee_code: emp.employee_code,
@@ -509,21 +513,21 @@ export default function PayrollManagement() {
         payroll_number: payrollNumber,
         advance_payment_id: advancePaymentId,
         worked_days: workedDays,
-        base_salary: emp.base_salary || 0,  // Siempre el salario del contrato
+        base_salary: safePayrollNumber(emp.base_salary),
         family_allowance: 0,
         overtime_pay: 0,
-        bonuses: Math.max(0, result.totals.totalIncome - (emp.base_salary || 0)),
+        bonuses: roundMoney(Math.max(0, safePayrollNumber(result.totals.totalIncome) - safePayrollNumber(emp.base_salary))),
         commissions: 0,
         other_income: 0,
-        total_income: result.totals.totalIncome,
-        pension_deduction: result.deductions.find(d => d.concept_name.includes("AFP") || d.concept_name === "ONP")?.calculated_amount || 0,
+        total_income: safePayrollNumber(result.totals.totalIncome),
+        pension_deduction: safePayrollNumber(result.deductions.find(d => d.concept_name.includes("AFP") || d.concept_name === "ONP")?.calculated_amount),
         health_insurance: 0,
-        income_tax: result.deductions.find(d => d.concept_name.includes("Renta"))?.calculated_amount || 0,
+        income_tax: safePayrollNumber(result.deductions.find(d => d.concept_name.includes("Renta"))?.calculated_amount),
         tardiness_discount: tardinessDiscount,
         absence_discount: absenceDiscount,
         loan_deduction: 0,
         advance_deduction: advanceDeduction,
-        other_deductions: result.totals.totalDeductions,
+        other_deductions: safePayrollNumber(result.totals.totalDeductions),
         total_deductions: adjustedDeductions,
         net_pay: adjustedNetPay,
         payment_date: `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-${payrollType === "Quincenal" ? "15" : "30"}`,
@@ -533,6 +537,13 @@ export default function PayrollManagement() {
         has_errors: result.errors.length > 0,
         errors: result.errors,
       };
+
+      // Sanitización final antes de retornar — corrige cualquier residuo no finito
+      const { sanitized, warnings } = sanitizePayslip(rawPayslip);
+      if (warnings.length > 0) {
+        console.warn(`[Planilla] Valores corregidos para ${rawPayslip.employee_name}:`, warnings);
+      }
+      return { ...sanitized, employee_name: rawPayslip.employee_name, employee_code: rawPayslip.employee_code, department: rawPayslip.department };
     }));
 
     setPreviewData(payslipsData);
@@ -659,8 +670,8 @@ export default function PayrollManagement() {
     return matchesPeriod && matchesType && matchesSearch && matchesDept;
   });
 
-  // Helper para parsear números seguros (evita Infinity/NaN)
-  const safeNum = (v) => { const n = parseFloat(v); return (isFinite(n) && !isNaN(n)) ? n : 0; };
+  // Helper para parsear números seguros (evita Infinity/NaN) — delegado a payrollUtils
+  const safeNum = (v) => safePayrollNumber(v);
 
   // Stats calculadas sobre el periodo/departamento filtrado actual
   const stats = {
@@ -1658,7 +1669,7 @@ export default function PayrollManagement() {
                                           if (emp) {
                                             const sede = emp.site ? ` | ${emp.site}` : "";
                                             doc.text(`${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}${sede}`, 14, y);
-                                            doc.text(`S/ ${p.net_pay.toFixed(2)}`, 195, y, { align: "right" });
+                                            doc.text(`S/ ${safePayrollNumber(p.net_pay).toFixed(2)}`, 195, y, { align: "right" });
                                             y += 7;
                                             if (y > 270) { doc.addPage(); y = 20; }
                                           }

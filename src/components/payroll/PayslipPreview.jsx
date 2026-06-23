@@ -1,4 +1,5 @@
 import React from "react";
+import { safePayrollNumber } from "@/lib/payrollUtils";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
       ? `<img src="${company.logo_url}" alt="Logo" style="width:56px;height:56px;object-fit:contain;border-radius:8px;padding:4px;background:white;" />`
       : `<div style="width:56px;height:56px;background:white;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;">🏢</div>`;
 
-    const fmt = (val) => (val || 0).toFixed(2);
+    const fmt = (val) => safePayrollNumber(val).toFixed(2);
 
     const incomeRows = [
       `<div class="row"><span>Remuneración Básica</span><span>S/ ${fmt(payslip.base_salary)}</span></div>`,
@@ -260,7 +261,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-slate-600">Remuneración Básica</span>
-              <span className="font-semibold text-slate-900">S/ {payslip.base_salary?.toFixed(2)}</span>
+              <span className="font-semibold text-slate-900">S/ {safePayrollNumber(payslip.base_salary).toFixed(2)}</span>
             </div>
             {payslip.family_allowance > 0 && (
               <div className="flex justify-between text-sm">
@@ -288,7 +289,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
             )}
             <div className="flex justify-between pt-2 border-t border-green-200">
               <span className="font-bold text-green-700">TOTAL INGRESOS</span>
-              <span className="font-bold text-green-700 text-lg">S/ {payslip.total_income?.toFixed(2)}</span>
+              <span className="font-bold text-green-700 text-lg">S/ {safePayrollNumber(payslip.total_income).toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -350,7 +351,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
             )}
             <div className="flex justify-between pt-2 border-t border-red-200">
               <span className="font-bold text-red-700">TOTAL DESCUENTOS</span>
-              <span className="font-bold text-red-700 text-lg">S/ {payslip.total_deductions?.toFixed(2)}</span>
+              <span className="font-bold text-red-700 text-lg">S/ {safePayrollNumber(payslip.total_deductions).toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -361,7 +362,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
             <div>
               <p className="text-slate-600 text-sm mb-1">NETO A PAGAR</p>
               <p className="text-4xl font-bold text-indigo-600">
-                S/ {payslip.net_pay?.toFixed(2)}
+                S/ {safePayrollNumber(payslip.net_pay).toFixed(2)}
               </p>
             </div>
             <div className="text-right text-sm text-slate-600">
@@ -393,7 +394,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
                         {item.name}
                         {item.formula && <span className="text-slate-500 ml-1">({item.formula})</span>}
                       </span>
-                      <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                      <span className="font-semibold">S/ {safePayrollNumber(item.amount).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -407,7 +408,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
                         {item.name}
                         {item.formula && <span className="text-slate-500 ml-1">({item.formula})</span>}
                       </span>
-                      <span className="font-semibold">S/ {item.amount.toFixed(2)}</span>
+                      <span className="font-semibold">S/ {safePayrollNumber(item.amount).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>

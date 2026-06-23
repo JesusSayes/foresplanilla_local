@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import PayslipPreview from "../components/payroll/PayslipPreview";
 import PlanillaCompletaView from "../components/payroll/PlanillaCompletaView";
 import ConfigFirmantesModal from "../components/payroll/ConfigFirmantesModal";
+import { safePayrollNumber, formatMoney } from "@/lib/payrollUtils";
 
 const TIPO_COLORS = {
   Quincenal:    "bg-blue-100 text-blue-700 border-blue-200",
@@ -149,7 +150,7 @@ export default function ConsultaPlanillas() {
 
   // Estadísticas del año seleccionado
   const gruposAnio = grupos.filter(g => g.year === filterYear);
-  const totalAnio  = gruposAnio.reduce((s, g) => s + g.payslips.reduce((ss, p) => ss + (p.net_pay || 0), 0), 0);
+  const totalAnio  = gruposAnio.reduce((s, g) => s + g.payslips.reduce((ss, p) => ss + safePayrollNumber(p.net_pay), 0), 0);
   const totalEmps  = new Set(gruposAnio.flatMap(g => g.payslips.map(p => p.employee_id))).size;
 
   const availableYears = [...new Set(allPayslips.map(p => p.year))].sort((a, b) => b - a);
@@ -157,9 +158,9 @@ export default function ConsultaPlanillas() {
 
   const getGrupoStats = (g) => ({
     empleados:   g.payslips.length,
-    totalIncome: g.payslips.reduce((s, p) => s + (p.total_income || 0), 0),
-    totalDesc:   g.payslips.reduce((s, p) => s + (p.total_deductions || 0), 0),
-    totalNeto:   g.payslips.reduce((s, p) => s + (p.net_pay || 0), 0),
+    totalIncome: g.payslips.reduce((s, p) => s + safePayrollNumber(p.total_income), 0),
+    totalDesc:   g.payslips.reduce((s, p) => s + safePayrollNumber(p.total_deductions), 0),
+    totalNeto:   g.payslips.reduce((s, p) => s + safePayrollNumber(p.net_pay), 0),
   });
 
   // Verifica si un grupo ya tiene asientos generados
@@ -480,9 +481,9 @@ export default function ConsultaPlanillas() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[
               { label: "Empleados incluidos", value: stats.empleados, icon: Users, color: "blue" },
-              { label: "Total Ingresos", value: `S/ ${stats.totalIncome.toFixed(2)}`, icon: DollarSign, color: "green" },
-              { label: "Total Descuentos", value: `S/ ${stats.totalDesc.toFixed(2)}`, icon: DollarSign, color: "red" },
-              { label: "Total Neto a Pagar", value: `S/ ${stats.totalNeto.toFixed(2)}`, icon: DollarSign, color: "indigo" },
+              { label: "Total Ingresos", value: formatMoney(stats.totalIncome), icon: DollarSign, color: "green" },
+              { label: "Total Descuentos", value: formatMoney(stats.totalDesc), icon: DollarSign, color: "red" },
+              { label: "Total Neto a Pagar", value: formatMoney(stats.totalNeto), icon: DollarSign, color: "indigo" },
             ].map(({ label, value, icon: Icon, color }) => (
               <Card key={label} className="border-0 shadow-lg">
                 <CardContent className="p-3">
@@ -534,9 +535,9 @@ export default function ConsultaPlanillas() {
                         <td className="px-4 py-3 text-slate-600 text-xs">{emp.position || "—"}</td>
                         <td className="px-4 py-3 text-slate-600 text-xs">{emp.department_name || "—"}</td>
                         <td className="px-4 py-3 text-center font-medium">{p.worked_days}</td>
-                        <td className="px-4 py-3 text-green-700 font-semibold">S/ {(p.total_income || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-red-600 font-semibold">S/ {(p.total_deductions || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 font-bold text-indigo-700 text-base">S/ {(p.net_pay || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-green-700 font-semibold">{formatMoney(p.total_income)}</td>
+                        <td className="px-4 py-3 text-red-600 font-semibold">{formatMoney(p.total_deductions)}</td>
+                        <td className="px-4 py-3 font-bold text-indigo-700 text-base">{formatMoney(p.net_pay)}</td>
                         <td className="px-4 py-3">
                           <Badge className={STATUS_COLORS[p.status] || "bg-slate-100"}>{p.status}</Badge>
                         </td>
@@ -567,9 +568,9 @@ export default function ConsultaPlanillas() {
                     <tr>
                       <td colSpan={5} className="px-4 py-3 font-bold text-slate-900 text-sm">TOTALES</td>
                       <td className="px-4 py-3 font-bold text-center">{payslipsConEmp.reduce((s, {p}) => s + (p.worked_days || 0), 0)}</td>
-                      <td className="px-4 py-3 font-bold text-green-700">S/ {stats.totalIncome.toFixed(2)}</td>
-                      <td className="px-4 py-3 font-bold text-red-600">S/ {stats.totalDesc.toFixed(2)}</td>
-                      <td className="px-4 py-3 font-bold text-indigo-700 text-base">S/ {stats.totalNeto.toFixed(2)}</td>
+                      <td className="px-4 py-3 font-bold text-green-700">{formatMoney(stats.totalIncome)}</td>
+                      <td className="px-4 py-3 font-bold text-red-600">{formatMoney(stats.totalDesc)}</td>
+                      <td className="px-4 py-3 font-bold text-indigo-700 text-base">{formatMoney(stats.totalNeto)}</td>
                       <td colSpan={2}></td>
                     </tr>
                   </tfoot>
@@ -589,7 +590,7 @@ export default function ConsultaPlanillas() {
       ? `<img src="${ci.logo_url}" alt="Logo" style="width:48px;height:48px;object-fit:contain;background:white;border-radius:6px;padding:3px;" />`
       : `<div style="width:48px;height:48px;background:#4f46e5;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:18px;">🏢</div>`;
 
-    const fmt = (v) => (v || 0).toFixed(2);
+    const fmt = (v) => safePayrollNumber(v).toFixed(2);
 
     const boletasHTML = grupo.payslips.map(p => {
       const emp = allEmployees.find(e => e.id === p.employee_id);
@@ -771,7 +772,7 @@ export default function ConsultaPlanillas() {
           {[
             { label: `Planillas ${filterYear}`, value: gruposAnio.length, icon: FileText, color: "indigo" },
             { label: "Empleados únicos", value: totalEmps, icon: Users, color: "blue" },
-            { label: `Total neto ${filterYear}`, value: `S/ ${totalAnio.toFixed(2)}`, icon: DollarSign, color: "green" },
+            { label: `Total neto ${filterYear}`, value: formatMoney(totalAnio), icon: DollarSign, color: "green" },
             { label: "Tipos de planilla", value: [...new Set(gruposAnio.map(g => g.payroll_type))].length, icon: Calendar, color: "purple" },
           ].map(({ label, value, icon: Icon, color }) => (
             <Card key={label} className="border-0 shadow-lg">
@@ -886,15 +887,15 @@ export default function ConsultaPlanillas() {
                         </div>
                         <div>
                           <p className="text-xs text-slate-400 mb-0.5">Ingresos</p>
-                          <p className="font-semibold text-green-600 text-sm">S/ {stats.totalIncome.toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400 mb-0.5">Descuentos</p>
-                          <p className="font-semibold text-red-500 text-sm">S/ {stats.totalDesc.toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400 mb-0.5">Neto Total</p>
-                          <p className="font-bold text-indigo-700 text-base">S/ {stats.totalNeto.toFixed(2)}</p>
+                          <p className="font-semibold text-green-600 text-sm">{formatMoney(stats.totalIncome)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Descuentos</p>
+                            <p className="font-semibold text-red-500 text-sm">{formatMoney(stats.totalDesc)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Neto Total</p>
+                            <p className="font-bold text-indigo-700 text-base">{formatMoney(stats.totalNeto)}</p>
                         </div>
                       </div>
 

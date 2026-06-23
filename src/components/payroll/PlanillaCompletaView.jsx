@@ -1,4 +1,5 @@
 import React from "react";
+import { safePayrollNumber } from "@/lib/payrollUtils";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Printer, Building2 } from "lucide-react";
 import { format } from "date-fns";
@@ -14,10 +15,11 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
     return (a.employee.first_name || "").toUpperCase().localeCompare((b.employee.first_name || "").toUpperCase(), "es");
   });
 
-  const totalIncome = sorted.reduce((s, { payslip: p }) => s + (p.total_income || 0), 0);
-  const totalDesc   = sorted.reduce((s, { payslip: p }) => s + (p.total_deductions || 0), 0);
-  const totalNeto   = sorted.reduce((s, { payslip: p }) => s + (p.net_pay || 0), 0);
-  const totalDias   = sorted.reduce((s, { payslip: p }) => s + (p.worked_days || 0), 0);
+  const s = safePayrollNumber;
+  const totalIncome = sorted.reduce((acc, { payslip: p }) => acc + s(p.total_income), 0);
+  const totalDesc   = sorted.reduce((acc, { payslip: p }) => acc + s(p.total_deductions), 0);
+  const totalNeto   = sorted.reduce((acc, { payslip: p }) => acc + s(p.net_pay), 0);
+  const totalDias   = sorted.reduce((acc, { payslip: p }) => acc + (p.worked_days || 0), 0);
 
   const firmante1 = firmantes?.firmante_gg       || { nombre: "Gerente General",      cargo: "Gerente General" };
   const firmante2 = firmantes?.firmante_delegado || { nombre: "Responsable de RRHH", cargo: "Jefe de Recursos Humanos" };
