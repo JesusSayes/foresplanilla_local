@@ -5,6 +5,10 @@ import { defineConfig, loadEnv } from 'vite'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  const rawApiUrl = env.VITE_API_URL || 'http://localhost:3001'
+  const apiTarget = (/^https?:\/\//i.test(rawApiUrl) ? rawApiUrl : 'http://localhost:3001')
+    .replace(/\/+$/, '')
+    .replace(/\/api$/i, '')
 
   return {
     logLevel: 'info',
@@ -20,7 +24,7 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api': {
-          target: env.VITE_API_URL || 'http://localhost:3001',
+          target: apiTarget,
           changeOrigin: true,
         },
       },

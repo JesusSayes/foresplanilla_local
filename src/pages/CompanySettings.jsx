@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from "@/api/entitiesClient";
+import { getPublicAssetUrl } from "@/api/apiConfig";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -369,7 +370,7 @@ export default function CompanySettings() {
                 {formData.legal_representative_signature_url ? (
                   <div className="flex items-center gap-4 p-4 border border-green-200 bg-green-50 rounded-lg">
                     <img
-                      src={`${import.meta.env.VITE_API_URL}${formData.legal_representative_signature_url}`}
+                      src={getPublicAssetUrl(formData.legal_representative_signature_url)}
                       alt="Firma del representante legal"
                       className="h-16 object-contain border border-slate-200 bg-white rounded px-2"
                     />

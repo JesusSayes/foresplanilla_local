@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from '@/api/entitiesClient';
+import { getPublicAssetUrl } from "@/api/apiConfig";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -475,7 +476,7 @@ export default function ManagerApprovals() {
 
                       {request.supporting_document_url && (
                         <a
-                          href={`${import.meta.env.VITE_API_URL}${request.supporting_document_url}`}
+                          href={getPublicAssetUrl(request.supporting_document_url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm text-indigo-600 hover:underline"
