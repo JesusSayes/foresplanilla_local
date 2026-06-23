@@ -368,6 +368,10 @@ const ENTITY_SCHEMAS = {
     contract_expiring: "BOOLEAN", payslip_ready: "BOOLEAN",
     attendance_alert: "BOOLEAN", system: "BOOLEAN", email_notifications: "BOOLEAN"
   },
+  IncidentType: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    name: "TEXT", affectation: "TEXT", is_active: "BOOLEAN"
+  },
 };
 
 const ENTITY_GROUPS = [
@@ -375,11 +379,11 @@ const ENTITY_GROUPS = [
   { label: "Contratos", entities: ["Contract", "ContractTemplate", "ContractClause", "ContractRenewalRule"] },
   { label: "Asistencia", entities: ["AttendanceRecord", "AttendanceEditRequest", "AttendanceIncident", "OvertimeAlert", "WorkSchedule", "AccessDevice", "EmployeeAccessMapping", "DeviceEvent", "DatabaseConnection", "SyncLog"] },
   { label: "Vacaciones", entities: ["VacationRequest", "VacationBalance"] },
-  { label: "Planillas y Remuneración", entities: ["Payslip", "PayrollConcept", "LoanType", "Loan", "LoanInstallment"] },
+  { label: "Planillas y Remuneración", entities: ["Payslip", "PayrollConcept", "Loan", "LoanInstallment"] },
   { label: "Centros de Costo", entities: ["CostCenter", "CostCenterAssignment", "CostCenterChangeLog", "CostCenterCategory", "AccountingAccount"] },
   { label: "Contabilidad", entities: ["AsientoContable", "CuentaContable"] },
-  { label: "Datos Maestros", entities: ["Holiday", "Position", "Department", "Bank", "Site", "AFP", "Profession", "Ubigeo", "RMV", "UIT", "SeguroVidaLey", "AreaUnidadCargo"] },
-  { label: "Configuración Planillas", entities: ["PayrollConfig"] },
+  { label: "Datos Maestros", entities: ["Holiday", "Position", "Department", "Bank", "Site", "AFP", "Profession", "Ubigeo", "RMV", "UIT", "SeguroVidaLey", "AreaUnidadCargo", "IncidentType"] },
+  { label: "Planillas y Remuneración", entities: ["Payslip", "PayrollConcept", "LoanType", "Loan", "LoanInstallment", "PayrollConfig"] },
   { label: "Roles y Permisos", entities: ["Role"] },
   { label: "Certificados", entities: ["Certificate"] },
   { label: "Configuración de Empresa", entities: ["CompanyInfo", "PayslipTemplate", "ReportConfiguration"] },

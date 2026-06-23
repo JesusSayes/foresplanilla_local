@@ -64,6 +64,7 @@ import { calcularAsistenciaDesdeLogs } from './scripts/calcularAsistenciaDesdeLo
 import { syncExternalAttendance } from './services/externalAttendanceSync.js';
 import asientosContablesRoutes from './routes/asientosContables.js';
 import cuentasContablesRoutes from './routes/cuentasContables.js';
+import incidentTypesRoutes from './routes/incidentTypes.js';
 
 dotenv.config();
 
@@ -161,6 +162,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api/derechohabientes', derechohabientesRoutes);
 app.use('/api/asientos-contables', asientosContablesRoutes);
 app.use('/api/cuentas-contables', cuentasContablesRoutes);
+app.use('/api/incident-types', incidentTypesRoutes);
 
 // Cron configuration
 const CRON_TIMEZONE = process.env.CRON_TIMEZONE || 'America/Lima';
