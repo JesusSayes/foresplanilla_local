@@ -10,7 +10,8 @@ const TAB_LABELS = {
   sites: "Sede", positions: "Cargo", departments: "Departamento", banks: "Banco",
   rmv: "RMV", afp: "AFP", professions: "Profesión", costcenters: "Centro de Costos",
   segurovida: "Seguro Vida Ley", uit: "UIT", accountingaccounts: "Cuenta Contable",
-  areaunidadcargo: "Área/Unidad/Cargo",
+  areaunidadcargo: "Área/Unidad/Cargo", incidenttypes: "Tipo de Incidente",
+  loantypes: "Tipo de Préstamo", costcentercategories: "Categoría de Centro de Costo",
 };
 
 export default function MasterDataFormModal({ activeTab, editingItem, formData, setFormData, onSubmit, onCancel, isSaving }) {
@@ -138,6 +139,34 @@ export default function MasterDataFormModal({ activeTab, editingItem, formData, 
               <div><Label>Código de Cuenta *</Label><Input {...F("cuenta")} placeholder="Ej: 2011100" /></div>
               <div><Label>Nombre de la Cuenta *</Label><Input {...F("nombre")} placeholder="Ej: MERCADERIAS COSTO" /></div>
               {checkbox("is_active", "is_active_accounting")}
+            </>)}
+
+            {activeTab === "incidenttypes" && (<>
+              <div><Label>Nombre *</Label><Input {...F("name")} placeholder="Ej: Descanso Médico" /></div>
+              <div>
+                <Label>Afectación *</Label>
+                <Select value={formData.affectation || ""} onValueChange={(v) => setFormData({ ...formData, affectation: v })}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar afectación" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Permiso">Permiso — no descuenta horas/días</SelectItem>
+                    <SelectItem value="Descuento">Descuento — descuenta horas/días</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {checkbox("is_active", "is_active_incidenttype")}
+            </>)}
+
+            {activeTab === "loantypes" && (<>
+              <div><Label>Nombre *</Label><Input {...F("name")} placeholder="Ej: Préstamo Personal" /></div>
+              <div><Label>Descripción</Label><Textarea {...F("description")} rows={3} placeholder="Descripción del tipo de préstamo..." /></div>
+              {checkbox("is_active", "is_active_loantype")}
+            </>)}
+
+            {activeTab === "costcentercategories" && (<>
+              <div><Label>Código</Label><Input {...F("code")} placeholder="Ej: ADM" /></div>
+              <div><Label>Nombre *</Label><Input {...F("name")} placeholder="Ej: Administración" /></div>
+              <div><Label>Descripción</Label><Textarea {...F("description")} rows={3} placeholder="Descripción de la categoría..." /></div>
+              {checkbox("is_active", "is_active_ccc")}
             </>)}
 
             <div className="flex gap-3 pt-4">

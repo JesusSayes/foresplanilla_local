@@ -88,7 +88,8 @@ export class PayrollCalculator {
     try {
       // Usar Function para evaluar de forma segura
       const result = Function('"use strict"; return (' + expr + ')')();
-      return typeof result === 'number' && isFinite(result) ? result : 0;
+      if (typeof result !== 'number' || !Number.isFinite(result) || Math.abs(result) > 500_000) return 0;
+      return result;
     } catch (error) {
       throw new Error('Error al evaluar la fórmula: ' + error.message);
     }
@@ -122,11 +123,12 @@ export class PayrollCalculator {
       }
     }
 
-    // Calcular totales
-    const totalIncome = incomes.reduce((sum, c) => sum + c.calculated_amount, 0);
-    const totalDeductions = deductions.reduce((sum, c) => sum + c.calculated_amount, 0);
-    const totalContributions = contributions.reduce((sum, c) => sum + c.calculated_amount, 0);
-    const netPay = totalIncome - totalDeductions;
+    // Calcular totales — sanitizar cada acumulador para evitar Infinity/NaN propagado
+    const safe = (v) => (Number.isFinite(v) && Math.abs(v) <= 500_000 ? v : 0);
+    const totalIncome = safe(incomes.reduce((sum, c) => sum + c.calculated_amount, 0));
+    const totalDeductions = safe(deductions.reduce((sum, c) => sum + c.calculated_amount, 0));
+    const totalContributions = safe(contributions.reduce((sum, c) => sum + c.calculated_amount, 0));
+    const netPay = safe(totalIncome - totalDeductions);
 
     return {
       employee: this.employee,
@@ -198,9 +200,14 @@ export class PayrollCalculator {
       calculatedAmount = parseFloat(concept.amount) || 0;
     }
 
+    // Sanitizar resultado: evitar Infinity, NaN y valores absurdos
+    const safeAmount = (typeof calculatedAmount === 'number' && Number.isFinite(calculatedAmount) && Math.abs(calculatedAmount) <= 500_000)
+      ? calculatedAmount
+      : 0;
+
     return {
       ...concept,
-      calculated_amount: Math.round(calculatedAmount * 100) / 100, // Redondear a 2 decimales
+      calculated_amount: Math.round(safeAmount * 100) / 100,
       calculation_method: concept.is_dynamic ? 'dynamic' : 'fixed',
       applied_date: new Date().toISOString()
     };

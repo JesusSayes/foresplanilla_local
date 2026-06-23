@@ -101,6 +101,21 @@ export default function MasterDataManagement() {
     queryFn: async () => await entitiesAPI.AreaUnidadCargo.list("area"),
   });
 
+  const { data: incidentTypes = [] } = useQuery({
+    queryKey: ["incidenttypes"],
+    queryFn: async () => await entitiesAPI.IncidentType.list("name"),
+  });
+
+  const { data: loanTypes = [] } = useQuery({
+    queryKey: ["loantypes"],
+    queryFn: async () => await entitiesAPI.LoanType.list("name"),
+  });
+
+  const { data: costCenterCategories = [] } = useQuery({
+    queryKey: ["costcentercategories"],
+    queryFn: async () => await entitiesAPI.CostCenterCategory.list("name"),
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ entity, data }) => {
       return await entitiesAPI[entity].create(data);
@@ -182,6 +197,9 @@ export default function MasterDataManagement() {
       uit: "UIT",
       accountingaccounts: "AccountingAccount",
       areaunidadcargo: "AreaUnidadCargo",
+      incidenttypes: "IncidentType",
+      loantypes: "LoanType",
+      costcentercategories: "CostCenterCategory",
     };
     const entity = entityMap[activeTab];
 
@@ -484,7 +502,7 @@ export default function MasterDataManagement() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-7xl grid-cols-12">
+          <TabsList className="flex flex-wrap gap-1 h-auto">
             <TabsTrigger value="areaunidadcargo">Área/Unidad</TabsTrigger>
             <TabsTrigger value="sites">Sedes</TabsTrigger>
             <TabsTrigger value="positions">Cargos</TabsTrigger>
@@ -497,6 +515,9 @@ export default function MasterDataManagement() {
             <TabsTrigger value="segurovida">Seguro Vida</TabsTrigger>
             <TabsTrigger value="uit">UIT</TabsTrigger>
             <TabsTrigger value="accountingaccounts">Cuentas</TabsTrigger>
+            <TabsTrigger value="incidenttypes">Tipos Incidente</TabsTrigger>
+            <TabsTrigger value="loantypes">Tipos Préstamo</TabsTrigger>
+            <TabsTrigger value="costcentercategories">Categ. CC</TabsTrigger>
           </TabsList>
 
           <TabsContent value="areaunidadcargo" className="space-y-6">
@@ -1440,6 +1461,121 @@ export default function MasterDataManagement() {
               </CardContent>
             </Card>
           </TabsContent>
+          <TabsContent value="incidenttypes" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Tipos de Incidente</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">Catálogo de tipos de incidente para justificación de asistencia. La afectación indica si es Permiso (no descuenta) o Descuento.</p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button onClick={() => handleCreate("incidenttypes")} className="bg-indigo-600 hover:bg-indigo-700"><Plus className="w-4 h-4 mr-2" />Nuevo Tipo</Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar tipo de incidente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
+                <div className="space-y-2">
+                  {incidentTypes.filter(t => t.name?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                    <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="font-medium text-slate-900">{item.name}</span>
+                        <Badge className={item.affectation === "Permiso" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{item.affectation}</Badge>
+                        {item.is_active === false && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                      </div>
+                      <div className="flex gap-1.5">
+                        {hasAnyPermission(["system.admin"]) && (
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "incidenttypes")}><Edit className="w-3.5 h-3.5" /></Button>
+                        )}
+                        {hasAnyPermission(["system.admin"]) && (
+                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "IncidentType")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="loantypes" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Tipos de Préstamo</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">Catálogo de tipos de préstamo disponibles para empleados.</p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button onClick={() => handleCreate("loantypes")} className="bg-indigo-600 hover:bg-indigo-700"><Plus className="w-4 h-4 mr-2" />Nuevo Tipo</Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar tipo de préstamo..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
+                <div className="space-y-2">
+                  {loanTypes.filter(t => t.name?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                    <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="font-medium text-slate-900">{item.name}</span>
+                        {item.description && <span className="text-sm text-slate-500">{item.description}</span>}
+                        {item.is_active === false && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                      </div>
+                      <div className="flex gap-1.5">
+                        {hasAnyPermission(["system.admin"]) && (
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "loantypes")}><Edit className="w-3.5 h-3.5" /></Button>
+                        )}
+                        {hasAnyPermission(["system.admin"]) && (
+                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "LoanType")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="costcentercategories" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Categorías de Centros de Costo</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">Agrupaciones para clasificar los centros de costo.</p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button onClick={() => handleCreate("costcentercategories")} className="bg-indigo-600 hover:bg-indigo-700"><Plus className="w-4 h-4 mr-2" />Nueva Categoría</Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar categoría..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
+                <div className="space-y-2">
+                  {costCenterCategories.filter(c => c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || c.code?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                    <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        {item.code && <Badge className="bg-rose-100 text-rose-700 font-mono">{item.code}</Badge>}
+                        <span className="font-medium text-slate-900">{item.name}</span>
+                        {item.description && <span className="text-sm text-slate-500">{item.description}</span>}
+                        {item.is_active === false && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                      </div>
+                      <div className="flex gap-1.5">
+                        {hasAnyPermission(["system.admin"]) && (
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "costcentercategories")}><Edit className="w-3.5 h-3.5" /></Button>
+                        )}
+                        {hasAnyPermission(["system.admin"]) && (
+                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "CostCenterCategory")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           </Tabs>
           </div>
 

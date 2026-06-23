@@ -1312,12 +1312,12 @@ export default function AttendanceManagement() {
 
                   {/* Tabla con anchos fijos para alineación perfecta */}
                   <div className="overflow-x-auto">
-                    <table className="w-full border-collapse" style={{tableLayout: "fixed"}}>
-                      <colgroup>
-                        <col style={{width: "270px"}} />
-                        <col style={{width: "60px"}} />
-                        <col style={{width: "70px"}} />
-                        <col style={{width: "70px"}} />
+                      <table className="w-full border-collapse" style={{tableLayout: "fixed"}}>
+                        <colgroup>
+                          <col style={{width: "270px"}} />
+                          <col style={{width: "60px"}} />
+                          <col style={{width: "70px"}} />
+                          <col style={{width: "70px"}} />
                         <col style={{width: "65px"}} />
                         <col style={{width: "65px"}} />
                         <col style={{width: "65px"}} />
@@ -1326,10 +1326,10 @@ export default function AttendanceManagement() {
                         <col style={{width: "60px"}} />
                         <col style={{width: "60px"}} />
                         <col style={{width: "70px"}} />
-                        <col style={{width: "110px"}} />
-                        <col style={{width: "90px"}} />
-                        <col style={{width: "300px"}} />
-                      </colgroup>
+                          <col style={{width: "110px"}} />
+                          <col style={{width: "90px"}} />
+                          <col style={{width: "300px"}} />
+                        </colgroup>
                       <thead>
                         <tr className="bg-slate-100 rounded-lg">
                           <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-2 rounded-l-lg">Empleado</th>

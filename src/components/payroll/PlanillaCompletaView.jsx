@@ -1,4 +1,5 @@
 import React from "react";
+import { safePayrollNumber } from "@/lib/payrollUtils";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Printer, Building2 } from "lucide-react";
 import { format } from "date-fns";
@@ -14,10 +15,11 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
     return (a.employee.first_name || "").toUpperCase().localeCompare((b.employee.first_name || "").toUpperCase(), "es");
   });
 
-  const totalIncome = sorted.reduce((s, { payslip: p }) => s + (p.total_income || 0), 0);
-  const totalDesc   = sorted.reduce((s, { payslip: p }) => s + (p.total_deductions || 0), 0);
-  const totalNeto   = sorted.reduce((s, { payslip: p }) => s + (p.net_pay || 0), 0);
-  const totalDias   = sorted.reduce((s, { payslip: p }) => s + (p.worked_days || 0), 0);
+  const s = safePayrollNumber;
+  const totalIncome = sorted.reduce((acc, { payslip: p }) => acc + s(p.total_income), 0);
+  const totalDesc   = sorted.reduce((acc, { payslip: p }) => acc + s(p.total_deductions), 0);
+  const totalNeto   = sorted.reduce((acc, { payslip: p }) => acc + s(p.net_pay), 0);
+  const totalDias   = sorted.reduce((acc, { payslip: p }) => acc + (p.worked_days || 0), 0);
 
   const firmante1 = firmantes?.firmante_gg       || { nombre: "Gerente General",      cargo: "Gerente General" };
   const firmante2 = firmantes?.firmante_delegado || { nombre: "Responsable de RRHH", cargo: "Jefe de Recursos Humanos" };
@@ -43,13 +45,13 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
         <td style="padding:3px 5px;color:#475569;white-space:nowrap;">${emp.document_type || ""} ${emp.document_number || ""}</td>
         <td style="padding:3px 5px;color:#475569;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${emp.position || "—"}</td>
         <td style="padding:3px 5px;text-align:center;">${p.worked_days || 0}</td>
-        <td style="padding:3px 5px;text-align:right;">${Number(p.base_salary || 0).toFixed(2)}</td>
-        <td style="padding:3px 5px;text-align:right;">${Number((p.total_income || 0) - (p.base_salary || 0)).toFixed(2)}</td>
-        <td style="padding:3px 5px;text-align:right;font-weight:600;color:#15803d;">${Number(p.total_income || 0).toFixed(2)}</td>
-        <td style="padding:3px 5px;text-align:right;">${Number(p.pension_deduction || 0).toFixed(2)}</td>
-        <td style="padding:3px 5px;text-align:right;">${Number((p.total_deductions || 0) - (p.pension_deduction || 0)).toFixed(2)}</td>
-        <td style="padding:3px 5px;text-align:right;font-weight:600;color:#dc2626;">${Number(p.total_deductions || 0).toFixed(2)}</td>
-        <td style="padding:3px 5px;text-align:right;font-weight:700;color:#4338ca;">${Number(p.net_pay || 0).toFixed(2)}</td>
+        <td style="padding:3px 5px;text-align:right;">${s(p.base_salary).toFixed(2)}</td>
+        <td style="padding:3px 5px;text-align:right;">${(s(p.total_income) - s(p.base_salary)).toFixed(2)}</td>
+        <td style="padding:3px 5px;text-align:right;font-weight:600;color:#15803d;">${s(p.total_income).toFixed(2)}</td>
+        <td style="padding:3px 5px;text-align:right;">${s(p.pension_deduction).toFixed(2)}</td>
+        <td style="padding:3px 5px;text-align:right;">${(s(p.total_deductions) - s(p.pension_deduction)).toFixed(2)}</td>
+        <td style="padding:3px 5px;text-align:right;font-weight:600;color:#dc2626;">${s(p.total_deductions).toFixed(2)}</td>
+        <td style="padding:3px 5px;text-align:right;font-weight:700;color:#4338ca;">${s(p.net_pay).toFixed(2)}</td>
         <td style="padding:3px 5px;"><div style="height:18px;border:1px dashed #cbd5e1;border-radius:3px;min-width:45px;"></div></td>
       </tr>`).join("");
 
@@ -156,11 +158,11 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
     <tr style="background:#eef2ff;border-top:2px solid #a5b4fc;font-weight:700;">
       <td colspan="5" style="padding:4px 5px;font-size:7.5pt;">TOTALES GENERALES</td>
       <td style="padding:4px 5px;text-align:center;font-size:7.5pt;">${totalDias}</td>
-      <td style="padding:4px 5px;text-align:right;font-size:7.5pt;">${sorted.reduce((s,{payslip:p})=>s+(p.base_salary||0),0).toFixed(2)}</td>
-      <td style="padding:4px 5px;text-align:right;font-size:7.5pt;">${sorted.reduce((s,{payslip:p})=>s+((p.total_income||0)-(p.base_salary||0)),0).toFixed(2)}</td>
+      <td style="padding:4px 5px;text-align:right;font-size:7.5pt;">${sorted.reduce((acc,{payslip:p})=>acc+s(p.base_salary),0).toFixed(2)}</td>
+      <td style="padding:4px 5px;text-align:right;font-size:7.5pt;">${sorted.reduce((acc,{payslip:p})=>acc+(s(p.total_income)-s(p.base_salary)),0).toFixed(2)}</td>
       <td style="padding:4px 5px;text-align:right;color:#15803d;font-size:7.5pt;">${totalIncome.toFixed(2)}</td>
-      <td style="padding:4px 5px;text-align:right;font-size:7.5pt;">${sorted.reduce((s,{payslip:p})=>s+(p.pension_deduction||0),0).toFixed(2)}</td>
-      <td style="padding:4px 5px;text-align:right;font-size:7.5pt;">${sorted.reduce((s,{payslip:p})=>s+((p.total_deductions||0)-(p.pension_deduction||0)),0).toFixed(2)}</td>
+      <td style="padding:4px 5px;text-align:right;font-size:7.5pt;">${sorted.reduce((acc,{payslip:p})=>acc+s(p.pension_deduction),0).toFixed(2)}</td>
+      <td style="padding:4px 5px;text-align:right;font-size:7.5pt;">${sorted.reduce((acc,{payslip:p})=>acc+(s(p.total_deductions)-s(p.pension_deduction)),0).toFixed(2)}</td>
       <td style="padding:4px 5px;text-align:right;color:#dc2626;font-size:7.5pt;">${totalDesc.toFixed(2)}</td>
       <td style="padding:4px 5px;text-align:right;color:#4338ca;font-size:8.5pt;">${totalNeto.toFixed(2)}</td>
       <td></td>
@@ -279,16 +281,16 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
                     <td className="px-1.5 py-1 font-mono text-slate-700">{emp.employee_code}</td>
                     <td className="px-1.5 py-1 font-medium text-slate-900 whitespace-nowrap">{emp.last_name}, {emp.first_name}</td>
                     <td className="px-1.5 py-1 text-slate-600 whitespace-nowrap">{emp.document_type} {emp.document_number}</td>
-                    <td className="px-1.5 py-1 text-slate-600" style={{ maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.position || "—"}</td>
-                    <td className="px-1.5 py-1 text-center">{p.worked_days}</td>
-                    <td className="px-1.5 py-1 text-right">{Number(p.base_salary || 0).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right">{Number((p.total_income || 0) - (p.base_salary || 0)).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right font-semibold" style={{ color: "#15803d" }}>{Number(p.total_income || 0).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right">{Number(p.pension_deduction || 0).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right">{Number((p.total_deductions || 0) - (p.pension_deduction || 0)).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right font-semibold" style={{ color: "#dc2626" }}>{Number(p.total_deductions || 0).toFixed(2)}</td>
-                    <td className="px-1.5 py-1 text-right font-bold" style={{ color: "#4338ca" }}>{Number(p.net_pay || 0).toFixed(2)}</td>
-                    <td className="px-1.5 py-1"><div style={{ height: "20px", border: "1px dashed #cbd5e1", borderRadius: "3px", minWidth: "50px" }} /></td>
+                      <td className="px-1.5 py-1 text-slate-600" style={{ maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.position || "—"}</td>
+                      <td className="px-1.5 py-1 text-center">{p.worked_days}</td>
+                    <td className="px-1.5 py-1 text-right">{s(p.base_salary).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right">{(s(p.total_income) - s(p.base_salary)).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right font-semibold" style={{ color: "#15803d" }}>{s(p.total_income).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right">{s(p.pension_deduction).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right">{(s(p.total_deductions) - s(p.pension_deduction)).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right font-semibold" style={{ color: "#dc2626" }}>{s(p.total_deductions).toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right font-bold" style={{ color: "#4338ca" }}>{s(p.net_pay).toFixed(2)}</td>
+                      <td className="px-1.5 py-1"><div style={{ height: "20px", border: "1px dashed #cbd5e1", borderRadius: "3px", minWidth: "50px" }} /></td>
                   </tr>
                 ))}
               </tbody>
