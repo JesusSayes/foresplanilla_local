@@ -1,0 +1,27 @@
+{
+  "name": "IncidentType",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del tipo de incidente"
+    },
+    "affectation": {
+      "type": "string",
+      "enum": [
+        "Permiso",
+        "Descuento"
+      ],
+      "description": "Tipo de afectaci\u00f3n: Permiso (no descuenta) o Descuento (descuenta horas/d\u00edas)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Tipo activo"
+    }
+  },
+  "required": [
+    "name",
+    "affectation"
+  ]
+}

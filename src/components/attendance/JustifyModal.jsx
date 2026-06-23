@@ -123,9 +123,14 @@ export default function JustifyModal({
   const [dateRangeStart, setDateRangeStart] = useState(null);
   const [dateRangeEnd, setDateRangeEnd]     = useState(null);
   const [extraDates, setExtraDates]         = useState([]);
+  const incidentTypes = ATTENDANCE_INCIDENT_TYPES.map((name, index) => ({
+    id: name,
+    name,
+    affectation: name === "Licencia sin Goce de Haber" ? "Descuento" : "Permiso",
+  }));
 
-  const filteredIncidentTypes = ATTENDANCE_INCIDENT_TYPES.filter(t =>
-    t.toLowerCase().includes(incidentSearch.toLowerCase())
+  const filteredIncidentTypes = incidentTypes.filter(t =>
+    t.name.toLowerCase().includes(incidentSearch.toLowerCase())
   );
 
   const getTargetDates = () => {
@@ -515,8 +520,15 @@ export default function JustifyModal({
                       className="h-8 text-sm" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
                   </div>
                   {filteredIncidentTypes.length > 0
-                    ? filteredIncidentTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)
-                    : <div className="px-3 py-2 text-sm text-slate-400">Sin resultados</div>}
+                   ? filteredIncidentTypes.map(t => (
+                       <SelectItem key={t.id} value={t.name}>
+                         <div className="flex items-center justify-between gap-3 w-full">
+                           <span>{t.name}</span>
+                           <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${t.affectation === "Permiso" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{t.affectation}</span>
+                         </div>
+                       </SelectItem>
+                     ))
+                   : <div className="px-3 py-2 text-sm text-slate-400">Sin resultados</div>}
                 </SelectContent>
               </Select>
             </div>

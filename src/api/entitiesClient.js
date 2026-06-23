@@ -111,6 +111,7 @@ export const entitiesAPI = {
   CostCenterChangeLog: createEntityAPI('/api/cost-center-changelogs'),
   DatabaseConnection: createEntityAPI('/api/database/connections'),
   SyncLog: createEntityAPI('/api/sync/logs'),
+  IncidentType: createEntityAPI('/api/incident-types'),
   SeguroVidaLey: createEntityAPI('/api/master-data/segurovidaley'),
   UIT: createEntityAPI('/api/master-data/uits'),
   AccountingAccount: createEntityAPI('/api/master-data/accountingaccounts'),
