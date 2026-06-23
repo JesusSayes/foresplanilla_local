@@ -637,17 +637,18 @@ export default function PayrollManagement() {
 
   const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
 
-  // Planillas del periodo actual filtradas por mes/año/departamento/búsqueda (SIN filtrar por tipo)
+  // Planillas del periodo actual filtradas por mes/año/tipo/departamento/búsqueda
   const filteredPayslips = existingPayslips.filter(p => {
     const emp = allEmployees.find(e => e.id === p.employee_id);
     if (!emp) return false;
+    const matchesType = p.payroll_type === payrollType;
     const matchesSearch = searchTerm ? (
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase())
     ) : true;
     const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
-    return matchesSearch && matchesDept;
+    return matchesType && matchesSearch && matchesDept;
   });
 
   // Helper para parsear números seguros (evita Infinity/NaN)
@@ -1532,14 +1533,13 @@ export default function PayrollManagement() {
                   </div>
 
                   {(() => {
-                    const latestPayslips = getLatestPayslipsByMonth();
-                    const filtered = latestPayslips.filter(p => {
+                    const filtered = allPayslips.filter(p => {
                       if (p.year !== historyYearFilter) return false;
                       if (historyMonthFilter !== "all" && p.month !== parseInt(historyMonthFilter)) return false;
                       if (historyTypeFilter !== "all" && p.payroll_type !== historyTypeFilter) return false;
+                      const emp = allEmployees.find(e => e.id === p.employee_id);
+                      if (!emp) return false;
                       if (historySearchTerm) {
-                        const emp = allEmployees.find(e => e.id === p.employee_id);
-                        if (!emp) return false;
                         const searchLower = historySearchTerm.toLowerCase();
                         return (
                           emp.first_name.toLowerCase().includes(searchLower) ||
@@ -1579,7 +1579,7 @@ export default function PayrollManagement() {
                     ) : (
                       <div className="space-y-4">
                         {groups.map((group, idx) => {
-                          const allGroupPayslips = allPayslips.filter(p =>
+                          const allGroupPayslips = filtered.filter(p =>
                             p.year === group.year &&
                             p.month === group.month &&
                             p.payroll_type === group.type
