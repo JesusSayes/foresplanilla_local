@@ -603,7 +603,7 @@ export default function EmployeeForm({
                     step="0.01"
                     min="0"
                     value={formData.quincenal_amount ?? ""}
-                    onChange={(e) => setFormData({ ...formData, quincenal_amount: e.target.value === "" ? null : parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, quincenal_amount: e.target.value })}
                     placeholder="Dejar vacío para usar % configurado"
                   />
                   <p className="text-xs text-slate-400 mt-1">Si se ingresa, reemplaza el % quincenal</p>

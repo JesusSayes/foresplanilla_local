@@ -198,7 +198,7 @@ export default function EmployeeManagement() {
   const createEmployeeMutation = useMutation({
     mutationFn: handleCreateEmployee,
     onSuccess: () => {
-      queryClient.invalidateQueries(["allEmployees"]);
+      queryClient.invalidateQueries({ queryKey: ["allEmployees"] });
       toast.success("✅ Empleado creado exitosamente");
       resetForm();
     },
@@ -301,8 +301,8 @@ export default function EmployeeManagement() {
       return updatedEmployee;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["allEmployees"]);
-      queryClient.invalidateQueries(["employeeChanges"]);
+      queryClient.invalidateQueries({ queryKey: ["allEmployees"] });
+      queryClient.invalidateQueries({ queryKey: ["employeeChanges"] });
       toast.success("✅ Empleado actualizado exitosamente");
       resetForm();
     },
@@ -551,6 +551,18 @@ export default function EmployeeManagement() {
 
   const toDateInputValue = (value) => value ? String(value).split("T")[0] : "";
 
+  const normalizeOptionalMoney = (value) => {
+    if (value === "" || value === null || value === undefined) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : null;
+  };
+
+  const buildEmployeePayload = (data) => ({
+    ...data,
+    base_salary: normalizeOptionalMoney(data.base_salary),
+    quincenal_amount: normalizeOptionalMoney(data.quincenal_amount),
+  });
+
   const initializeForm = (emp = null) => {
     // Buscar el último contrato vigente del empleado
     let baseSalary = emp?.base_salary || "";
@@ -606,6 +618,7 @@ export default function EmployeeManagement() {
       termination_date: toDateInputValue(emp?.termination_date),
       contract_type: contractType,
       base_salary: baseSalary || null,
+      quincenal_amount: emp?.quincenal_amount ?? null,
       photo_url: emp?.photo_url || "",
       pension_system: emp?.pension_system || "Ninguno",
       afp_id: emp?.afp_id || "",
@@ -666,7 +679,7 @@ export default function EmployeeManagement() {
       setFormErrors([]);
       updateEmployeeMutation.mutate({
         id: editingEmployee.id,
-        data: formData,
+        data: buildEmployeePayload(formData),
         oldData: editingEmployee
       });
       return;
@@ -698,7 +711,7 @@ export default function EmployeeManagement() {
     }
 
     setFormErrors([]);
-    createEmployeeMutation.mutate(formData);
+    createEmployeeMutation.mutate(buildEmployeePayload(formData));
   };
 
   const handleStatusChange = async (emp, newStatus) => {
