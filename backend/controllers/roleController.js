@@ -1,7 +1,24 @@
 import prisma from "../config/prisma.js";
 import { hasPermission } from "../middleware/authorization.js";
+import { LOCAL_PERMISSION_ALIASES } from "../config/permissions.js";
 
 import { v4 as uuidv4 } from 'uuid';
+
+const expandPermissionAliases = permissions => {
+  if (!Array.isArray(permissions)) return [];
+  const expanded = new Set(permissions);
+  permissions.forEach(permission => {
+    (LOCAL_PERMISSION_ALIASES[permission] || []).forEach(grantedPermission => {
+      expanded.add(grantedPermission);
+    });
+  });
+  return [...expanded];
+};
+
+const withEffectivePermissions = role => ({
+  ...role,
+  permissions: expandPermissionAliases(role.permissions),
+});
 
 const isPrivilegedRole = role => (
   role?.is_system_role || (Array.isArray(role?.permissions) && role.permissions.includes('system.admin'))
@@ -14,7 +31,7 @@ export const getAllRoles = async (req, res) => {
     const roles = await prisma.role.findMany({
       orderBy: { created_date: 'desc' }
     });
-    res.json(roles);
+    res.json(roles.map(withEffectivePermissions));
   } catch (error) {
     console.error('Error al obtener roles:', error);
     res.status(500).json({ error: 'Error al obtener roles' });
@@ -32,7 +49,7 @@ export const getRoleById = async (req, res) => {
       return res.status(404).json({ error: 'Rol no encontrado' });
     }
 
-    res.json(role);
+    res.json(withEffectivePermissions(role));
   } catch (error) {
     console.error('Error al obtener rol:', error);
     res.status(500).json({ error: 'Error al obtener rol' });
