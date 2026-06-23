@@ -110,6 +110,11 @@ export default function MasterDataManagement() {
     queryFn: async () => await base44.entities.AreaUnidadCargo.list("area"),
   });
 
+  const { data: incidentTypes = [] } = useQuery({
+    queryKey: ["incidenttypes"],
+    queryFn: async () => await base44.entities.IncidentType.list("name"),
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ entity, data }) => {
       return await base44.entities[entity].create(data);
@@ -191,6 +196,7 @@ export default function MasterDataManagement() {
       uit: "UIT",
       accountingaccounts: "AccountingAccount",
       areaunidadcargo: "AreaUnidadCargo",
+      incidenttypes: "IncidentType",
     };
     const entity = entityMap[activeTab];
 
@@ -493,7 +499,7 @@ export default function MasterDataManagement() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-7xl grid-cols-12">
+          <TabsList className="flex flex-wrap gap-1 h-auto">
             <TabsTrigger value="areaunidadcargo">Área/Unidad</TabsTrigger>
             <TabsTrigger value="sites">Sedes</TabsTrigger>
             <TabsTrigger value="positions">Cargos</TabsTrigger>
@@ -506,6 +512,7 @@ export default function MasterDataManagement() {
             <TabsTrigger value="segurovida">Seguro Vida</TabsTrigger>
             <TabsTrigger value="uit">UIT</TabsTrigger>
             <TabsTrigger value="accountingaccounts">Cuentas</TabsTrigger>
+            <TabsTrigger value="incidenttypes">Tipos Incidente</TabsTrigger>
           </TabsList>
 
           <TabsContent value="areaunidadcargo" className="space-y-6">
@@ -1446,6 +1453,43 @@ export default function MasterDataManagement() {
                     </div>
                   );
                 })}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="incidenttypes" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Tipos de Incidente</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">Catálogo de tipos de incidente para justificación de asistencia. La afectación indica si es Permiso (no descuenta) o Descuento.</p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button onClick={() => handleCreate("incidenttypes")} className="bg-indigo-600 hover:bg-indigo-700"><Plus className="w-4 h-4 mr-2" />Nuevo Tipo</Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar tipo de incidente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
+                <div className="space-y-2">
+                  {incidentTypes.filter(t => t.name?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                    <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="font-medium text-slate-900">{item.name}</span>
+                        <Badge className={item.affectation === "Permiso" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{item.affectation}</Badge>
+                        {item.is_active === false && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                      </div>
+                      <div className="flex gap-1.5">
+                        {hasAnyPermission(["system.admin"]) && (
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "incidenttypes")}><Edit className="w-3.5 h-3.5" /></Button>
+                        )}
+                        {hasAnyPermission(["system.admin"]) && (
+                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "IncidentType")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
