@@ -4,10 +4,7 @@ const trimTrailingSlash = value => value.replace(/\/+$/, '');
 
 export const getApiBaseUrl = () => {
   const rawUrl = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
-
-  // En producción VITE_API_URL puede ser "/api"; como las rutas del cliente ya
-  // incluyen "/api", la base debe quedar relativa a la misma origin.
-  return trimTrailingSlash(rawUrl).replace(/\/api$/i, '');
+  return trimTrailingSlash(rawUrl);
 };
 
 export const API_BASE_URL = getApiBaseUrl();
