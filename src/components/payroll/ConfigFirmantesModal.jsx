@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from '@/api/entitiesClient';
+import { getPublicAssetUrl } from "@/api/apiConfig";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -287,7 +288,7 @@ export default function ConfigFirmantesModal({ companyInfo, onClose, onSave }) {
         <div className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center">
           {data.firma_url ? (
             <div className="space-y-2">
-              <img src={`${import.meta.env.VITE_API_URL}${data.firma_url}`} alt="firma" className="max-h-20 mx-auto object-contain" />
+              <img src={getPublicAssetUrl(data.firma_url)} alt="firma" className="max-h-20 mx-auto object-contain" />
               <div className="flex gap-2 justify-center">
                 <Button
                   size="sm"

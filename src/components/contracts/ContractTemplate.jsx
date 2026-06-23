@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { entitiesAPI } from "@/api/entitiesClient";
+import { getPublicAssetUrl } from "@/api/apiConfig";
 
 export const generateContractPDF = async (employee, contract, companyData = {}, templateData = null) => {
   const doc = new jsPDF();
@@ -317,8 +318,8 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
 
         // img.src = contract.digital_signature_image_url;
         console.log(contract.digital_signature_image_url);
-        console.log(`${import.meta.env.VITE_API_URL}${contract.digital_signature_image_url}`);
-        img.src = `${import.meta.env.VITE_API_URL}${contract.digital_signature_image_url}`;
+        console.log(getPublicAssetUrl(contract.digital_signature_image_url));
+        img.src = getPublicAssetUrl(contract.digital_signature_image_url);
       });
     } catch (error)
     { /* continuar sin imagen */

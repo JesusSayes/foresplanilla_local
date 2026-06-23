@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from "@/api/entitiesClient";
+import { getPublicAssetUrl } from "@/api/apiConfig";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -156,7 +157,7 @@ export default function Dashboard() {
               <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-xl">
                 {employee.photo_url ? (
                   <img
-                    src={`${import.meta.env.VITE_API_URL}${employee.photo_url}`}
+                    src={getPublicAssetUrl(employee.photo_url)}
                     alt={employee.first_name}
                     className="w-full h-full rounded-2xl object-cover"
                   />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { entitiesAPI } from "@/api/entitiesClient";
+import { getPublicAssetUrl } from "@/api/apiConfig";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -197,7 +198,7 @@ export default function EmployeeManagement() {
   const createEmployeeMutation = useMutation({
     mutationFn: handleCreateEmployee,
     onSuccess: () => {
-      queryClient.invalidateQueries(["allEmployees"]);
+      queryClient.invalidateQueries({ queryKey: ["allEmployees"] });
       toast.success("✅ Empleado creado exitosamente");
       resetForm();
     },
@@ -300,8 +301,8 @@ export default function EmployeeManagement() {
       return updatedEmployee;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["allEmployees"]);
-      queryClient.invalidateQueries(["employeeChanges"]);
+      queryClient.invalidateQueries({ queryKey: ["allEmployees"] });
+      queryClient.invalidateQueries({ queryKey: ["employeeChanges"] });
       toast.success("✅ Empleado actualizado exitosamente");
       resetForm();
     },
@@ -550,6 +551,18 @@ export default function EmployeeManagement() {
 
   const toDateInputValue = (value) => value ? String(value).split("T")[0] : "";
 
+  const normalizeOptionalMoney = (value) => {
+    if (value === "" || value === null || value === undefined) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : null;
+  };
+
+  const buildEmployeePayload = (data) => ({
+    ...data,
+    base_salary: normalizeOptionalMoney(data.base_salary),
+    quincenal_amount: normalizeOptionalMoney(data.quincenal_amount),
+  });
+
   const initializeForm = (emp = null) => {
     // Buscar el último contrato vigente del empleado
     let baseSalary = emp?.base_salary || "";
@@ -605,6 +618,7 @@ export default function EmployeeManagement() {
       termination_date: toDateInputValue(emp?.termination_date),
       contract_type: contractType,
       base_salary: baseSalary || null,
+      quincenal_amount: emp?.quincenal_amount ?? null,
       photo_url: emp?.photo_url || "",
       pension_system: emp?.pension_system || "Ninguno",
       afp_id: emp?.afp_id || "",
@@ -665,7 +679,7 @@ export default function EmployeeManagement() {
       setFormErrors([]);
       updateEmployeeMutation.mutate({
         id: editingEmployee.id,
-        data: formData,
+        data: buildEmployeePayload(formData),
         oldData: editingEmployee
       });
       return;
@@ -697,7 +711,7 @@ export default function EmployeeManagement() {
     }
 
     setFormErrors([]);
-    createEmployeeMutation.mutate(formData);
+    createEmployeeMutation.mutate(buildEmployeePayload(formData));
   };
 
   const handleStatusChange = async (emp, newStatus) => {
@@ -974,7 +988,7 @@ export default function EmployeeManagement() {
                         <div className="flex items-center gap-4 flex-1">
                           {emp.photo_url ? (
                             <img
-                              src={`${import.meta.env.VITE_API_URL}${emp.photo_url}`}
+                              src={getPublicAssetUrl(emp.photo_url)}
                               alt={`${emp.first_name} ${emp.last_name}`}
                               className="w-14 h-14 rounded-full object-cover border-2 border-indigo-200"
                             />
@@ -1169,7 +1183,7 @@ export default function EmployeeManagement() {
                 <div className="flex items-center gap-4">
                   {selectedEmployee.photo_url ? (
                     <img
-                      src={`${import.meta.env.VITE_API_URL}${selectedEmployee.photo_url}`}
+                      src={getPublicAssetUrl(selectedEmployee.photo_url)}
                       alt={`${selectedEmployee.first_name} ${selectedEmployee.last_name}`}
                       className="w-16 h-16 rounded-full object-cover border-2 border-indigo-200"
                     />
