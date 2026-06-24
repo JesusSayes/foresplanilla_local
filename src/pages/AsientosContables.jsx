@@ -82,6 +82,11 @@ export default function AsientosContables() {
     queryFn: () => base44.entities.Subdiario.list("codigo"),
   });
 
+  const { data: tipoAnexos = [] } = useQuery({
+    queryKey: ["tipo_anexos"],
+    queryFn: () => base44.entities.TipoAnexo.list("codigo_tipo_anexo"),
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.AsientoContable.update(id, data),
     onSuccess: () => queryClient.invalidateQueries(["asientosContables"]),
@@ -562,6 +567,7 @@ export default function AsientosContables() {
             asiento={selectedAsiento}
             employees={employees}
             cuentas={cuentas}
+            tipoAnexos={tipoAnexos}
             onClose={() => setSelectedAsiento(null)}
           />
         )}
@@ -570,7 +576,7 @@ export default function AsientosContables() {
   );
 }
 
-function DetalleAsientoModal({ asiento, employees, cuentas, onClose }) {
+function DetalleAsientoModal({ asiento, employees, cuentas, tipoAnexos, onClose }) {
   const emp = employees.find(e => e.id === asiento.employee_id);
   const cuenta = cuentas.find(c => c.cuenta === asiento.cuenta);
   const estConfig = ESTADO_CONFIG[asiento.estado_migracion] || ESTADO_CONFIG.Pendiente;
@@ -622,7 +628,7 @@ function DetalleAsientoModal({ asiento, employees, cuentas, onClose }) {
             <Row label="Medio de Pago" value={asiento.medio_pago} />
           </Section>
           <Section title="Anexo / Documento">
-            <Row label="Tipo Anexo" value={asiento.tipo_anexo} />
+            <Row label="Tipo Anexo" value={asiento.tipo_anexo ? `${asiento.tipo_anexo}${(() => { const ta = tipoAnexos?.find(t => t.codigo_tipo_anexo === asiento.tipo_anexo); return ta ? ` — ${ta.descripcion}` : ""; })()}` : null} />
             <Row label="Cód. Anexo" value={asiento.cod_anexo} />
             <Row label="Tipo Documento" value={asiento.tipo_doc} />
             <Row label="N° Documento" value={asiento.nro_doc} />

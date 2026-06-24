@@ -1,0 +1,27 @@
+{
+  "name": "TipoAnexo",
+  "type": "object",
+  "properties": {
+    "codigo_tipo_anexo": {
+      "type": "string",
+      "description": "C\u00f3digo del tipo de anexo (m\u00e1x. 5 caracteres, ej: P, C, T, O)"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Descripci\u00f3n del tipo de anexo (ej: Proveedor, Cliente, Trabajador, Otros)"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "A",
+        "I"
+      ],
+      "default": "A",
+      "description": "Estado: A = Activo, I = Inactivo"
+    }
+  },
+  "required": [
+    "codigo_tipo_anexo",
+    "descripcion"
+  ]
+}
