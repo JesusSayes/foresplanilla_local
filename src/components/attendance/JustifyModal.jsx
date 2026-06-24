@@ -102,7 +102,9 @@ export default function JustifyModal({
   const [incidentTypes, setIncidentTypes]   = useState([]);
 
   useEffect(() => {
-    base44.entities.IncidentType.filter({ is_active: true }).then(setIncidentTypes).catch(() => {});
+    base44.entities.IncidentType.list().then(types =>
+      setIncidentTypes(types.filter(t => t.is_active !== false))
+    ).catch(() => {});
   }, []);
 
   const filteredIncidentTypes = incidentTypes.filter(t =>
