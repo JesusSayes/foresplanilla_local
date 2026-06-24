@@ -178,8 +178,16 @@ export default function JustifyModal({
 
       const incidentsByDate = {};
       allIncidentsInRange.forEach(i => { incidentsByDate[i.incident_date] = i; });
+
+      // Construir mapa de registros: primero desde la BD (fuente confiable),
+      // con fallback a todayRecords (prop en memoria) para las fechas no encontradas.
       const recordsByDate = {};
       allRecordsInRange.forEach(r => { recordsByDate[r.date] = r; });
+      (todayRecords || []).forEach(r => {
+        if (!recordsByDate[r.date] && r.employee_id === justifyingEmployee.id) {
+          recordsByDate[r.date] = r;
+        }
+      });
 
       // Buscar la afectación del tipo de incidente seleccionado
       const selectedIncidentType = incidentTypes.find(t => t.name === justificationData.incident_type);
