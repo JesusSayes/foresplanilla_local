@@ -1120,3 +1120,16 @@ model attendance_edit_request {
   @@index([requested_at(sort: Desc)], map: "idx_attendance_edit_request_requested_at")
   @@index([status], map: "idx_attendance_edit_request_status")
 }
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model incident_type {
+  id            String    @id @db.VarChar(255)
+  name          String    @unique(map: "incident_type_name_unique")
+  affectation   String
+  is_active     Boolean?  @default(true)
+  created_date  DateTime? @default(now()) @db.Timestamp(6)
+  updated_date  DateTime? @default(now()) @db.Timestamp(6)
+  created_by_id String?
+  created_by    String?
+  is_sample     Boolean?  @default(false)
+}
