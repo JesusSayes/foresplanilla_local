@@ -22,7 +22,6 @@ import ClockInOutWidget from "../components/attendance/ClockInOutWidget";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 import { uploadFile } from "@/services/uploadService";
-import { ATTENDANCE_INCIDENT_TYPES } from "@/constants/attendanceIncidentTypes";
 
 export default function Attendance() {
   const { user: currentUser } = useAuth();
@@ -32,7 +31,7 @@ export default function Attendance() {
   const [showJustifyForm, setShowJustifyForm] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [justificationForm, setJustificationForm] = useState({
-    incident_type: ATTENDANCE_INCIDENT_TYPES[0],
+    incident_type: "",
     justification: "",
     supporting_document_url: null,
   });
@@ -128,6 +127,14 @@ export default function Attendance() {
     enabled: !!employee?.id,
   });
 
+  const { data: incidentTypes = [], isLoading: loadingIncidentTypes } = useQuery({
+    queryKey: ["incidenttypes"],
+    queryFn: async () => {
+      const types = await entitiesAPI.IncidentType.list("name");
+      return (Array.isArray(types) ? types : []).filter(t => t?.is_active !== false && t?.name);
+    },
+  });
+
   const createIncidentMutation = useMutation({
     mutationFn: async (data) => {
       return await entitiesAPI.AttendanceIncident.create(data);
@@ -164,6 +171,10 @@ export default function Attendance() {
   };
 
   const handleSubmitJustification = () => {
+    if (!justificationForm.incident_type) {
+      toast.error("Por favor selecciona un tipo de incidencia");
+      return;
+    }
     if (!justificationForm.justification.trim()) {
       toast.error("Por favor ingresa una justificación");
       return;
@@ -184,7 +195,7 @@ export default function Attendance() {
 
   const resetForm = () => {
     setJustificationForm({
-      incident_type: ATTENDANCE_INCIDENT_TYPES[0],
+      incident_type: "",
       justification: "",
       supporting_document_url: null,
     });
@@ -707,14 +718,17 @@ export default function Attendance() {
                     <Select
                       value={justificationForm.incident_type}
                       onValueChange={(value) => setJustificationForm({ ...justificationForm, incident_type: value })}
+                      disabled={loadingIncidentTypes}
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder={loadingIncidentTypes ? "Cargando tipos..." : "Seleccionar tipo..."} />
                       </SelectTrigger>
                       <SelectContent>
-                        {ATTENDANCE_INCIDENT_TYPES.map(type => (
-                          <SelectItem key={type} value={type}>{type}</SelectItem>
-                        ))}
+                        {incidentTypes.length > 0
+                          ? incidentTypes.map(type => (
+                              <SelectItem key={type.id || type.name} value={type.name}>{type.name}</SelectItem>
+                            ))
+                          : <div className="px-3 py-2 text-sm text-slate-400">Sin tipos activos</div>}
                       </SelectContent>
                     </Select>
                   </div>

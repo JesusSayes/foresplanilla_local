@@ -15,7 +15,6 @@ import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { uploadFile } from "@/services/uploadService";
 import { calcEffectiveMetrics, toMin } from "@/lib/attendanceMetrics";
-import { ATTENDANCE_INCIDENT_TYPES } from "@/constants/attendanceIncidentTypes";
 
 const toDateStr = value => {
   if (!value) return "";
@@ -119,19 +118,45 @@ export default function JustifyModal({
   const [submitting, setSubmitting]         = useState(false);
   const [validationError, setValidationError] = useState("");
   const [incidentSearch, setIncidentSearch] = useState("");
+  const [incidentTypes, setIncidentTypes] = useState([]);
+  const [loadingIncidentTypes, setLoadingIncidentTypes] = useState(false);
   const [multiDateMode, setMultiDateMode]   = useState(false);
   const [dateRangeStart, setDateRangeStart] = useState(null);
   const [dateRangeEnd, setDateRangeEnd]     = useState(null);
   const [extraDates, setExtraDates]         = useState([]);
-  const incidentTypes = ATTENDANCE_INCIDENT_TYPES.map((name, index) => ({
-    id: name,
-    name,
-    affectation: name === "Licencia sin Goce de Haber" ? "Descuento" : "Permiso",
-  }));
 
   const filteredIncidentTypes = incidentTypes.filter(t =>
     t.name.toLowerCase().includes(incidentSearch.toLowerCase())
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingIncidentTypes(true);
+
+    entitiesAPI.IncidentType.list("name")
+      .then((types) => {
+        if (cancelled) return;
+        setIncidentTypes((Array.isArray(types) ? types : [])
+          .filter(t => t?.is_active !== false || t?.name === justificationData.incident_type)
+          .map(t => ({
+            id: t.id || t.name,
+            name: t.name,
+            affectation: t.affectation || "Permiso",
+          }))
+          .filter(t => t.name));
+      })
+      .catch((error) => {
+        console.error("Error cargando tipos de incidente:", error);
+        if (!cancelled) toast.error("No se pudieron cargar los tipos de incidente");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingIncidentTypes(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [justificationData.incident_type]);
 
   const getTargetDates = () => {
     if (!multiDateMode) return [format(selectedDate, "yyyy-MM-dd")];
@@ -511,15 +536,18 @@ export default function JustifyModal({
               <Select
                 value={justificationData.incident_type}
                 onValueChange={(v) => { setJustificationData({ ...justificationData, incident_type: v }); setValidationError(""); setIncidentSearch(""); }}
+                disabled={loadingIncidentTypes}
               >
-                <SelectTrigger><SelectValue placeholder="Seleccionar tipo..." /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={loadingIncidentTypes ? "Cargando tipos..." : "Seleccionar tipo..."} /></SelectTrigger>
                 <SelectContent>
                   <div className="p-2 border-b sticky top-0 bg-white z-10">
                     <Input placeholder="Buscar tipo..." value={incidentSearch}
                       onChange={(e) => setIncidentSearch(e.target.value)}
                       className="h-8 text-sm" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
                   </div>
-                  {filteredIncidentTypes.length > 0
+                  {loadingIncidentTypes
+                   ? <div className="px-3 py-2 text-sm text-slate-400">Cargando tipos...</div>
+                   : filteredIncidentTypes.length > 0
                    ? filteredIncidentTypes.map(t => (
                        <SelectItem key={t.id} value={t.name}>
                          <div className="flex items-center justify-between gap-3 w-full">
