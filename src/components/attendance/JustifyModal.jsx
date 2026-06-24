@@ -222,8 +222,12 @@ export default function JustifyModal({
       const incidentsByDate = {};
       allIncidentsInRange.forEach(i => { incidentsByDate[toDateStr(i.incident_date)] = i; });
 
+      // Buscar la afectación del tipo de incidente seleccionado
+      const selectedIncidentType = incidentTypes.find(t => t.name === justificationData.incident_type);
+      const isPermiso = selectedIncidentType?.affectation === "Permiso";
+
       for (const dStr of targetDates) {
-        // ── Guardar incidente SOLAMENTE — no tocar el AttendanceRecord ─────
+        // ── Guardar incidente ──────────────────────────────────────────────
         const incidentPayload = {
           employee_id: justifyingEmployee.id,
           incident_date: dStr,
@@ -247,9 +251,29 @@ export default function JustifyModal({
         } else {
           await entitiesAPI.AttendanceIncident.create(incidentPayload);
         }
-        // El AttendanceRecord original no se modifica.
-        // Las métricas combinadas (asistencia + justificación) se calculan
-        // en pantalla y en el Excel usando calcEffectiveMetrics, sin persistir.
+
+        // Si el tipo es "Permiso", actualizar clock_in/clock_out según horario programado
+        if (isPermiso) {
+          const record = recordsByDate[dStr];
+          if (record) {
+            await base44.entities.AttendanceRecord.update(record.id, {
+              clock_in: schedStart,
+              clock_out: schedEnd,
+            });
+          } else {
+            // No existe registro de asistencia — crearlo con el horario programado
+            await base44.entities.AttendanceRecord.create({
+              employee_id: justifyingEmployee.id,
+              date: dStr,
+              clock_in: schedStart,
+              clock_out: schedEnd,
+              scheduled_start: schedStart,
+              scheduled_end: schedEnd,
+              status: "Justificado",
+              is_absent: false,
+            });
+          }
+        }
       }
 
       toast.success(
