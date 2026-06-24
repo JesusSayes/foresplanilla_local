@@ -1565,13 +1565,16 @@ export default function AttendanceManagement() {
                   <p className="text-sm text-slate-600 mt-2">Personal que registró horas extras sin autorización previa</p>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <div className="flex flex-wrap gap-3 mb-6">
+                  <div className="flex flex-wrap items-center gap-3 mb-6">
                     <div className="relative flex-1 min-w-[180px]">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                       <Input placeholder="Buscar por nombre..." value={overtimeSearchTerm} onChange={(e) => { setOvertimeSearchTerm(e.target.value); setOvertimePage(1); }} className="pl-9" />
                     </div>
                     <Input type="date" value={overtimeDateFilter} onChange={(e) => { setOvertimeDateFilter(e.target.value); setOvertimePage(1); }} className="w-40" title="Filtrar por fecha" />
                     {overtimeDateFilter && <Button size="sm" variant="outline" onClick={() => { setOvertimeDateFilter(""); setOvertimePage(1); }}>✕ Fecha</Button>}
+                    <div className="ml-auto">
+                      <PaginationBar inline currentPage={overtimePage} totalItems={overtimeAlerts.filter(a => accessibleEmployeeIds.has(a.employee_id) && (!overtimeSearchTerm || (() => { const e = allEmployees.find(x => x.id === a.employee_id); return e ? `${e.first_name} ${e.last_name}`.toLowerCase().includes(overtimeSearchTerm.toLowerCase()) : false; })()) && (!overtimeDateFilter || a.alert_date === overtimeDateFilter)).length} pageSize={OVERTIME_PAGE_SIZE} onPageChange={setOvertimePage} />
+                    </div>
                   </div>
                   {overtimeAlerts.length === 0 ? (
                     <div className="text-center py-12">
@@ -1679,7 +1682,7 @@ export default function AttendanceManagement() {
                          );
                          })}
                          </div>
-                         <PaginationBar currentPage={overtimePage} totalItems={filteredOT.length} pageSize={OVERTIME_PAGE_SIZE} onPageChange={setOvertimePage} />
+
                          </>
                          );
                          })()}
@@ -1692,7 +1695,7 @@ export default function AttendanceManagement() {
             {/* Incidents Tab */}
             <TabsContent value="incidents" className="space-y-4">
               {/* Filtros globales de justificaciones */}
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <div className="relative flex-1 min-w-[180px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                   <Input placeholder="Buscar por nombre..." value={incidentSearchTerm} onChange={(e) => { setIncidentSearchTerm(e.target.value); setIncidentPage(1); }} className="pl-9" />
@@ -1708,6 +1711,9 @@ export default function AttendanceManagement() {
                 </Select>
                 <Input type="date" value={incidentDateFilter} onChange={(e) => { setIncidentDateFilter(e.target.value); setIncidentPage(1); }} className="w-40" title="Filtrar por fecha" />
                 {incidentDateFilter && <Button size="sm" variant="outline" onClick={() => { setIncidentDateFilter(""); setIncidentPage(1); }}>✕ Fecha</Button>}
+                <div className="ml-auto">
+                  <PaginationBar inline currentPage={incidentPage} totalItems={applyIncidentFilters(allIncidents).length} pageSize={INCIDENT_PAGE_SIZE} onPageChange={setIncidentPage} />
+                </div>
               </div>
               <Tabs defaultValue="pending">
                 <TabsList className="grid w-full max-w-xl grid-cols-3 mb-6">
@@ -1765,7 +1771,6 @@ export default function AttendanceManagement() {
                             );
                           })}
                         </div>
-                        <PaginationBar currentPage={incidentPage} totalItems={filtered.length} pageSize={INCIDENT_PAGE_SIZE} onPageChange={setIncidentPage} />
                           </>
                         );
                       })()}
@@ -1818,15 +1823,14 @@ export default function AttendanceManagement() {
                             );
                           })}
                           </div>
-                          <PaginationBar currentPage={incidentPage} totalItems={filtered.length} pageSize={INCIDENT_PAGE_SIZE} onPageChange={setIncidentPage} />
                           </>
-                        );
-                      })()}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                          );
+                          })()}
+                          </CardContent>
+                          </Card>
+                          </TabsContent>
 
-                <TabsContent value="rejected">
+                          <TabsContent value="rejected">
                   <Card className="border-0 shadow-lg">
                     <CardHeader className="border-b bg-red-50/50"><CardTitle className="text-xl font-bold flex items-center gap-2"><XCircle className="w-5 h-5 text-red-600" />Justificaciones Rechazadas</CardTitle></CardHeader>
                     <CardContent className="p-6">
@@ -1871,15 +1875,14 @@ export default function AttendanceManagement() {
                             );
                           })}
                           </div>
-                          <PaginationBar currentPage={incidentPage} totalItems={filtered.length} pageSize={INCIDENT_PAGE_SIZE} onPageChange={setIncidentPage} />
                           </>
-                        );
-                      })()}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            </TabsContent>
+                          );
+                          })()}
+                          </CardContent>
+                          </Card>
+                          </TabsContent>
+                          </Tabs>
+                          </TabsContent>
 
                                   {/* Edit Requests Tab */}
                                   <TabsContent value="edit-requests" className="space-y-6">

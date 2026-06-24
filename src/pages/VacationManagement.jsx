@@ -424,7 +424,7 @@ export default function VacationManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="flex flex-wrap gap-3 mb-4">
+                <div className="flex flex-wrap items-center gap-3 mb-4">
                   <div className="relative flex-1 min-w-[180px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <Input placeholder="Buscar empleado..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setBalancePage(1); }} className="pl-9" />
@@ -445,6 +445,9 @@ export default function VacationManagement() {
                       <SelectItem value="sin_saldo">Sin saldo</SelectItem>
                     </SelectContent>
                   </Select>
+                  <div className="ml-auto">
+                    <PaginationBar inline currentPage={balancePage} totalItems={filteredEmployees.length} pageSize={BALANCE_PAGE_SIZE} onPageChange={setBalancePage} />
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -517,7 +520,6 @@ export default function VacationManagement() {
                     );
                   })}
                 </div>
-                <PaginationBar currentPage={balancePage} totalItems={filteredEmployees.length} pageSize={BALANCE_PAGE_SIZE} onPageChange={setBalancePage} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -529,7 +531,7 @@ export default function VacationManagement() {
                 <CardTitle className="text-xl font-bold">Solicitudes de Vacaciones</CardTitle>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="flex flex-wrap gap-3 mb-4">
+                <div className="flex flex-wrap items-center gap-3 mb-4">
                   <div className="relative flex-1 min-w-[180px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <Input placeholder="Buscar empleado..." value={reqSearchTerm} onChange={(e) => { setReqSearchTerm(e.target.value); setReqPage(1); }} className="pl-9" />
@@ -551,6 +553,9 @@ export default function VacationManagement() {
                       {allReqTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  <div className="ml-auto">
+                    <PaginationBar inline currentPage={reqPage} totalItems={filteredRequests.length} pageSize={REQ_PAGE_SIZE} onPageChange={setReqPage} />
+                  </div>
                 </div>
                 <div className="space-y-3">
                   {filteredRequests
@@ -640,7 +645,7 @@ export default function VacationManagement() {
                       );
                     })}
                 </div>
-                <PaginationBar currentPage={reqPage} totalItems={filteredRequests.length} pageSize={REQ_PAGE_SIZE} onPageChange={setReqPage} />
+
               </CardContent>
             </Card>
           </TabsContent>
@@ -652,7 +657,7 @@ export default function VacationManagement() {
                 <CardTitle className="text-xl font-bold">Historial de Vacaciones</CardTitle>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="flex flex-wrap gap-3 mb-4">
+                <div className="flex flex-wrap items-center gap-3 mb-4">
                   <div className="relative flex-1 min-w-[180px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <Input placeholder="Buscar empleado..." value={histSearchTerm} onChange={(e) => { setHistSearchTerm(e.target.value); setHistPage(1); }} className="pl-9" />
@@ -664,6 +669,9 @@ export default function VacationManagement() {
                       {allDepts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  <div className="ml-auto">
+                    <PaginationBar inline currentPage={histPage} totalItems={filteredHistory.length} pageSize={HIST_PAGE_SIZE} onPageChange={setHistPage} />
+                  </div>
                 </div>
                 <div className="space-y-3">
                   {filteredHistory
@@ -700,7 +708,7 @@ export default function VacationManagement() {
                       );
                     })}
                 </div>
-                <PaginationBar currentPage={histPage} totalItems={filteredHistory.length} pageSize={HIST_PAGE_SIZE} onPageChange={setHistPage} />
+
               </CardContent>
             </Card>
           </TabsContent>

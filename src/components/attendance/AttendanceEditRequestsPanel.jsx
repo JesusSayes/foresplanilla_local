@@ -266,13 +266,14 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
           <Input placeholder="Buscar por empleado o solicitante..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setEditPage(1); }} className="pl-9" />
         </div>
         <Input type="date" value={dateFilter} onChange={(e) => { setDateFilter(e.target.value); setEditPage(1); }} className="w-40" title="Filtrar por fecha de asistencia" />
         {dateFilter && <Button size="sm" variant="outline" onClick={() => { setDateFilter(""); setEditPage(1); }}>✕ Fecha</Button>}
+
       </div>
 
       <Tabs defaultValue="pending">
@@ -293,13 +294,16 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
             <TabsContent key={tab} value={tab}>
               <Card className="border-0 shadow-lg">
                 <CardHeader className="border-b py-4">
-                  <CardTitle className="text-lg font-bold flex items-center gap-2">
-                    {tab === "pending" && <Clock className="w-5 h-5 text-yellow-600" />}
-                    {tab === "approved" && <CheckCircle className="w-5 h-5 text-green-600" />}
-                    {tab === "rejected" && <XCircle className="w-5 h-5 text-red-600" />}
-                    {tab === "cancelled" && <Ban className="w-5 h-5 text-slate-500" />}
-                    Solicitudes {statusMap[tab]}s
-                  </CardTitle>
+                  <div className="flex items-center justify-between gap-4">
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                      {tab === "pending" && <Clock className="w-5 h-5 text-yellow-600" />}
+                      {tab === "approved" && <CheckCircle className="w-5 h-5 text-green-600" />}
+                      {tab === "rejected" && <XCircle className="w-5 h-5 text-red-600" />}
+                      {tab === "cancelled" && <Ban className="w-5 h-5 text-slate-500" />}
+                      Solicitudes {statusMap[tab]}s
+                    </CardTitle>
+                    <PaginationBar inline currentPage={editPage} totalItems={items.length} pageSize={EDIT_PAGE_SIZE} onPageChange={setEditPage} />
+                  </div>
                 </CardHeader>
                 <CardContent className="p-4">
                   {items.length === 0 ? (
@@ -323,7 +327,6 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
                         />
                       ))}
                     </div>
-                    <PaginationBar currentPage={editPage} totalItems={items.length} pageSize={EDIT_PAGE_SIZE} onPageChange={setEditPage} />
                     </>
                   )}
                 </CardContent>

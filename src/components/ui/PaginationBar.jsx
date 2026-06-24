@@ -6,17 +6,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
  * Reusable pagination bar.
  * Props: currentPage, totalItems, pageSize, onPageChange, onPageSizeChange (optional)
  */
-export default function PaginationBar({ currentPage, totalItems, pageSize = 20, onPageChange, onPageSizeChange }) {
+/**
+ * inline=true → sin borde superior ni margen superior, para usar dentro de la fila de filtros (ml-auto)
+ */
+export default function PaginationBar({ currentPage, totalItems, pageSize = 20, onPageChange, onPageSizeChange, inline = false }) {
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const from = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const to = Math.min(currentPage * pageSize, totalItems);
 
+  const wrapper = inline
+    ? "flex items-center gap-2"
+    : "flex items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-100";
+
   return (
-    <div className="flex items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-100">
-      <span className="text-sm text-slate-500">
+    <div className={wrapper}>
+      <span className="text-sm text-slate-500 whitespace-nowrap">
         {totalItems === 0 ? "Sin registros" : `${from}–${to} de ${totalItems}`}
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         {onPageSizeChange && (
           <Select value={String(pageSize)} onValueChange={(v) => { onPageSizeChange(Number(v)); onPageChange(1); }}>
             <SelectTrigger className="w-20 h-8 text-xs">
