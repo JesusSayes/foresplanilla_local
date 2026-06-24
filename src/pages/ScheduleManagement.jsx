@@ -60,6 +60,7 @@ export default function ScheduleManagement() {
     employee_id: null,
     departments: [],
     effective_from: new Date(),
+    effective_to: null,
   });
 
   const { hasAnyPermission, getAccessibleSites, employee, loading: permissionsLoading } = usePermissions();
@@ -185,7 +186,7 @@ export default function ScheduleManagement() {
       return;
     }
     setEditingAssignment(null);
-    setAssignFormData({ employee_id: null, departments: [], effective_from: new Date() });
+    setAssignFormData({ employee_id: null, departments: [], effective_from: new Date(), effective_to: null });
     setSelectedTemplateId("");
     setTemplateSearch("");
     setEmployeeSearch("");
@@ -200,6 +201,7 @@ export default function ScheduleManagement() {
       employee_id: assignment.employee_id || null,
       departments: assignment.departments || (assignment.department_name ? [assignment.department_name] : []),
       effective_from: assignment.effective_from ? new Date(assignment.effective_from + "T00:00:00") : new Date(),
+      effective_to: assignment.effective_to ? new Date(assignment.effective_to + "T00:00:00") : null,
     });
 
     // Buscar la plantilla que corresponde a esta asignación por nombre
@@ -265,7 +267,18 @@ export default function ScheduleManagement() {
       return;
     }
 
+    if (!assignFormData.effective_from) {
+      toast.error("La fecha de inicio de vigencia es obligatoria");
+      return;
+    }
+
+    const today = format(new Date(), "yyyy-MM-dd");
     const effectiveFromStr = format(assignFormData.effective_from, "yyyy-MM-dd");
+    const effectiveToStr = assignFormData.effective_to
+      ? format(assignFormData.effective_to, "yyyy-MM-dd")
+      : null;
+    // Si la fecha de fin ya pasó, el horario queda inactivo
+    const isExpired = effectiveToStr !== null && effectiveToStr < today;
 
     if (editingAssignment) {
       if (selectedTemplateId) {
@@ -276,6 +289,8 @@ export default function ScheduleManagement() {
           employee_id: assignFormData.employee_id,
           departments: assignFormData.departments,
           effective_from: effectiveFromStr,
+          effective_to: effectiveToStr,
+          is_active: !isExpired,
         };
         delete updatedData.id;
         delete updatedData.created_date;
@@ -287,8 +302,11 @@ export default function ScheduleManagement() {
           employee_id: assignFormData.employee_id,
           departments: assignFormData.departments,
           effective_from: effectiveFromStr,
+          effective_to: effectiveToStr,
+          is_active: !isExpired,
         }});
       }
+      if (isExpired) toast.warning("El horario se guardó como inactivo porque la fecha de vigencia ya venció.");
     } else {
       const template = templates.find(t => t.id === selectedTemplateId);
       if (!template) { toast.error("Plantilla no encontrada"); return; }
@@ -297,12 +315,15 @@ export default function ScheduleManagement() {
         employee_id: assignFormData.employee_id,
         departments: assignFormData.departments,
         effective_from: effectiveFromStr,
+        effective_to: effectiveToStr,
+        is_active: !isExpired,
       };
       delete newAssignment.id;
       delete newAssignment.created_date;
       delete newAssignment.updated_date;
       delete newAssignment.created_by;
       createAssignmentMutation.mutate(newAssignment);
+      if (isExpired) toast.warning("El horario se guardó como inactivo porque la fecha de vigencia ya venció.");
     }
   };
 
@@ -335,7 +356,7 @@ export default function ScheduleManagement() {
   };
 
   const resetAssignForm = () => {
-    setAssignFormData({ employee_id: null, departments: [], effective_from: new Date() });
+    setAssignFormData({ employee_id: null, departments: [], effective_from: new Date(), effective_to: null });
     setSelectedTemplateId("");
     setTemplateSearch("");
     setEmployeeSearch("");
@@ -678,15 +699,24 @@ export default function ScheduleManagement() {
                       </div>
                       ) : (
                       <div className="space-y-3">
-                      {filteredIndividual.map(schedule => (
-                      <div key={schedule.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
+                      {(() => {
+                        const todayStr = format(new Date(), "yyyy-MM-dd");
+                        return filteredIndividual.map(schedule => {
+                          const from = schedule.effective_from || "0000-01-01";
+                          const to = schedule.effective_to || "9999-12-31";
+                          const isVigente = from <= todayStr && to >= todayStr && schedule.is_active !== false;
+                          const isVencido = to < todayStr;
+                          return (
+                      <div key={schedule.id} className={`p-4 border rounded-lg hover:shadow-md transition-all ${isVigente ? "border-green-300 bg-green-50/30" : isVencido ? "border-slate-200 bg-slate-50/50 opacity-70" : "border-slate-200"}`}>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
+                            <div className="flex items-center gap-3 mb-2 flex-wrap">
                               <h4 className="font-bold text-slate-900 text-lg">
                                 {getEmployeeName(schedule.employee_id)}
                               </h4>
-                              {!schedule.is_active && (
+                              {isVigente && <Badge className="bg-green-100 text-green-700 border border-green-300">✓ Vigente hoy</Badge>}
+                              {isVencido && <Badge className="bg-slate-200 text-slate-600">Vencido</Badge>}
+                              {!schedule.is_active && !isVencido && (
                                 <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
                               )}
                               {schedule.exempt_from_clocking && (
@@ -707,16 +737,31 @@ export default function ScheduleManagement() {
                                <span><strong>Break:</strong> {schedule.break_duration_minutes} min</span>
                                <span><strong>Tolerancia:</strong> {schedule.tolerance_minutes} min</span>
                              </div>
-                             {schedule.effective_from && (
-                               <p className="text-slate-500">
-                                 <strong>Vigente desde:</strong> {schedule.effective_from}
-                               </p>
-                             )}
+                             <div className="flex gap-4 text-slate-500 text-xs mt-1">
+                               {schedule.effective_from && <span><strong>Desde:</strong> {schedule.effective_from}</span>}
+                               {schedule.effective_to
+                                 ? <span><strong>Hasta:</strong> {schedule.effective_to}</span>
+                                 : <span className="text-green-600"><strong>Hasta:</strong> sin límite</span>}
+                             </div>
                             </div>
+                          </div>
+                          <div className="flex gap-2 ml-3 shrink-0">
+                            {hasAnyPermission(["schedules.edit", "schedules.manage", "system.admin"]) && (
+                              <Button size="sm" variant="outline" onClick={() => handleEditAssignment(schedule)}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {hasAnyPermission(["schedules.delete", "schedules.manage", "system.admin"]) && (
+                              <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDeleteSchedule(schedule)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
-                    ))}
+                          );
+                        });
+                      })()}
                   </div>
                 )}
               </TabsContent>
@@ -1335,14 +1380,16 @@ export default function ScheduleManagement() {
               {/* Vigente desde */}
               <div>
                 <Label className="font-semibold text-slate-800 mb-2 block">
-                  Vigente desde *
+                  Vigente desde <span className="text-red-500">*</span>
                 </Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start bg-green-50 border-green-200 hover:bg-green-100">
                       <CalendarIcon className="mr-2 h-4 w-4 text-green-700" />
                       <span className="text-green-700">
-                        {format(assignFormData.effective_from, "dd 'de' MMMM yyyy", { locale: es })}
+                        {assignFormData.effective_from
+                          ? format(assignFormData.effective_from, "dd 'de' MMMM yyyy", { locale: es })
+                          : "Seleccionar fecha..."}
                       </span>
                     </Button>
                   </PopoverTrigger>
@@ -1356,8 +1403,45 @@ export default function ScheduleManagement() {
                   </PopoverContent>
                 </Popover>
                 <p className="text-xs text-slate-500 mt-1">
-                  El horario aplicará a partir de esta fecha en adelante.
+                  El horario aplicará a partir de esta fecha. Campo obligatorio.
                 </p>
+              </div>
+
+              {/* Vigente hasta (opcional) */}
+              <div>
+                <Label className="font-semibold text-slate-800 mb-2 block">
+                  Vigente hasta <span className="font-normal text-slate-400">(opcional — dejar vacío = sin fecha de fin)</span>
+                </Label>
+                <div className="flex gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="flex-1 justify-start">
+                        <CalendarIcon className="mr-2 h-4 w-4 text-slate-400" />
+                        <span className={assignFormData.effective_to ? "text-slate-800" : "text-slate-400"}>
+                          {assignFormData.effective_to
+                            ? format(assignFormData.effective_to, "dd 'de' MMMM yyyy", { locale: es })
+                            : "Sin fecha de fin"}
+                        </span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <CalendarPicker
+                        mode="single"
+                        selected={assignFormData.effective_to}
+                        onSelect={d => setAssignFormData({ ...assignFormData, effective_to: d || null })}
+                        locale={es}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {assignFormData.effective_to && (
+                    <Button variant="outline" size="icon" onClick={() => setAssignFormData({ ...assignFormData, effective_to: null })}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+                {assignFormData.effective_to && format(assignFormData.effective_to, "yyyy-MM-dd") < format(new Date(), "yyyy-MM-dd") && (
+                  <p className="text-xs text-amber-600 mt-1">⚠️ La fecha de fin ya pasó. El horario se guardará como inactivo.</p>
+                )}
               </div>
 
               <div className="flex gap-3 pt-4 border-t">
