@@ -1312,12 +1312,12 @@ export default function AttendanceManagement() {
 
                   {/* Tabla con anchos fijos para alineación perfecta */}
                   <div className="overflow-x-auto">
-                      <table className="w-full border-collapse" style={{tableLayout: "fixed"}}>
-                        <colgroup>
-                          <col style={{width: "270px"}} />
-                          <col style={{width: "60px"}} />
-                          <col style={{width: "70px"}} />
-                          <col style={{width: "70px"}} />
+                    <table className="w-full border-collapse" style={{tableLayout: "fixed"}}>
+                      <colgroup>
+                        <col style={{width: "270px"}} />
+                        <col style={{width: "60px"}} />
+                        <col style={{width: "70px"}} />
+                        <col style={{width: "70px"}} />
                         <col style={{width: "65px"}} />
                         <col style={{width: "65px"}} />
                         <col style={{width: "65px"}} />
@@ -1326,10 +1326,10 @@ export default function AttendanceManagement() {
                         <col style={{width: "60px"}} />
                         <col style={{width: "60px"}} />
                         <col style={{width: "70px"}} />
-                          <col style={{width: "110px"}} />
-                          <col style={{width: "90px"}} />
-                          <col style={{width: "300px"}} />
-                        </colgroup>
+                        <col style={{width: "110px"}} />
+                        <col style={{width: "90px"}} />
+                        <col style={{width: "300px"}} />
+                      </colgroup>
                       <thead>
                         <tr className="bg-slate-100 rounded-lg">
                           <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-2 rounded-l-lg">Empleado</th>
@@ -1593,6 +1593,13 @@ export default function AttendanceManagement() {
                                     onClick={() => { setSchedulingEmployee({ ...emp, _rowDate: rowDate }); setShowScheduleModal(true); }}>
                                     <CalendarClock className="w-3 h-3" />
                                   </Button>}
+                                  {!vacation && emp.record && (
+                                    <Button size="sm" variant="outline"
+                                      className="h-7 px-2 text-xs shrink-0 whitespace-nowrap text-purple-700 border-purple-300 hover:bg-purple-50"
+                                      onClick={() => handleOpenValidationModal(emp.record)}>
+                                      <CheckCircle className="w-3 h-3 mr-1" />Validar
+                                    </Button>
+                                  )}
                                 </div>
                               </td>
                             </tr>

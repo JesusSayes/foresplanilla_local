@@ -124,7 +124,6 @@ export default function JustifyModal({
   const [dateRangeStart, setDateRangeStart] = useState(null);
   const [dateRangeEnd, setDateRangeEnd]     = useState(null);
   const [extraDates, setExtraDates]         = useState([]);
-
   const filteredIncidentTypes = incidentTypes.filter(t =>
     t.name.toLowerCase().includes(incidentSearch.toLowerCase())
   );
