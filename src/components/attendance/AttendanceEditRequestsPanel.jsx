@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima } from "@/lib/dateUtils";
+import PaginationBar from "@/components/ui/PaginationBar";
 
 const FIELD_LABELS = {
   clock_in: "Hora de entrada",
@@ -227,8 +228,12 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
   );
 }
 
+const EDIT_PAGE_SIZE = 20;
+
 export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, canApprove }) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [editPage, setEditPage] = useState(1);
   const queryClient = useQueryClient();
 
   const { data: requests = [], refetch } = useQuery({
@@ -248,6 +253,7 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
   const filtered = (status) =>
     requests.filter((r) => {
       if (r.status !== status) return false;
+      if (dateFilter && r.attendance_date !== dateFilter) return false;
       if (!searchTerm) return true;
       const emp = allEmployees.find((e) => e.id === r.employee_id);
       const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
@@ -260,14 +266,13 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
 
   return (
     <div className="space-y-4">
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-        <Input
-          placeholder="Buscar por empleado o solicitante..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <Input placeholder="Buscar por empleado o solicitante..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setEditPage(1); }} className="pl-9" />
+        </div>
+        <Input type="date" value={dateFilter} onChange={(e) => { setDateFilter(e.target.value); setEditPage(1); }} className="w-40" title="Filtrar por fecha de asistencia" />
+        {dateFilter && <Button size="sm" variant="outline" onClick={() => { setDateFilter(""); setEditPage(1); }}>✕ Fecha</Button>}
       </div>
 
       <Tabs defaultValue="pending">
@@ -283,6 +288,7 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
         {["pending", "approved", "rejected", "cancelled"].map((tab) => {
           const statusMap = { pending: "Pendiente", approved: "Aprobada", rejected: "Rechazada", cancelled: "Cancelada" };
           const items = filtered(statusMap[tab]);
+          const paged = items.slice((editPage - 1) * EDIT_PAGE_SIZE, editPage * EDIT_PAGE_SIZE);
           return (
             <TabsContent key={tab} value={tab}>
               <Card className="border-0 shadow-lg">
@@ -302,8 +308,9 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
                       <p className="text-slate-500 text-sm">No hay solicitudes {statusMap[tab].toLowerCase()}s</p>
                     </div>
                   ) : (
+                    <>
                     <div className="space-y-3">
-                      {items.map((req) => (
+                      {paged.map((req) => (
                         <RequestCard
                           key={req.id}
                           req={req}
@@ -316,6 +323,8 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
                         />
                       ))}
                     </div>
+                    <PaginationBar currentPage={editPage} totalItems={items.length} pageSize={EDIT_PAGE_SIZE} onPageChange={setEditPage} />
+                    </>
                   )}
                 </CardContent>
               </Card>

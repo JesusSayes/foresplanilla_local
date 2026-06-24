@@ -29,6 +29,7 @@ import AttendanceEditRequestModal from "../components/attendance/AttendanceEditR
 import AttendanceEditRequestsPanel from "../components/attendance/AttendanceEditRequestsPanel";
 import AttendanceValidationModal from "../components/attendance/AttendanceValidationModal";
 import IncidentDetailModal from "../components/attendance/IncidentDetailModal";
+import PaginationBar from "@/components/ui/PaginationBar";
 
 
 export default function AttendanceManagement() {
@@ -59,7 +60,16 @@ export default function AttendanceManagement() {
   const [editRequestRecord, setEditRequestRecord] = useState(null);
   const [editRequestEmployee, setEditRequestEmployee] = useState(null);
   const [incidentSearchTerm, setIncidentSearchTerm] = useState("");
+  const [incidentDateFilter, setIncidentDateFilter] = useState("");
+  const [incidentTypeFilter, setIncidentTypeFilter] = useState("all");
+  const [incidentPage, setIncidentPage] = useState(1);
+  const INCIDENT_PAGE_SIZE = 20;
+
   const [overtimeSearchTerm, setOvertimeSearchTerm] = useState("");
+  const [overtimeDateFilter, setOvertimeDateFilter] = useState("");
+  const [overtimePage, setOvertimePage] = useState(1);
+  const OVERTIME_PAGE_SIZE = 20;
+
   const [pageSize, setPageSize] = useState(300);
   const [currentPage, setCurrentPage] = useState(1);
   const [justificationData, setJustificationData] = useState({
@@ -146,6 +156,19 @@ export default function AttendanceManagement() {
   const pendingIncidents = allIncidents.filter(i => i.status === "Pendiente");
   const approvedIncidents = allIncidents.filter(i => i.status === "Aprobada");
   const rejectedIncidents = allIncidents.filter(i => i.status === "Rechazada");
+
+  // Filtra una lista de incidentes con los filtros de la pestaña Justificaciones
+  const applyIncidentFilters = (list) => list.filter(i => {
+    if (!accessibleEmployeeIds.has(i.employee_id)) return false;
+    if (incidentSearchTerm) {
+      const emp = allEmployees.find(e => e.id === i.employee_id);
+      const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
+      if (!name.includes(incidentSearchTerm.toLowerCase())) return false;
+    }
+    if (incidentTypeFilter !== "all" && i.incident_type !== incidentTypeFilter) return false;
+    if (incidentDateFilter && i.incident_date !== incidentDateFilter) return false;
+    return true;
+  });
 
   const { data: overtimeAlerts = [] } = useQuery({
     queryKey: ["overtimeAlerts"],
@@ -1542,14 +1565,13 @@ export default function AttendanceManagement() {
                   <p className="text-sm text-slate-600 mt-2">Personal que registró horas extras sin autorización previa</p>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <div className="relative max-w-sm mb-6">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                    <Input
-                      placeholder="Buscar por nombre..."
-                      value={overtimeSearchTerm}
-                      onChange={(e) => setOvertimeSearchTerm(e.target.value)}
-                      className="pl-9"
-                    />
+                  <div className="flex flex-wrap gap-3 mb-6">
+                    <div className="relative flex-1 min-w-[180px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <Input placeholder="Buscar por nombre..." value={overtimeSearchTerm} onChange={(e) => { setOvertimeSearchTerm(e.target.value); setOvertimePage(1); }} className="pl-9" />
+                    </div>
+                    <Input type="date" value={overtimeDateFilter} onChange={(e) => { setOvertimeDateFilter(e.target.value); setOvertimePage(1); }} className="w-40" title="Filtrar por fecha" />
+                    {overtimeDateFilter && <Button size="sm" variant="outline" onClick={() => { setOvertimeDateFilter(""); setOvertimePage(1); }}>✕ Fecha</Button>}
                   </div>
                   {overtimeAlerts.length === 0 ? (
                     <div className="text-center py-12">
@@ -1557,14 +1579,23 @@ export default function AttendanceManagement() {
                       <p className="text-slate-600">No hay alertas de horas extras</p>
                     </div>
                   ) : (
+                    <>
+                    {(() => {
+                      const filteredOT = overtimeAlerts.filter(a => {
+                        if (!accessibleEmployeeIds.has(a.employee_id)) return false;
+                        if (overtimeSearchTerm) {
+                          const emp = allEmployees.find(e => e.id === a.employee_id);
+                          const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
+                          if (!name.includes(overtimeSearchTerm.toLowerCase())) return false;
+                        }
+                        if (overtimeDateFilter && a.alert_date !== overtimeDateFilter) return false;
+                        return true;
+                      });
+                      const pagedOT = filteredOT.slice((overtimePage - 1) * OVERTIME_PAGE_SIZE, overtimePage * OVERTIME_PAGE_SIZE);
+                      return (
+                    <>
                     <div className="space-y-4">
-                      {overtimeAlerts.filter(a => {
-                       if (!accessibleEmployeeIds.has(a.employee_id)) return false;
-                       if (!overtimeSearchTerm) return true;
-                       const emp = allEmployees.find(e => e.id === a.employee_id);
-                       const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
-                       return name.includes(overtimeSearchTerm.toLowerCase());
-                      }).map(alert => {
+                      {pagedOT.map(alert => {
                        const emp = allEmployees.find(e => e.id === alert.employee_id);
                        const record = todayRecords.find(r => r.id === alert.attendance_record_id);
                        const alertSched = emp ? getEmployeeScheduleForDate(emp.id, alert.alert_date) : null;
@@ -1645,24 +1676,38 @@ export default function AttendanceManagement() {
                               </Button>
                             </div>
                          </div>
-                       );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+                         );
+                         })}
+                         </div>
+                         <PaginationBar currentPage={overtimePage} totalItems={filteredOT.length} pageSize={OVERTIME_PAGE_SIZE} onPageChange={setOvertimePage} />
+                         </>
+                         );
+                         })()}
+                         </>
+                         )}
+                         </CardContent>
+                         </Card>
+                         </TabsContent>
 
             {/* Incidents Tab */}
-            <TabsContent value="incidents" className="space-y-6">
-              <div className="relative max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <Input
-                  placeholder="Buscar por nombre..."
-                  value={incidentSearchTerm}
-                  onChange={(e) => setIncidentSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
+            <TabsContent value="incidents" className="space-y-4">
+              {/* Filtros globales de justificaciones */}
+              <div className="flex flex-wrap gap-3">
+                <div className="relative flex-1 min-w-[180px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <Input placeholder="Buscar por nombre..." value={incidentSearchTerm} onChange={(e) => { setIncidentSearchTerm(e.target.value); setIncidentPage(1); }} className="pl-9" />
+                </div>
+                <Select value={incidentTypeFilter} onValueChange={(v) => { setIncidentTypeFilter(v); setIncidentPage(1); }}>
+                  <SelectTrigger className="w-52"><SelectValue placeholder="Tipo de incidente" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los tipos</SelectItem>
+                    {[...new Set(allIncidents.map(i => i.incident_type).filter(Boolean))].sort().map(t => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input type="date" value={incidentDateFilter} onChange={(e) => { setIncidentDateFilter(e.target.value); setIncidentPage(1); }} className="w-40" title="Filtrar por fecha" />
+                {incidentDateFilter && <Button size="sm" variant="outline" onClick={() => { setIncidentDateFilter(""); setIncidentPage(1); }}>✕ Fecha</Button>}
               </div>
               <Tabs defaultValue="pending">
                 <TabsList className="grid w-full max-w-xl grid-cols-3 mb-6">
@@ -1675,17 +1720,15 @@ export default function AttendanceManagement() {
                   <Card className="border-0 shadow-lg">
                     <CardHeader className="border-b bg-slate-50/50"><CardTitle className="text-xl font-bold">Justificaciones Pendientes de Aprobación</CardTitle></CardHeader>
                     <CardContent className="p-6">
-                      {pendingIncidents.length === 0 ? (
-                        <div className="text-center py-12"><CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones pendientes</p></div>
-                      ) : (
-                        <div className="space-y-4">
-                          {pendingIncidents.filter(i => {
-                            if (!accessibleEmployeeIds.has(i.employee_id)) return false;
-                            if (!incidentSearchTerm) return true;
-                            const emp = allEmployees.find(e => e.id === i.employee_id);
-                            const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
-                            return name.includes(incidentSearchTerm.toLowerCase());
-                          }).map(incident => {
+                      {(() => {
+                        const filtered = applyIncidentFilters(pendingIncidents);
+                        const paged = filtered.slice((incidentPage - 1) * INCIDENT_PAGE_SIZE, incidentPage * INCIDENT_PAGE_SIZE);
+                        return filtered.length === 0 ? (
+                          <div className="text-center py-12"><CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones pendientes</p></div>
+                        ) : (
+                          <>
+                          <div className="space-y-4">
+                          {paged.map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
                               <div key={incident.id} className="p-4 border border-slate-200 rounded-lg">
@@ -1696,10 +1739,10 @@ export default function AttendanceManagement() {
                                     <div className="flex gap-4 text-sm">
                                       <Badge className="bg-orange-100 text-orange-700">{incident.incident_type}</Badge>
                                       <span className="text-slate-600">📅 {format(parseDateLima(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
-                                              </div>
-                                              </div>
-                                              </div>
-                                              <div className="p-3 bg-slate-50 rounded-lg mb-4">
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="p-3 bg-slate-50 rounded-lg mb-4">
                                   <p className="text-sm font-semibold text-slate-900 mb-1">Justificación:</p>
                                   <p className="text-sm text-slate-700">{incident.justification}</p>
                                 </div>
@@ -1722,7 +1765,10 @@ export default function AttendanceManagement() {
                             );
                           })}
                         </div>
-                      )}
+                        <PaginationBar currentPage={incidentPage} totalItems={filtered.length} pageSize={INCIDENT_PAGE_SIZE} onPageChange={setIncidentPage} />
+                          </>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -1731,17 +1777,15 @@ export default function AttendanceManagement() {
                   <Card className="border-0 shadow-lg">
                     <CardHeader className="border-b bg-green-50/50"><CardTitle className="text-xl font-bold flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-600" />Justificaciones Aprobadas</CardTitle></CardHeader>
                     <CardContent className="p-6">
-                      {approvedIncidents.length === 0 ? (
-                        <div className="text-center py-12"><AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones aprobadas</p></div>
-                      ) : (
-                        <div className="space-y-4">
-                          {approvedIncidents.filter(i => {
-                            if (!accessibleEmployeeIds.has(i.employee_id)) return false;
-                            if (!incidentSearchTerm) return true;
-                            const emp = allEmployees.find(e => e.id === i.employee_id);
-                            const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
-                            return name.includes(incidentSearchTerm.toLowerCase());
-                          }).map(incident => {
+                      {(() => {
+                        const filtered = applyIncidentFilters(approvedIncidents);
+                        const paged = filtered.slice((incidentPage - 1) * INCIDENT_PAGE_SIZE, incidentPage * INCIDENT_PAGE_SIZE);
+                        return filtered.length === 0 ? (
+                          <div className="text-center py-12"><AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones aprobadas</p></div>
+                        ) : (
+                          <>
+                          <div className="space-y-4">
+                          {paged.map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
                               <div key={incident.id} className="p-4 border border-green-200 bg-green-50/30 rounded-lg">
@@ -1769,31 +1813,32 @@ export default function AttendanceManagement() {
                                 <div className="flex items-center gap-4 text-xs text-slate-600">
                                   <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
                                   <span>Fecha: {incident.review_date ? format(parseDateLima(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
-                                  </div>
-                                  </div>
-                                  );
-                                  })}
-                                  </div>
-                                  )}
-                                  </CardContent>
-                                  </Card>
-                                  </TabsContent>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          </div>
+                          <PaginationBar currentPage={incidentPage} totalItems={filtered.length} pageSize={INCIDENT_PAGE_SIZE} onPageChange={setIncidentPage} />
+                          </>
+                        );
+                      })()}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
 
-                                  <TabsContent value="rejected">
+                <TabsContent value="rejected">
                   <Card className="border-0 shadow-lg">
                     <CardHeader className="border-b bg-red-50/50"><CardTitle className="text-xl font-bold flex items-center gap-2"><XCircle className="w-5 h-5 text-red-600" />Justificaciones Rechazadas</CardTitle></CardHeader>
                     <CardContent className="p-6">
-                      {rejectedIncidents.length === 0 ? (
-                        <div className="text-center py-12"><AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones rechazadas</p></div>
-                      ) : (
-                        <div className="space-y-4">
-                          {rejectedIncidents.filter(i => {
-                            if (!accessibleEmployeeIds.has(i.employee_id)) return false;
-                            if (!incidentSearchTerm) return true;
-                            const emp = allEmployees.find(e => e.id === i.employee_id);
-                            const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
-                            return name.includes(incidentSearchTerm.toLowerCase());
-                          }).map(incident => {
+                      {(() => {
+                        const filtered = applyIncidentFilters(rejectedIncidents);
+                        const paged = filtered.slice((incidentPage - 1) * INCIDENT_PAGE_SIZE, incidentPage * INCIDENT_PAGE_SIZE);
+                        return filtered.length === 0 ? (
+                          <div className="text-center py-12"><AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones rechazadas</p></div>
+                        ) : (
+                          <>
+                          <div className="space-y-4">
+                          {paged.map(incident => {
                             const emp = allEmployees.find(e => e.id === incident.employee_id);
                             return (
                               <div key={incident.id} className="p-4 border border-red-200 bg-red-50/30 rounded-lg">
@@ -1821,17 +1866,20 @@ export default function AttendanceManagement() {
                                 <div className="flex items-center gap-4 text-xs text-slate-600">
                                   <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
                                   <span>Fecha: {incident.review_date ? format(parseDateLima(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
-                                  </div>
-                                  </div>
-                                  );
-                                  })}
-                                  </div>
-                                  )}
-                                  </CardContent>
-                                  </Card>
-                                  </TabsContent>
-                                  </Tabs>
-                                  </TabsContent>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          </div>
+                          <PaginationBar currentPage={incidentPage} totalItems={filtered.length} pageSize={INCIDENT_PAGE_SIZE} onPageChange={setIncidentPage} />
+                          </>
+                        );
+                      })()}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
 
                                   {/* Edit Requests Tab */}
                                   <TabsContent value="edit-requests" className="space-y-6">
