@@ -41,6 +41,8 @@ export default function VacationManagement() {
   // Historial filters & pagination
   const [histSearchTerm, setHistSearchTerm] = useState("");
   const [histDeptFilter, setHistDeptFilter] = useState("all");
+  const [histStatusFilter, setHistStatusFilter] = useState("all");
+  const [histTypeFilter, setHistTypeFilter] = useState("all");
   const [histPage, setHistPage] = useState(1);
   const HIST_PAGE_SIZE = 20;
 
@@ -313,13 +315,16 @@ export default function VacationManagement() {
     return matchesSearch && matchesStatus && matchesType;
   });
 
+  const histStatuses = [...new Set(vacationRequests.map(r => r.status).filter(Boolean))].sort();
+
   const filteredHistory = vacationRequests.filter(r => {
-    if (r.status !== "Aprobada") return false;
     const emp = allEmployees.find(e => e.id === r.employee_id);
     const term = histSearchTerm.toLowerCase();
     const matchesSearch = !term || (emp && (`${emp.first_name} ${emp.last_name}`.toLowerCase().includes(term) || (emp.employee_code || "").toLowerCase().includes(term)));
     const matchesDept = histDeptFilter === "all" || (emp && emp.department_name === histDeptFilter);
-    return matchesSearch && matchesDept;
+    const matchesStatus = histStatusFilter === "all" || r.status === histStatusFilter;
+    const matchesType = histTypeFilter === "all" || r.request_type === histTypeFilter;
+    return matchesSearch && matchesDept && matchesStatus && matchesType;
   });
 
   const stats = {
@@ -669,6 +674,20 @@ export default function VacationManagement() {
                       {allDepts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  <Select value={histStatusFilter} onValueChange={(v) => { setHistStatusFilter(v); setHistPage(1); }}>
+                    <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los estados</SelectItem>
+                      {histStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={histTypeFilter} onValueChange={(v) => { setHistTypeFilter(v); setHistPage(1); }}>
+                    <SelectTrigger className="w-44"><SelectValue placeholder="Tipo" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los tipos</SelectItem>
+                      {allReqTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                   <div className="ml-auto">
                     <PaginationBar inline currentPage={histPage} totalItems={filteredHistory.length} pageSize={HIST_PAGE_SIZE} onPageChange={setHistPage} />
                   </div>
@@ -680,8 +699,15 @@ export default function VacationManagement() {
                       const emp = allEmployees.find(e => e.id === request.employee_id);
                       if (!emp) return null;
 
+                      const statusStyle = {
+                        "Aprobada": { border: "border-green-200", bg: "bg-green-50", badge: "bg-green-100 text-green-700" },
+                        "Rechazada": { border: "border-red-200", bg: "bg-red-50", badge: "bg-red-100 text-red-700" },
+                        "Cancelada": { border: "border-slate-200", bg: "bg-slate-50", badge: "bg-slate-100 text-slate-600" },
+                        "Pendiente": { border: "border-amber-200", bg: "bg-amber-50", badge: "bg-amber-100 text-amber-700" },
+                      }[request.status] || { border: "border-slate-200", bg: "bg-white", badge: "bg-slate-100 text-slate-600" };
+
                       return (
-                        <div key={request.id} className="p-4 border border-green-200 bg-green-50 rounded-lg">
+                        <div key={request.id} className={`p-4 border ${statusStyle.border} ${statusStyle.bg} rounded-lg`}>
                           <div className="flex items-start justify-between mb-2">
                             <div>
                               <h4 className="font-bold text-slate-900">
@@ -689,18 +715,20 @@ export default function VacationManagement() {
                               </h4>
                               <p className="text-sm text-slate-600">{emp.department_name}</p>
                             </div>
-                            <Badge className="bg-green-100 text-green-700">
-                              {request.total_days} días
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge className={statusStyle.badge}>{request.status}</Badge>
+                              <Badge variant="outline">{request.total_days} días</Badge>
+                            </div>
                           </div>
 
-                          <div className="text-sm text-slate-700">
+                          <div className="text-sm text-slate-700 space-y-0.5">
+                            {request.request_type && <p><strong>Tipo:</strong> {request.request_type}</p>}
                             <p>
                               <strong>Período:</strong> {format(parseDateLima(request.start_date), "dd/MM/yyyy")} - {format(parseDateLima(request.end_date), "dd/MM/yyyy")}
                             </p>
                             {request.approved_by && (
-                              <p className="text-xs text-slate-600 mt-1">
-                                Aprobado por: {request.approved_by}
+                              <p className="text-xs text-slate-500 mt-1">
+                                {request.status === "Aprobada" ? "Aprobado" : "Revisado"} por: {request.approved_by}
                               </p>
                             )}
                           </div>
