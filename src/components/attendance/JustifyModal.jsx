@@ -221,6 +221,8 @@ export default function JustifyModal({
 
       const incidentsByDate = {};
       allIncidentsInRange.forEach(i => { incidentsByDate[toDateStr(i.incident_date)] = i; });
+      const recordsByDate = {};
+      todayRecords.forEach(r => { recordsByDate[toDateStr(r.date)] = r; });
 
       // Buscar la afectación del tipo de incidente seleccionado
       const selectedIncidentType = incidentTypes.find(t => t.name === justificationData.incident_type);
@@ -256,13 +258,13 @@ export default function JustifyModal({
         if (isPermiso) {
           const record = recordsByDate[dStr];
           if (record) {
-            await base44.entities.AttendanceRecord.update(record.id, {
+            await entitiesAPI.AttendanceRecord.update(record.id, {
               clock_in: schedStart,
               clock_out: schedEnd,
             });
           } else {
             // No existe registro de asistencia — crearlo con el horario programado
-            await base44.entities.AttendanceRecord.create({
+            await entitiesAPI.AttendanceRecord.create({
               employee_id: justifyingEmployee.id,
               date: dStr,
               clock_in: schedStart,

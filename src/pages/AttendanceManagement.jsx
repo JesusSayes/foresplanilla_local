@@ -31,6 +31,7 @@ import AttendanceValidationModal from "../components/attendance/AttendanceValida
 import AttendanceEditRequestModal from "../components/attendance/AttendanceEditRequestModal";
 import AttendanceEditRequestsPanel from "../components/attendance/AttendanceEditRequestsPanel";
 import recalcularAsistenciaService from '@/services/recalcularAsistenciaService';
+import IncidentDetailModal from "../components/attendance/IncidentDetailModal";
 
 export default function AttendanceManagement() {
   const { user: currentUser } = useAuth();
@@ -60,6 +61,9 @@ export default function AttendanceManagement() {
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validatingRecord, setValidatingRecord] = useState(null);
   const [validationLogs, setValidationLogs] = useState([]);
+  const [showIncidentDetail, setShowIncidentDetail] = useState(false);
+  const [incidentDetailData, setIncidentDetailData] = useState(null);
+  const [incidentDetailEmployee, setIncidentDetailEmployee] = useState(null);
   const [showEditRequestModal, setShowEditRequestModal] = useState(false);
   const [editRequestRecord, setEditRequestRecord] = useState(null);
   const [editRequestEmployee, setEditRequestEmployee] = useState(null);
@@ -1552,7 +1556,12 @@ export default function AttendanceManagement() {
                               {/* Acciones */}
                               <td className="px-2 py-2">
                                 <div className="flex items-center gap-1 flex-wrap justify-start">
-                                  <Badge className={`${statusConfig.color} text-xs shrink-0 whitespace-nowrap`} style={{minWidth: "78px", justifyContent: "center"}}>
+                                  <Badge
+                                    className={`${statusConfig.color} text-xs shrink-0 whitespace-nowrap ${rowIncident ? "cursor-pointer hover:opacity-80" : ""}`}
+                                    style={{minWidth: "78px", justifyContent: "center"}}
+                                    onClick={rowIncident ? () => { setIncidentDetailData(rowIncident); setIncidentDetailEmployee(emp); setShowIncidentDetail(true); } : undefined}
+                                    title={rowIncident ? "Ver detalle de justificación" : undefined}
+                                  >
                                     <StatusIcon className="w-3 h-3 mr-1" />{statusConfig.text}
                                   </Badge>
 
@@ -2126,6 +2135,15 @@ export default function AttendanceManagement() {
               setValidatingRecord(null);
               setValidationLogs([]);
             }}
+          />
+        )}
+
+        {/* Incident Detail Modal */}
+        {showIncidentDetail && incidentDetailData && (
+          <IncidentDetailModal
+            incident={incidentDetailData}
+            employee={incidentDetailEmployee}
+            onClose={() => { setShowIncidentDetail(false); setIncidentDetailData(null); setIncidentDetailEmployee(null); }}
           />
         )}
 

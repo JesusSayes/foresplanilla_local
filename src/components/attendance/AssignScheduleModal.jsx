@@ -185,6 +185,10 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess, init
       toast.error("Selecciona un horario");
       return;
     }
+    if (!effectiveFrom) {
+      toast.error("Debes indicar la fecha de inicio de vigencia");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -194,6 +198,9 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess, init
 
       const effectiveFromStr = format(effectiveFrom, "yyyy-MM-dd");
       const effectiveToStr = effectiveTo ? format(effectiveTo, "yyyy-MM-dd") : null;
+
+      // Si la fecha de fin ya pasó, el horario se creará inactivo
+      const isExpired = effectiveToStr !== null && effectiveToStr < today;
 
       // 1. Cerrar horarios individuales del empleado que se superpongan
       for (const s of empSchedules) {
@@ -221,6 +228,7 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess, init
         schedule_name: `${selectedSchedule.schedule_name} - ${employee.first_name} ${employee.last_name}`,
         effective_from: effectiveFromStr,
         effective_to: effectiveToStr,
+        is_active: !isExpired,
         monday_start: selectedSchedule.monday_start,
         monday_end: selectedSchedule.monday_end,
         tuesday_start: selectedSchedule.tuesday_start,
@@ -239,11 +247,10 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess, init
         tolerance_minutes: selectedSchedule.tolerance_minutes ?? 10,
         exempt_from_clocking: selectedSchedule.exempt_from_clocking ?? false,
         overtime_authorized: selectedSchedule.overtime_authorized ?? false,
-        is_active: true,
       });
 
-      // 3. Recalcular asistencias si se solicitó
-      if (recalcRange) {
+      // 3. Recalcular asistencias si se solicitó (solo si el período no está completamente en el futuro)
+      if (recalcRange && !isExpired) {
         const dateTo = effectiveToStr || format(new Date(), "yyyy-MM-dd");
         if (effectiveFromStr <= dateTo) {
           // const res = await base44.functions.invoke("recalcularAsistencia", {
@@ -261,6 +268,8 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess, init
         } else {
           toast.success("Horario asignado correctamente");
         }
+      } else if (isExpired) {
+        toast.warning("Horario guardado como inactivo porque la fecha de vigencia ya venció.");
       } else {
         toast.success("Horario asignado correctamente");
       }
