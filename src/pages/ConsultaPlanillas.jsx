@@ -774,11 +774,11 @@ export default function ConsultaPlanillas() {
 
         {/* KPIs del año */}
         <div className="grid grid-cols-4 gap-3 mb-6">
-            {[
-              { label: `Planillas ${filterYear}`, value: gruposAnio.length, icon: FileText, color: "indigo" },
-              { label: "Empleados únicos", value: totalEmps, icon: Users, color: "blue" },
+          {[
+            { label: `Planillas ${filterYear}`, value: gruposAnio.length, icon: FileText, color: "indigo" },
+            { label: "Empleados únicos", value: totalEmps, icon: Users, color: "blue" },
             { label: `Total neto ${filterYear}`, value: formatMoney(totalAnio), icon: DollarSign, color: "green" },
-              { label: "Tipos de planilla", value: [...new Set(gruposAnio.map(g => g.payroll_type))].length, icon: Calendar, color: "purple" },
+            { label: "Tipos de planilla", value: [...new Set(gruposAnio.map(g => g.payroll_type))].length, icon: Calendar, color: "purple" },
           ].map(({ label, value, icon: Icon, color }) => (
             <Card key={label} className="border-0 shadow-lg">
               <CardContent className="p-3">

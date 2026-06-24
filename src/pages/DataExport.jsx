@@ -379,7 +379,6 @@ const ENTITY_GROUPS = [
   { label: "Contratos", entities: ["Contract", "ContractTemplate", "ContractClause", "ContractRenewalRule"] },
   { label: "Asistencia", entities: ["AttendanceRecord", "AttendanceEditRequest", "AttendanceIncident", "OvertimeAlert", "WorkSchedule", "AccessDevice", "EmployeeAccessMapping", "DeviceEvent", "DatabaseConnection", "SyncLog"] },
   { label: "Vacaciones", entities: ["VacationRequest", "VacationBalance"] },
-  { label: "Planillas y Remuneración", entities: ["Payslip", "PayrollConcept", "Loan", "LoanInstallment"] },
   { label: "Centros de Costo", entities: ["CostCenter", "CostCenterAssignment", "CostCenterChangeLog", "CostCenterCategory", "AccountingAccount"] },
   { label: "Contabilidad", entities: ["AsientoContable", "CuentaContable"] },
   { label: "Datos Maestros", entities: ["Holiday", "Position", "Department", "Bank", "Site", "AFP", "Profession", "Ubigeo", "RMV", "UIT", "SeguroVidaLey", "AreaUnidadCargo", "IncidentType"] },

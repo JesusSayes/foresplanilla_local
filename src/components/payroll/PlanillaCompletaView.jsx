@@ -281,8 +281,8 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
                     <td className="px-1.5 py-1 font-mono text-slate-700">{emp.employee_code}</td>
                     <td className="px-1.5 py-1 font-medium text-slate-900 whitespace-nowrap">{emp.last_name}, {emp.first_name}</td>
                     <td className="px-1.5 py-1 text-slate-600 whitespace-nowrap">{emp.document_type} {emp.document_number}</td>
-                      <td className="px-1.5 py-1 text-slate-600" style={{ maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.position || "—"}</td>
-                      <td className="px-1.5 py-1 text-center">{p.worked_days}</td>
+                    <td className="px-1.5 py-1 text-slate-600" style={{ maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.position || "—"}</td>
+                    <td className="px-1.5 py-1 text-center">{p.worked_days}</td>
                     <td className="px-1.5 py-1 text-right">{s(p.base_salary).toFixed(2)}</td>
                     <td className="px-1.5 py-1 text-right">{(s(p.total_income) - s(p.base_salary)).toFixed(2)}</td>
                     <td className="px-1.5 py-1 text-right font-semibold" style={{ color: "#15803d" }}>{s(p.total_income).toFixed(2)}</td>
@@ -290,7 +290,7 @@ export default function PlanillaCompletaView({ grupo, payslips, companyInfo, fir
                     <td className="px-1.5 py-1 text-right">{(s(p.total_deductions) - s(p.pension_deduction)).toFixed(2)}</td>
                     <td className="px-1.5 py-1 text-right font-semibold" style={{ color: "#dc2626" }}>{s(p.total_deductions).toFixed(2)}</td>
                     <td className="px-1.5 py-1 text-right font-bold" style={{ color: "#4338ca" }}>{s(p.net_pay).toFixed(2)}</td>
-                      <td className="px-1.5 py-1"><div style={{ height: "20px", border: "1px dashed #cbd5e1", borderRadius: "3px", minWidth: "50px" }} /></td>
+                    <td className="px-1.5 py-1"><div style={{ height: "20px", border: "1px dashed #cbd5e1", borderRadius: "3px", minWidth: "50px" }} /></td>
                   </tr>
                 ))}
               </tbody>
