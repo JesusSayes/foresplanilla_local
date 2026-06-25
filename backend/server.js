@@ -65,6 +65,8 @@ import { syncExternalAttendance } from './services/externalAttendanceSync.js';
 import asientosContablesRoutes from './routes/asientosContables.js';
 import cuentasContablesRoutes from './routes/cuentasContables.js';
 import incidentTypesRoutes from './routes/incidentTypes.js';
+import subdiariosRoutes from './routes/subdiarios.js';
+import tipoAnexosRoutes from './routes/tipoAnexos.js';
 
 dotenv.config();
 
@@ -163,6 +165,8 @@ app.use('/api/derechohabientes', derechohabientesRoutes);
 app.use('/api/asientos-contables', asientosContablesRoutes);
 app.use('/api/cuentas-contables', cuentasContablesRoutes);
 app.use('/api/incident-types', incidentTypesRoutes);
+app.use('/api/subdiarios', subdiariosRoutes);
+app.use('/api/tipo-anexos', tipoAnexosRoutes);
 
 // Cron configuration
 const CRON_TIMEZONE = process.env.CRON_TIMEZONE || 'America/Lima';

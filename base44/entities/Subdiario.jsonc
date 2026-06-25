@@ -1,0 +1,39 @@
+{
+  "name": "Subdiario",
+  "type": "object",
+  "properties": {
+    "codigo": {
+      "type": "string",
+      "description": "C\u00f3digo del subdiario (m\u00e1x. 5 caracteres, ej: 08, 01)"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Descripci\u00f3n del subdiario contable"
+    },
+    "nombre_breve": {
+      "type": "string",
+      "description": "Nombre breve del subdiario (m\u00e1x. 10 caracteres)"
+    },
+    "apertura": {
+      "type": "string",
+      "description": "Tipo de apertura (A = Apertura, etc.)"
+    },
+    "codigo_sunat": {
+      "type": "string",
+      "description": "C\u00f3digo SUNAT asociado al subdiario"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "A",
+        "I"
+      ],
+      "default": "A",
+      "description": "Estado del subdiario: A = Activo, I = Inactivo"
+    }
+  },
+  "required": [
+    "codigo",
+    "descripcion"
+  ]
+}
