@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameMonth, isToday } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameMonth, isToday, isFuture, isAfter } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,8 @@ function getDayScheduleInfo(date, schedule) {
 
 export default function EmployeeScheduleCalendar({ employee, schedules, templates, onAssign, onEdit, onClose }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const maxMonth = addMonths(new Date(), 1);
+  const canGoNext = currentMonth < startOfMonth(maxMonth);
 
   const days = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });
 
@@ -67,7 +69,7 @@ export default function EmployeeScheduleCalendar({ employee, schedules, template
           <h3 className="text-lg font-semibold text-slate-800 capitalize">
             {format(currentMonth, "MMMM yyyy", { locale: es })}
           </h3>
-          <Button variant="outline" size="icon" onClick={() => setCurrentMonth(m => addMonths(m, 1))}>
+          <Button variant="outline" size="icon" onClick={() => setCurrentMonth(m => addMonths(m, 1))} disabled={!canGoNext}>
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
@@ -112,7 +114,8 @@ export default function EmployeeScheduleCalendar({ employee, schedules, template
                   key={day.toISOString()}
                   onClick={() => {
                     if (hasAssignment) {
-                      onEdit(activeSchedules[0]);
+                      const workingSlots = activeSchedules.filter(s => getDayScheduleInfo(day, s));
+                      onEdit(workingSlots.length > 0 ? workingSlots[0] : activeSchedules[0]);
                     } else {
                       onAssign(day);
                     }
@@ -189,10 +192,7 @@ export default function EmployeeScheduleCalendar({ employee, schedules, template
               })}
             </div>
           )}
-          <Button onClick={() => onAssign(null)} className="mt-3 w-full bg-indigo-600 hover:bg-indigo-700" size="sm">
-            <Plus className="w-4 h-4 mr-2" />
-            Agregar nuevo horario
-          </Button>
+
         </div>
       </div>
     </div>
