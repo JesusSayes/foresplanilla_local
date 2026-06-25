@@ -1625,13 +1625,6 @@ export default function AttendanceManagement() {
                                     onClick={() => { setSchedulingEmployee({ ...emp, _rowDate: rowDate }); setShowScheduleModal(true); }}>
                                     <CalendarClock className="w-3 h-3" />
                                   </Button>}
-                                  {!vacation && emp.record && (
-                                    <Button size="sm" variant="outline"
-                                      className="h-7 px-2 text-xs shrink-0 whitespace-nowrap text-purple-700 border-purple-300 hover:bg-purple-50"
-                                      onClick={() => handleOpenValidationModal(emp.record)}>
-                                      <CheckCircle className="w-3 h-3 mr-1" />Validar
-                                    </Button>
-                                  )}
                                 </div>
                               </td>
                             </tr>
