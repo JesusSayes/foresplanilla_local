@@ -81,12 +81,12 @@ export default function AsientosContables() {
 
   const { data: subdiariosCatalog = [] } = useQuery({
     queryKey: ["subdiarios_catalog"],
-    queryFn: () => [],
+    queryFn: () => entitiesAPI.Subdiario.list("codigo"),
   });
 
   const { data: tipoAnexos = [] } = useQuery({
     queryKey: ["tipo_anexos"],
-    queryFn: () => [],
+    queryFn: () => entitiesAPI.TipoAnexo.list("codigo_tipo_anexo"),
   });
 
   const updateMutation = useMutation({

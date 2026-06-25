@@ -122,6 +122,8 @@ export const entitiesAPI = {
   LoanInstallment: createEntityAPI('/api/payroll/loan-installments'),
   Derechohabiente: createEntityAPI('/api/derechohabientes'),
   CuentaContable: createEntityAPI('/api/cuentas-contables'),
+  Subdiario: createEntityAPI('/api/subdiarios'),
+  TipoAnexo: createEntityAPI('/api/tipo-anexos'),
   AsientoContable: {
     ...createEntityAPI('/api/asientos-contables'),
 

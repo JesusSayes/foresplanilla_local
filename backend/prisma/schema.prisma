@@ -818,6 +818,37 @@ model accountingaccount {
   is_sample     Boolean?
 }
 
+model subdiario {
+  id            String    @id @db.VarChar(255)
+  codigo        String    @unique(map: "subdiario_codigo_unique")
+  descripcion   String
+  nombre_breve  String?
+  apertura      String?
+  codigo_sunat  String?
+  estado        String?   @default("A")
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by_id String?
+  created_by    String?
+  is_sample     Boolean?  @default(false)
+
+  @@index([estado], map: "idx_subdiario_estado")
+}
+
+model tipo_anexo {
+  id                String    @id @db.VarChar(255)
+  codigo_tipo_anexo String    @unique(map: "tipo_anexo_codigo_unique")
+  descripcion       String
+  estado            String?   @default("A")
+  created_date      DateTime? @db.Timestamp(6)
+  updated_date      DateTime? @db.Timestamp(6)
+  created_by_id     String?
+  created_by        String?
+  is_sample         Boolean?  @default(false)
+
+  @@index([estado], map: "idx_tipo_anexo_estado")
+}
+
 model overtime_alert {
   id                   String    @id(map: "overtimealert_pkey") @db.VarChar(255)
   created_date         DateTime? @db.Timestamp(6)
