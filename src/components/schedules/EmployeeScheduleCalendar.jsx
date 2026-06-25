@@ -56,7 +56,7 @@ export default function EmployeeScheduleCalendar({ employee, schedules, template
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-4" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b bg-indigo-50 rounded-t-2xl">
@@ -194,7 +194,12 @@ export default function EmployeeScheduleCalendar({ employee, schedules, template
 
         {/* Schedule list */}
         <div className="px-6 pb-6 border-t pt-4">
-          <h4 className="text-sm font-semibold text-slate-700 mb-3">Horarios asignados a este empleado</h4>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold text-slate-700">Horarios asignados a este empleado</h4>
+            <Button variant="outline" size="sm" onClick={onClose} className="text-xs">
+              <X className="w-3.5 h-3.5 mr-1" /> Cerrar calendario
+            </Button>
+          </div>
           {schedules.length === 0 ? (
             <p className="text-sm text-slate-500 text-center py-4">No tiene horarios asignados</p>
           ) : (
