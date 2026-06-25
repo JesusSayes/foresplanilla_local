@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search, Download, Upload, RefreshCw, CheckCircle, XCircle,
   AlertCircle, Clock, BookOpen, Filter, Eye, Loader2
@@ -80,6 +79,16 @@ export default function AsientosContables() {
     queryFn: () => entitiesAPI.CuentaContable.list("cuenta"),
   });
 
+  const { data: subdiariosCatalog = [] } = useQuery({
+    queryKey: ["subdiarios_catalog"],
+    queryFn: () => [],
+  });
+
+  const { data: tipoAnexos = [] } = useQuery({
+    queryKey: ["tipo_anexos"],
+    queryFn: () => [],
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => entitiesAPI.AsientoContable.update(id, data),
     onSuccess: () => queryClient.invalidateQueries(["asientosContables"]),
@@ -121,7 +130,11 @@ export default function AsientosContables() {
     totalHaber: filtered.filter(a => a.debe_haber === "H" && !a.anulado).reduce((s, a) => s + (a.importe || 0), 0),
   };
 
-  const subdiarios = [...new Set(asientos.map(a => a.subdiario).filter(Boolean))].sort();
+  // Combinar catálogo de subdiarios con los que aparecen en asientos (por si hay sin catálogo aún)
+  const subdiariosCodigos = [...new Set([
+    ...subdiariosCatalog.map(s => s.codigo),
+    ...asientos.map(a => a.subdiario).filter(Boolean),
+  ])].sort();
 
   const handleMarcarMigrado = async (asiento) => {
     setMigratingIds(prev => new Set([...prev, asiento.id]));
@@ -339,10 +352,17 @@ export default function AsientosContables() {
                 title="Filtrar por período"
               />
               <Select value={filterSubdiario} onValueChange={setFilterSubdiario}>
-                <SelectTrigger className="w-36"><SelectValue placeholder="Subdiario" /></SelectTrigger>
+                <SelectTrigger className="w-48"><SelectValue placeholder="Subdiario" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {subdiarios.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  <SelectItem value="all">Todos los subdiarios</SelectItem>
+                  {subdiariosCodigos.map(codigo => {
+                    const cat = subdiariosCatalog.find(s => s.codigo === codigo);
+                    return (
+                      <SelectItem key={codigo} value={codigo}>
+                        {codigo}{cat ? ` — ${cat.nombre_breve || cat.descripcion}` : ""}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               <Select value={filterOrigen} onValueChange={setFilterOrigen}>
@@ -434,7 +454,11 @@ export default function AsientosContables() {
                       return (
                         <tr key={asiento.id} className={`hover:bg-slate-50 transition-colors ${asiento.anulado ? "opacity-50" : ""}`}>
                           <td className="px-3 py-3 font-mono text-xs text-slate-700 whitespace-nowrap">{asiento.annomes}</td>
-                          <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{asiento.subdiario || "—"}</td>
+                          <td className="px-3 py-3 text-slate-600 whitespace-nowrap">
+                            {asiento.subdiario
+                              ? (() => { const cat = subdiariosCatalog.find(s => s.codigo === asiento.subdiario); return cat ? <span title={cat.descripcion}>{asiento.subdiario} <span className="text-xs text-slate-400">{cat.nombre_breve}</span></span> : asiento.subdiario; })()
+                              : "—"}
+                          </td>
                           <td className="px-3 py-3 font-medium text-indigo-700 whitespace-nowrap">{asiento.comprobante}</td>
                           <td className="px-3 py-3 whitespace-nowrap">
                             <span className="font-mono text-xs font-semibold text-slate-800">{asiento.cuenta}</span>
@@ -545,6 +569,7 @@ export default function AsientosContables() {
             asiento={selectedAsiento}
             employees={employees}
             cuentas={cuentas}
+            tipoAnexos={tipoAnexos}
             onClose={() => setSelectedAsiento(null)}
           />
         )}
@@ -553,7 +578,7 @@ export default function AsientosContables() {
   );
 }
 
-function DetalleAsientoModal({ asiento, employees, cuentas, onClose }) {
+function DetalleAsientoModal({ asiento, employees, cuentas, tipoAnexos, onClose }) {
   const emp = employees.find(e => e.id === asiento.employee_id);
   const cuenta = cuentas.find(c => c.cuenta === asiento.cuenta);
   const estConfig = ESTADO_CONFIG[asiento.estado_migracion] || ESTADO_CONFIG.Pendiente;
@@ -605,7 +630,7 @@ function DetalleAsientoModal({ asiento, employees, cuentas, onClose }) {
             <Row label="Medio de Pago" value={asiento.medio_pago} />
           </Section>
           <Section title="Anexo / Documento">
-            <Row label="Tipo Anexo" value={asiento.tipo_anexo} />
+            <Row label="Tipo Anexo" value={asiento.tipo_anexo ? `${asiento.tipo_anexo}${(() => { const ta = tipoAnexos?.find(t => t.codigo_tipo_anexo === asiento.tipo_anexo); return ta ? ` — ${ta.descripcion}` : ""; })()}` : null} />
             <Row label="Cód. Anexo" value={asiento.cod_anexo} />
             <Row label="Tipo Documento" value={asiento.tipo_doc} />
             <Row label="N° Documento" value={asiento.nro_doc} />

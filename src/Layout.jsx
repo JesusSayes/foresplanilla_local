@@ -219,10 +219,8 @@ export default function Layout({ children, currentPageName }) {
     // Gestión Empleados (solo quien puede ver empleados)
     if (hasPermission("employees.view")) {
       const submenu = [{ name: "Ver Empleados", path: "EmployeeManagement" }];
-      if (isAdmin) {
-        submenu.push({ name: "Organigrama", path: "OrgChart" });
-        if (hasPermission("employees.import")) submenu.push({ name: "Importar Empleados", path: "ImportEmployees" });
-      }
+      if (isAdmin || hasPermission("employees.orgchart")) submenu.push({ name: "Organigrama", path: "OrgChart" });
+      if (hasPermission("employees.import")) submenu.push({ name: "Importar Empleados", path: "ImportEmployees" });
       if (hasPermission("vacations.manage")) submenu.push({ name: "Gestión Vacaciones", path: "VacationManagement" });
       if (hasPermission("vacations.approve")) submenu.push({ name: "Aprobar Vacaciones", path: "ManagerApprovals" });
       if (hasAnyPermission(["vacations.view_calendar", "vacations.manage_balances"])) submenu.push({ name: "Calendario Vacaciones", path: "VacationCalendar" });
@@ -232,44 +230,61 @@ export default function Layout({ children, currentPageName }) {
 
     // Contratos
     if (hasPermission("contracts.view")) {
+      const contractSubmenu = [{ name: "Ver Contratos", path: "ContractManagement" }];
+      if (isAdmin || hasPermission("contracts.manage_templates")) contractSubmenu.push({ name: "Plantillas Contratos", path: "ContractTemplateConfig" });
+      if (isAdmin || hasPermission("contracts.manage_renewals")) contractSubmenu.push({ name: "Automatización Renovación", path: "ContractRenewalAutomation" });
       items.push({
         name: "Gestión Contratos",
         icon: FileText,
         path: "ContractManagement",
-        submenu: [
-          { name: "Ver Contratos", path: "ContractManagement" },
-          ...(hasPermission("contracts.manage_templates") ? [{ name: "Plantillas Contratos", path: "ContractTemplateConfig" }] : []),
-          ...(hasPermission("contracts.manage_renewals") ? [{ name: "Automatización Renovación", path: "ContractRenewalAutomation" }] : []),
-        ]
+        submenu: contractSubmenu,
       });
     }
 
     // Asistencia - incluye aprobadores de edición aunque no tengan permisos de vista generales
-    if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.manage", "attendance.approve_edits"])) {
+    if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.manage", "attendance.approve_edits", "schedules.view"])) {
       const submenu = [];
-      if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.approve_edits"])) submenu.push({ name: "Ver Asistencia", path: "AttendanceManagement" });
-      if (hasAnyPermission(["reports.attendance", "attendance.view_reports", "attendance.export"])) submenu.push({ name: "Reportes Asistencia", path: "AttendanceReports" });
-      if (hasAnyPermission(["schedules.view"])) submenu.push({ name: "Gestión Horarios", path: "ScheduleManagement" });
-      if (isAdmin) {
+      if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.manage", "attendance.approve_edits"])) submenu.push({ name: "Ver Asistencia", path: "AttendanceManagement" });
+      if (hasAnyPermission(["reports.attendance", "attendance.view_reports", "attendance.export", "reports.view", "attendance.view_all"])) submenu.push({ name: "Reportes Asistencia", path: "AttendanceReports" });
+      if (hasPermission("schedules.view")) submenu.push({ name: "Gestión Horarios", path: "ScheduleManagement" });
+      if (isAdmin || hasPermission("attendance.devices")) {
         submenu.push({ name: "Base de Datos Externa", path: "DatabaseConfig" });
         submenu.push({ name: "Control de Acceso Físico", path: "AccessDeviceConfig" });
       }
       items.push({ name: "Gestión Asistencia", icon: CheckSquare, path: "AttendanceManagement", submenu });
     }
 
-    // Planillas - solo quien puede ver planillas de todos o del departamento
-    if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department"])) {
-      const submenu = [{ name: "Generar Planillas", path: "PayrollManagement" }];
-      if (isAdmin) submenu.push({ name: "Conceptos de Planilla", path: "PayrollConcepts" });
-      submenu.push({ name: "Consulta de Planillas", path: "ConsultaPlanillas" });
-      submenu.push({ name: "Préstamos", path: "LoanManagement" });
+    // Planillas — visible si tiene cualquier permiso de planillas O centros de costo O contabilidad
+    if (hasAnyPermission([
+      "payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create", "payroll.calculate", "payroll.view_own",
+      "cost_centers.view"
+    ])) {
+      const submenu = [];
+      if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create", "payroll.calculate"])) {
+        submenu.push({ name: "Generar Planillas", path: "PayrollManagement" });
+      }
+      if (isAdmin || hasPermission("payroll.manage_concepts")) {
+        submenu.push({ name: "Conceptos de Planilla", path: "PayrollConcepts" });
+      }
+      if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create", "payroll.calculate"])) {
+        submenu.push({ name: "Consulta de Planillas", path: "ConsultaPlanillas" });
+      }
+      if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create"])) {
+        submenu.push({ name: "Préstamos", path: "LoanManagement" });
+      }
       if (hasPermission("cost_centers.view")) {
         submenu.push({ name: "Centros de Costo", path: "CostCenterManagement" });
         submenu.push({ name: "Consulta Valorizada", path: "CostCenterValuation" });
       }
-      submenu.push({ name: "Asientos Contables", path: "AsientosContables" });
-      submenu.push({ name: "Cuentas Contables", path: "CuentasContables" });
-      items.push({ name: "Gestión Planillas", icon: FileText, path: "PayrollManagement", submenu });
+      if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create", "payroll.calculate"])) {
+        submenu.push({ name: "Asientos Contables", path: "AsientosContables" });
+        submenu.push({ name: "Cuentas Contables", path: "CuentasContables" });
+      }
+      // Solo mostrar el menú si hay al menos un submenú disponible
+      if (submenu.length > 0) {
+        const firstPath = submenu[0].path;
+        items.push({ name: "Gestión Planillas", icon: FileText, path: firstPath, submenu });
+      }
     }
 
     // Reportes
