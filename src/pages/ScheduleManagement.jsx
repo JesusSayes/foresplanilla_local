@@ -780,7 +780,7 @@ export default function ScheduleManagement() {
                               size="sm"
                               variant="outline"
                               className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                              onClick={() => setCalendarEmployee(allEmployees.find(e => e.id === schedule.employee_id) || null)}
+                              onClick={() => setCalendarEmployee(allEmployees.find(e => String(e.id) === String(schedule.employee_id)) || { id: schedule.employee_id, first_name: getEmployeeName(schedule.employee_id), last_name: "", employee_code: "", department_name: "" })}
                               title="Ver calendario de horarios"
                             >
                               <CalendarDays className="w-4 h-4" />
@@ -988,7 +988,7 @@ export default function ScheduleManagement() {
       {calendarEmployee && (
         <EmployeeScheduleCalendar
           employee={calendarEmployee}
-          schedules={individualAssignments.filter(s => s.employee_id === calendarEmployee.id)}
+          schedules={individualAssignments.filter(s => String(s.employee_id) === String(calendarEmployee.id))}
           templates={templates}
           onAssign={(day) => {
             setCalendarEmployee(null);
