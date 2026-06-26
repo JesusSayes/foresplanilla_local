@@ -12,13 +12,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Clock, Plus, Edit, Trash2, Users, User, Calendar, Search, ChevronsUpDown, Check, X, CalendarIcon
+  Clock, Plus, Edit, Trash2, Users, User, Calendar, Search, ChevronsUpDown, Check, X, CalendarIcon, CalendarDays
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
+import EmployeeScheduleCalendar from "../components/schedules/EmployeeScheduleCalendar";
 
 export default function ScheduleManagement() {
   const { user: currentUser } = useAuth();
@@ -26,7 +27,7 @@ export default function ScheduleManagement() {
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [editingAssignment, setEditingAssignment] = useState(null);
-
+  const [calendarEmployee, setCalendarEmployee] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSite, setFilterSite] = useState("all");
   const [filterActive, setFilterActive] = useState("all");
@@ -775,6 +776,15 @@ export default function ScheduleManagement() {
                             </div>
                           </div>
                           <div className="flex gap-2 ml-3 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                              onClick={() => setCalendarEmployee(allEmployees.find(e => e.id === schedule.employee_id) || null)}
+                              title="Ver calendario de horarios"
+                            >
+                              <CalendarDays className="w-4 h-4" />
+                            </Button>
                             {hasAnyPermission(["schedules.edit", "schedules.assign", "schedules.manage", "system.admin"]) && (
                               <Button size="sm" variant="outline" onClick={() => handleEditAssignment(schedule)}>
                                 <Edit className="w-4 h-4" />
@@ -973,6 +983,34 @@ export default function ScheduleManagement() {
                               </Card>
                               </Tabs>
                               </div>
+
+      {/* Employee Schedule Calendar Modal */}
+      {calendarEmployee && (
+        <EmployeeScheduleCalendar
+          employee={calendarEmployee}
+          schedules={individualAssignments.filter(s => s.employee_id === calendarEmployee.id)}
+          templates={templates}
+          onAssign={(day) => {
+            setCalendarEmployee(null);
+            setAssignFormData({
+              employee_id: calendarEmployee.id,
+              departments: [],
+              effective_from: day || new Date(),
+              effective_to: null,
+            });
+            setEmployeeSearch(`${calendarEmployee.first_name} ${calendarEmployee.last_name} - ${calendarEmployee.employee_code}`);
+            setEditingAssignment(null);
+            setSelectedTemplateId("");
+            setTemplateSearch("");
+            setShowAssignForm(true);
+          }}
+          onEdit={(schedule) => {
+            setCalendarEmployee(null);
+            handleEditAssignment(schedule);
+          }}
+          onClose={() => setCalendarEmployee(null)}
+        />
+      )}
 
       {/* Template Form Modal */}
       {showTemplateForm && (
