@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, Download, Image, X, Clock, Calendar, User } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { getPublicAssetUrl } from "@/api/apiConfig";
 import { parseDateLima } from "@/lib/dateUtils";
 
 const isImageUrl = (url) => /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(url);
@@ -98,7 +99,7 @@ export default function IncidentDetailModal({ incident, employee, onClose }) {
                 {isImage ? (
                   <div className="rounded-lg overflow-hidden border border-slate-200">
                     <img
-                      src={incident.supporting_document_url}
+                      src={getPublicAssetUrl(incident.supporting_document_url)}
                       alt="Documento de sustento"
                       className="w-full object-contain max-h-64"
                       onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
@@ -109,7 +110,7 @@ export default function IncidentDetailModal({ incident, employee, onClose }) {
                   </div>
                 ) : null}
                 <a
-                  href={incident.supporting_document_url}
+                  href={getPublicAssetUrl(incident.supporting_document_url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:underline bg-indigo-50 px-3 py-2 rounded-lg w-full"

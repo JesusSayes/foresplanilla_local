@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getPublicAssetUrl } from "@/api/apiConfig";
 import { entitiesAPI } from '@/api/entitiesClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -669,7 +670,7 @@ export default function JustifyModal({
                 {justificationData.supporting_document_url && (
                   <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
                     <FileText className="w-4 h-4 text-green-600" />
-                    <a href={justificationData.supporting_document_url} target="_blank" rel="noopener noreferrer"
+                    <a href={getPublicAssetUrl(justificationData.supporting_document_url)} target="_blank" rel="noopener noreferrer"
                       className="text-xs text-green-700 hover:underline flex-1">Archivo adjunto</a>
                     <Button size="sm" variant="ghost" onClick={() => setJustificationData({ ...justificationData, supporting_document_url: "" })}>✕</Button>
                   </div>
