@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from '@/lib/AuthContext';
+import { getPublicAssetUrl } from "@/api/apiConfig";
 import { entitiesAPI } from '@/api/entitiesClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1832,7 +1833,7 @@ export default function AttendanceManagement() {
                                 </div>
                                 {incident.supporting_document_url && (
                                   <div className="mb-4">
-                                   <a href={incident.supporting_document_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:underline bg-indigo-50 px-3 py-2 rounded-lg">
+                                   <a href={getPublicAssetUrl(incident.supporting_document_url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:underline bg-indigo-50 px-3 py-2 rounded-lg">
                                       <Download className="w-4 h-4" />Ver documento adjunto
                                     </a>
                                   </div>
