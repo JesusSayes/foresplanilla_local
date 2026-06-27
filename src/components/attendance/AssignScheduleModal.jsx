@@ -194,7 +194,7 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess, init
       const effectiveFromStr = format(effectiveFrom, "yyyy-MM-dd");
       const effectiveToStr = effectiveTo ? format(effectiveTo, "yyyy-MM-dd") : null;
 
-      // Si la fecha de fin ya pasó, el horario se creará inactivo
+      // Si la fecha de fin ya pasó, el horario se considera vencido (pero se guarda activo para que aparezca en el calendario)
       const isExpired = effectiveToStr !== null && effectiveToStr < today;
 
       // 1. Cerrar horarios individuales del empleado que se superpongan
@@ -219,7 +219,7 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess, init
         schedule_name: `${selectedSchedule.schedule_name} - ${employee.first_name} ${employee.last_name}`,
         effective_from: effectiveFromStr,
         effective_to: effectiveToStr,
-        is_active: !isExpired,
+        is_active: true,
         monday_start: selectedSchedule.monday_start,
         monday_end: selectedSchedule.monday_end,
         tuesday_start: selectedSchedule.tuesday_start,
@@ -240,23 +240,25 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess, init
         overtime_authorized: selectedSchedule.overtime_authorized ?? false,
       });
 
-      // 3. Recalcular asistencias si se solicitó (solo si el período no está completamente en el futuro)
-      if (recalcRange && !isExpired) {
-        const dateTo = effectiveToStr || format(new Date(), "yyyy-MM-dd");
+      // 3. Recalcular asistencias si se solicitó, incluyendo períodos históricos
+      if (recalcRange) {
+        const dateTo = effectiveToStr && effectiveToStr < today ? effectiveToStr : (effectiveToStr || today);
         if (effectiveFromStr <= dateTo) {
           const res = await base44.functions.invoke("recalcularAsistencia", {
             employee_id: employee.id,
             date_from: effectiveFromStr,
             date_to: dateTo,
           });
-          toast.success(`Horario asignado y ${res.data?.updated || 0} registros recalculados`);
+          if (isExpired) {
+            toast.success(`Horario histórico registrado y ${res.data?.updated || 0} registros recalculados (período vencido)`);
+          } else {
+            toast.success(`Horario asignado y ${res.data?.updated || 0} registros recalculados`);
+          }
         } else {
-          toast.success("Horario asignado correctamente");
+          toast.success(isExpired ? "Horario histórico registrado correctamente (período vencido)" : "Horario asignado correctamente");
         }
-      } else if (isExpired) {
-        toast.warning("Horario guardado como inactivo porque la fecha de vigencia ya venció.");
       } else {
-        toast.success("Horario asignado correctamente");
+        toast.success(isExpired ? "Horario histórico registrado (período vencido)" : "Horario asignado correctamente");
       }
 
       onSuccess?.();
