@@ -13,11 +13,45 @@
     },
     "clock_in": {
       "type": "string",
-      "description": "Hora de entrada (HH:mm)"
+      "description": "Hora de entrada segmento 1 (HH:mm)"
     },
     "clock_out": {
       "type": "string",
-      "description": "Hora de salida (HH:mm)"
+      "description": "Hora de salida segmento 1 (HH:mm)"
+    },
+    "clock_in_2": {
+      "type": "string",
+      "description": "Hora de entrada segmento 2 (HH:mm)"
+    },
+    "clock_out_2": {
+      "type": "string",
+      "description": "Hora de salida segmento 2 (HH:mm)"
+    },
+    "clock_in_3": {
+      "type": "string",
+      "description": "Hora de entrada segmento 3 (HH:mm)"
+    },
+    "clock_out_3": {
+      "type": "string",
+      "description": "Hora de salida segmento 3 (HH:mm)"
+    },
+    "clock_in_4": {
+      "type": "string",
+      "description": "Hora de entrada segmento 4 (HH:mm)"
+    },
+    "clock_out_4": {
+      "type": "string",
+      "description": "Hora de salida segmento 4 (HH:mm)"
+    },
+    "segment_count": {
+      "type": "integer",
+      "default": 1,
+      "description": "N\u00famero de segmentos de trabajo del d\u00eda (1\u20134)"
+    },
+    "is_split_day": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si el d\u00eda tiene m\u00e1s de un segmento de trabajo"
     },
     "scheduled_start": {
       "type": "string",

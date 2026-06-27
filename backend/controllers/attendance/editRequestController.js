@@ -3,7 +3,18 @@ import { canAccessEmployee, hasPermission } from "../../middleware/authorization
 import { calcularAsistenciaDesdeLogs } from "../../scripts/calcularAsistenciaDesdeLogs.js";
 import { generate24HexId } from "../../utils/idGenerator.js";
 
-const EDITABLE_FIELDS = new Set(["clock_in", "clock_out", "status", "notes"]);
+const TIME_FIELDS = new Set([
+  "clock_in",
+  "clock_out",
+  "clock_in_2",
+  "clock_out_2",
+  "clock_in_3",
+  "clock_out_3",
+  "clock_in_4",
+  "clock_out_4",
+]);
+const SEGMENT_FIELDS = new Set(["segment_count", "is_split_day"]);
+const EDITABLE_FIELDS = new Set([...TIME_FIELDS, ...SEGMENT_FIELDS, "status", "notes"]);
 const VALID_STATUSES = new Set(["Completo", "Incompleto", "Ausente", "Justificado", "Vacaciones", "Revisar", "Sin marcar"]);
 
 const reviewerName = employee =>
@@ -20,12 +31,28 @@ const normalizeRequestedValues = values => {
       throw new Error(`El campo ${field} no puede editarse mediante una solicitud`);
     }
 
-    if (field === "clock_in" || field === "clock_out") {
+    if (TIME_FIELDS.has(field)) {
       const normalizedTime = value === "" || value === null ? null : String(value).slice(0, 5);
       if (normalizedTime !== null && !/^\d{2}:\d{2}$/.test(normalizedTime)) {
         throw new Error(`${field} debe tener formato HH:mm`);
       }
       normalized[field] = normalizedTime;
+    } else if (field === "segment_count") {
+      const segmentCount = Number(value);
+      if (!Number.isInteger(segmentCount) || segmentCount < 1 || segmentCount > 4) {
+        throw new Error("segment_count debe ser un entero entre 1 y 4");
+      }
+      normalized[field] = segmentCount;
+    } else if (field === "is_split_day") {
+      if (typeof value === "boolean") {
+        normalized[field] = value;
+      } else if (value === "true") {
+        normalized[field] = true;
+      } else if (value === "false") {
+        normalized[field] = false;
+      } else {
+        throw new Error("is_split_day debe ser booleano");
+      }
     } else if (field === "status") {
       if (!VALID_STATUSES.has(value)) throw new Error("Estado de asistencia inválido");
       normalized[field] = value;
