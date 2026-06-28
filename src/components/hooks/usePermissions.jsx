@@ -129,8 +129,6 @@ export const usePermissions = () => {
   const [roles, setRoles] = useState([]);
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
-  // fallbackSiteRestriction: undefined=cargando, null=todas, []|[...]=restricción
-  const [fallbackSiteRestriction, setFallbackSiteRestriction] = useState(undefined);
 
   useEffect(() => {
     const loadPermissions = async () => {
@@ -144,45 +142,24 @@ export const usePermissions = () => {
           const emp = employees[0];
           setEmployee(emp);
 
-          // Super Admin: carga sus roles asignados igual que cualquier otro usuario.
-          // No tiene bypass automático — debe tener employees.view_financials en su rol para verlo.
-
-          // Obtener roles asignados al usuario
           const userRoles = await base44.entities.UserRole.filter({ 
             employee_id: emp.id 
           });
 
-          if (userRoles.length > 0) {
-            const roleIds = userRoles.map(ur => ur.role_id);
-            const allRoles = await base44.entities.Role.list();
-            const assignedRoles = allRoles.filter(r => roleIds.includes(r.id));
-            
-            setRoles(assignedRoles);
-            setFallbackSiteRestriction(null); // los roles custom manejan la restricción
+          const roleIds = userRoles.map(ur => ur.role_id);
+          const allRoles = await base44.entities.Role.list();
+          const assignedRoles = allRoles.filter(r => roleIds.includes(r.id));
+          
+          setRoles(assignedRoles);
 
-            // Combinar permisos de todos los roles
-            const allPermissions = new Set();
-            assignedRoles.forEach(role => {
-              if (role.permissions) {
-                role.permissions.forEach(p => allPermissions.add(p));
-              }
-            });
-
-            setPermissions([...allPermissions]);
-          } else {
-            // Fallback al rol básico del empleado si no tiene roles asignados en UserRole
-            const basicPermissions = getBasicPermissionsByRole(emp.role);
-            setPermissions(basicPermissions);
-            // Calcular restricción de sede para roles legacy:
-            // admin y super_admin: sin restricción
-            // cualquier otro rol: restringido a su propia sede
-            if (emp.role === "admin" || emp.role === "super_admin") {
-              setFallbackSiteRestriction(null);
-            } else {
-              // Roles como manager, hr_readonly, empleado: solo su sede
-              setFallbackSiteRestriction(emp.site ? [emp.site] : []);
+          const allPermissions = new Set();
+          assignedRoles.forEach(role => {
+            if (role.permissions) {
+              role.permissions.forEach(p => allPermissions.add(p));
             }
-          }
+          });
+
+          setPermissions([...allPermissions]);
         }
       } catch (error) {
         console.error("Error loading permissions:", error);
@@ -215,37 +192,28 @@ export const usePermissions = () => {
   };
 
   const getAccessibleSites = () => {
-    // Mientras carga, devolver undefined para que los componentes esperen
     if (loading) return undefined;
 
     // Super admin siempre ve todo
     if (employee?.role === "super_admin") return null;
 
-    // Si el usuario tiene roles custom asignados en UserRole
-    if (roles.length > 0) {
-      // system.admin en los roles custom => acceso total
-      if (permissions.includes("system.admin")) return null;
+    // system.admin en los roles => acceso total
+    if (permissions.includes("system.admin")) return null;
 
-      const siteRestrictedRoles = roles.filter(r => r.site_restricted);
-      // Ningún rol tiene restricción → acceso total
-      if (siteRestrictedRoles.length === 0) return null;
+    const siteRestrictedRoles = roles.filter(r => r.site_restricted);
+    // Ningún rol tiene restricción → acceso total
+    if (siteRestrictedRoles.length === 0) return null;
 
-      // Si tiene algún rol SIN restricción de sede, ve todas
-      const hasUnrestrictedRole = roles.some(r => !r.site_restricted);
-      if (hasUnrestrictedRole) return null;
+    // Si tiene algún rol SIN restricción de sede, ve todas
+    const hasUnrestrictedRole = roles.some(r => !r.site_restricted);
+    if (hasUnrestrictedRole) return null;
 
-      // Combinar sedes de TODOS los roles site_restricted
-      const allowedSites = [...new Set(siteRestrictedRoles.flatMap(r => r.allowed_sites || []))];
-      // Si ningún rol tiene sedes específicas, restringir a la sede propia
-      if (allowedSites.length === 0) {
-        return employee?.site ? [employee.site] : [];
-      }
-      return allowedSites;
+    // Combinar sedes de TODOS los roles site_restricted
+    const allowedSites = [...new Set(siteRestrictedRoles.flatMap(r => r.allowed_sites || []))];
+    if (allowedSites.length === 0) {
+      return employee?.site ? [employee.site] : [];
     }
-
-    // Fallback para usuarios con rol legacy (sin UserRole asignado)
-    // fallbackSiteRestriction se calculó en el useEffect (undefined mientras carga)
-    return fallbackSiteRestriction ?? null;
+    return allowedSites;
   };
 
   const canAccessDepartment = (departmentName) => {
@@ -328,59 +296,4 @@ export const usePermissions = () => {
     getAccessibleEmployeeIds,
     canViewFinancials,
   };
-};
-
-// Permisos básicos por rol antiguo (para compatibilidad)
-const getBasicPermissionsByRole = (role) => {
-  const basicPermissions = {
-    super_admin: Object.keys(AVAILABLE_PERMISSIONS),
-    admin: [
-      "system.admin", "system.settings",
-      "employees.view", "employees.view_financials", "employees.edit", "employees.create", "employees.delete", "employees.import", "employees.export", "employees.change_status",
-      "attendance.view_all", "attendance.edit", "attendance.approve_edits", "attendance.approve_incidents", "attendance.manage", "attendance.export",
-      "vacations.view_all", "vacations.approve", "vacations.manage", "vacations.calendar",
-      "payroll.view_all", "payroll.view_amounts", "payroll.edit", "payroll.create", "payroll.delete", "payroll.calculate", "payroll.approve", "payroll.view_department",
-      "certificates.view_all", "certificates.approve", "certificates.create", "certificates.request",
-      "schedules.view", "schedules.edit", "schedules.create", "schedules.delete", "schedules.assign",
-      "holidays.view", "holidays.manage", "holidays.create", "holidays.edit", "holidays.delete",
-      "reports.view", "reports.export", "reports.attendance", "reports.payroll", "reports.vacations", "reports.employees",
-      "roles.view", "roles.manage", "roles.assign",
-      "cost_centers.view", "cost_centers.create", "cost_centers.edit", "cost_centers.assign", "cost_centers.view_amounts", "cost_centers.delete",
-      "contracts.view", "contracts.view_amounts", "contracts.create", "contracts.edit", "contracts.delete", "contracts.sign",
-      "sites.view", "sites.create", "sites.edit", "sites.delete", "sites.manage",
-      "departments.view", "departments.create", "departments.edit", "departments.delete", "departments.manage",
-      "positions.view", "positions.create", "positions.edit", "positions.delete", "positions.manage",
-      "banks.view", "banks.create", "banks.edit", "banks.delete",
-    ],
-    hr_readonly: [
-      "employees.view",
-      "attendance.view_all",
-      "vacations.view_all",
-      "payroll.view_all",
-      "certificates.view_all",
-      "schedules.view",
-      "holidays.view",
-      "reports.view", "reports.export",
-    ],
-    manager: [
-      "employees.view",
-      "attendance.view_department", "attendance.approve_incidents",
-      "vacations.view_department", "vacations.approve",
-      "payroll.view_own",
-      "certificates.view_own",
-      "schedules.view",
-      "holidays.view",
-      "reports.view", "reports.export",
-    ],
-    empleado: [
-      "attendance.view_own",
-      "vacations.view_own",
-      "payroll.view_own",
-      "certificates.view_own",
-      "schedules.view",
-      "holidays.view",
-    ],
-  };
-
-  return basicPermissions[role] || basicPermissions.empleado;
 };
