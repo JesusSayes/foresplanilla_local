@@ -22,7 +22,7 @@ function getScheduleForDate(date, schedules) {
   return schedules.filter(s => {
     const from = s.effective_from || "0000-01-01";
     const to = s.effective_to || "9999-12-31";
-    return from <= dateStr && to >= dateStr && s.is_active !== false;
+    return from <= dateStr && to >= dateStr;
   });
 }
 
