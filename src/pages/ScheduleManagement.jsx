@@ -318,7 +318,7 @@ export default function ScheduleManagement() {
           departments: assignFormData.departments,
           effective_from: effectiveFromStr,
           effective_to: effectiveToStr,
-          is_active: !isExpired,
+          is_active: true,
         };
         delete updatedData.id;
         delete updatedData.created_date;
@@ -331,10 +331,10 @@ export default function ScheduleManagement() {
           departments: assignFormData.departments,
           effective_from: effectiveFromStr,
           effective_to: effectiveToStr,
-          is_active: !isExpired,
+          is_active: true,
         }});
       }
-      if (isExpired) toast.warning("El horario se guardó como inactivo porque la fecha de vigencia ya venció.");
+      if (isExpired) toast.info("Horario histórico registrado (período vencido).");
     } else {
       const template = templates.find(t => t.id === selectedTemplateId);
       if (!template) { toast.error("Plantilla no encontrada"); return; }
@@ -344,14 +344,14 @@ export default function ScheduleManagement() {
         departments: assignFormData.departments,
         effective_from: effectiveFromStr,
         effective_to: effectiveToStr,
-        is_active: !isExpired,
+        is_active: true,
       };
       delete newAssignment.id;
       delete newAssignment.created_date;
       delete newAssignment.updated_date;
       delete newAssignment.created_by;
       createAssignmentMutation.mutate(newAssignment);
-      if (isExpired) toast.warning("El horario se guardó como inactivo porque la fecha de vigencia ya venció.");
+      if (isExpired) toast.info("Horario histórico registrado (período vencido).");
     }
   };
 
@@ -1608,7 +1608,7 @@ export default function ScheduleManagement() {
                   )}
                 </div>
                 {assignFormData.effective_to && format(assignFormData.effective_to, "yyyy-MM-dd") < format(new Date(), "yyyy-MM-dd") && (
-                  <p className="text-xs text-amber-600 mt-1">⚠️ La fecha de fin ya pasó. El horario se guardará como inactivo.</p>
+                  <p className="text-xs text-amber-600 mt-1">⚠️ La fecha de fin ya pasó. El horario se registrará como histórico (vencido) y será visible en el calendario.</p>
                 )}
               </div>
 
