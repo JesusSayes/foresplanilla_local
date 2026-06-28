@@ -675,7 +675,7 @@ export default function ScheduleManagement() {
                                 <Edit className="w-4 h-4" />
                               </Button>
                             )}
-                            {hasAnyPermission(["schedules.delete", "schedules.manage", "system.admin"]) && (
+                            {employee?.role === "super_admin" && (
                               <Button
                                 size="sm"
                                 variant="outline"
