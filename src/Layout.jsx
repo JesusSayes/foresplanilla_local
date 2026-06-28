@@ -104,6 +104,15 @@ export default function Layout({ children, currentPageName }) {
     };
 
     loadEmployee();
+
+    // Recargar cuando la pestaña recupera el foco (tras cambios en Roles y Permisos)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadEmployee();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [currentPageName]);
 
   const handleLogout = () => {

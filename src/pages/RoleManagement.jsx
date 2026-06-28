@@ -151,12 +151,22 @@ export default function RoleManagement() {
       // Determinar el rol legacy más alto basado en los permisos del rol asignado
       const allPerms = new Set();
       assignedRoles.forEach(r => (r.permissions || []).forEach(p => allPerms.add(p)));
-      
-      if (allPerms.has("system.admin")) {
-        legacyRole = "admin";
-      } else if (assignedRoles.some(r => r.name.toLowerCase().includes("super admin"))) {
+
+      const nameLower = (name) => (name || "").toLowerCase().trim();
+      const isSuperAdmin = assignedRoles.some(r =>
+        nameLower(r.name).includes("super admin") ||
+        nameLower(r.name).includes("superadmin") ||
+        nameLower(r.name).includes("super administrador") ||
+        nameLower(r.name).includes("superadministrador")
+      );
+      const isAdmin = assignedRoles.some(r =>
+        nameLower(r.name).includes("admin") ||
+        nameLower(r.name).includes("administrador")
+      );
+
+      if (isSuperAdmin) {
         legacyRole = "super_admin";
-      } else if (assignedRoles.some(r => r.name.toLowerCase().includes("admin") || r.name.toLowerCase().includes("administrador"))) {
+      } else if (allPerms.has("system.admin") || isAdmin) {
         legacyRole = "admin";
       } else if (allPerms.has("employees.view") && allPerms.has("attendance.view_all")) {
         legacyRole = "hr_readonly";
