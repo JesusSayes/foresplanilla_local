@@ -31,6 +31,7 @@ export default function Layout({ children, currentPageName }) {
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
+  const [mobileOpenSubmenu, setMobileOpenSubmenu] = useState(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwordData, setPasswordData] = useState({ newPassword: "", confirmPassword: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -538,26 +539,71 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
-        <div className="fixed top-[73px] left-0 right-0 bg-white border-b border-slate-200 z-30 lg:hidden shadow-lg">
-          <nav className="max-h-[calc(100vh-73px)] overflow-y-auto p-4">
+        <div className="fixed top-[73px] left-0 right-0 bottom-0 bg-white z-40 lg:hidden shadow-lg overflow-y-auto">
+          <nav className="p-4">
             <ul className="space-y-1">
               {menuItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = currentPageName === item.path;
-                
+                const isActive = currentPageName === item.path ||
+                  (item.submenu && item.submenu.some(sub => sub.path === currentPageName));
+                const isSubmenuOpen = mobileOpenSubmenu === item.path;
+
+                if (item.submenu) {
+                  return (
+                    <li key={item.path}>
+                      <button
+                        type="button"
+                        onPointerUp={(e) => {
+                          e.stopPropagation();
+                          setMobileOpenSubmenu(isSubmenuOpen ? null : item.path);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                          isActive ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-700'
+                        }`}
+                      >
+                        <Icon className="w-5 h-5 shrink-0" />
+                        <span className="flex-1 text-left">{item.name}</span>
+                        <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${isSubmenuOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {isSubmenuOpen && (
+                        <ul className="ml-4 mt-1 space-y-1 border-l-2 border-indigo-100 pl-3">
+                          {item.submenu.map((subItem) => (
+                            <li key={subItem.path}>
+                              <Link
+                                to={createPageUrl(subItem.path)}
+                                onPointerUp={(e) => {
+                                  e.stopPropagation();
+                                  setMobileMenuOpen(false);
+                                  setMobileOpenSubmenu(null);
+                                }}
+                                className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
+                                  currentPageName === subItem.path
+                                    ? 'bg-indigo-50 text-indigo-600 font-semibold'
+                                    : 'text-slate-600 hover:bg-slate-50'
+                                }`}
+                              >
+                                {subItem.name}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                }
+
                 return (
                   <li key={item.path}>
                     <Link
                       to={createPageUrl(item.path)}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`
-                        flex items-center gap-3 px-4 py-3 rounded-lg
-                        transition-all duration-200
-                        ${isActive 
-                          ? 'bg-indigo-50 text-indigo-600 font-semibold' 
-                          : 'text-slate-700 hover:bg-slate-50'
-                        }
-                      `}
+                      onPointerUp={(e) => {
+                        e.stopPropagation();
+                        setMobileMenuOpen(false);
+                        setMobileOpenSubmenu(null);
+                      }}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                        isActive ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
                     >
                       <Icon className="w-5 h-5" />
                       <span>{item.name}</span>
@@ -580,7 +626,7 @@ export default function Layout({ children, currentPageName }) {
         </div>
       )}
 
-      {/* Overlay to close dropdowns when clicking outside */}
+      {/* Overlay to close desktop dropdowns when clicking outside */}
       {openDropdown && (
         <div 
           className="fixed inset-0 z-30"
@@ -588,11 +634,14 @@ export default function Layout({ children, currentPageName }) {
         />
       )}
 
-      {/* Mobile overlay */}
+      {/* Mobile overlay — detrás del menú para cerrar al tocar fuera */}
       {mobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
-          onClick={() => setMobileMenuOpen(false)}
+          className="fixed inset-0 bg-black/50 z-39 lg:hidden"
+          onPointerUp={() => {
+            setMobileMenuOpen(false);
+            setMobileOpenSubmenu(null);
+          }}
         />
       )}
 
