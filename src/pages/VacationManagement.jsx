@@ -17,10 +17,12 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { parseDateLima } from "@/lib/dateUtils";
 import { createPageUrl } from "../utils";
+import { useNavigate } from "react-router-dom";
 import PaginationBar from "@/components/ui/PaginationBar";
 import { usePermissions } from "../components/hooks/usePermissions";
 
 export default function VacationManagement() {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -363,25 +365,25 @@ export default function VacationManagement() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-8 flex justify-between items-start">
+        <div className="mb-8 flex flex-wrap justify-between items-start gap-3">
           <div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-2">
+            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
               Gestión de Vacaciones
             </h1>
             <p className="text-slate-600 text-lg">
               Administra solicitudes, saldos y calendario de vacaciones
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button
-              onClick={() => window.location.href = createPageUrl("VacationCalendar")}
+              onClick={() => navigate(createPageUrl("VacationCalendar"))}
               variant="outline"
             >
               <Calendar className="w-4 h-4 mr-2" />
               Ver Calendario
             </Button>
             <Button
-              onClick={() => window.location.href = createPageUrl("ManagerApprovals")}
+              onClick={() => navigate(createPageUrl("ManagerApprovals"))}
               className="bg-blue-600 hover:bg-blue-700"
             >
               <CheckCircle className="w-4 h-4 mr-2" />
@@ -763,11 +765,11 @@ export default function VacationManagement() {
       {/* Employee Detail Modal */}
       {selectedEmployee && (
         <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-3 sm:p-6 overflow-y-auto"
           onClick={() => setSelectedEmployee(null)}
         >
           <Card 
-            className="max-w-2xl w-full"
+            className="max-w-2xl w-full my-4 sm:my-0"
             onClick={(e) => e.stopPropagation()}
           >
             <CardHeader className="border-b">

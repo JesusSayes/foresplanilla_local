@@ -15,6 +15,7 @@ import {
   Calendar as CalendarIcon, Briefcase, Mail, Phone, MapPin, Shield, History, Loader2, Trash2, Upload
 } from "lucide-react";
 import { createPageUrl } from "../utils";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -24,6 +25,7 @@ import EmployeeForm from "../components/employees/EmployeeForm";
 import ImportDerechohabientesModal from "../components/employees/ImportDerechohabientesModal";
 
 export default function EmployeeManagement() {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -865,7 +867,7 @@ export default function EmployeeManagement() {
             )}
             {hasPermission("employees.import") && (
               <Button
-                onClick={() => window.location.href = createPageUrl("ImportEmployees")}
+                onClick={() => navigate(createPageUrl("ImportEmployees"))}
                 variant="outline"
               >
                 <Shield className="w-4 h-4 mr-2" />
@@ -983,117 +985,42 @@ export default function EmployeeManagement() {
                       key={emp.id}
                       className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 flex-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
                           {emp.photo_url ? (
-                            <img 
-                              src={emp.photo_url} 
-                              alt={`${emp.first_name} ${emp.last_name}`}
-                              className="w-14 h-14 rounded-full object-cover border-2 border-indigo-200"
-                            />
+                            <img src={emp.photo_url} alt={`${emp.first_name} ${emp.last_name}`} className="w-11 h-11 rounded-full object-cover border-2 border-indigo-200 shrink-0" />
                           ) : (
-                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
+                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
                               {emp.first_name[0]}{emp.last_name[0]}
                             </div>
                           )}
-                          
-                          <div className="flex-1">
-                            <h4 className="font-bold text-slate-900 text-lg">
-                              {emp.first_name} {emp.last_name}
-                            </h4>
-                            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600 mt-1">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-slate-900 text-sm sm:text-base truncate">{emp.first_name} {emp.last_name}</h4>
+                            <div className="flex flex-wrap items-center gap-1 text-xs text-slate-600 mt-0.5">
                               <span className="font-medium">{emp.employee_code}</span>
                               <span>•</span>
-                              <span>{emp.position}</span>
-                              <span>•</span>
-                              <span>{emp.department_name}</span>
+                              <span className="truncate max-w-[100px] sm:max-w-none">{emp.position}</span>
+                              <span className="hidden sm:inline">•</span>
+                              <span className="hidden sm:inline">{emp.department_name}</span>
                               <span>•</span>
                               <span className="text-indigo-600 font-medium">{emp.site || "Sin sede"}</span>
                             </div>
                           </div>
-
-                          <div className="flex items-center gap-3">
-                            <Badge className={statusConfig.color}>
-                              <StatusIcon className="w-3 h-3 mr-1" />
-                              {emp.status}
-                            </Badge>
-
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleView(emp)}
-                                title="Ver detalles"
-                              >
-                                <Eye className="w-4 h-4" />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                          <Badge className={statusConfig.color}><StatusIcon className="w-3 h-3 mr-1" />{emp.status}</Badge>
+                          <div className="flex flex-wrap gap-1">
+                            <Button size="sm" variant="outline" onClick={() => handleView(emp)} title="Ver detalles"><Eye className="w-4 h-4" /></Button>
+                            <Button size="sm" variant="outline" onClick={() => handleViewHistory(emp)} title="Ver historial"><History className="w-4 h-4" /></Button>
+                            {hasPermission("employees.edit") && (<Button size="sm" variant="outline" onClick={() => handleEdit(emp)} title="Editar"><Edit className="w-4 h-4" /></Button>)}
+                            {hasPermission("employees.edit") && emp.status === "Activo" && (<Button size="sm" variant="outline" className="text-yellow-600" onClick={() => handleStatusChange(emp, "Suspendido")} title="Suspender"><UserX className="w-4 h-4" /></Button>)}
+                            {hasPermission("employees.edit") && emp.status === "Suspendido" && (<Button size="sm" variant="outline" className="text-green-600" onClick={() => handleStatusChange(emp, "Activo")} title="Activar"><UserCheck className="w-4 h-4" /></Button>)}
+                            {hasPermission("employees.edit") && emp.status === "Cesado" && (
+                              <Button size="sm" variant="outline" className="text-blue-600" title="Reactivar"
+                                onClick={() => { if (confirm("¿Reactivar empleado cesado?")) { base44.entities.Employee.update(emp.id, { status: "Activo", termination_date: null }).then(() => { queryClient.invalidateQueries(["allEmployees"]); toast.success("Empleado reactivado"); }); } }}>
+                                <UserCheck className="w-4 h-4" />
                               </Button>
-
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleViewHistory(emp)}
-                                title="Ver historial"
-                              >
-                                <History className="w-4 h-4" />
-                              </Button>
-
-                              {hasPermission("employees.edit") && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleEdit(emp)}
-                                  title="Editar"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                              )}
-
-                              {hasPermission("employees.edit") && emp.status === "Activo" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-yellow-600"
-                                  onClick={() => handleStatusChange(emp, "Suspendido")}
-                                  title="Suspender"
-                                >
-                                  <UserX className="w-4 h-4" />
-                                </Button>
-                              )}
-
-                              {hasPermission("employees.edit") && emp.status === "Suspendido" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-green-600"
-                                  onClick={() => handleStatusChange(emp, "Activo")}
-                                  title="Activar"
-                                >
-                                  <UserCheck className="w-4 h-4" />
-                                </Button>
-                              )}
-
-                              {hasPermission("employees.edit") && emp.status === "Cesado" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-blue-600"
-                                  onClick={() => {
-                                    if (confirm("¿Reactivar empleado cesado? Esto cambiará el estado a Activo y limpiará la fecha de cese.")) {
-                                      base44.entities.Employee.update(emp.id, { 
-                                        status: "Activo",
-                                        termination_date: null 
-                                      }).then(() => {
-                                        queryClient.invalidateQueries(["allEmployees"]);
-                                        toast.success("Empleado reactivado");
-                                      });
-                                    }
-                                  }}
-                                  title="Reactivar"
-                                >
-                                  <UserCheck className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1172,11 +1099,11 @@ export default function EmployeeManagement() {
       {/* Details Modal */}
       {showDetails && selectedEmployee && (
         <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-3 sm:p-6 overflow-y-auto"
           onClick={() => setShowDetails(false)}
         >
           <Card 
-            className="max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            className="max-w-4xl w-full my-4 sm:my-0 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <CardHeader className="border-b">
@@ -1204,7 +1131,7 @@ export default function EmployeeManagement() {
               </div>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <h3 className="font-bold text-slate-900 mb-3">Información Personal</h3>
                   <div className="space-y-2 text-sm">
