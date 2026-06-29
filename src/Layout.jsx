@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { createPageUrl } from "./utils";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,8 @@ const getBasicPermissionsByRole = (role) => {
 };
 
 export default function Layout({ children, currentPageName }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [employee, setEmployee] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [userPermissions, setUserPermissions] = useState([]);
@@ -106,6 +108,10 @@ export default function Layout({ children, currentPageName }) {
 
     loadEmployee();
 
+    // Cerrar menú móvil al cambiar de página
+    setMobileMenuOpen(false);
+    setMobileOpenSubmenu(null);
+
     // Recargar cuando la pestaña recupera el foco (tras cambios en Roles y Permisos)
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -114,7 +120,13 @@ export default function Layout({ children, currentPageName }) {
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [currentPageName]);
+  }, [currentPageName]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cerrar menú móvil en cualquier cambio de ruta (navegación programática)
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setMobileOpenSubmenu(null);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     base44.auth.logout(createPageUrl("Home"));
@@ -537,10 +549,25 @@ export default function Layout({ children, currentPageName }) {
         </div>
       </header>
 
-      {/* Mobile Menu Dropdown */}
+      {/* Mobile overlay — z-45 para quedar sobre el header (z-40) pero detrás del menú (z-50) */}
       {mobileMenuOpen && (
-        <div className="fixed top-[73px] left-0 right-0 bottom-0 bg-white z-40 lg:hidden shadow-lg overflow-y-auto">
-          <nav className="p-4">
+        <div
+          className="fixed inset-0 bg-black/50 lg:hidden"
+          style={{ zIndex: 45 }}
+          onClick={() => {
+            setMobileMenuOpen(false);
+            setMobileOpenSubmenu(null);
+          }}
+        />
+      )}
+
+      {/* Mobile Menu Panel — z-50 para estar sobre el overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed left-0 right-0 bottom-0 bg-white lg:hidden shadow-2xl overflow-y-auto"
+          style={{ top: 73, zIndex: 50 }}
+        >
+          <nav className="p-4 pb-8">
             <ul className="space-y-1">
               {menuItems.map((item) => {
                 const Icon = item.icon;
@@ -553,37 +580,32 @@ export default function Layout({ children, currentPageName }) {
                     <li key={item.path}>
                       <button
                         type="button"
-                        onPointerUp={(e) => {
-                          e.stopPropagation();
-                          setMobileOpenSubmenu(isSubmenuOpen ? null : item.path);
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                        onClick={() => setMobileOpenSubmenu(isSubmenuOpen ? null : item.path)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 touch-manipulation ${
                           isActive ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-700'
                         }`}
                       >
                         <Icon className="w-5 h-5 shrink-0" />
-                        <span className="flex-1 text-left">{item.name}</span>
+                        <span className="flex-1 text-left text-base">{item.name}</span>
                         <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${isSubmenuOpen ? 'rotate-180' : ''}`} />
                       </button>
                       {isSubmenuOpen && (
                         <ul className="ml-4 mt-1 space-y-1 border-l-2 border-indigo-100 pl-3">
                           {item.submenu.map((subItem) => (
                             <li key={subItem.path}>
-                              <Link
-                                to={createPageUrl(subItem.path)}
-                                onPointerUp={(e) => {
-                                  e.stopPropagation();
-                                  setMobileMenuOpen(false);
-                                  setMobileOpenSubmenu(null);
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigate(createPageUrl(subItem.path));
                                 }}
-                                className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
+                                className={`w-full text-left flex items-center gap-2 px-3 py-3 rounded-lg text-base transition-all duration-200 touch-manipulation ${
                                   currentPageName === subItem.path
                                     ? 'bg-indigo-50 text-indigo-600 font-semibold'
-                                    : 'text-slate-600 hover:bg-slate-50'
+                                    : 'text-slate-600'
                                 }`}
                               >
                                 {subItem.name}
-                              </Link>
+                              </button>
                             </li>
                           ))}
                         </ul>
@@ -594,20 +616,16 @@ export default function Layout({ children, currentPageName }) {
 
                 return (
                   <li key={item.path}>
-                    <Link
-                      to={createPageUrl(item.path)}
-                      onPointerUp={(e) => {
-                        e.stopPropagation();
-                        setMobileMenuOpen(false);
-                        setMobileOpenSubmenu(null);
-                      }}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                        isActive ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                    <button
+                      type="button"
+                      onClick={() => navigate(createPageUrl(item.path))}
+                      className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 touch-manipulation ${
+                        isActive ? 'bg-indigo-50 text-indigo-600 font-semibold' : 'text-slate-700'
                       }`}
                     >
                       <Icon className="w-5 h-5" />
-                      <span>{item.name}</span>
-                    </Link>
+                      <span className="text-base">{item.name}</span>
+                    </button>
                   </li>
                 );
               })}
@@ -626,22 +644,11 @@ export default function Layout({ children, currentPageName }) {
         </div>
       )}
 
-      {/* Overlay to close desktop dropdowns when clicking outside */}
+      {/* Overlay para cerrar dropdowns de escritorio */}
       {openDropdown && (
-        <div 
+        <div
           className="fixed inset-0 z-30"
           onClick={() => setOpenDropdown(null)}
-        />
-      )}
-
-      {/* Mobile overlay — detrás del menú para cerrar al tocar fuera */}
-      {mobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-39 lg:hidden"
-          onPointerUp={() => {
-            setMobileMenuOpen(false);
-            setMobileOpenSubmenu(null);
-          }}
         />
       )}
 
