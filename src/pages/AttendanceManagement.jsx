@@ -202,7 +202,9 @@ export default function AttendanceManagement() {
 
   useEffect(() => {
     const generateExemptClockings = async () => {
-      if (!effectiveEmployee || effectiveEmployee.role !== "admin") return;
+      if (!effectiveEmployee) return;
+      // Solo admin/super_admin (por permiso system.admin) pueden generar marcaciones automáticas
+      if (!hasPermission("system.admin") && !["admin", "super_admin"].includes(effectiveEmployee.role)) return;
       const result = await generateAutoClockings(selectedDate);
       if (result.success && result.recordsCreated > 0) {
         queryClient.invalidateQueries(["todayAttendance"]);
