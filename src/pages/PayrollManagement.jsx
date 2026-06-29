@@ -23,11 +23,13 @@ import ConceptsManager from "../components/payroll/ConceptsManager";
 import AttendancePeriodModal from "../components/payroll/AttendancePeriodModal";
 import PayrollConfigModal from "../components/payroll/PayrollConfigModal";
 import { createPageUrl } from "../utils";
+import { useNavigate } from "react-router-dom";
 import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
 import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/lib/payrollUtils";
 
 export default function PayrollManagement() {
+  const navigate = useNavigate();
   const { hasPermission, canAccessDepartment, loading: permissionsLoading } = usePermissions();
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
@@ -875,16 +877,16 @@ export default function PayrollManagement() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-8 flex items-start justify-between gap-4">
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-2">Gestión de Planillas</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">Gestión de Planillas</h1>
             <p className="text-slate-600 text-lg">Generar y administrar planillas quincenales, mensuales y adicionales</p>
           </div>
-          <div className="flex gap-2 shrink-0 pt-2">
-            <Button onClick={() => window.location.href = createPageUrl("PayrollConcepts")} variant="outline" className="whitespace-nowrap">
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Button onClick={() => navigate(createPageUrl("PayrollConcepts"))} variant="outline" className="whitespace-nowrap text-sm">
               <Edit2 className="w-4 h-4 mr-2" />Gestionar Conceptos
             </Button>
-            <Button onClick={() => setShowPayrollConfig(true)} variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 whitespace-nowrap">
+            <Button onClick={() => setShowPayrollConfig(true)} variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 whitespace-nowrap text-sm">
               <Settings className="w-4 h-4 mr-2" />Configurar Quincenal
             </Button>
           </div>
@@ -1770,11 +1772,11 @@ export default function PayrollManagement() {
         {/* Modal de Vista Previa de Boleta */}
         {previewPayslip && (
           <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6 overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-3 sm:p-6 overflow-y-auto"
             onClick={() => setPreviewPayslip(null)}
           >
             <div 
-              className="max-w-4xl w-full my-8"
+              className="max-w-4xl w-full my-4 sm:my-8"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-4 flex justify-end">
