@@ -227,7 +227,7 @@ export default function AccessDeviceConfig() {
     setShowMappingForm(false);
   };
 
-  if (!employee || employee.role !== "admin") {
+  if (!employee || !["admin", "super_admin"].includes(employee.role)) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <Card className="max-w-md">

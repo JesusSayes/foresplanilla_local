@@ -135,6 +135,13 @@ Deno.serve(async (req) => {
     if (!employee_id || !date_from || !date_to) {
       return Response.json({ error: 'employee_id, date_from y date_to son requeridos' }, { status: 400 });
     }
+    const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+    if (!ISO_DATE.test(date_from) || !ISO_DATE.test(date_to)) {
+      return Response.json({ error: 'date_from y date_to deben tener formato YYYY-MM-DD' }, { status: 400 });
+    }
+    if (date_from > date_to) {
+      return Response.json({ error: 'date_from no puede ser mayor que date_to' }, { status: 400 });
+    }
 
     function parseSDKResponse(raw) {
       if (Array.isArray(raw)) return raw;
