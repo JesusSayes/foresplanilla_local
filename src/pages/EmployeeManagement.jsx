@@ -252,10 +252,7 @@ export default function EmployeeManagement() {
         }
       }
       
-      console.log("✅ Datos limpios a enviar:", cleanData);
-      
       const updatedEmployee = await base44.entities.Employee.update(id, cleanData);
-      console.log("✅ Empleado actualizado:", updatedEmployee);
       
       // Si cambió la AFP, actualizar conceptos de planilla
       if (cleanData.afp_id && cleanData.afp_id !== oldData.afp_id && cleanData.pension_system === "AFP") {

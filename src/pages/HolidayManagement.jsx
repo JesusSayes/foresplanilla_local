@@ -18,6 +18,7 @@ import { es } from "date-fns/locale";
 import { todayDateLima, dateToStringLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
+import { usePermissions } from "../components/hooks/usePermissions";
 
 export default function HolidayManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -35,6 +36,7 @@ export default function HolidayManagement() {
   const [showLoadHolidaysModal, setShowLoadHolidaysModal] = useState(false);
   const [yearToLoad, setYearToLoad] = useState(new Date().getFullYear());
 
+  const { hasAnyPermission } = usePermissions();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -520,21 +522,25 @@ export default function HolidayManagement() {
                                   </div>
 
                                   <div className="flex gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleEdit(holiday)}
-                                    >
-                                      <Edit className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="text-red-600 hover:bg-red-50"
-                                      onClick={() => handleDelete(holiday.id)}
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    {hasAnyPermission(["holidays.edit", "holidays.manage", "system.admin"]) && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleEdit(holiday)}
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                    {hasAnyPermission(["holidays.delete", "holidays.manage", "system.admin"]) && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-red-600 hover:bg-red-50"
+                                        onClick={() => handleDelete(holiday.id)}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
                               </div>

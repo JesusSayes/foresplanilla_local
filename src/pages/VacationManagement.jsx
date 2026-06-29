@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { parseDateLima } from "@/lib/dateUtils";
 import { createPageUrl } from "../utils";
 import PaginationBar from "@/components/ui/PaginationBar";
+import { usePermissions } from "../components/hooks/usePermissions";
 
 export default function VacationManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -46,6 +47,7 @@ export default function VacationManagement() {
   const [histPage, setHistPage] = useState(1);
   const HIST_PAGE_SIZE = 20;
 
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -334,11 +336,26 @@ export default function VacationManagement() {
     rejectedRequests: vacationRequests.filter(r => r.status === "Rechazada").length,
   };
 
-  // Mientras carga el empleado, mostrar spinner
-  if (!employee) {
+  // Mientras carga el empleado o permisos, mostrar spinner
+  if (!employee || permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Guard de acceso — solo roles con permisos de vacaciones
+  if (!hasPermission("vacations.manage") && !hasPermission("vacations.view_all") &&
+      !hasPermission("vacations.approve") && !hasPermission("system.admin")) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
+            <p className="text-slate-600">No tienes permisos para gestionar vacaciones</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }

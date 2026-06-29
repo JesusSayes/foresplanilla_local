@@ -370,7 +370,7 @@ export default function ContractManagement() {
     return <div className="min-h-screen flex items-center justify-center"><div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
   }
 
-  if (!employee || (!hasPermission("contracts.view") && !hasPermission("system.admin") && employee.role !== "admin")) {
+  if (!employee || (!hasPermission("contracts.view") && !hasPermission("system.admin"))) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <Card className="max-w-md"><CardContent className="p-8 text-center">
@@ -381,7 +381,7 @@ export default function ContractManagement() {
     );
   }
 
-  const canManage = hasPermission("contracts.create") || hasPermission("system.admin") || employee.role === "admin";
+  const canManage = hasPermission("contracts.create") || hasPermission("system.admin");
 
   // El botón "Firmar" solo se habilita para el representante legal:
   // el DNI del empleado logueado debe coincidir con el DNI del representante legal en CompanyInfo
