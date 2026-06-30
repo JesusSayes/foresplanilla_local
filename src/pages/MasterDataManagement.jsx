@@ -25,6 +25,7 @@ export default function MasterDataManagement() {
   const [formData, setFormData] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [elementoFilter, setElementoFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all"); // "all" | "active" | "inactive"
 
   const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -190,10 +191,23 @@ export default function MasterDataManagement() {
     }
   };
 
+  // Helper: filtra por estado activo/inactivo según el campo que use cada entidad
+  const filterByStatus = (item) => {
+    if (statusFilter === "all") return true;
+    // Entidades con campo "estado" (A/I): Subdiario, TipoAnexo
+    if (item.estado !== undefined) {
+      return statusFilter === "active" ? item.estado !== "I" : item.estado === "I";
+    }
+    // Resto usan is_active (true/false, undefined = activo)
+    const isActive = item.is_active !== false;
+    return statusFilter === "active" ? isActive : !isActive;
+  };
+
   const filteredAreaUnidadCargo = areaUnidadCargos.filter(a =>
-    a.area?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (a.area?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     a.unidad?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.cargo?.toLowerCase().includes(searchTerm.toLowerCase())
+    a.cargo?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(a)
   );
 
   const handleSoftDelete = (item, entity) => {
@@ -251,56 +265,66 @@ export default function MasterDataManagement() {
   };
 
   const filteredSites = sites.filter(s => 
-    s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.code?.toLowerCase().includes(searchTerm.toLowerCase())
+    (s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.code?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(s)
   );
 
   const filteredPositions = positions.filter(p => 
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.department?.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.department?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(p)
   );
 
   const filteredDepartments = departments.filter(d => 
-    d.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.code?.toLowerCase().includes(searchTerm.toLowerCase())
+    (d.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    d.code?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(d)
   );
 
   const filteredBanks = banks.filter(b => 
-    b.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.code?.toLowerCase().includes(searchTerm.toLowerCase())
+    (b.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.code?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(b)
   );
 
   const filteredRMVs = rmvRecords.filter(r => 
-    r.amount?.toString().includes(searchTerm) ||
-    r.notes?.toLowerCase().includes(searchTerm.toLowerCase())
+    (r.amount?.toString().includes(searchTerm) ||
+    r.notes?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(r)
   );
 
   const activeRMV = rmvRecords.find(r => r.is_active);
 
   const filteredAFPs = afps.filter(a => 
-    a.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.code?.toLowerCase().includes(searchTerm.toLowerCase())
+    (a.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.code?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(a)
   );
 
   const filteredProfessions = professions.filter(p => 
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category?.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.category?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(p)
   );
 
   const filteredCostCenters = costCenters.filter(c => 
-    c.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.category?.toLowerCase().includes(searchTerm.toLowerCase())
+    c.category?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(c)
   );
 
   const filteredSeguroVida = seguroVidaLey.filter(s =>
-    s.age_range_start?.toString().includes(searchTerm) ||
-    s.age_range_end?.toString().includes(searchTerm)
+    (s.age_range_start?.toString().includes(searchTerm) ||
+    s.age_range_end?.toString().includes(searchTerm)) &&
+    filterByStatus(s)
   );
 
   const filteredUIT = uitRecords.filter(u =>
-    u.year?.toString().includes(searchTerm) ||
-    u.amount?.toString().includes(searchTerm)
+    (u.year?.toString().includes(searchTerm) ||
+    u.amount?.toString().includes(searchTerm)) &&
+    filterByStatus(u)
   );
 
   const activeUIT = uitRecords.find(u => u.year === new Date().getFullYear());
@@ -310,7 +334,7 @@ export default function MasterDataManagement() {
       a.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.elemento?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesElemento = elementoFilter === "all" || a.elemento === elementoFilter;
-    return matchesSearch && matchesElemento;
+    return matchesSearch && matchesElemento && filterByStatus(a);
   });
 
   if (!employee || permissionsLoading) {
@@ -522,6 +546,29 @@ export default function MasterDataManagement() {
           </Card>
         </div>
 
+        {/* Barra de filtros globales */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Input placeholder="Buscar en todos los datos maestros..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); }} className="pl-9" />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="active">✅ Solo Activos</SelectItem>
+              <SelectItem value="inactive">❌ Solo Inactivos</SelectItem>
+            </SelectContent>
+          </Select>
+          {(searchTerm || statusFilter !== "all") && (
+            <Button variant="outline" size="sm" onClick={() => { setSearchTerm(""); setStatusFilter("all"); }}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="flex flex-wrap gap-1 h-auto">
             <TabsTrigger value="areaunidadcargo">Área/Unidad</TabsTrigger>
@@ -557,7 +604,7 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar área, unidad o cargo..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
+
                 {[...new Set(filteredAreaUnidadCargo.map(a => a.area))].sort().map(area => (
                   <div key={area} className="mb-5">
                     <h3 className="text-sm font-bold text-indigo-700 mb-2 pb-1 border-b border-indigo-100 flex items-center gap-2">
@@ -608,18 +655,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar sede..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredSites.map(site => (
                     <div key={site.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -627,10 +662,8 @@ export default function MasterDataManagement() {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h4 className="font-bold text-slate-900 text-lg">{site.name}</h4>
-                            <Badge className="bg-blue-100 text-blue-700">{site.code}</Badge>
-                            {!site.is_active && (
-                              <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
-                            )}
+                             <Badge className="bg-blue-100 text-blue-700">{site.code}</Badge>
+                            <Badge className={site.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{site.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
                           {site.address && (
                             <p className="text-sm text-slate-600">{site.address}</p>
@@ -682,18 +715,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar cargo..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredPositions.map(pos => (
                     <div key={pos.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -704,9 +725,7 @@ export default function MasterDataManagement() {
                             {pos.level && (
                               <Badge className="bg-purple-100 text-purple-700">{pos.level}</Badge>
                             )}
-                            {!pos.is_active && (
-                              <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
-                            )}
+                            <Badge className={pos.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{pos.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
                           {pos.department && (
                             <p className="text-sm text-slate-600 mb-1">
@@ -763,18 +782,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar departamento..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredDepartments.map(dept => (
                     <div key={dept.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -785,9 +792,7 @@ export default function MasterDataManagement() {
                             {dept.code && (
                               <Badge className="bg-orange-100 text-orange-700">{dept.code}</Badge>
                             )}
-                            {!dept.is_active && (
-                              <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
-                            )}
+                            <Badge className={dept.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{dept.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
                           {dept.description && (
                             <p className="text-sm text-slate-600">{dept.description}</p>
@@ -839,18 +844,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar banco..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredBanks.map(bank => (
                     <div key={bank.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -859,11 +852,9 @@ export default function MasterDataManagement() {
                           <div className="flex items-center gap-3 mb-2">
                             <h4 className="font-bold text-slate-900 text-lg">{bank.name}</h4>
                             {bank.code && (
-                              <Badge className="bg-green-100 text-green-700">{bank.code}</Badge>
+                              <Badge className="bg-slate-100 text-slate-700">{bank.code}</Badge>
                             )}
-                            {!bank.is_active && (
-                              <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
-                            )}
+                            <Badge className={bank.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{bank.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -917,18 +908,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar RMV..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredRMVs.map(rmv => (
                     <div key={rmv.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -1005,18 +984,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar AFP..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredAFPs.map(afp => (
                     <div key={afp.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -1027,9 +994,7 @@ export default function MasterDataManagement() {
                             {afp.code && (
                               <Badge className="bg-teal-100 text-teal-700">{afp.code}</Badge>
                             )}
-                            {!afp.is_active && (
-                              <Badge className="bg-red-100 text-red-700">Inactiva</Badge>
-                            )}
+                            <Badge className={afp.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{afp.is_active !== false ? "Activa" : "Inactiva"}</Badge>
                           </div>
                           <div className="grid grid-cols-3 gap-4 text-sm">
                             <div className="p-2 bg-blue-50 rounded">
@@ -1100,18 +1065,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar profesión..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredProfessions.map(prof => (
                     <div key={prof.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -1122,9 +1075,7 @@ export default function MasterDataManagement() {
                             {prof.category && (
                               <Badge className="bg-cyan-100 text-cyan-700">{prof.category}</Badge>
                             )}
-                            {!prof.is_active && (
-                              <Badge className="bg-red-100 text-red-700">Inactiva</Badge>
-                            )}
+                            <Badge className={prof.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{prof.is_active !== false ? "Activa" : "Inactiva"}</Badge>
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -1178,18 +1129,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar centro de costos..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 {["Administración", "Ventas", "Transportes", "Oxapampa", "Lima - VES", "Operaciones Generales"].map(category => {
                   const categoryCenters = filteredCostCenters.filter(c => c.category === category);
                   if (categoryCenters.length === 0) return null;
@@ -1399,18 +1338,6 @@ export default function MasterDataManagement() {
               <CardContent className="p-6">
                 <div className="mb-6">
                   <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex-1 min-w-64">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                        <Input
-                          placeholder="Buscar cuenta contable..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
-
                     <Select value={elementoFilter} onValueChange={setElementoFilter}>
                       <SelectTrigger className="w-48">
                         <SelectValue placeholder="Elemento" />
@@ -1498,14 +1425,13 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar tipo de incidente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
                 <div className="space-y-2">
-                  {incidentTypes.filter(t => t.name?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                  {incidentTypes.filter(t => t.name?.toLowerCase().includes(searchTerm.toLowerCase()) && filterByStatus(t)).map(item => (
                     <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
                       <div className="flex items-center gap-3">
                         <span className="font-medium text-slate-900">{item.name}</span>
                         <Badge className={item.affectation === "Permiso" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{item.affectation}</Badge>
-                        {item.is_active === false && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                        <Badge className={item.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                       </div>
                       <div className="flex gap-1.5">
                         {hasAnyPermission(["system.admin"]) && (
@@ -1536,14 +1462,13 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar tipo de préstamo..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
                 <div className="space-y-2">
-                  {loanTypes.filter(t => t.name?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                  {loanTypes.filter(t => t.name?.toLowerCase().includes(searchTerm.toLowerCase()) && filterByStatus(t)).map(item => (
                     <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
                       <div className="flex items-center gap-3">
                         <span className="font-medium text-slate-900">{item.name}</span>
                         {item.description && <span className="text-sm text-slate-500">{item.description}</span>}
-                        {item.is_active === false && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                        <Badge className={item.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                       </div>
                       <div className="flex gap-1.5">
                         {hasAnyPermission(["system.admin"]) && (
@@ -1574,15 +1499,14 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar categoría..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
                 <div className="space-y-2">
-                  {costCenterCategories.filter(c => c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || c.code?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                  {costCenterCategories.filter(c => (c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || c.code?.toLowerCase().includes(searchTerm.toLowerCase())) && filterByStatus(c)).map(item => (
                     <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
                       <div className="flex items-center gap-3">
                         {item.code && <Badge className="bg-rose-100 text-rose-700 font-mono">{item.code}</Badge>}
                         <span className="font-medium text-slate-900">{item.name}</span>
                         {item.description && <span className="text-sm text-slate-500">{item.description}</span>}
-                        {item.is_active === false && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                        <Badge className={item.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                       </div>
                       <div className="flex gap-1.5">
                         {hasAnyPermission(["system.admin"]) && (
@@ -1613,16 +1537,15 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar subdiario..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
                 <div className="space-y-2">
-                  {subdiarios.filter(s => s.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) || s.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                  {subdiarios.filter(s => (s.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) || s.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())) && filterByStatus(s)).map(item => (
                     <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
                       <div className="flex items-center gap-3">
                         <Badge className="bg-indigo-100 text-indigo-700 font-mono">{item.codigo}</Badge>
                         <span className="font-medium text-slate-900">{item.descripcion}</span>
                         {item.nombre_breve && <span className="text-xs text-slate-400">{item.nombre_breve}</span>}
                         {item.codigo_sunat && <Badge className="bg-slate-100 text-slate-600 font-mono text-xs">{item.codigo_sunat}</Badge>}
-                        {item.estado === "I" && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                        <Badge className={item.estado !== "I" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.estado !== "I" ? "Activo" : "Inactivo"}</Badge>
                       </div>
                       <div className="flex gap-1.5">
                         {hasAnyPermission(["system.admin"]) && (
@@ -1653,14 +1576,13 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar tipo de anexo..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
                 <div className="space-y-2">
-                  {tiposAnexo.filter(t => t.codigo_tipo_anexo?.toLowerCase().includes(searchTerm.toLowerCase()) || t.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                  {tiposAnexo.filter(t => (t.codigo_tipo_anexo?.toLowerCase().includes(searchTerm.toLowerCase()) || t.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())) && filterByStatus(t)).map(item => (
                     <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
                       <div className="flex items-center gap-3">
                         <Badge className="bg-amber-100 text-amber-700 font-mono font-bold">{item.codigo_tipo_anexo}</Badge>
                         <span className="font-medium text-slate-900">{item.descripcion}</span>
-                        {item.estado === "I" && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                        <Badge className={item.estado !== "I" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.estado !== "I" ? "Activo" : "Inactivo"}</Badge>
                       </div>
                       <div className="flex gap-1.5">
                         {hasAnyPermission(["system.admin"]) && (
