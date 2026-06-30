@@ -845,7 +845,7 @@ export default function ConsultaPlanillas() {
         ) : (
           /* Contenedor con scroll horizontal SOLO aquí, no afecta header ni filtros */
           <div className="overflow-x-auto -mx-4 px-4">
-            <div className="space-y-3" style={{ minWidth: "760px" }}>
+            <div className="space-y-3" style={{ minWidth: "860px" }}>
               {filteredGrupos.map(g => {
                 const stats = getGrupoStats(g);
                 const asientoStatus = getGrupoAsientoStatus(g);
@@ -858,7 +858,7 @@ export default function ConsultaPlanillas() {
                     <CardContent className="p-0">
                       {/* Grid dinámico: info crece, botones fijos y sin superposición */}
                       <div className="grid items-center w-full min-h-[76px]" style={{
-                        gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(110px,1fr) 1px minmax(110px,1fr) 1px minmax(110px,1fr) 1px 196px 1px 160px 28px"
+                        gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(110px,1fr) 1px minmax(110px,1fr) 1px minmax(110px,1fr) 1px 228px 1px 176px 32px"
                       }}>
 
                         {/* Col 1 — Período + badges */}
@@ -917,17 +917,17 @@ export default function ConsultaPlanillas() {
 
                         <div className="bg-slate-100 self-stretch my-3" />
 
-                        {/* Col 6 — Botones Ver / Imprimir / Boletas — ancho fijo 196px */}
-                        <div className="flex items-center justify-center gap-1.5 px-2 py-3" onClick={e => e.stopPropagation()}>
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs whitespace-nowrap"
+                        {/* Col 6 — Botones Ver / Imprimir / Boletas */}
+                        <div className="flex items-center justify-center gap-2 px-3 py-3" onClick={e => e.stopPropagation()}>
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap"
                             onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); }}>
                             <Eye className="w-3 h-3 mr-1" />Ver
                           </Button>
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs whitespace-nowrap"
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap"
                             onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); setTimeout(() => window.print(), 800); }}>
                             <Printer className="w-3 h-3 mr-1" />Imprimir
                           </Button>
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs whitespace-nowrap text-purple-700 border-purple-200 hover:bg-purple-50"
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap text-purple-700 border-purple-200 hover:bg-purple-50"
                             onClick={e => { e.stopPropagation(); handlePrintAllBoletas(g); }}>
                             <Printer className="w-3 h-3 mr-1" />Boletas
                           </Button>
@@ -935,8 +935,8 @@ export default function ConsultaPlanillas() {
 
                         <div className="bg-slate-100 self-stretch my-3" />
 
-                        {/* Col 7 — Generar Asiento — ancho fijo 160px */}
-                        <div className="flex items-center justify-center px-2 py-3" onClick={e => e.stopPropagation()}>
+                        {/* Col 7 — Generar Asiento */}
+                        <div className="flex items-center justify-center px-3 py-3" onClick={e => e.stopPropagation()}>
                           {g.payroll_type !== "Quincenal" ? (
                             <div className="flex flex-col items-stretch gap-1 w-full">
                               {asientoStatus && (
