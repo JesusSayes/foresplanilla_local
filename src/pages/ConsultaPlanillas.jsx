@@ -10,9 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   FileText, Users, DollarSign, Eye, Printer, ChevronRight,
   CheckCircle, Search, Calendar, ArrowLeft, Settings, PenTool,
-  Loader2, Download, BookOpen, RefreshCw, CheckSquare, Square, PackageOpen
+  Loader2, Download, BookOpen, RefreshCw
 } from "lucide-react";
-import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -63,9 +62,7 @@ export default function ConsultaPlanillas() {
   const [previewPayslip, setPreviewPayslip] = useState(null);
   const [showPlanillaCompleta, setShowPlanillaCompleta] = useState(false);
   const [showConfigFirmantes, setShowConfigFirmantes] = useState(false);
-  const [generatingAsiento, setGeneratingAsiento] = useState(null);
-  const [selectedKeys, setSelectedKeys] = useState(new Set());
-  const [downloadingPDF, setDownloadingPDF] = useState(false);
+  const [generatingAsiento, setGeneratingAsiento] = useState(null); // payroll_number en proceso
 
   const queryClient = useQueryClient();
 
@@ -597,144 +594,6 @@ export default function ConsultaPlanillas() {
     );
   }
 
-  // --- Descarga masiva de boletas seleccionadas como un único PDF ---
-  const handleDownloadSelectedPDF = async () => {
-    const gruposSeleccionados = filteredGrupos.filter(g => selectedKeys.has(g.key));
-    if (gruposSeleccionados.length === 0) return;
-
-    setDownloadingPDF(true);
-    const ci = companyInfo || { company_name: "Empresa", ruc: "00000000000", address: "" };
-    const fmt = (v) => safePayrollNumber(v).toFixed(2);
-
-    // Construir el HTML con todas las boletas de todos los grupos seleccionados
-    const todasBoletasHTML = gruposSeleccionados.flatMap(grupo =>
-      grupo.payslips.map(p => {
-        const emp = allEmployees.find(e => e.id === p.employee_id);
-        if (!emp) return "";
-        const firmanteGG = firmantes?.firmante_gg;
-        const firmanteD  = firmantes?.firmante_delegado;
-        const incomeRows = [
-          `<tr><td>Remuneración Básica</td><td>S/ ${fmt(p.base_salary)}</td></tr>`,
-          p.family_allowance > 0 ? `<tr><td>Asignación Familiar</td><td>S/ ${fmt(p.family_allowance)}</td></tr>` : "",
-          p.overtime_pay > 0     ? `<tr><td>Horas Extras</td><td>S/ ${fmt(p.overtime_pay)}</td></tr>` : "",
-          p.bonuses > 0          ? `<tr><td>Bonificaciones</td><td>S/ ${fmt(p.bonuses)}</td></tr>` : "",
-          p.other_income > 0     ? `<tr><td>Otros Ingresos</td><td>S/ ${fmt(p.other_income)}</td></tr>` : "",
-        ].filter(Boolean).join("");
-        const deductRows = [
-          p.pension_deduction > 0   ? `<tr><td>AFP/ONP</td><td>S/ ${fmt(p.pension_deduction)}</td></tr>` : "",
-          p.health_insurance > 0    ? `<tr><td>Seguro de Salud</td><td>S/ ${fmt(p.health_insurance)}</td></tr>` : "",
-          p.income_tax > 0          ? `<tr><td>Impuesto 5ta Cat.</td><td>S/ ${fmt(p.income_tax)}</td></tr>` : "",
-          p.tardiness_discount > 0  ? `<tr><td>Desc. Tardanzas</td><td>S/ ${fmt(p.tardiness_discount)}</td></tr>` : "",
-          p.absence_discount > 0    ? `<tr><td>Desc. Inasistencias</td><td>S/ ${fmt(p.absence_discount)}</td></tr>` : "",
-          p.advance_deduction > 0   ? `<tr><td>Adelanto Quincenal</td><td>S/ ${fmt(p.advance_deduction)}</td></tr>` : "",
-          p.loan_deduction > 0      ? `<tr><td>Préstamos</td><td>S/ ${fmt(p.loan_deduction)}</td></tr>` : "",
-          p.other_deductions > 0    ? `<tr><td>Otros Descuentos</td><td>S/ ${fmt(p.other_deductions)}</td></tr>` : "",
-        ].filter(Boolean).join("");
-        const logoHtml = ci.logo_url
-          ? `<img src="${ci.logo_url}" alt="Logo" style="width:48px;height:48px;object-fit:contain;background:white;border-radius:6px;padding:3px;" />`
-          : `<div style="width:48px;height:48px;background:#4f46e5;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:18px;">🏢</div>`;
-        return `
-          <div class="boleta">
-            <div class="header">
-              <div class="header-left">${logoHtml}<div><div class="company-name">${ci.company_name}</div><div class="company-sub">RUC: ${ci.ruc}</div></div></div>
-              <div class="header-right"><div class="boleta-title">BOLETA DE PAGO</div><div class="boleta-period">${p.period || ""}</div><span class="tipo-badge">${p.payroll_type}</span></div>
-            </div>
-            <div class="body">
-              <div class="section-title">Información del Trabajador</div>
-              <div class="grid2">
-                <div><span class="lbl">Nombres:</span><span class="val">${emp.first_name} ${emp.last_name}</span></div>
-                <div><span class="lbl">DNI:</span><span class="val">${emp.document_number || ""}</span></div>
-                <div><span class="lbl">Cargo:</span><span class="val">${emp.position || "—"}</span></div>
-                <div><span class="lbl">Área:</span><span class="val">${emp.department_name || "—"}</span></div>
-              </div>
-              <div class="two-cols">
-                <div class="col">
-                  <div class="col-title green">INGRESOS</div>
-                  <table class="items-table"><tbody>${incomeRows || '<tr><td colspan="2">Sin ingresos</td></tr>'}</tbody>
-                  <tfoot><tr class="total-row green"><td>TOTAL INGRESOS</td><td>S/ ${fmt(p.total_income)}</td></tr></tfoot></table>
-                </div>
-                <div class="col">
-                  <div class="col-title red">DESCUENTOS</div>
-                  <table class="items-table"><tbody>${deductRows || '<tr><td colspan="2">Sin descuentos</td></tr>'}</tbody>
-                  <tfoot><tr class="total-row red"><td>TOTAL DESCUENTOS</td><td>S/ ${fmt(p.total_deductions)}</td></tr></tfoot></table>
-                </div>
-              </div>
-              <div class="neto-box"><div><div class="neto-label">NETO A PAGAR</div><div class="neto-amount">S/ ${fmt(p.net_pay)}</div></div>
-              <div style="text-align:right;"><div style="font-size:8pt;color:#64748b;">Fecha pago:</div><div style="font-size:9pt;font-weight:600;">${p.payment_date || "—"}</div></div></div>
-              ${(firmanteGG || firmanteD) ? `<div class="firmantes">
-                ${firmanteGG ? `<div class="firmante"><div style="height:36px;">${firmanteGG.signature_url ? `<img src="${firmanteGG.signature_url}" style="height:36px;object-fit:contain;" />` : ""}</div><div class="firma-line"></div><div class="firma-name">${firmanteGG.full_name || ""}</div><div class="firma-role">${firmanteGG.position || "Gerente General"}</div></div>` : ""}
-                ${firmanteD  ? `<div class="firmante"><div style="height:36px;">${firmanteD.signature_url  ? `<img src="${firmanteD.signature_url}"  style="height:36px;object-fit:contain;" />` : ""}</div><div class="firma-line"></div><div class="firma-name">${firmanteD.full_name  || ""}</div><div class="firma-role">${firmanteD.position  || "Delegado"}</div></div>` : ""}
-              </div>` : ""}
-            </div>
-          </div>`;
-      })
-    ).filter(Boolean).join("");
-
-    const totalBoletas = gruposSeleccionados.reduce((s, g) => s + g.payslips.length, 0);
-    const nombreArchivo = gruposSeleccionados.length === 1
-      ? `Boletas_${gruposSeleccionados[0].period}_${gruposSeleccionados[0].payroll_type}`
-      : `Boletas_${gruposSeleccionados.length}_planillas`;
-
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-<style>
-  @page { size: A4; margin: 10mm; }
-  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: Arial, sans-serif; font-size: 9pt; color: #1e293b; margin: 0; }
-  .boleta { page-break-after: always; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
-  .boleta:last-child { page-break-after: auto; }
-  .header { background: linear-gradient(135deg,#4f46e5,#2563eb); color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
-  .header-left { display: flex; align-items: center; gap: 10px; }
-  .company-name { font-size: 12pt; font-weight: 700; }
-  .company-sub { font-size: 7.5pt; color: #c7d2fe; }
-  .header-right { text-align: right; }
-  .boleta-title { font-size: 13pt; font-weight: 700; }
-  .boleta-period { font-size: 8.5pt; color: #c7d2fe; }
-  .tipo-badge { display: inline-block; background: white; color: #4f46e5; padding: 1px 8px; border-radius: 10px; font-size: 7.5pt; font-weight: 700; margin-top: 3px; }
-  .body { padding: 12px 16px; }
-  .section-title { font-size: 9pt; font-weight: 700; color: #0f172a; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 3px; margin-bottom: 6px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; font-size: 8pt; margin-bottom: 8px; }
-  .lbl { color: #64748b; margin-right: 4px; }
-  .val { font-weight: 600; }
-  .two-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
-  .col-title { font-size: 8.5pt; font-weight: 700; border-bottom: 1.5px solid; padding-bottom: 3px; margin-bottom: 5px; }
-  .col-title.green { color: #15803d; border-color: #bbf7d0; }
-  .col-title.red { color: #dc2626; border-color: #fecaca; }
-  .items-table { width: 100%; font-size: 8pt; border-collapse: collapse; }
-  .items-table td { padding: 1.5px 0; }
-  .items-table td:last-child { text-align: right; font-weight: 600; }
-  .total-row td { font-weight: 700; border-top: 1px solid #e2e8f0; padding-top: 3px; font-size: 8.5pt; }
-  .total-row.green td { color: #15803d; }
-  .total-row.red td { color: #dc2626; }
-  .neto-box { background: linear-gradient(135deg,#eef2ff,#dbeafe); border: 1.5px solid #c7d2fe; border-radius: 6px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .neto-label { font-size: 8pt; color: #64748b; }
-  .neto-amount { font-size: 18pt; font-weight: 700; color: #4338ca; }
-  .firmantes { display: flex; gap: 30px; justify-content: center; margin: 8px 0; }
-  .firmante { text-align: center; flex: 1; max-width: 160px; }
-  .firma-line { border-top: 1px solid #94a3b8; margin-top: 4px; margin-bottom: 2px; }
-  .firma-name { font-size: 8pt; font-weight: 700; }
-  .firma-role { font-size: 7.5pt; color: #64748b; }
-</style></head>
-<body>${todasBoletasHTML}
-<script>
-  window.onload = function() {
-    window.document.title = "${nombreArchivo}";
-    window.print();
-  };
-</script>
-</body></html>`;
-
-    const win = window.open("", "_blank");
-    if (!win) {
-      toast.error("Permite las ventanas emergentes para descargar.");
-      setDownloadingPDF(false);
-      return;
-    }
-    win.document.write(html);
-    win.document.close();
-    toast.success(`Preparando ${totalBoletas} boleta(s) de ${gruposSeleccionados.length} planilla(s) para descargar…`);
-    setDownloadingPDF(false);
-  };
-
   // --- Imprimir todas las boletas de un grupo de un solo golpe ---
   const handlePrintAllBoletas = (grupo) => {
     const ci = companyInfo || { company_name: "Empresa", ruc: "00000000000", address: "" };
@@ -954,28 +813,6 @@ export default function ConsultaPlanillas() {
           </div>
         </div>
 
-        {/* Barra flotante de acción cuando hay selección */}
-        {selectedKeys.size > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-indigo-700 text-white rounded-2xl shadow-2xl px-6 py-3 flex items-center gap-4">
-            <span className="text-sm font-semibold">{selectedKeys.size} planilla(s) seleccionada(s)</span>
-            <Button
-              size="sm"
-              className="bg-white text-indigo-700 hover:bg-indigo-50 font-semibold gap-2"
-              disabled={downloadingPDF}
-              onClick={handleDownloadSelectedPDF}
-            >
-              {downloadingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              Descargar PDF
-            </Button>
-            <button
-              className="text-indigo-200 hover:text-white text-xs underline"
-              onClick={() => setSelectedKeys(new Set())}
-            >
-              Limpiar
-            </button>
-          </div>
-        )}
-
         {/* Lista de planillas — scroll horizontal único en este bloque */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -992,27 +829,9 @@ export default function ConsultaPlanillas() {
           <div className="overflow-x-auto -mx-4 px-4">
             {/* Cabecera de columnas */}
             <div className="grid items-center mb-1 px-1" style={{
-              minWidth: "1020px",
-              gridTemplateColumns: "40px minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
+              minWidth: "980px",
+              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
             }}>
-              {/* Checkbox seleccionar todo */}
-              <div className="flex items-center justify-center">
-                <button
-                  onClick={() => {
-                    if (selectedKeys.size === filteredGrupos.length) {
-                      setSelectedKeys(new Set());
-                    } else {
-                      setSelectedKeys(new Set(filteredGrupos.map(g => g.key)));
-                    }
-                  }}
-                  className="text-slate-400 hover:text-indigo-600 transition-colors"
-                  title="Seleccionar todas"
-                >
-                  {selectedKeys.size === filteredGrupos.length && filteredGrupos.length > 0
-                    ? <CheckSquare className="w-4 h-4 text-indigo-600" />
-                    : <Square className="w-4 h-4" />}
-                </button>
-              </div>
               <div className="px-4 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Período / Tipo</div>
               <div />
               <div className="px-2 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-center">Empl.</div>
@@ -1030,40 +849,21 @@ export default function ConsultaPlanillas() {
             </div>
 
 
-            <div className="space-y-2" style={{ minWidth: "1020px" }}>
+            <div className="space-y-2" style={{ minWidth: "980px" }}>
               {filteredGrupos.map(g => {
                 const stats = getGrupoStats(g);
                 const asientoStatus = getGrupoAsientoStatus(g);
-                const isChecked = selectedKeys.has(g.key);
                 return (
                   <Card
                     key={g.key}
-                    className={`border-0 shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer group overflow-hidden ${isChecked ? "ring-2 ring-indigo-400" : ""}`}
+                    className="border-0 shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer group overflow-hidden"
                     onClick={() => setSelectedGroup(g)}
                   >
                     <CardContent className="p-0">
+                      {/* Grid dinámico: info crece, botones fijos y sin superposición */}
                       <div className="grid items-center w-full min-h-[76px]" style={{
-                        gridTemplateColumns: "40px minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
+                        gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
                       }}>
-
-                        {/* Checkbox selección */}
-                        <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
-                          <button
-                            onClick={e => {
-                              e.stopPropagation();
-                              setSelectedKeys(prev => {
-                                const next = new Set(prev);
-                                next.has(g.key) ? next.delete(g.key) : next.add(g.key);
-                                return next;
-                              });
-                            }}
-                            className="text-slate-300 hover:text-indigo-600 transition-colors"
-                          >
-                            {isChecked
-                              ? <CheckSquare className="w-4 h-4 text-indigo-600" />
-                              : <Square className="w-4 h-4" />}
-                          </button>
-                        </div>
 
                         {/* Col 1 — Período + badges */}
                         <div className="flex items-center gap-3 px-4 py-3">
@@ -1179,10 +979,9 @@ export default function ConsultaPlanillas() {
 
             {/* Fila de totales dinámicos — al pie del datagrid */}
             <div className="grid items-center mt-2 bg-indigo-600 rounded-xl px-1 py-3" style={{
-              minWidth: "1020px",
-              gridTemplateColumns: "40px minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
+              minWidth: "980px",
+              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
             }}>
-              <div />
               <div className="px-4 text-xs font-bold text-white uppercase tracking-wide">
                 TOTALES — {filteredGrupos.length} planilla(s)
               </div>
