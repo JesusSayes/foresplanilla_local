@@ -747,7 +747,7 @@ export default function ConsultaPlanillas() {
   // --- Vista principal: lista de cabeceras ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 py-8">
 
         {/* Header */}
         <div className="mb-8 flex items-start justify-between">
@@ -850,127 +850,123 @@ export default function ConsultaPlanillas() {
               return (
                 <Card
                   key={g.key}
-                  className="border-0 shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer group"
+                  className="border-0 shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer group overflow-hidden"
                   onClick={() => setSelectedGroup(g)}
                 >
                   <CardContent className="p-0">
-                    <div className="flex items-stretch min-h-[80px]">
+                    {/* Scroll horizontal en pantallas pequeñas */}
+                    <div className="overflow-x-auto">
+                      <div className="flex items-stretch min-h-[82px] min-w-[1100px]">
 
-                      {/* Columna 1 — Fecha (icono + nombre + badges + número) — ancho fijo */}
-                      <div className="flex items-center gap-4 px-5 py-4 w-[280px] shrink-0">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex flex-col items-center justify-center text-white shrink-0">
-                          <span className="text-xs font-bold leading-none">
-                            {format(new Date(g.year, g.month - 1), "MMM", { locale: es }).toUpperCase()}
-                          </span>
-                          <span className="text-lg font-bold leading-none">{g.year}</span>
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                            <h3 className="text-base font-bold text-slate-900 capitalize whitespace-nowrap">{g.period}</h3>
+                        {/* Col 1 — Fecha + badges */}
+                        <div className="flex items-center gap-3 px-4 py-3 w-[260px] shrink-0">
+                          <div className="w-13 h-13 w-[52px] h-[52px] rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex flex-col items-center justify-center text-white shrink-0">
+                            <span className="text-[10px] font-bold leading-none uppercase">
+                              {format(new Date(g.year, g.month - 1), "MMM", { locale: es })}
+                            </span>
+                            <span className="text-base font-bold leading-none">{g.year}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                            <Badge className={`text-xs ${TIPO_COLORS[g.payroll_type] || "bg-slate-100 text-slate-700"}`}>
-                              {g.payroll_type}
-                            </Badge>
-                            <Badge className={`text-xs ${STATUS_COLORS[g.status] || "bg-slate-100"}`}>
-                              {g.status}
-                            </Badge>
+                          <div className="min-w-0">
+                            <h3 className="text-sm font-bold text-slate-900 capitalize whitespace-nowrap leading-tight">{g.period}</h3>
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                              <Badge className={`text-[10px] px-1.5 py-0 ${TIPO_COLORS[g.payroll_type] || "bg-slate-100 text-slate-700"}`}>
+                                {g.payroll_type}
+                              </Badge>
+                              <Badge className={`text-[10px] px-1.5 py-0 ${STATUS_COLORS[g.status] || "bg-slate-100"}`}>
+                                {g.status}
+                              </Badge>
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-0.5">N° {g.payroll_number}</p>
                           </div>
-                          <p className="text-xs text-slate-400">N° {g.payroll_number}</p>
                         </div>
-                      </div>
 
-                      {/* Divisor */}
-                      <div className="w-px bg-slate-100 my-3" />
+                        <div className="w-px bg-slate-100 my-3 shrink-0" />
 
-                      {/* Columna 2 — Empleados — ancho fijo */}
-                      <div className="flex flex-col items-center justify-center px-4 py-4 w-[100px] shrink-0">
-                        <p className="text-xs text-slate-400 mb-1">Empleados</p>
-                        <div className="flex items-center gap-1">
-                          <Users className="w-3.5 h-3.5 text-blue-500" />
-                          <span className="font-bold text-slate-900 text-base">{stats.empleados}</span>
-                        </div>
-                      </div>
-
-                      {/* Divisor */}
-                      <div className="w-px bg-slate-100 my-3" />
-
-                      {/* Columna 3 — Ingresos — ancho fijo */}
-                      <div className="flex flex-col items-end justify-center px-4 py-4 w-[140px] shrink-0">
-                        <p className="text-xs text-slate-400 mb-1">Ingresos</p>
-                        <p className="font-semibold text-slate-700 text-sm">{formatMoney(stats.totalIncome)}</p>
-                      </div>
-
-                      {/* Divisor */}
-                      <div className="w-px bg-slate-100 my-3" />
-
-                      {/* Columna 4 — Descuentos — ancho fijo */}
-                      <div className="flex flex-col items-end justify-center px-4 py-4 w-[140px] shrink-0">
-                        <p className="text-xs text-slate-400 mb-1">Descuentos</p>
-                        <p className="font-semibold text-red-500 text-sm">{formatMoney(stats.totalDesc)}</p>
-                      </div>
-
-                      {/* Divisor */}
-                      <div className="w-px bg-slate-100 my-3" />
-
-                      {/* Columna 5 — Neto Total — ancho fijo */}
-                      <div className="flex flex-col items-end justify-center px-4 py-4 w-[150px] shrink-0">
-                        <p className="text-xs text-slate-400 mb-1">Neto Total</p>
-                        <p className="font-bold text-indigo-700 text-base">{formatMoney(stats.totalNeto)}</p>
-                      </div>
-
-                      {/* Divisor */}
-                      <div className="w-px bg-slate-100 my-3" />
-
-                      {/* Columna 6 — Acciones fijas (Ver, Imprimir, Boletas) — ancho fijo */}
-                      <div className="flex items-center justify-center gap-1.5 px-3 py-4 w-[190px] shrink-0" onClick={e => e.stopPropagation()}>
-                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs"
-                          onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); }}>
-                          <Eye className="w-3.5 h-3.5 mr-1" />Ver
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-8 px-3 text-xs"
-                          onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); setTimeout(() => window.print(), 800); }}>
-                          <Printer className="w-3.5 h-3.5 mr-1" />Imprimir
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-8 px-2 text-xs text-purple-700 border-purple-200 hover:bg-purple-50"
-                          onClick={e => { e.stopPropagation(); handlePrintAllBoletas(g); }}>
-                          <Printer className="w-3.5 h-3.5 mr-1" />Boletas
-                        </Button>
-                      </div>
-
-                      {/* Divisor */}
-                      <div className="w-px bg-slate-100 my-3" />
-
-                      {/* Columna 7 — Asiento contable (siempre presente, en blanco si es Quincenal) — ancho fijo */}
-                      <div className="flex items-center justify-center px-4 py-4 w-[200px] shrink-0" onClick={e => e.stopPropagation()}>
-                        {g.payroll_type !== "Quincenal" ? (
-                          <div className="flex flex-col items-center gap-1 w-full">
-                            {asientoStatus && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 mb-1">
-                                <CheckCircle className="w-3 h-3" />Asiento generado
-                              </span>
-                            )}
-                            <Button
-                              size="sm"
-                              className={`w-full h-8 text-xs ${asientoStatus ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
-                              disabled={generatingAsiento === g.key}
-                              onClick={e => { e.stopPropagation(); handleGenerarAsiento(g); }}
-                            >
-                              {generatingAsiento === g.key
-                                ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-                                : <BookOpen className="w-3.5 h-3.5 mr-1" />
-                              }
-                              {asientoStatus ? "Actualizar Asiento" : "Generar Asiento"}
-                            </Button>
+                        {/* Col 2 — Empleados */}
+                        <div className="flex flex-col items-center justify-center px-3 py-3 w-[90px] shrink-0">
+                          <p className="text-[10px] text-slate-400 mb-0.5 whitespace-nowrap">Empleados</p>
+                          <div className="flex items-center gap-1">
+                            <Users className="w-3 h-3 text-blue-500" />
+                            <span className="font-bold text-slate-900 text-sm">{stats.empleados}</span>
                           </div>
-                        ) : (
-                          <span className="text-xs text-slate-300 italic">—</span>
-                        )}
-                      </div>
+                        </div>
 
-                      {/* Flecha */}
-                      <div className="flex items-center pr-4">
-                        <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                        <div className="w-px bg-slate-100 my-3 shrink-0" />
+
+                        {/* Col 3 — Ingresos */}
+                        <div className="flex flex-col items-end justify-center px-3 py-3 w-[130px] shrink-0">
+                          <p className="text-[10px] text-slate-400 mb-0.5">Ingresos</p>
+                          <p className="font-semibold text-slate-700 text-xs whitespace-nowrap">{formatMoney(stats.totalIncome)}</p>
+                        </div>
+
+                        <div className="w-px bg-slate-100 my-3 shrink-0" />
+
+                        {/* Col 4 — Descuentos */}
+                        <div className="flex flex-col items-end justify-center px-3 py-3 w-[130px] shrink-0">
+                          <p className="text-[10px] text-slate-400 mb-0.5">Descuentos</p>
+                          <p className="font-semibold text-red-500 text-xs whitespace-nowrap">{formatMoney(stats.totalDesc)}</p>
+                        </div>
+
+                        <div className="w-px bg-slate-100 my-3 shrink-0" />
+
+                        {/* Col 5 — Neto Total */}
+                        <div className="flex flex-col items-end justify-center px-3 py-3 w-[140px] shrink-0">
+                          <p className="text-[10px] text-slate-400 mb-0.5">Neto Total</p>
+                          <p className="font-bold text-indigo-700 text-sm whitespace-nowrap">{formatMoney(stats.totalNeto)}</p>
+                        </div>
+
+                        <div className="w-px bg-slate-100 my-3 shrink-0" />
+
+                        {/* Col 6 — Ver / Imprimir / Boletas */}
+                        <div className="flex items-center justify-center gap-1.5 px-3 py-3 w-[210px] shrink-0" onClick={e => e.stopPropagation()}>
+                          <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs whitespace-nowrap"
+                            onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); }}>
+                            <Eye className="w-3 h-3 mr-1" />Ver
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs whitespace-nowrap"
+                            onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); setTimeout(() => window.print(), 800); }}>
+                            <Printer className="w-3 h-3 mr-1" />Imprimir
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs whitespace-nowrap text-purple-700 border-purple-200 hover:bg-purple-50"
+                            onClick={e => { e.stopPropagation(); handlePrintAllBoletas(g); }}>
+                            <Printer className="w-3 h-3 mr-1" />Boletas
+                          </Button>
+                        </div>
+
+                        <div className="w-px bg-slate-100 my-3 shrink-0" />
+
+                        {/* Col 7 — Generar Asiento (fija, en blanco si Quincenal) */}
+                        <div className="flex items-center justify-center px-3 py-3 w-[185px] shrink-0" onClick={e => e.stopPropagation()}>
+                          {g.payroll_type !== "Quincenal" ? (
+                            <div className="flex flex-col items-stretch gap-1 w-full">
+                              {asientoStatus && (
+                                <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                  <CheckCircle className="w-2.5 h-2.5" />Asiento generado
+                                </span>
+                              )}
+                              <Button
+                                size="sm"
+                                className={`h-8 text-xs whitespace-nowrap ${asientoStatus ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                                disabled={generatingAsiento === g.key}
+                                onClick={e => { e.stopPropagation(); handleGenerarAsiento(g); }}
+                              >
+                                {generatingAsiento === g.key
+                                  ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                  : <BookOpen className="w-3 h-3 mr-1" />
+                                }
+                                {asientoStatus ? "Actualizar Asiento" : "Generar Asiento"}
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 text-xs">—</span>
+                          )}
+                        </div>
+
+                        {/* Flecha */}
+                        <div className="flex items-center justify-center px-3 shrink-0">
+                          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                        </div>
+
                       </div>
                     </div>
                   </CardContent>
