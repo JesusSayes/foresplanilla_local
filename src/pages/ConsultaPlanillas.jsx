@@ -747,88 +747,67 @@ export default function ConsultaPlanillas() {
   // --- Vista principal: lista de cabeceras ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <div className="max-w-[1600px] mx-auto px-4 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 py-6">
 
-        {/* Header */}
-        <div className="mb-8 flex items-start justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-2 flex items-center gap-3">
-              <FileText className="w-9 h-9 text-indigo-600" />
-              Consulta de Planillas
-            </h1>
-            <p className="text-slate-600 text-lg">Visualiza, imprime y firma planillas por período</p>
-          </div>
-          <Button
-            variant="outline"
-            className="border-slate-300 hover:bg-slate-50 gap-2"
-            onClick={() => setShowConfigFirmantes(true)}
-          >
-            <Settings className="w-4 h-4" />Configurar Firmantes
-          </Button>
-        </div>
-
-        {/* KPIs del año */}
-        <div className="grid grid-cols-4 gap-3 mb-6">
-          {[
-            { label: `Planillas ${filterYear}`, value: gruposAnio.length, icon: FileText, color: "indigo" },
-            { label: "Empleados únicos", value: totalEmps, icon: Users, color: "blue" },
-            { label: `Total neto ${filterYear}`, value: formatMoney(totalAnio), icon: DollarSign, color: "green" },
-            { label: "Tipos de planilla", value: [...new Set(gruposAnio.map(g => g.payroll_type))].length, icon: Calendar, color: "purple" },
-          ].map(({ label, value, icon: Icon, color }) => (
-            <Card key={label} className="border-0 shadow-lg">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <div className={`p-2 bg-${color}-100 rounded-lg shrink-0`}>
-                    <Icon className={`w-4 h-4 text-${color}-600`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xl font-bold text-slate-900 leading-tight">{value}</div>
-                    <p className="text-slate-600 text-xs truncate">{label}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Filtros */}
-        <Card className="border-0 shadow-lg mb-6">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap gap-3 items-center">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <Input placeholder="Buscar período o número..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9" />
-              </div>
-              <Select value={String(filterYear)} onValueChange={v => setFilterYear(parseInt(v))}>
-                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {availableYears.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filterMonth} onValueChange={setFilterMonth}>
-                <SelectTrigger className="w-40"><SelectValue placeholder="Todos los meses" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los meses</SelectItem>
-                  {Array.from({length: 12}, (_, i) => (
-                    <SelectItem key={i+1} value={String(i+1)}>
-                      {format(new Date(2024, i), "MMMM", { locale: es })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterTipo} onValueChange={setFilterTipo}>
-                <SelectTrigger className="w-36"><SelectValue placeholder="Tipo" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {["Quincenal","Mensual","Adicional","SNP","CTS","Gratificacion"].map(t => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-sm text-slate-500 ml-auto">{filteredGrupos.length} planilla(s) encontrada(s)</span>
+        {/* Header + Filtros en una sola barra */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm mb-4 px-4 py-3">
+          <div className="flex flex-wrap gap-3 items-center">
+            {/* Título compacto */}
+            <div className="flex items-center gap-2 mr-2">
+              <FileText className="w-5 h-5 text-indigo-600 shrink-0" />
+              <span className="text-base font-bold text-slate-900 whitespace-nowrap">Consulta de Planillas</span>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Buscador */}
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Input placeholder="Buscar período o número..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 h-9" />
+            </div>
+
+            {/* Año */}
+            <Select value={String(filterYear)} onValueChange={v => setFilterYear(parseInt(v))}>
+              <SelectTrigger className="w-24 h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {availableYears.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            {/* Mes */}
+            <Select value={filterMonth} onValueChange={setFilterMonth}>
+              <SelectTrigger className="w-38 h-9"><SelectValue placeholder="Todos los meses" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los meses</SelectItem>
+                {Array.from({length: 12}, (_, i) => (
+                  <SelectItem key={i+1} value={String(i+1)}>
+                    {format(new Date(2024, i), "MMMM", { locale: es })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Tipo */}
+            <Select value={filterTipo} onValueChange={setFilterTipo}>
+              <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {["Quincenal","Mensual","Adicional","SNP","CTS","Gratificacion"].map(t => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Contador + Firmantes */}
+            <span className="text-sm text-slate-500 whitespace-nowrap">{filteredGrupos.length} planilla(s)</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-slate-300 hover:bg-slate-50 gap-2 ml-auto h-9"
+              onClick={() => setShowConfigFirmantes(true)}
+            >
+              <Settings className="w-4 h-4" />Firmantes
+            </Button>
+          </div>
+        </div>
 
         {/* Lista de planillas — scroll horizontal único en este bloque */}
         {isLoading ? (
@@ -843,9 +822,30 @@ export default function ConsultaPlanillas() {
             </CardContent>
           </Card>
         ) : (
-          /* Contenedor con scroll horizontal SOLO aquí, no afecta header ni filtros */
           <div className="overflow-x-auto -mx-4 px-4">
-            <div className="space-y-3" style={{ minWidth: "980px" }}>
+            {/* Cabecera de columnas */}
+            <div className="grid items-center mb-1 px-1" style={{
+              minWidth: "980px",
+              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
+            }}>
+              <div className="px-4 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Período / Tipo</div>
+              <div />
+              <div className="px-2 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-center">Empl.</div>
+              <div />
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-right">Ingresos</div>
+              <div />
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-right">Descuentos</div>
+              <div />
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-right">Neto Total</div>
+              <div />
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-center">Acciones</div>
+              <div />
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-center">Contabilidad</div>
+              <div />
+            </div>
+
+
+            <div className="space-y-2" style={{ minWidth: "980px" }}>
               {filteredGrupos.map(g => {
                 const stats = getGrupoStats(g);
                 const asientoStatus = getGrupoAsientoStatus(g);
@@ -977,6 +977,7 @@ export default function ConsultaPlanillas() {
       </div>
 
       {/* Modal configuración de firmantes */}
+
       {showConfigFirmantes && (
         <ConfigFirmantesModal
           companyInfo={companyInfo}
