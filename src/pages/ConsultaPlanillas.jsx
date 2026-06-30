@@ -935,18 +935,20 @@ export default function ConsultaPlanillas() {
                         >
                           <Printer className="w-4 h-4 mr-1" />Boletas
                         </Button>
-                        <Button
-                          size="sm"
-                          className={`hidden sm:flex ${getGrupoAsientoStatus(g) ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
-                          disabled={generatingAsiento === g.key}
-                          onClick={e => { e.stopPropagation(); handleGenerarAsiento(g); }}
-                        >
-                          {generatingAsiento === g.key
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-                            : <BookOpen className="w-3.5 h-3.5 mr-1" />
-                          }
-                          {getGrupoAsientoStatus(g) ? "Actualizar Asiento" : "Generar Asiento"}
-                        </Button>
+                        {g.payroll_type !== "Quincenal" && (
+                          <Button
+                            size="sm"
+                            className={`hidden sm:flex ${getGrupoAsientoStatus(g) ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                            disabled={generatingAsiento === g.key}
+                            onClick={e => { e.stopPropagation(); handleGenerarAsiento(g); }}
+                          >
+                            {generatingAsiento === g.key
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                              : <BookOpen className="w-3.5 h-3.5 mr-1" />
+                            }
+                            {getGrupoAsientoStatus(g) ? "Actualizar Asiento" : "Generar Asiento"}
+                          </Button>
+                        )}
                         <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
                       </div>
                     </div>
