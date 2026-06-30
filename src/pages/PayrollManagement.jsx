@@ -482,17 +482,36 @@ export default function PayrollManagement() {
       const absenceDiscount = payrollType === "Quincenal" ? 0 : roundMoney(absentRecords.length * dailyRate);
 
       // Buscar adelanto quincenal si es mensual
+      // Se hace una consulta fresca para garantizar que se encuentre incluso si
+      // la quincenal fue generada en esta misma sesión sin recarga de página.
       let advanceDeduction = 0;
       let advancePaymentId = null;
       if (payrollType === "Mensual") {
-        const quincenalPayslip = existingPayslips.find(p => 
+        // Primero buscar en la cache local (existingPayslips ya cargados)
+        let quincenalPayslip = existingPayslips.find(p => 
           p.employee_id === emp.id && 
           p.payroll_type === "Quincenal" &&
-          p.month === selectedMonth &&
-          p.year === selectedYear
+          Number(p.month) === selectedMonth &&
+          Number(p.year) === selectedYear
         );
+        // Si no está en cache, hacer consulta fresca a la BD
+        if (!quincenalPayslip) {
+          const freshQuincenales = await base44.entities.Payslip.filter({
+            employee_id: emp.id,
+            payroll_type: "Quincenal",
+            month: selectedMonth,
+            year: selectedYear,
+          });
+          quincenalPayslip = freshQuincenales.length > 0 ? freshQuincenales[0] : null;
+        }
         if (quincenalPayslip) {
-          advanceDeduction = safePayrollNumber(quincenalPayslip.net_pay); // sanitizar adelanto
+          // Se descuenta el total_income de la quincenal (monto bruto adelantado),
+          // no el net_pay, porque la quincenal no tiene descuentos propios.
+          // Si total_income está disponible y es mayor a 0, usarlo; si no, usar net_pay.
+          const quincenalAmount = safePayrollNumber(quincenalPayslip.total_income) > 0
+            ? safePayrollNumber(quincenalPayslip.total_income)
+            : safePayrollNumber(quincenalPayslip.net_pay);
+          advanceDeduction = quincenalAmount;
           advancePaymentId = quincenalPayslip.id;
         }
       }
