@@ -10,8 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Building, MapPin, Briefcase, CreditCard, Plus, Edit, Trash2, Search, DollarSign, Target, Shield
+  Building, MapPin, Briefcase, CreditCard, Plus, Edit, Trash2, Search, DollarSign, Target, Shield, ToggleLeft, ToggleRight
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import MasterDataFormModal from "../components/master/MasterDataFormModal";
@@ -209,6 +210,18 @@ export default function MasterDataManagement() {
     a.cargo?.toLowerCase().includes(searchTerm.toLowerCase())) &&
     filterByStatus(a)
   );
+
+  // Toggle rápido activo/inactivo
+  const handleToggleStatus = (item, entity) => {
+    // Entidades con campo "estado" (A/I)
+    if (item.estado !== undefined) {
+      const newEstado = item.estado === "I" ? "A" : "I";
+      updateMutation.mutate({ entity, id: item.id, data: { estado: newEstado } });
+    } else {
+      const newActive = item.is_active === false ? true : false;
+      updateMutation.mutate({ entity, id: item.id, data: { is_active: newActive } });
+    }
+  };
 
   const handleSoftDelete = (item, entity) => {
     if (confirm(`¿Desactivar este registro?`)) {
@@ -616,17 +629,14 @@ export default function MasterDataManagement() {
                           <div className="flex items-center gap-3">
                             <Badge className="bg-violet-100 text-violet-700 text-xs">{item.unidad}</Badge>
                             <span className="text-sm font-medium text-slate-900">{item.cargo}</span>
-                            {item.is_active === false && <Badge className="bg-red-100 text-red-700 text-xs">Inactivo</Badge>}
+                            <Badge className={item.is_active !== false ? "bg-green-100 text-green-700 text-xs" : "bg-red-100 text-red-700 text-xs"}>{item.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
-                          <div className="flex gap-1.5">
+                          <div className="flex items-center gap-1.5">
+                            {hasAnyPermission(["system.admin"]) && (
+                              <Switch checked={item.is_active !== false} onCheckedChange={() => handleToggleStatus(item, "AreaUnidadCargo")} title={item.is_active !== false ? "Desactivar" : "Activar"} />
+                            )}
                             {hasAnyPermission(["system.admin"]) && (
                               <Button size="sm" variant="outline" onClick={() => handleEdit(item, "areaunidadcargo")}><Edit className="w-3.5 h-3.5" /></Button>
-                            )}
-                            {hasAnyPermission(["system.admin"]) && item.is_active !== false && (
-                              <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleSoftDelete(item, "AreaUnidadCargo")}><Trash2 className="w-3.5 h-3.5" /></Button>
-                            )}
-                            {hasAnyPermission(["system.admin"]) && item.is_active === false && (
-                              <Button size="sm" variant="outline" className="text-green-600 text-xs px-2" onClick={() => updateMutation.mutate({ entity: "AreaUnidadCargo", id: item.id, data: { is_active: true } })}>Reactivar</Button>
                             )}
                           </div>
                         </div>
@@ -669,23 +679,21 @@ export default function MasterDataManagement() {
                             <p className="text-sm text-slate-600">{site.address}</p>
                           )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-2">
                           {hasAnyPermission(["sites.edit", "sites.manage", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(site, "sites")}
-                            >
+                            <Switch
+                              checked={site.is_active !== false}
+                              onCheckedChange={() => handleToggleStatus(site, "Site")}
+                              title={site.is_active !== false ? "Desactivar" : "Activar"}
+                            />
+                          )}
+                          {hasAnyPermission(["sites.edit", "sites.manage", "system.admin"]) && (
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(site, "sites")}>
                               <Edit className="w-4 h-4" />
                             </Button>
                           )}
                           {hasAnyPermission(["sites.delete", "sites.manage", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(site, "Site")}
-                            >
+                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(site, "Site")}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
@@ -736,27 +744,17 @@ export default function MasterDataManagement() {
                             <p className="text-sm text-slate-600">{pos.description}</p>
                           )}
                         </div>
-                        <div className="flex gap-2">
-                          {hasAnyPermission(["positions.edit", "positions.manage", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(pos, "positions")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {hasAnyPermission(["positions.delete", "positions.manage", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(pos, "Position")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
+                        <div className="flex items-center gap-2">
+                           {hasAnyPermission(["positions.edit", "positions.manage", "system.admin"]) && (
+                             <Switch checked={pos.is_active !== false} onCheckedChange={() => handleToggleStatus(pos, "Position")} title={pos.is_active !== false ? "Desactivar" : "Activar"} />
+                           )}
+                           {hasAnyPermission(["positions.edit", "positions.manage", "system.admin"]) && (
+                             <Button size="sm" variant="outline" onClick={() => handleEdit(pos, "positions")}><Edit className="w-4 h-4" /></Button>
+                           )}
+                           {hasAnyPermission(["positions.delete", "positions.manage", "system.admin"]) && (
+                             <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(pos, "Position")}><Trash2 className="w-4 h-4" /></Button>
+                           )}
+                         </div>
                       </div>
                     </div>
                   ))}
@@ -798,27 +796,17 @@ export default function MasterDataManagement() {
                             <p className="text-sm text-slate-600">{dept.description}</p>
                           )}
                         </div>
-                        <div className="flex gap-2">
-                          {hasAnyPermission(["departments.edit", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(dept, "departments")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {hasAnyPermission(["departments.delete", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(dept, "Department")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
+                        <div className="flex items-center gap-2">
+                           {hasAnyPermission(["departments.edit", "system.admin"]) && (
+                             <Switch checked={dept.is_active !== false} onCheckedChange={() => handleToggleStatus(dept, "Department")} title={dept.is_active !== false ? "Desactivar" : "Activar"} />
+                           )}
+                           {hasAnyPermission(["departments.edit", "system.admin"]) && (
+                             <Button size="sm" variant="outline" onClick={() => handleEdit(dept, "departments")}><Edit className="w-4 h-4" /></Button>
+                           )}
+                           {hasAnyPermission(["departments.delete", "system.admin"]) && (
+                             <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(dept, "Department")}><Trash2 className="w-4 h-4" /></Button>
+                           )}
+                         </div>
                       </div>
                     </div>
                   ))}
@@ -857,27 +845,17 @@ export default function MasterDataManagement() {
                             <Badge className={bank.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{bank.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          {hasAnyPermission(["banks.edit", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(bank, "banks")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {hasAnyPermission(["banks.delete", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(bank, "Bank")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
+                        <div className="flex items-center gap-2">
+                           {hasAnyPermission(["banks.edit", "system.admin"]) && (
+                             <Switch checked={bank.is_active !== false} onCheckedChange={() => handleToggleStatus(bank, "Bank")} title={bank.is_active !== false ? "Desactivar" : "Activar"} />
+                           )}
+                           {hasAnyPermission(["banks.edit", "system.admin"]) && (
+                             <Button size="sm" variant="outline" onClick={() => handleEdit(bank, "banks")}><Edit className="w-4 h-4" /></Button>
+                           )}
+                           {hasAnyPermission(["banks.delete", "system.admin"]) && (
+                             <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(bank, "Bank")}><Trash2 className="w-4 h-4" /></Button>
+                           )}
+                         </div>
                       </div>
                     </div>
                   ))}
@@ -1014,27 +992,17 @@ export default function MasterDataManagement() {
                             <p className="text-sm text-slate-600 mt-2">{afp.notes}</p>
                           )}
                         </div>
-                        <div className="flex gap-2">
-                          {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(afp, "afp")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(afp, "AFP")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
+                        <div className="flex items-center gap-2">
+                           {hasAnyPermission(["system.admin"]) && (
+                             <Switch checked={afp.is_active !== false} onCheckedChange={() => handleToggleStatus(afp, "AFP")} title={afp.is_active !== false ? "Desactivar" : "Activar"} />
+                           )}
+                           {hasAnyPermission(["system.admin"]) && (
+                             <Button size="sm" variant="outline" onClick={() => handleEdit(afp, "afp")}><Edit className="w-4 h-4" /></Button>
+                           )}
+                           {hasAnyPermission(["system.admin"]) && (
+                             <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(afp, "AFP")}><Trash2 className="w-4 h-4" /></Button>
+                           )}
+                         </div>
                       </div>
                     </div>
                   ))}
@@ -1078,27 +1046,17 @@ export default function MasterDataManagement() {
                             <Badge className={prof.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{prof.is_active !== false ? "Activa" : "Inactiva"}</Badge>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(prof, "professions")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(prof, "Profession")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
+                        <div className="flex items-center gap-2">
+                           {hasAnyPermission(["system.admin"]) && (
+                             <Switch checked={prof.is_active !== false} onCheckedChange={() => handleToggleStatus(prof, "Profession")} title={prof.is_active !== false ? "Desactivar" : "Activar"} />
+                           )}
+                           {hasAnyPermission(["system.admin"]) && (
+                             <Button size="sm" variant="outline" onClick={() => handleEdit(prof, "professions")}><Edit className="w-4 h-4" /></Button>
+                           )}
+                           {hasAnyPermission(["system.admin"]) && (
+                             <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(prof, "Profession")}><Trash2 className="w-4 h-4" /></Button>
+                           )}
+                         </div>
                       </div>
                     </div>
                   ))}
@@ -1145,29 +1103,17 @@ export default function MasterDataManagement() {
                               <div className="flex items-center gap-3">
                                 <Badge className="bg-rose-100 text-rose-700 font-mono">{cc.code}</Badge>
                                 <span className="font-medium text-slate-900">{cc.name}</span>
-                                {!cc.is_active && (
-                                  <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
-                                )}
+                                <Badge className={cc.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{cc.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                               </div>
-                              <div className="flex gap-2">
+                              <div className="flex items-center gap-2">
                                 {hasAnyPermission(["system.admin"]) && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleEdit(cc, "costcenters")}
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </Button>
+                                  <Switch checked={cc.is_active !== false} onCheckedChange={() => handleToggleStatus(cc, "CostCenter")} title={cc.is_active !== false ? "Desactivar" : "Activar"} />
                                 )}
                                 {hasAnyPermission(["system.admin"]) && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-red-600"
-                                    onClick={() => handleDelete(cc, "CostCenter")}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => handleEdit(cc, "costcenters")}><Edit className="w-4 h-4" /></Button>
+                                )}
+                                {hasAnyPermission(["system.admin"]) && (
+                                  <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(cc, "CostCenter")}><Trash2 className="w-4 h-4" /></Button>
                                 )}
                               </div>
                             </div>
@@ -1213,32 +1159,20 @@ export default function MasterDataManagement() {
                               {seguro.age_range_start}-{seguro.age_range_end === 1000 ? "más" : seguro.age_range_end} años
                             </h4>
                             <Badge className="bg-red-100 text-red-700">{seguro.commercial_rate}%</Badge>
-                            {!seguro.is_active && (
-                              <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>
-                            )}
+                            <Badge className={seguro.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{seguro.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
-                        </div>
-                        <div className="flex gap-2">
+                          </div>
+                          <div className="flex items-center gap-2">
                           {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(seguro, "segurovida")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
+                            <Switch checked={seguro.is_active !== false} onCheckedChange={() => handleToggleStatus(seguro, "SeguroVidaLey")} title={seguro.is_active !== false ? "Desactivar" : "Activar"} />
                           )}
                           {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(seguro, "SeguroVidaLey")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(seguro, "segurovida")}><Edit className="w-4 h-4" /></Button>
                           )}
-                        </div>
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(seguro, "SeguroVidaLey")}><Trash2 className="w-4 h-4" /></Button>
+                          )}
+                          </div>
                       </div>
                     </div>
                   ))}
@@ -1280,32 +1214,20 @@ export default function MasterDataManagement() {
                             {uit.year === new Date().getFullYear() && (
                               <Badge className="bg-green-100 text-green-700">Vigente</Badge>
                             )}
-                            {!uit.is_active && (
-                              <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>
-                            )}
+                            <Badge className={uit.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{uit.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
-                        </div>
-                        <div className="flex gap-2">
+                          </div>
+                          <div className="flex items-center gap-2">
                           {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(uit, "uit")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
+                            <Switch checked={uit.is_active !== false} onCheckedChange={() => handleToggleStatus(uit, "UIT")} title={uit.is_active !== false ? "Desactivar" : "Activar"} />
                           )}
                           {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(uit, "UIT")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(uit, "uit")}><Edit className="w-4 h-4" /></Button>
                           )}
-                        </div>
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(uit, "UIT")}><Trash2 className="w-4 h-4" /></Button>
+                          )}
+                          </div>
                       </div>
                     </div>
                   ))}
@@ -1376,29 +1298,17 @@ export default function MasterDataManagement() {
                               <div className="flex items-center gap-3">
                                 <Badge className="bg-emerald-100 text-emerald-700 font-mono">{acc.cuenta}</Badge>
                                 <span className="font-medium text-slate-900">{acc.nombre}</span>
-                                {!acc.is_active && (
-                                  <Badge className="bg-red-100 text-red-700">Inactiva</Badge>
-                                )}
+                                <Badge className={acc.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{acc.is_active !== false ? "Activa" : "Inactiva"}</Badge>
                               </div>
-                              <div className="flex gap-2">
+                              <div className="flex items-center gap-2">
                                 {hasAnyPermission(["system.admin"]) && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleEdit(acc, "accountingaccounts")}
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </Button>
+                                  <Switch checked={acc.is_active !== false} onCheckedChange={() => handleToggleStatus(acc, "AccountingAccount")} title={acc.is_active !== false ? "Desactivar" : "Activar"} />
                                 )}
                                 {hasAnyPermission(["system.admin"]) && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-red-600"
-                                    onClick={() => handleDelete(acc, "AccountingAccount")}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => handleEdit(acc, "accountingaccounts")}><Edit className="w-4 h-4" /></Button>
+                                )}
+                                {hasAnyPermission(["system.admin"]) && (
+                                  <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(acc, "AccountingAccount")}><Trash2 className="w-4 h-4" /></Button>
                                 )}
                               </div>
                             </div>
@@ -1433,14 +1343,17 @@ export default function MasterDataManagement() {
                         <Badge className={item.affectation === "Permiso" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{item.affectation}</Badge>
                         <Badge className={item.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                       </div>
-                      <div className="flex gap-1.5">
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "incidenttypes")}><Edit className="w-3.5 h-3.5" /></Button>
-                        )}
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "IncidentType")}><Trash2 className="w-3.5 h-3.5" /></Button>
-                        )}
-                      </div>
+                      <div className="flex items-center gap-1.5">
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Switch checked={item.is_active !== false} onCheckedChange={() => handleToggleStatus(item, "IncidentType")} />
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" onClick={() => handleEdit(item, "incidenttypes")}><Edit className="w-3.5 h-3.5" /></Button>
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "IncidentType")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                         )}
+                       </div>
                     </div>
                   ))}
                 </div>
@@ -1470,14 +1383,17 @@ export default function MasterDataManagement() {
                         {item.description && <span className="text-sm text-slate-500">{item.description}</span>}
                         <Badge className={item.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                       </div>
-                      <div className="flex gap-1.5">
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "loantypes")}><Edit className="w-3.5 h-3.5" /></Button>
-                        )}
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "LoanType")}><Trash2 className="w-3.5 h-3.5" /></Button>
-                        )}
-                      </div>
+                      <div className="flex items-center gap-1.5">
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Switch checked={item.is_active !== false} onCheckedChange={() => handleToggleStatus(item, "LoanType")} />
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" onClick={() => handleEdit(item, "loantypes")}><Edit className="w-3.5 h-3.5" /></Button>
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "LoanType")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                         )}
+                       </div>
                     </div>
                   ))}
                 </div>
@@ -1508,14 +1424,17 @@ export default function MasterDataManagement() {
                         {item.description && <span className="text-sm text-slate-500">{item.description}</span>}
                         <Badge className={item.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                       </div>
-                      <div className="flex gap-1.5">
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "costcentercategories")}><Edit className="w-3.5 h-3.5" /></Button>
-                        )}
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "CostCenterCategory")}><Trash2 className="w-3.5 h-3.5" /></Button>
-                        )}
-                      </div>
+                      <div className="flex items-center gap-1.5">
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Switch checked={item.is_active !== false} onCheckedChange={() => handleToggleStatus(item, "CostCenterCategory")} />
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" onClick={() => handleEdit(item, "costcentercategories")}><Edit className="w-3.5 h-3.5" /></Button>
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "CostCenterCategory")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                         )}
+                       </div>
                     </div>
                   ))}
                 </div>
@@ -1547,14 +1466,17 @@ export default function MasterDataManagement() {
                         {item.codigo_sunat && <Badge className="bg-slate-100 text-slate-600 font-mono text-xs">{item.codigo_sunat}</Badge>}
                         <Badge className={item.estado !== "I" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.estado !== "I" ? "Activo" : "Inactivo"}</Badge>
                       </div>
-                      <div className="flex gap-1.5">
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "subdiarios")}><Edit className="w-3.5 h-3.5" /></Button>
-                        )}
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "Subdiario")}><Trash2 className="w-3.5 h-3.5" /></Button>
-                        )}
-                      </div>
+                      <div className="flex items-center gap-1.5">
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Switch checked={item.estado !== "I"} onCheckedChange={() => handleToggleStatus(item, "Subdiario")} />
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" onClick={() => handleEdit(item, "subdiarios")}><Edit className="w-3.5 h-3.5" /></Button>
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "Subdiario")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                         )}
+                       </div>
                     </div>
                   ))}
                 </div>
@@ -1584,14 +1506,17 @@ export default function MasterDataManagement() {
                         <span className="font-medium text-slate-900">{item.descripcion}</span>
                         <Badge className={item.estado !== "I" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.estado !== "I" ? "Activo" : "Inactivo"}</Badge>
                       </div>
-                      <div className="flex gap-1.5">
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "tiposanexo")}><Edit className="w-3.5 h-3.5" /></Button>
-                        )}
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "TipoAnexo")}><Trash2 className="w-3.5 h-3.5" /></Button>
-                        )}
-                      </div>
+                      <div className="flex items-center gap-1.5">
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Switch checked={item.estado !== "I"} onCheckedChange={() => handleToggleStatus(item, "TipoAnexo")} />
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" onClick={() => handleEdit(item, "tiposanexo")}><Edit className="w-3.5 h-3.5" /></Button>
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "TipoAnexo")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                         )}
+                       </div>
                     </div>
                   ))}
                 </div>
