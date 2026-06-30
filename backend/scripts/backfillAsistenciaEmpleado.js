@@ -5,6 +5,7 @@ import { employmentEndDate, isEmploymentDateValid } from '../utils/employmentDat
 const prisma = new PrismaClient();
 
 const DAY_NAMES = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
   const candidates = schedules.filter(s => {
@@ -69,6 +70,7 @@ function todayInPeru() {
  */
 export async function backfillAsistenciaEmpleado({ employee_id, date_from = "2026-01-01" } = {}) {
   if (!employee_id) throw new Error('employee_id es requerido');
+  if (!ISO_DATE.test(date_from)) throw new Error('date_from debe tener formato YYYY-MM-DD');
 
   const todayStr = todayInPeru();
 

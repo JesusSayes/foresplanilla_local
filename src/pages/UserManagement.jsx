@@ -863,7 +863,7 @@ export default function UserManagement() {
               <div>
                 <Label>Nueva Contraseña *</Label>
                 <Input
-                  type="text"
+                  type="password"
                   placeholder="Nueva contraseña"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}

@@ -279,7 +279,6 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess, init
     }
   };
 
-    try {
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-6"
@@ -461,7 +460,4 @@ export default function AssignScheduleModal({ employee, onClose, onSuccess, init
       </Card>
     </div>
   );
-    } catch (error) {
-      console.log("Error al asignar horario: " + error.message);
-    }
 }

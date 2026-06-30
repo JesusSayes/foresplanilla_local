@@ -77,7 +77,8 @@ export async function generarAsistenciaDiaria({ date_from = null, employee_id = 
   const filterEmployeeId = employee_id;
   const isBackfill       = !!forcedDateFrom;
   const defaultBatch     = isBackfill ? 5 : 200;
-  const employeeBatch    = Number(employee_batch) || defaultBatch;
+  const rawBatch         = parseInt(employee_batch, 10) || defaultBatch;
+  const employeeBatch    = Math.min(Math.max(1, rawBatch), 200);
   const todayStr         = todayInPeru();
 
   const [schedulesRaw, holidaysRaw, contractsRaw] = await Promise.all([

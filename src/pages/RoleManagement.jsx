@@ -154,6 +154,39 @@ export default function RoleManagement() {
         await Promise.all(assignments.map(a => entitiesAPI.UserRole.create(a)));
       }
 
+      // Actualizar el campo role legacy en Employee para compatibilidad con sistema anterior
+      const assignedRoles = roles.filter(r => roleIds.includes(r.id));
+      let legacyRole = "empleado";
+      
+      // Determinar el rol legacy más alto basado en los permisos del rol asignado
+      const allPerms = new Set();
+      assignedRoles.forEach(r => (r.permissions || []).forEach(p => allPerms.add(p)));
+
+      const nameLower = (name) => (name || "").toLowerCase().trim();
+      const isSuperAdmin = assignedRoles.some(r =>
+        nameLower(r.name).includes("super admin") ||
+        nameLower(r.name).includes("superadmin") ||
+        nameLower(r.name).includes("super administrador") ||
+        nameLower(r.name).includes("superadministrador")
+      );
+      const isAdmin = assignedRoles.some(r =>
+        nameLower(r.name).includes("admin") ||
+        nameLower(r.name).includes("administrador")
+      );
+
+      if (isSuperAdmin) {
+        legacyRole = "super_admin";
+      } else if (allPerms.has("system.admin") || isAdmin) {
+        legacyRole = "admin";
+      } else if (allPerms.has("employees.view") && allPerms.has("attendance.view_all")) {
+        legacyRole = "hr_readonly";
+      } else if (allPerms.has("vacations.approve") || allPerms.has("attendance.approve_incidents") || allPerms.has("attendance.view_department")) {
+        legacyRole = "manager";
+      } else if (roleIds.length === 0) {
+        legacyRole = "empleado";
+      }
+
+      await entitiesAPI.Employee.update(employeeId, { role: legacyRole });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["userRoles"] });
