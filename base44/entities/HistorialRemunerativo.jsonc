@@ -1,0 +1,66 @@
+{
+  "name": "HistorialRemunerativo",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "year": {
+      "type": "integer",
+      "description": "A\u00f1o del per\u00edodo"
+    },
+    "month": {
+      "type": "integer",
+      "description": "Mes del per\u00edodo (1-12)"
+    },
+    "period_label": {
+      "type": "string",
+      "description": "Etiqueta del per\u00edodo (ej: Enero 2024)"
+    },
+    "base_salary": {
+      "type": "number",
+      "default": 0,
+      "description": "Remuneraci\u00f3n b\u00e1sica del mes"
+    },
+    "family_allowance": {
+      "type": "number",
+      "default": 0,
+      "description": "Asignaci\u00f3n familiar del mes"
+    },
+    "other_regular_income": {
+      "type": "number",
+      "default": 0,
+      "description": "Otros ingresos regulares (bonificaciones fijas, movilidad, alimento, etc.)"
+    },
+    "total_remuneration": {
+      "type": "number",
+      "default": 0,
+      "description": "Remuneraci\u00f3n computable total (base + asig. familiar + otros regulares)"
+    },
+    "worked_days": {
+      "type": "integer",
+      "default": 30,
+      "description": "D\u00edas trabajados en el mes (m\u00e1x. 30)"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "Manual",
+        "Importado",
+        "Calculado"
+      ],
+      "default": "Manual",
+      "description": "Origen del registro"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas u observaciones del per\u00edodo"
+    }
+  },
+  "required": [
+    "employee_id",
+    "year",
+    "month"
+  ]
+}

@@ -8,6 +8,8 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import BeneficiosSociales from './pages/BeneficiosSociales';
+import HistorialRemunerativo from './pages/HistorialRemunerativo';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -59,6 +61,8 @@ const AuthenticatedApp = () => {
           }
         />
       ))}
+      <Route path="/BeneficiosSociales" element={<LayoutWrapper currentPageName="BeneficiosSociales"><BeneficiosSociales /></LayoutWrapper>} />
+      <Route path="/HistorialRemunerativo" element={<LayoutWrapper currentPageName="HistorialRemunerativo"><HistorialRemunerativo /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
