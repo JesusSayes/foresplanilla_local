@@ -125,6 +125,16 @@ export default function MasterDataManagement() {
     queryFn: async () => await base44.entities.CostCenterCategory.list("name"),
   });
 
+  const { data: subdiarios = [] } = useQuery({
+    queryKey: ["subdiarios"],
+    queryFn: async () => await base44.entities.Subdiario.list("codigo"),
+  });
+
+  const { data: tiposAnexo = [] } = useQuery({
+    queryKey: ["tipos_anexo"],
+    queryFn: async () => await base44.entities.TipoAnexo.list("codigo_tipo_anexo"),
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ entity, data }) => {
       return await base44.entities[entity].create(data);
@@ -209,6 +219,8 @@ export default function MasterDataManagement() {
       incidenttypes: "IncidentType",
       loantypes: "LoanType",
       costcentercategories: "CostCenterCategory",
+      subdiarios: "Subdiario",
+      tiposanexo: "TipoAnexo",
     };
     const entity = entityMap[activeTab];
 
@@ -527,6 +539,8 @@ export default function MasterDataManagement() {
             <TabsTrigger value="incidenttypes">Tipos Incidente</TabsTrigger>
             <TabsTrigger value="loantypes">Tipos Préstamo</TabsTrigger>
             <TabsTrigger value="costcentercategories">Categ. CC</TabsTrigger>
+            <TabsTrigger value="subdiarios">Subdiarios</TabsTrigger>
+            <TabsTrigger value="tiposanexo">Tipos Anexo</TabsTrigger>
           </TabsList>
 
           <TabsContent value="areaunidadcargo" className="space-y-6">
@@ -1576,6 +1590,84 @@ export default function MasterDataManagement() {
                         )}
                         {hasAnyPermission(["system.admin"]) && (
                           <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "CostCenterCategory")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="subdiarios" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Subdiarios Contables</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">Subdiarios para clasificación de asientos contables</p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button onClick={() => handleCreate("subdiarios")} className="bg-indigo-600 hover:bg-indigo-700"><Plus className="w-4 h-4 mr-2" />Nuevo Subdiario</Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar subdiario..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
+                <div className="space-y-2">
+                  {subdiarios.filter(s => s.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) || s.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                    <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <Badge className="bg-indigo-100 text-indigo-700 font-mono">{item.codigo}</Badge>
+                        <span className="font-medium text-slate-900">{item.descripcion}</span>
+                        {item.nombre_breve && <span className="text-xs text-slate-400">{item.nombre_breve}</span>}
+                        {item.codigo_sunat && <Badge className="bg-slate-100 text-slate-600 font-mono text-xs">{item.codigo_sunat}</Badge>}
+                        {item.estado === "I" && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                      </div>
+                      <div className="flex gap-1.5">
+                        {hasAnyPermission(["system.admin"]) && (
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "subdiarios")}><Edit className="w-3.5 h-3.5" /></Button>
+                        )}
+                        {hasAnyPermission(["system.admin"]) && (
+                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "Subdiario")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="tiposanexo" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Tipos de Anexo</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">P=Proveedor · C=Cliente · T=Trabajador · O=Otros</p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button onClick={() => handleCreate("tiposanexo")} className="bg-indigo-600 hover:bg-indigo-700"><Plus className="w-4 h-4 mr-2" />Nuevo Tipo Anexo</Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar tipo de anexo..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
+                <div className="space-y-2">
+                  {tiposAnexo.filter(t => t.codigo_tipo_anexo?.toLowerCase().includes(searchTerm.toLowerCase()) || t.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                    <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <Badge className="bg-amber-100 text-amber-700 font-mono font-bold">{item.codigo_tipo_anexo}</Badge>
+                        <span className="font-medium text-slate-900">{item.descripcion}</span>
+                        {item.estado === "I" && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                      </div>
+                      <div className="flex gap-1.5">
+                        {hasAnyPermission(["system.admin"]) && (
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "tiposanexo")}><Edit className="w-3.5 h-3.5" /></Button>
+                        )}
+                        {hasAnyPermission(["system.admin"]) && (
+                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "TipoAnexo")}><Trash2 className="w-3.5 h-3.5" /></Button>
                         )}
                       </div>
                     </div>
