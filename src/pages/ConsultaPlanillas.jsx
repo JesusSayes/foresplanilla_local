@@ -416,6 +416,7 @@ export default function ConsultaPlanillas() {
             employee={emp}
             companyInfo={companyInfo}
             firmantes={firmantes}
+            showPrintButton={true}
           />
         </div>
       </div>
@@ -560,7 +561,7 @@ export default function ConsultaPlanillas() {
                               className="h-8 px-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50 text-xs"
                               onClick={() => setPreviewPayslip(p)}
                             >
-                              <Eye className="w-3.5 h-3.5 mr-1" />Ver
+                              <Eye className="w-3.5 h-3.5 mr-1" />Ver Boleta
                             </Button>
                             <Button
                               size="sm"
