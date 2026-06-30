@@ -830,7 +830,7 @@ export default function ConsultaPlanillas() {
           </CardContent>
         </Card>
 
-        {/* Lista de planillas (cabecera) */}
+        {/* Lista de planillas — scroll horizontal único en este bloque */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
@@ -843,28 +843,29 @@ export default function ConsultaPlanillas() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {filteredGrupos.map(g => {
-              const stats = getGrupoStats(g);
-              const asientoStatus = getGrupoAsientoStatus(g);
-              return (
-                <Card
-                  key={g.key}
-                  className="border-0 shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer group overflow-hidden"
-                  onClick={() => setSelectedGroup(g)}
-                >
-                  <CardContent className="p-0">
-                    {/* Scroll horizontal en pantallas pequeñas */}
-                    <div className="overflow-x-auto">
-                      <div className="flex items-stretch min-h-[82px] min-w-[1100px]">
+          /* Contenedor con scroll horizontal SOLO aquí, no afecta header ni filtros */
+          <div className="overflow-x-auto -mx-4 px-4">
+            <div className="space-y-3" style={{ minWidth: "1050px" }}>
+              {filteredGrupos.map(g => {
+                const stats = getGrupoStats(g);
+                const asientoStatus = getGrupoAsientoStatus(g);
+                return (
+                  <Card
+                    key={g.key}
+                    className="border-0 shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer group overflow-hidden"
+                    onClick={() => setSelectedGroup(g)}
+                  >
+                    <CardContent className="p-0">
+                      {/* Una sola fila que se expande al 100% del contenedor */}
+                      <div className="flex items-stretch w-full min-h-[82px]">
 
-                        {/* Col 1 — Fecha + badges */}
-                        <div className="flex items-center gap-3 px-4 py-3 w-[260px] shrink-0">
-                          <div className="w-13 h-13 w-[52px] h-[52px] rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex flex-col items-center justify-center text-white shrink-0">
+                        {/* Col 1 — Fecha + badges — ancho mínimo fijo, crece si hay espacio */}
+                        <div className="flex items-center gap-3 px-4 py-3 min-w-[240px] flex-[2]">
+                          <div className="w-[50px] h-[50px] rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex flex-col items-center justify-center text-white shrink-0">
                             <span className="text-[10px] font-bold leading-none uppercase">
                               {format(new Date(g.year, g.month - 1), "MMM", { locale: es })}
                             </span>
-                            <span className="text-base font-bold leading-none">{g.year}</span>
+                            <span className="text-sm font-bold leading-none">{g.year}</span>
                           </div>
                           <div className="min-w-0">
                             <h3 className="text-sm font-bold text-slate-900 capitalize whitespace-nowrap leading-tight">{g.period}</h3>
@@ -876,14 +877,14 @@ export default function ConsultaPlanillas() {
                                 {g.status}
                               </Badge>
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-0.5">N° {g.payroll_number}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">N° {g.payroll_number}</p>
                           </div>
                         </div>
 
                         <div className="w-px bg-slate-100 my-3 shrink-0" />
 
                         {/* Col 2 — Empleados */}
-                        <div className="flex flex-col items-center justify-center px-3 py-3 w-[90px] shrink-0">
+                        <div className="flex flex-col items-center justify-center px-3 py-3 min-w-[80px] flex-1">
                           <p className="text-[10px] text-slate-400 mb-0.5 whitespace-nowrap">Empleados</p>
                           <div className="flex items-center gap-1">
                             <Users className="w-3 h-3 text-blue-500" />
@@ -894,7 +895,7 @@ export default function ConsultaPlanillas() {
                         <div className="w-px bg-slate-100 my-3 shrink-0" />
 
                         {/* Col 3 — Ingresos */}
-                        <div className="flex flex-col items-end justify-center px-3 py-3 w-[130px] shrink-0">
+                        <div className="flex flex-col items-end justify-center px-3 py-3 min-w-[110px] flex-1">
                           <p className="text-[10px] text-slate-400 mb-0.5">Ingresos</p>
                           <p className="font-semibold text-slate-700 text-xs whitespace-nowrap">{formatMoney(stats.totalIncome)}</p>
                         </div>
@@ -902,7 +903,7 @@ export default function ConsultaPlanillas() {
                         <div className="w-px bg-slate-100 my-3 shrink-0" />
 
                         {/* Col 4 — Descuentos */}
-                        <div className="flex flex-col items-end justify-center px-3 py-3 w-[130px] shrink-0">
+                        <div className="flex flex-col items-end justify-center px-3 py-3 min-w-[110px] flex-1">
                           <p className="text-[10px] text-slate-400 mb-0.5">Descuentos</p>
                           <p className="font-semibold text-red-500 text-xs whitespace-nowrap">{formatMoney(stats.totalDesc)}</p>
                         </div>
@@ -910,7 +911,7 @@ export default function ConsultaPlanillas() {
                         <div className="w-px bg-slate-100 my-3 shrink-0" />
 
                         {/* Col 5 — Neto Total */}
-                        <div className="flex flex-col items-end justify-center px-3 py-3 w-[140px] shrink-0">
+                        <div className="flex flex-col items-end justify-center px-3 py-3 min-w-[120px] flex-1">
                           <p className="text-[10px] text-slate-400 mb-0.5">Neto Total</p>
                           <p className="font-bold text-indigo-700 text-sm whitespace-nowrap">{formatMoney(stats.totalNeto)}</p>
                         </div>
@@ -918,7 +919,7 @@ export default function ConsultaPlanillas() {
                         <div className="w-px bg-slate-100 my-3 shrink-0" />
 
                         {/* Col 6 — Ver / Imprimir / Boletas */}
-                        <div className="flex items-center justify-center gap-1.5 px-3 py-3 w-[210px] shrink-0" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5 px-3 py-3 min-w-[200px] flex-[1.5]" onClick={e => e.stopPropagation()}>
                           <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs whitespace-nowrap"
                             onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); }}>
                             <Eye className="w-3 h-3 mr-1" />Ver
@@ -935,8 +936,8 @@ export default function ConsultaPlanillas() {
 
                         <div className="w-px bg-slate-100 my-3 shrink-0" />
 
-                        {/* Col 7 — Generar Asiento (fija, en blanco si Quincenal) */}
-                        <div className="flex items-center justify-center px-3 py-3 w-[185px] shrink-0" onClick={e => e.stopPropagation()}>
+                        {/* Col 7 — Generar Asiento (siempre ocupa espacio, en blanco si Quincenal) */}
+                        <div className="flex items-center justify-center px-3 py-3 min-w-[175px] flex-[1.5]" onClick={e => e.stopPropagation()}>
                           {g.payroll_type !== "Quincenal" ? (
                             <div className="flex flex-col items-stretch gap-1 w-full">
                               {asientoStatus && (
@@ -958,7 +959,7 @@ export default function ConsultaPlanillas() {
                               </Button>
                             </div>
                           ) : (
-                            <span className="text-slate-300 text-xs">—</span>
+                            <span className="text-slate-200 text-sm">—</span>
                           )}
                         </div>
 
@@ -968,11 +969,11 @@ export default function ConsultaPlanillas() {
                         </div>
 
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
