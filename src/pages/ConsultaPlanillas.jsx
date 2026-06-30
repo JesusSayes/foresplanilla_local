@@ -845,7 +845,7 @@ export default function ConsultaPlanillas() {
         ) : (
           /* Contenedor con scroll horizontal SOLO aquí, no afecta header ni filtros */
           <div className="overflow-x-auto -mx-4 px-4">
-            <div className="space-y-3" style={{ minWidth: "860px" }}>
+            <div className="space-y-3" style={{ minWidth: "980px" }}>
               {filteredGrupos.map(g => {
                 const stats = getGrupoStats(g);
                 const asientoStatus = getGrupoAsientoStatus(g);
@@ -858,7 +858,7 @@ export default function ConsultaPlanillas() {
                     <CardContent className="p-0">
                       {/* Grid dinámico: info crece, botones fijos y sin superposición */}
                       <div className="grid items-center w-full min-h-[76px]" style={{
-                        gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(110px,1fr) 1px minmax(110px,1fr) 1px minmax(110px,1fr) 1px 228px 1px 176px 32px"
+                        gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
                       }}>
 
                         {/* Col 1 — Período + badges */}
