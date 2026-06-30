@@ -163,6 +163,17 @@ export default function ConsultaPlanillas() {
     totalNeto:   g.payslips.reduce((s, p) => s + safePayrollNumber(p.net_pay), 0),
   });
 
+  // Totales dinámicos calculados directo sobre payslips de los grupos filtrados
+  const filteredTotals = useMemo(() => {
+    const allPs = filteredGrupos.flatMap(g => g.payslips);
+    return {
+      empleados:    filteredGrupos.reduce((s, g) => s + g.payslips.length, 0),
+      totalIncome:  allPs.reduce((s, p) => s + (Number(p.total_income)      || 0), 0),
+      totalDesc:    allPs.reduce((s, p) => s + (Number(p.total_deductions)  || 0), 0),
+      totalNeto:    allPs.reduce((s, p) => s + (Number(p.net_pay)           || 0), 0),
+    };
+  }, [filteredGrupos]);
+
   // Verifica si un grupo ya tiene asientos generados
   const getGrupoAsientoStatus = (grupo) => {
     const existing = allAsientos.filter(
@@ -967,32 +978,23 @@ export default function ConsultaPlanillas() {
             </div>
 
             {/* Fila de totales dinámicos — al pie del datagrid */}
-            {(() => {
-              const allStats = filteredGrupos.map(g => getGrupoStats(g));
-              const totalEmpleados = filteredGrupos.reduce((s, g) => s + g.payslips.length, 0);
-              const totalIngresos  = allStats.reduce((s, st) => s + st.totalIncome, 0);
-              const totalDesc      = allStats.reduce((s, st) => s + st.totalDesc, 0);
-              const totalNeto      = allStats.reduce((s, st) => s + st.totalNeto, 0);
-              return (
-                <div className="grid items-center mt-2 bg-indigo-600 rounded-xl px-1 py-3" style={{
-                  minWidth: "980px",
-                  gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
-                }}>
-                  <div className="px-4 text-xs font-bold text-white uppercase tracking-wide">
-                    TOTALES — {filteredGrupos.length} planilla(s)
-                  </div>
-                  <div />
-                  <div className="px-2 text-center text-sm font-bold text-white">{totalEmpleados}</div>
-                  <div />
-                  <div className="px-3 text-right text-sm font-bold text-emerald-200">{formatMoney(totalIngresos)}</div>
-                  <div />
-                  <div className="px-3 text-right text-sm font-bold text-red-300">{formatMoney(totalDesc)}</div>
-                  <div />
-                  <div className="px-3 text-right text-sm font-bold text-white">{formatMoney(totalNeto)}</div>
-                  <div /><div /><div /><div /><div />
-                </div>
-              );
-            })()}
+            <div className="grid items-center mt-2 bg-indigo-600 rounded-xl px-1 py-3" style={{
+              minWidth: "980px",
+              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
+            }}>
+              <div className="px-4 text-xs font-bold text-white uppercase tracking-wide">
+                TOTALES — {filteredGrupos.length} planilla(s)
+              </div>
+              <div />
+              <div className="px-2 text-center text-sm font-bold text-white">{filteredTotals.empleados}</div>
+              <div />
+              <div className="px-3 text-right text-sm font-bold text-emerald-200">{formatMoney(filteredTotals.totalIncome)}</div>
+              <div />
+              <div className="px-3 text-right text-sm font-bold text-red-300">{formatMoney(filteredTotals.totalDesc)}</div>
+              <div />
+              <div className="px-3 text-right text-sm font-bold text-white">{formatMoney(filteredTotals.totalNeto)}</div>
+              <div /><div /><div /><div /><div />
+            </div>
           </div>
         )}
       </div>
