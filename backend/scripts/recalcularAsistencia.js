@@ -9,6 +9,7 @@ import {
 } from "../utils/attendanceMetrics.js";
 
 const prisma = new PrismaClient();
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Recalcula métricas de asistencia (tardanza, horas trabajadas, horas extra) para un empleado en un rango de fechas.
@@ -22,6 +23,12 @@ const prisma = new PrismaClient();
 export async function recalcularAsistencia({ employee_id, date_from, date_to } = {}) {
   if (!employee_id || !date_from || !date_to) {
     throw new Error('employee_id, date_from y date_to son requeridos');
+  }
+  if (!ISO_DATE.test(date_from) || !ISO_DATE.test(date_to)) {
+    throw new Error('date_from y date_to deben tener formato YYYY-MM-DD');
+  }
+  if (date_from > date_to) {
+    throw new Error('date_from no puede ser mayor que date_to');
   }
 
   const emp = await prisma.employee.findUnique({ where: { id: employee_id } });

@@ -39,8 +39,18 @@ async function listAll(entity, query = null, sortField = "-created_date", pageSi
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const db = base44.asServiceRole;
 
+    // Requiere autenticación y rol admin/super_admin
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'No autenticado' }, { status: 401 });
+
+    const employees = await base44.asServiceRole.entities.Employee.filter({ work_email: user.email });
+    const emp = employees?.[0];
+    if (!emp || !['admin', 'super_admin'].includes(emp.role)) {
+      return Response.json({ error: 'Acceso denegado' }, { status: 403 });
+    }
+
+    const db = base44.asServiceRole;
     const allEmployees = await listAll(db.entities.Employee);
     const active = allEmployees.filter(e => e.status === "Activo");
 
@@ -52,6 +62,6 @@ Deno.serve(async (req) => {
       firstStatus: allEmployees[0]?.status,
     });
   } catch (error) {
-    return Response.json({ error: error.message, stack: error.stack?.slice(0,500) }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 });

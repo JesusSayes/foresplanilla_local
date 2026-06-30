@@ -9,6 +9,8 @@ import {
   calcularMetricas,
 } from "../../utils/attendanceMetrics.js";
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 const recalcularAsistencia = async (req, res) => {
   try {
     const { user } = req;
@@ -20,6 +22,12 @@ const recalcularAsistencia = async (req, res) => {
 
     if (!employee_id || !date_from || !date_to) {
       return res.status(400).json({ error: 'employee_id, date_from y date_to son requeridos' });
+    }
+    if (!ISO_DATE.test(date_from) || !ISO_DATE.test(date_to)) {
+      return res.status(400).json({ error: 'date_from y date_to deben tener formato YYYY-MM-DD' });
+    }
+    if (date_from > date_to) {
+      return res.status(400).json({ error: 'date_from no puede ser mayor que date_to' });
     }
     if (!canAccessEmployee(req, employee_id)) {
       return res.status(403).json({ error: 'Acceso denegado al empleado' });
