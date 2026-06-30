@@ -749,32 +749,37 @@ export default function ConsultaPlanillas() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-[1600px] mx-auto px-4 py-6">
 
-        {/* Header + Filtros en una sola barra */}
+        {/* Fila 1: Título del módulo + botón Firmantes */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-indigo-600 shrink-0" />
+            <span className="text-xl font-bold text-slate-900">Consulta de Planillas</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-slate-300 hover:bg-slate-50 gap-2 h-9"
+            onClick={() => setShowConfigFirmantes(true)}
+          >
+            <Settings className="w-4 h-4" />Configurar Firmantes
+          </Button>
+        </div>
+
+        {/* Fila 2: Filtros del datagrid */}
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm mb-4 px-4 py-3">
           <div className="flex flex-wrap gap-3 items-center">
-            {/* Título compacto */}
-            <div className="flex items-center gap-2 mr-2">
-              <FileText className="w-5 h-5 text-indigo-600 shrink-0" />
-              <span className="text-base font-bold text-slate-900 whitespace-nowrap">Consulta de Planillas</span>
-            </div>
-
-            {/* Buscador */}
             <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input placeholder="Buscar período o número..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 h-9" />
             </div>
-
-            {/* Año */}
             <Select value={String(filterYear)} onValueChange={v => setFilterYear(parseInt(v))}>
               <SelectTrigger className="w-24 h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {availableYears.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
               </SelectContent>
             </Select>
-
-            {/* Mes */}
             <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger className="w-38 h-9"><SelectValue placeholder="Todos los meses" /></SelectTrigger>
+              <SelectTrigger className="w-40 h-9"><SelectValue placeholder="Todos los meses" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los meses</SelectItem>
                 {Array.from({length: 12}, (_, i) => (
@@ -784,8 +789,6 @@ export default function ConsultaPlanillas() {
                 ))}
               </SelectContent>
             </Select>
-
-            {/* Tipo */}
             <Select value={filterTipo} onValueChange={setFilterTipo}>
               <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Tipo" /></SelectTrigger>
               <SelectContent>
@@ -795,17 +798,7 @@ export default function ConsultaPlanillas() {
                 ))}
               </SelectContent>
             </Select>
-
-            {/* Contador + Firmantes */}
-            <span className="text-sm text-slate-500 whitespace-nowrap">{filteredGrupos.length} planilla(s)</span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-slate-300 hover:bg-slate-50 gap-2 ml-auto h-9"
-              onClick={() => setShowConfigFirmantes(true)}
-            >
-              <Settings className="w-4 h-4" />Firmantes
-            </Button>
+            <span className="text-sm text-slate-500 whitespace-nowrap ml-auto">{filteredGrupos.length} planilla(s)</span>
           </div>
         </div>
 
