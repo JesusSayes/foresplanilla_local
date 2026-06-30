@@ -10,15 +10,19 @@ const prisma = new PrismaClient();
  * Params:
  *   requestingEmail → email del administrador que solicita el cambio
  *   targetEmail     → email del usuario cuya contraseña se cambiará
- *   newPassword     → nueva contraseña (mínimo 6 caracteres)
+ *   newPassword     → nueva contraseña (mínimo 8 caracteres, con mayúsculas, minúsculas y números)
  */
 export async function changeUserPassword({ requestingEmail, targetEmail, newPassword } = {}) {
   if (!requestingEmail || !targetEmail || !newPassword) {
     throw new Error('Se requieren requestingEmail, targetEmail y newPassword');
   }
 
-  if (newPassword.length < 6) {
-    throw new Error('La contraseña debe tener al menos 6 caracteres');
+  if (newPassword.length < 8) {
+    throw new Error('La contraseña debe tener al menos 8 caracteres');
+  }
+
+  if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+    throw new Error('La contraseña debe contener mayúsculas, minúsculas y números');
   }
 
   const adminEmployee = await prisma.employee.findFirst({

@@ -19,6 +19,8 @@ import {
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
 import { todayLima, todayDateLima, parseDateLima, dateToStringLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
@@ -38,6 +40,7 @@ import PaginationBar from "@/components/ui/PaginationBar";
 export default function AttendanceManagement() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(todayDateLima());
   const [dateFrom, setDateFrom] = useState(null);
   const [dateTo, setDateTo] = useState(null);
@@ -228,7 +231,9 @@ export default function AttendanceManagement() {
 
   useEffect(() => {
     const generateExemptClockings = async () => {
-      if (!effectiveEmployee || effectiveEmployee.role !== "admin") return;
+      if (!effectiveEmployee) return;
+      // Solo admin/super_admin (por permiso system.admin) pueden generar marcaciones automáticas
+      if (!hasPermission("system.admin") && !["admin", "super_admin"].includes(effectiveEmployee.role)) return;
       const result = await generateAutoClockings(selectedDate);
       if (result.success && result.recordsCreated > 0) {
         queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
@@ -1104,9 +1109,9 @@ export default function AttendanceManagement() {
     <>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-full mx-auto px-4 py-6">
-          <div className="mb-8 flex justify-between items-start">
+          <div className="mb-8 flex flex-wrap justify-between items-start gap-3">
             <div>
-              <h1 className="text-4xl font-bold text-slate-900 mb-2">Gestión de Asistencia</h1>
+              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">Gestión de Asistencia</h1>
               <p className="text-slate-600 text-lg">Control y verificación de asistencia del personal</p>
             </div>
             {dbConnections.length > 0 && (
@@ -1123,7 +1128,7 @@ export default function AttendanceManagement() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" onClick={() => window.location.href = "/DatabaseConfig"}>
+                <Button variant="outline" onClick={() => navigate(createPageUrl("DatabaseConfig"))}>
                   <Database className="w-4 h-4 mr-2" />Configurar
                 </Button>
               </div>
@@ -1180,8 +1185,8 @@ export default function AttendanceManagement() {
           </div>
 
           <Tabs defaultValue="attendance" className="space-y-6">
-            <div className="flex items-center justify-between gap-3">
-              <TabsList className="grid grid-cols-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full sm:w-auto">
                 <TabsTrigger value="attendance">
                   Asistencia del Día
                   {employeesWithRecords.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{employeesWithRecords.length}</Badge>}
@@ -1199,24 +1204,24 @@ export default function AttendanceManagement() {
                   {pendingEditRequests.length > 0 && <Badge className="ml-2 bg-indigo-500 text-white">{pendingEditRequests.length}</Badge>}
                 </TabsTrigger>
               </TabsList>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {hasPermission("system.admin") && (
                   <Button
                     onClick={handleRecalcularTodo}
                     variant="outline"
                     disabled={recalculandoTodo}
-                    className="whitespace-nowrap border-orange-300 text-orange-700 hover:bg-orange-50"
+                    className="whitespace-nowrap border-orange-300 text-orange-700 hover:bg-orange-50 text-xs sm:text-sm"
                   >
                     {recalculandoTodo
                       ? `Recalculando... ${recalcProgress.done}/${recalcProgress.total}`
                       : "Recalcular Todo"}
                   </Button>
                 )}
-                {canExportAttendance && <Button onClick={() => handleExportToExcel()} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap">
-                  <Download className="w-4 h-4 mr-2" />Excel
+                {canExportAttendance && <Button onClick={() => handleExportToExcel()} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap text-xs sm:text-sm">
+                  <Download className="w-4 h-4 mr-1 sm:mr-2" /><span className="hidden sm:inline">Excel</span><span className="sm:hidden">XLS</span>
                 </Button>}
-                <Button onClick={handlePrint} variant="outline" className="whitespace-nowrap">
-                  <Printer className="w-4 h-4 mr-2" />Imprimir
+                <Button onClick={handlePrint} variant="outline" className="whitespace-nowrap text-xs sm:text-sm">
+                  <Printer className="w-4 h-4 mr-1 sm:mr-2" /><span className="hidden sm:inline">Imprimir</span>
                 </Button>
               </div>
             </div>
@@ -1992,8 +1997,8 @@ export default function AttendanceManagement() {
         )}
 
         {showEditModal && editingRecord && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" onClick={() => setShowEditModal(false)}>
-            <Card className="max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-3 sm:p-6 overflow-y-auto" onClick={() => setShowEditModal(false)}>
+            <Card className="max-w-2xl w-full my-4 sm:my-0" onClick={(e) => e.stopPropagation()}>
               <CardHeader className="border-b">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-xl font-bold">Editar Registro de Asistencia</CardTitle>
@@ -2097,8 +2102,8 @@ export default function AttendanceManagement() {
         )}
 
         {showIncidentModal && reviewingIncident && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" onClick={() => { setShowIncidentModal(false); setReviewComments(""); }}>
-            <Card className="max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-3 sm:p-6 overflow-y-auto" onClick={() => { setShowIncidentModal(false); setReviewComments(""); }}>
+            <Card className="max-w-2xl w-full my-4 sm:my-0" onClick={(e) => e.stopPropagation()}>
               <CardHeader className="border-b">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-xl font-bold">Revisar Justificación</CardTitle>

@@ -122,7 +122,8 @@ Deno.serve(async (req) => {
     // En modo backfill usamos lotes pequeños para evitar rate limit
     // En modo cron diario procesamos todos (solo 1 día = pocas escrituras)
     const defaultBatch = isBackfill ? 5 : 200;
-    const employeeBatch = body.employee_batch || defaultBatch;
+    const rawBatch = parseInt(body.employee_batch) || defaultBatch;
+    const employeeBatch = Math.min(Math.max(1, rawBatch), 200); // entre 1 y 200
 
     const todayStr = todayInPeru();
 

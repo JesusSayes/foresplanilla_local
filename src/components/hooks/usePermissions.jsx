@@ -183,8 +183,13 @@ export const usePermissions = () => {
   }, [user, isLoadingAuth]);
 
   const hasPermission = (permission) => {
-    // Super Admin siempre tiene todos los permisos
+    // Si el usuario tiene roles asignados en UserRole, esos son la fuente de verdad
+    if (roles.length > 0) {
+      return permissions.includes(permission) || permissions.includes("system.admin");
+    }
+    // Fallback legacy (sin UserRole asignados): super_admin tiene todo
     if (employee?.role === "super_admin") return true;
+    // Fallback legacy: usar permisos del rol básico (ya cargados en permissions)
     return permissions.includes(permission) || permissions.includes("system.admin");
   };
 
@@ -206,8 +211,9 @@ export const usePermissions = () => {
     // Mientras carga, devolver undefined para que los componentes esperen
     if (loading) return undefined;
 
-    // Super admin siempre ve todo
-    if (employee?.role === "super_admin") return null;
+    // Super admin con roles custom asignados: respetar restricciones de esos roles
+    // Super admin SIN roles custom: acceso total (fallback legacy)
+    if (employee?.role === "super_admin" && roles.length === 0) return null;
 
     // Si el usuario tiene roles custom asignados en UserRole
     if (roles.length > 0) {
@@ -244,8 +250,10 @@ export const usePermissions = () => {
   };
 
   const canAccessDepartment = (departmentName) => {
-    // Super Admin y Admin pueden ver todo
-    if (employee?.role === "super_admin" || employee?.role === "admin") return true;
+    // Si tiene system.admin en sus permisos efectivos → acceso total
+    if (hasPermission("system.admin")) return true;
+    // Fallback legacy sin roles asignados: super_admin y admin ven todo
+    if (roles.length === 0 && (employee?.role === "super_admin" || employee?.role === "admin")) return true;
 
     const hasDepartmentRestriction = roles.some(r => r.department_restricted);
     if (!hasDepartmentRestriction) return true;
@@ -261,11 +269,11 @@ export const usePermissions = () => {
     // El empleado puede ver sus propios datos
     if (employee?.id === targetEmployeeId) return true;
 
-    // Super Admin puede ver todo
-    if (employee?.role === "super_admin") return true;
+    // Si tiene system.admin en sus permisos efectivos → puede ver todo
+    if (hasPermission("system.admin")) return true;
 
-    // Admin puede ver todo
-    if (employee?.role === "admin") return true;
+    // Fallback legacy sin roles asignados
+    if (roles.length === 0 && (employee?.role === "super_admin" || employee?.role === "admin")) return true;
 
     // Managers con equipo específico
     if (employee?.managed_team_ids && employee.managed_team_ids.includes(targetEmployeeId)) {
@@ -282,8 +290,8 @@ export const usePermissions = () => {
   };
 
   const getAccessibleEmployeeIds = async () => {
-    // Super Admin ve todo
-    if (employee?.role === "super_admin" || employee?.role === "admin") {
+    // system.admin o fallback legacy admin/super_admin sin roles → ve todo
+    if (hasPermission("system.admin") || (roles.length === 0 && (employee?.role === "super_admin" || employee?.role === "admin"))) {
       const allEmployees = await entitiesAPI.Employee.list();
       return allEmployees.map(e => e.id);
     }

@@ -112,6 +112,11 @@ Deno.serve(async (req) => {
     if (!employee_id) {
       return Response.json({ error: "employee_id es requerido" }, { status: 400 });
     }
+    // Validar formato de fechas para evitar valores arbitrarios
+    const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+    if (!ISO_DATE.test(date_from)) {
+      return Response.json({ error: "date_from debe tener formato YYYY-MM-DD" }, { status: 400 });
+    }
 
     const todayStr = todayInPeru();
 

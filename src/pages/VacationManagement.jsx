@@ -18,9 +18,12 @@ import { toast } from "sonner";
 import { parseDateLima } from "@/lib/dateUtils";
 import { createPageUrl } from "../utils";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
+import { useNavigate } from "react-router-dom";
 import PaginationBar from "@/components/ui/PaginationBar";
+import { usePermissions } from "../components/hooks/usePermissions";
 
 export default function VacationManagement() {
+  const navigate = useNavigate();
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
   // Saldos filters & pagination
@@ -45,6 +48,7 @@ export default function VacationManagement() {
   const [histPage, setHistPage] = useState(1);
   const HIST_PAGE_SIZE = 20;
 
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
 
   const { user: currentUser } = useAuth();
@@ -326,8 +330,8 @@ export default function VacationManagement() {
     rejectedRequests: vacationRequests.filter(r => r.status === "Rechazada").length,
   };
 
-  // Mientras carga el empleado, mostrar spinner
-  if (!employee) {
+  // Mientras carga el empleado o permisos, mostrar spinner
+  if (!employee || permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -335,28 +339,43 @@ export default function VacationManagement() {
     );
   }
 
+  // Guard de acceso — solo roles con permisos de vacaciones
+  if (!hasPermission("vacations.manage") && !hasPermission("vacations.view_all") &&
+      !hasPermission("vacations.approve") && !hasPermission("system.admin")) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
+            <p className="text-slate-600">No tienes permisos para gestionar vacaciones</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-8 flex justify-between items-start">
+        <div className="mb-8 flex flex-wrap justify-between items-start gap-3">
           <div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-2">
+            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
               Gestión de Vacaciones
             </h1>
             <p className="text-slate-600 text-lg">
               Administra solicitudes, saldos y calendario de vacaciones
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button
-              onClick={() => window.location.href = createPageUrl("VacationCalendar")}
+              onClick={() => navigate(createPageUrl("VacationCalendar"))}
               variant="outline"
             >
               <Calendar className="w-4 h-4 mr-2" />
               Ver Calendario
             </Button>
             <Button
-              onClick={() => window.location.href = createPageUrl("ManagerApprovals")}
+              onClick={() => navigate(createPageUrl("ManagerApprovals"))}
               className="bg-blue-600 hover:bg-blue-700"
             >
               <CheckCircle className="w-4 h-4 mr-2" />
@@ -737,12 +756,12 @@ export default function VacationManagement() {
 
       {/* Employee Detail Modal */}
       {selectedEmployee && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-3 sm:p-6 overflow-y-auto"
           onClick={() => setSelectedEmployee(null)}
         >
-          <Card
-            className="max-w-2xl w-full"
+          <Card 
+            className="max-w-2xl w-full my-4 sm:my-0"
             onClick={(e) => e.stopPropagation()}
           >
             <CardHeader className="border-b">

@@ -88,7 +88,7 @@ import UserManagement from './pages/UserManagement';
 import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
-import ScheduleManagement from './pages/ScheduleManagement';
+import SunatExport from './pages/SunatExport';
 import __Layout from './Layout.jsx';
 
 
@@ -134,6 +134,7 @@ export const PAGES = {
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
     "ScheduleManagement": ScheduleManagement,
+    "SunatExport": SunatExport,
 }
 
 export const pagesConfig = {

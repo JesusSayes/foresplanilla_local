@@ -23,8 +23,11 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Se requieren targetEmail y newPassword' }, { status: 400 });
         }
 
-        if (newPassword.length < 6) {
-            return Response.json({ error: 'La contraseña debe tener al menos 6 caracteres' }, { status: 400 });
+        if (newPassword.length < 8) {
+            return Response.json({ error: 'La contraseña debe tener al menos 8 caracteres' }, { status: 400 });
+        }
+        if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+            return Response.json({ error: 'La contraseña debe contener mayúsculas, minúsculas y números' }, { status: 400 });
         }
 
         // Buscar el usuario por email

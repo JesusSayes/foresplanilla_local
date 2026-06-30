@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { entitiesAPI } from "@/api/entitiesClient";
+import localClient from "@/api/localClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,18 +19,7 @@ export default function BackfillAsistencia() {
   const loadEmployees = async () => {
     setLoadingEmps(true);
     try {
-      const PAGE = 10;
-      const all = [];
-      let skip = 0;
-      while (true) {
-        const raw = await entitiesAPI.Employee.filter({}, "-created_date", PAGE, skip);
-        const items = Array.isArray(raw) ? raw : [];
-        all.push(...items);
-        if (items.length < PAGE) break;
-        skip += PAGE;
-        if (skip > 10000) break;
-      }
-      const active = all.filter(e => e.status === "Activo");
+      const active = await entitiesAPI.Employee.filter({ status: "Activo" }, "-created_date");
       setEmployees(active);
     } catch (e) {
       alert("Error cargando empleados: " + e.message);
@@ -55,7 +45,7 @@ export default function BackfillAsistencia() {
       const emp = employees[i];
       setCurrentIdx(i);
       try {
-        const res = await base44.functions.invoke("backfillAsistenciaEmpleado", {
+        const res = await localClient.post("/api/attendance/backfill", {
           employee_id: emp.id,
           date_from: dateFrom,
         });
