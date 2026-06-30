@@ -389,175 +389,142 @@ export default function MasterDataManagement() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-11 gap-6 mb-8">
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-blue-100 rounded-xl">
-                  <MapPin className="w-6 h-6 text-blue-600" />
+        {/* Tarjeta resumen dinámica según tab activo */}
+        {(() => {
+          const tabInfo = {
+            areaunidadcargo: { label: "Área / Unidad / Cargo", icon: Building, iconBg: "bg-violet-100", iconColor: "text-violet-600", data: areaUnidadCargos,
+              stats: [
+                { label: "Total", value: areaUnidadCargos.length },
+                { label: "Activos", value: areaUnidadCargos.filter(a => a.is_active !== false).length },
+                { label: "Inactivos", value: areaUnidadCargos.filter(a => a.is_active === false).length },
+                { label: "Áreas", value: new Set(areaUnidadCargos.map(a => a.area)).size },
+              ]},
+            sites: { label: "Sedes", icon: MapPin, iconBg: "bg-blue-100", iconColor: "text-blue-600", data: sites,
+              stats: [
+                { label: "Total", value: sites.length },
+                { label: "Activas", value: sites.filter(s => s.is_active !== false).length },
+                { label: "Inactivas", value: sites.filter(s => s.is_active === false).length },
+              ]},
+            positions: { label: "Cargos", icon: Briefcase, iconBg: "bg-purple-100", iconColor: "text-purple-600", data: positions,
+              stats: [
+                { label: "Total", value: positions.length },
+                { label: "Activos", value: positions.filter(p => p.is_active !== false).length },
+                { label: "Inactivos", value: positions.filter(p => p.is_active === false).length },
+              ]},
+            departments: { label: "Departamentos", icon: Building, iconBg: "bg-orange-100", iconColor: "text-orange-600", data: departments,
+              stats: [
+                { label: "Total", value: departments.length },
+                { label: "Activos", value: departments.filter(d => d.is_active !== false).length },
+                { label: "Inactivos", value: departments.filter(d => d.is_active === false).length },
+              ]},
+            banks: { label: "Bancos", icon: CreditCard, iconBg: "bg-green-100", iconColor: "text-green-600", data: banks,
+              stats: [
+                { label: "Total", value: banks.length },
+                { label: "Activos", value: banks.filter(b => b.is_active !== false).length },
+                { label: "Inactivos", value: banks.filter(b => b.is_active === false).length },
+              ]},
+            rmv: { label: "RMV", icon: DollarSign, iconBg: "bg-indigo-100", iconColor: "text-indigo-600", data: rmvRecords,
+              stats: [
+                { label: "Vigente", value: activeRMV ? `S/ ${activeRMV.amount.toFixed(2)}` : "N/A" },
+                { label: "Registros", value: rmvRecords.length },
+                { label: "Asig. Familiar", value: activeRMV ? `S/ ${(activeRMV.amount * 0.10).toFixed(2)}` : "N/A" },
+              ]},
+            afp: { label: "AFPs", icon: Building, iconBg: "bg-teal-100", iconColor: "text-teal-600", data: afps,
+              stats: [
+                { label: "Total", value: afps.length },
+                { label: "Activas", value: afps.filter(a => a.is_active !== false).length },
+                { label: "Inactivas", value: afps.filter(a => a.is_active === false).length },
+              ]},
+            professions: { label: "Profesiones", icon: Briefcase, iconBg: "bg-cyan-100", iconColor: "text-cyan-600", data: professions,
+              stats: [
+                { label: "Total", value: professions.length },
+                { label: "Activas", value: professions.filter(p => p.is_active !== false).length },
+                { label: "Inactivas", value: professions.filter(p => p.is_active === false).length },
+              ]},
+            costcenters: { label: "Centros de Costos", icon: Target, iconBg: "bg-rose-100", iconColor: "text-rose-600", data: costCenters,
+              stats: [
+                { label: "Total", value: costCenters.length },
+                { label: "Activos", value: costCenters.filter(c => c.is_active !== false).length },
+                { label: "Inactivos", value: costCenters.filter(c => c.is_active === false).length },
+              ]},
+            segurovida: { label: "Seguro Vida Ley", icon: Shield, iconBg: "bg-red-100", iconColor: "text-red-600", data: seguroVidaLey,
+              stats: [
+                { label: "Rangos de Edad", value: seguroVidaLey.length },
+                { label: "Activos", value: seguroVidaLey.filter(s => s.is_active !== false).length },
+              ]},
+            uit: { label: "UIT", icon: DollarSign, iconBg: "bg-yellow-100", iconColor: "text-yellow-600", data: uitRecords,
+              stats: [
+                { label: `UIT ${new Date().getFullYear()}`, value: activeUIT ? `S/ ${activeUIT.amount.toFixed(0)}` : "N/A" },
+                { label: "Registros históricos", value: uitRecords.length },
+              ]},
+            accountingaccounts: { label: "Cuentas Contables", icon: DollarSign, iconBg: "bg-emerald-100", iconColor: "text-emerald-600", data: accountingAccounts,
+              stats: [
+                { label: "Total cuentas", value: accountingAccounts.length },
+                { label: "Activas", value: accountingAccounts.filter(a => a.is_active !== false).length },
+                { label: "Inactivas", value: accountingAccounts.filter(a => a.is_active === false).length },
+                { label: "Elementos", value: new Set(accountingAccounts.map(a => a.elemento)).size },
+              ]},
+            incidenttypes: { label: "Tipos de Incidente", icon: Shield, iconBg: "bg-amber-100", iconColor: "text-amber-600", data: incidentTypes,
+              stats: [
+                { label: "Total", value: incidentTypes.length },
+                { label: "Activos", value: incidentTypes.filter(t => t.is_active !== false).length },
+                { label: "Permisos", value: incidentTypes.filter(t => t.affectation === "Permiso").length },
+                { label: "Descuentos", value: incidentTypes.filter(t => t.affectation === "Descuento").length },
+              ]},
+            loantypes: { label: "Tipos de Préstamo", icon: CreditCard, iconBg: "bg-sky-100", iconColor: "text-sky-600", data: loanTypes,
+              stats: [
+                { label: "Total", value: loanTypes.length },
+                { label: "Activos", value: loanTypes.filter(t => t.is_active !== false).length },
+                { label: "Inactivos", value: loanTypes.filter(t => t.is_active === false).length },
+              ]},
+            costcentercategories: { label: "Categorías de CC", icon: Target, iconBg: "bg-pink-100", iconColor: "text-pink-600", data: costCenterCategories,
+              stats: [
+                { label: "Total", value: costCenterCategories.length },
+                { label: "Activas", value: costCenterCategories.filter(c => c.is_active !== false).length },
+              ]},
+            subdiarios: { label: "Subdiarios Contables", icon: Building, iconBg: "bg-indigo-100", iconColor: "text-indigo-600", data: subdiarios,
+              stats: [
+                { label: "Total", value: subdiarios.length },
+                { label: "Activos", value: subdiarios.filter(s => s.estado !== "I").length },
+                { label: "Inactivos", value: subdiarios.filter(s => s.estado === "I").length },
+              ]},
+            tiposanexo: { label: "Tipos de Anexo", icon: Shield, iconBg: "bg-amber-100", iconColor: "text-amber-600", data: tiposAnexo,
+              stats: [
+                { label: "Total", value: tiposAnexo.length },
+                { label: "Activos", value: tiposAnexo.filter(t => t.estado !== "I").length },
+                { label: "Inactivos", value: tiposAnexo.filter(t => t.estado === "I").length },
+              ]},
+          };
+          const info = tabInfo[activeTab];
+          if (!info) return null;
+          const Icon = info.icon;
+          return (
+            <Card className="border-0 shadow-lg mb-6 bg-gradient-to-r from-slate-50 to-white">
+              <CardContent className="p-5">
+                <div className="flex flex-wrap items-center gap-6">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`p-3 ${info.iconBg} rounded-xl shrink-0`}>
+                      <Icon className={`w-6 h-6 ${info.iconColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Sección activa</p>
+                      <p className="text-lg font-bold text-slate-900">{info.label}</p>
+                    </div>
+                  </div>
+                  <div className="h-8 w-px bg-slate-200 hidden sm:block" />
+                  <div className="flex flex-wrap gap-6">
+                    {info.stats.map((stat, i) => (
+                      <div key={i} className="text-center">
+                        <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                        <p className="text-xs text-slate-500">{stat.label}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {sites.length}
-              </div>
-              <p className="text-slate-600 text-sm">Sedes</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-purple-100 rounded-xl">
-                  <Briefcase className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {positions.length}
-              </div>
-              <p className="text-slate-600 text-sm">Cargos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-orange-100 rounded-xl">
-                  <Building className="w-6 h-6 text-orange-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {departments.length}
-              </div>
-              <p className="text-slate-600 text-sm">Departamentos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <CreditCard className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {banks.length}
-              </div>
-              <p className="text-slate-600 text-sm">Bancos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-indigo-100 rounded-xl">
-                  <DollarSign className="w-6 h-6 text-indigo-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {activeRMV ? `S/ ${activeRMV.amount.toFixed(2)}` : "N/A"}
-              </div>
-              <p className="text-slate-600 text-sm">RMV</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-teal-100 rounded-xl">
-                  <Building className="w-6 h-6 text-teal-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {afps.length}
-              </div>
-              <p className="text-slate-600 text-sm">AFPs</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-cyan-100 rounded-xl">
-                  <Briefcase className="w-6 h-6 text-cyan-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {professions.length}
-              </div>
-              <p className="text-slate-600 text-sm">Profesiones</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-rose-100 rounded-xl">
-                  <Target className="w-6 h-6 text-rose-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {costCenters.length}
-              </div>
-              <p className="text-slate-600 text-sm">Centros Costos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-red-100 rounded-xl">
-                  <Shield className="w-6 h-6 text-red-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {seguroVidaLey.length}
-              </div>
-              <p className="text-slate-600 text-sm">Seguro Vida</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-yellow-100 rounded-xl">
-                  <DollarSign className="w-6 h-6 text-yellow-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {activeUIT ? `S/ ${activeUIT.amount.toFixed(0)}` : "N/A"}
-              </div>
-              <p className="text-slate-600 text-sm">UIT {new Date().getFullYear()}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-emerald-100 rounded-xl">
-                  <DollarSign className="w-6 h-6 text-emerald-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {accountingAccounts.length}
-              </div>
-              <p className="text-slate-600 text-sm">Cuentas</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-violet-100 rounded-xl">
-                  <Briefcase className="w-6 h-6 text-violet-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {areaUnidadCargos.filter(a => a.is_active !== false).length}
-              </div>
-              <p className="text-slate-600 text-sm">Área/Unidad/Cargo</p>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Barra de filtros globales */}
         <div className="flex flex-wrap items-center gap-3 mb-4">
