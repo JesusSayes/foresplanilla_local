@@ -89,6 +89,8 @@ import VacationCalendar from './pages/VacationCalendar';
 import VacationManagement from './pages/VacationManagement';
 import VacationRequest from './pages/VacationRequest';
 import SunatExport from './pages/SunatExport';
+import SubdiarioManagement from './pages/SubdiarioManagement';
+import TipoAnexoManagement from './pages/TipoAnexoManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -135,6 +137,8 @@ export const PAGES = {
     "VacationManagement": VacationManagement,
     "VacationRequest": VacationRequest,
     "SunatExport": SunatExport,
+    "SubdiarioManagement": SubdiarioManagement,
+    "TipoAnexoManagement": TipoAnexoManagement,
 }
 
 export const pagesConfig = {

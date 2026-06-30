@@ -278,6 +278,8 @@ export default function Layout({ children, currentPageName }) {
       if (hasAnyPermission(["accounting.view", "accounting.manage", "payroll.view_all", "payroll.create", "payroll.calculate"])) {
         submenu.push({ name: "Asientos Contables", path: "AsientosContables" });
         submenu.push({ name: "Cuentas Contables", path: "CuentasContables" });
+        submenu.push({ name: "Subdiarios", path: "SubdiarioManagement" });
+        submenu.push({ name: "Tipos de Anexo", path: "TipoAnexoManagement" });
         submenu.push({ name: "Exportar SUNAT (T-Registro / PLAME)", path: "SunatExport" });
       }
       // Solo mostrar el menú si hay al menos un submenú disponible
