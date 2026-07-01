@@ -33,6 +33,9 @@ export class PayrollCalculator {
         horas_nocturnas: context.horas_nocturnas || 0,
         total_income: context.total_income || 0,
         total_deductions: context.total_deductions || 0,
+        transport_cost: context.transport_cost || 0,
+        food_cost: context.food_cost || 0,
+        activity_cost: context.activity_cost || 0,
       };
 
       // Reemplazar variables en la fórmula
@@ -183,6 +186,9 @@ export class PayrollCalculator {
       horas_nocturnas: attendanceData?.horas_nocturnas || 0,
       total_income: 0,
       total_deductions: 0,
+      transport_cost: this.employee.transport_cost || 0,
+      food_cost: this.employee.food_cost || 0,
+      activity_cost: this.employee.activity_cost || 0,
     };
   }
 
