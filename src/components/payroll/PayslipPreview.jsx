@@ -341,9 +341,9 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
         </div>
       </div>
 
-      {/* ── Sección 1: Datos del trabajador (cuadro rojo) ── */}
-      <div className="px-5 py-3 border-b-2 border-red-200 bg-red-50/30">
-        <div className="text-xs font-bold text-red-700 mb-2 uppercase tracking-wide">Información del Trabajador</div>
+      {/* ── Sección 1: Datos del trabajador ── */}
+      <div className="px-5 py-3 border-b border-slate-200">
+        <div className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Información del Trabajador</div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
@@ -393,9 +393,9 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
         </div>
       </div>
 
-      {/* ── Sección 2: Conceptos dinámicos (cuadro verde) ── */}
-      <div className="px-5 py-3 border-b-2 border-green-200 bg-green-50/20">
-        <div className="text-xs font-bold text-green-700 mb-2 uppercase tracking-wide">Conceptos</div>
+      {/* ── Sección 2: Conceptos dinámicos ── */}
+      <div className="px-5 py-3 border-b border-slate-200">
+        <div className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Conceptos</div>
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="bg-slate-100">
@@ -457,10 +457,10 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
         </table>
       </div>
 
-      {/* ── Sección 3: Aportes del Empleador (cuadro amarillo) ── */}
+      {/* ── Sección 3: Aportes del Empleador ── */}
       {aportEmpl.length > 0 && (
-        <div className="px-5 py-3 border-b-2 border-yellow-200 bg-yellow-50/30">
-          <div className="text-xs font-bold text-yellow-700 mb-2 uppercase tracking-wide">Aportes de Empleador</div>
+        <div className="px-5 py-3 border-b border-slate-200">
+          <div className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Aportes de Empleador</div>
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-slate-100">
@@ -471,7 +471,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
             </thead>
             <tbody>
               {aportEmpl.map((r, i) => (
-                <tr key={i} className="hover:bg-yellow-50/50">
+                <tr key={i} className="hover:bg-slate-50">
                   <td className="border border-slate-200 px-2 py-1 text-slate-400 font-mono text-center">{r.code}</td>
                   <td className="border border-slate-200 px-2 py-1">{r.label}</td>
                   <td className="border border-slate-200 px-2 py-1 text-right font-semibold text-slate-700">S/ {fmt(r.amount)}</td>
