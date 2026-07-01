@@ -138,13 +138,19 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "" 
   const conceptRow = (code, label, ing, desc) =>
     `<tr><td class="c-code">${code}</td><td class="c-lbl">${label}</td><td class="c-ing">${ing !== "" ? `S/ ${ing}` : ""}</td><td class="c-des">${desc !== "" ? `S/ ${desc}` : ""}</td><td class="c-net"></td></tr>`;
 
+  const totalIngresos = ingresos.reduce((s, r) => s + r.amount, 0);
+  const totalDescuentos = [...descuentos, ...aportTrab].reduce((s, r) => s + r.amount, 0);
+  const totalAportEmpl = aportEmpl.reduce((s, r) => s + r.amount, 0);
+
   const conceptRowsHTML = [
     ingresos.length  > 0 ? `<tr class="g-row"><td colspan="5">Ingresos</td></tr>` : "",
     ...ingresos.map(r => conceptRow(r.code, r.label, fmt(r.amount), "")),
+    ingresos.length  > 0 ? `<tr class="subtotal-row"><td colspan="2" style="text-align:right;font-weight:700;color:#166534;">Total Ingresos</td><td class="c-ing" style="color:#166534;">S/ ${fmt(totalIngresos)}</td><td></td><td></td></tr>` : "",
     descuentos.length > 0 ? `<tr class="g-row"><td colspan="5">Descuentos</td></tr>` : "",
     ...descuentos.map(r => conceptRow(r.code, r.label, "", fmt(r.amount))),
     aportTrab.length > 0 ? `<tr class="g-row"><td colspan="5">Aportes del Trabajador</td></tr>` : "",
     ...aportTrab.map(r => conceptRow(r.code, r.label, "", fmt(r.amount))),
+    (descuentos.length > 0 || aportTrab.length > 0) ? `<tr class="subtotal-row"><td colspan="2" style="text-align:right;font-weight:700;color:#991b1b;">Total Descuentos</td><td></td><td class="c-des" style="color:#991b1b;">S/ ${fmt(totalDescuentos)}</td><td></td></tr>` : "",
     `<tr class="neto-row"><td></td><td><b>Neto a Pagar</b></td><td></td><td></td><td class="c-net"><b>S/ ${fmt(netoPay)}</b></td></tr>`,
   ].join("");
 
@@ -152,7 +158,9 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "" 
     ? `<table class="tbl">
         <thead><tr><th class="c-code">Código</th><th class="c-lbl">Conceptos</th><th colspan="2" class="c-ing" style="text-align:left;">Concepto</th><th class="c-net">Aporte S/.</th></tr></thead>
         <thead><tr><td colspan="5" style="padding:1px 0 3px; font-weight:700; font-size:7.5pt;">Aportes de Empleador</td></tr></thead>
-        <tbody>${aportEmpl.map(r => `<tr><td class="c-code">${r.code}</td><td colspan="3" class="c-lbl">${r.label}</td><td class="c-net">S/ ${fmt(r.amount)}</td></tr>`).join("")}</tbody>
+        <tbody>${aportEmpl.map(r => `<tr><td class="c-code">${r.code}</td><td colspan="3" class="c-lbl">${r.label}</td><td class="c-net">S/ ${fmt(r.amount)}</td></tr>`).join("")}
+          <tr class="subtotal-row"><td colspan="4" style="text-align:right;font-weight:700;color:#92400e;">Total Aportes Empleador</td><td class="c-net" style="color:#92400e;">S/ ${fmt(totalAportEmpl)}</td></tr>
+        </tbody>
       </table>`
     : "";
 
@@ -276,6 +284,7 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "" 
   .c-des  { width:14%; text-align:right; color:#dc2626; font-weight:600; }
   .c-net  { width:11%; text-align:right; color:#4338ca; font-weight:600; }
   .g-row td { background:#f8fafc; font-weight:700; font-size:7pt; color:#475569; padding:2px 4px; }
+  .subtotal-row td { background:#f8fafc; border-top:1px solid #94a3b8; font-size:7.5pt; }
   .neto-row td { border-top:2px solid #94a3b8; font-size:8.5pt; }
   /* Footer */
   .print-footer { text-align:center; font-size:6.5pt; color:#94a3b8; border-top:1px dashed #e2e8f0; padding-top:4px; margin-top:4px; }
@@ -440,6 +449,15 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
                 <td className="border border-slate-200 px-2 py-1"></td>
               </tr>
             ))}
+            {/* Subtotal Ingresos */}
+            {ingresos.length > 0 && (
+              <tr className="bg-green-50">
+                <td colSpan={2} className="border border-slate-300 px-2 py-1 font-bold text-green-800 text-right">Total Ingresos</td>
+                <td className="border border-slate-300 px-2 py-1 text-right font-bold text-green-800">S/ {fmt(ingresos.reduce((s, r) => s + r.amount, 0))}</td>
+                <td className="border border-slate-300 px-2 py-1"></td>
+                <td className="border border-slate-300 px-2 py-1"></td>
+              </tr>
+            )}
             {/* Descuentos */}
             {descuentos.length > 0 && (
               <tr className="bg-slate-50"><td colSpan={5} className="border border-slate-200 px-2 py-1 font-bold text-slate-500">Descuentos</td></tr>
@@ -466,6 +484,15 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
                 <td className="border border-slate-200 px-2 py-1"></td>
               </tr>
             ))}
+            {/* Subtotal Descuentos (descuentos + aportes trabajador) */}
+            {(descuentos.length > 0 || aportTrab.length > 0) && (
+              <tr className="bg-red-50">
+                <td colSpan={2} className="border border-slate-300 px-2 py-1 font-bold text-red-800 text-right">Total Descuentos</td>
+                <td className="border border-slate-300 px-2 py-1"></td>
+                <td className="border border-slate-300 px-2 py-1 text-right font-bold text-red-800">S/ {fmt([...descuentos, ...aportTrab].reduce((s, r) => s + r.amount, 0))}</td>
+                <td className="border border-slate-300 px-2 py-1"></td>
+              </tr>
+            )}
             {/* Neto */}
             <tr className="bg-indigo-50 border-t-2 border-indigo-300">
               <td colSpan={2} className="border border-slate-300 px-2 py-2 font-bold text-slate-900">Neto a Pagar</td>
@@ -497,6 +524,10 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
                   <td className="border border-slate-200 px-2 py-1 text-right font-semibold text-slate-700">S/ {fmt(r.amount)}</td>
                 </tr>
               ))}
+              <tr className="bg-amber-50">
+                <td colSpan={2} className="border border-slate-300 px-2 py-1 font-bold text-amber-800 text-right">Total Aportes Empleador</td>
+                <td className="border border-slate-300 px-2 py-1 text-right font-bold text-amber-800">S/ {fmt(aportEmpl.reduce((s, r) => s + r.amount, 0))}</td>
+              </tr>
             </tbody>
           </table>
         </div>
