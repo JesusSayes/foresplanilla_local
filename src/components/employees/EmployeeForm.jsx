@@ -610,7 +610,7 @@ export default function EmployeeForm({
                 </div>
                 <div>
                   <Label>Sistema de Pensiones</Label>
-                  <Select value={formData.pension_system || "Ninguno"} onValueChange={(v) => setFormData({ ...formData, pension_system: v, afp_id: v === "AFP" ? formData.afp_id : "" })}>
+                  <Select value={formData.pension_system || "Ninguno"} onValueChange={(v) => setFormData({ ...formData,               pension_system: v, afp_id: v === "AFP" ? formData.afp_id : "", cuspp: v === "AFP" ? formData.cuspp : "" })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Ninguno">Ninguno</SelectItem>
@@ -622,16 +622,33 @@ export default function EmployeeForm({
                 {formData.pension_system === "AFP" && (
                   <>
                     <div>
-                      <Label>AFP Afiliada</Label>
+                      <Label>AFP Afiliada <span className="text-red-600">*</span></Label>
                       <Select value={formData.afp_id || ""} onValueChange={(v) => setFormData({ ...formData, afp_id: v })}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar AFP" /></SelectTrigger>
+                        <SelectTrigger className={!formData.afp_id ? "border-red-300" : ""}><SelectValue placeholder="Seleccionar AFP" /></SelectTrigger>
                         <SelectContent>{afps.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                    <div><Label>Fecha Afiliación AFP</Label><Input type="date" value={formData.afp_affiliation_date} onChange={(e) => setFormData({ ...formData, afp_affiliation_date: e.target.value })} /></div>
                   </>
                 )}
               </div>
+              {formData.pension_system === "AFP" && (
+                <div className="grid grid-cols-3 gap-4 mt-2">
+                    <div>
+                      <Label>Fecha Afiliación AFP</Label>
+                      <Input type="date" value={formData.afp_affiliation_date} onChange={(e) => setFormData({ ...formData, afp_affiliation_date: e.target.value })} />
+                    </div>
+                    <div className="col-span-2">
+                      <Label>CUSPP <span className="text-red-600">*</span></Label>
+                      <Input
+                        value={formData.cuspp || ""}
+                        onChange={(e) => setFormData({ ...formData, cuspp: e.target.value })}
+                        placeholder="Código Único del Sistema Privado de Pensiones"
+                        className={!formData.cuspp ? "border-red-300" : ""}
+                      />
+                      {!formData.cuspp && <p className="text-xs text-red-600 mt-1">⚠ Obligatorio cuando el sistema de pensiones es AFP</p>}
+                    </div>
+              </div>
+              )}
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label>Banco</Label>

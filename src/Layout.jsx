@@ -302,6 +302,10 @@ export default function Layout({ children, currentPageName }) {
         submenu.push({ name: "Cuentas Contables", path: "CuentasContables" });
         submenu.push({ name: "Exportar SUNAT (T-Registro / PLAME)", path: "SunatExport" });
       }
+      if (hasAnyPermission(["payroll.view_all", "payroll.create", "payroll.calculate"])) {
+        submenu.push({ name: "Beneficios Sociales", path: "BeneficiosSociales" });
+        submenu.push({ name: "Historial Remunerativo", path: "HistorialRemunerativo" });
+      }
       // Solo mostrar el menú si hay al menos un submenú disponible
       if (submenu.length > 0) {
         const firstPath = submenu[0].path;

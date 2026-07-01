@@ -1,437 +1,616 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { safePayrollNumber } from "@/lib/payrollUtils";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { FileText, Building2, User, Calendar, Printer } from "lucide-react";
+import { Printer, Copy, AlertTriangle, ExternalLink } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { Link } from "react-router-dom";
 
-export default function PayslipPreview({ payslip, employee, companyInfo, showPrintButton = false }) {
-  const company = companyInfo || {
-    company_name: "Empresa",
-    ruc: "00000000000",
-    address: "Lima, Perú"
-  };
+const fmt = (val) => safePayrollNumber(val).toFixed(2);
 
-  const handlePrint = () => {
-    const logoHtml = company.logo_url
-      ? `<img src="${company.logo_url}" alt="Logo" style="width:56px;height:56px;object-fit:contain;border-radius:8px;padding:4px;background:white;" />`
-      : `<div style="width:56px;height:56px;background:white;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;">🏢</div>`;
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
-    const fmt = (val) => safePayrollNumber(val).toFixed(2);
+function safeDateFmt(dateStr, fmt_str) {
+  if (!dateStr) return "—";
+  try { return format(new Date(dateStr), fmt_str, { locale: es }); } catch { return "—"; }
+}
 
-    const incomeRows = [
-      `<div class="row"><span>Remuneración Básica</span><span>S/ ${fmt(payslip.base_salary)}</span></div>`,
-      payslip.family_allowance > 0 ? `<div class="row"><span>Asignación Familiar</span><span>S/ ${fmt(payslip.family_allowance)}</span></div>` : "",
-      payslip.overtime_pay > 0 ? `<div class="row"><span>Horas Extras</span><span>S/ ${fmt(payslip.overtime_pay)}</span></div>` : "",
-      payslip.bonuses > 0 ? `<div class="row"><span>Bonificaciones</span><span>S/ ${fmt(payslip.bonuses)}</span></div>` : "",
-      payslip.commissions > 0 ? `<div class="row"><span>Comisiones</span><span>S/ ${fmt(payslip.commissions)}</span></div>` : "",
-    ].filter(Boolean).join("");
+function toHorasMinutos(decimalHours) {
+  const total = Math.round(safePayrollNumber(decimalHours) * 60);
+  return { horas: Math.floor(total / 60), minutos: total % 60 };
+}
 
-    const deductionRows = [
-      payslip.pension_deduction > 0 ? `<div class="row"><span>AFP/ONP</span><span>S/ ${fmt(payslip.pension_deduction)}</span></div>` : "",
-      payslip.health_insurance > 0 ? `<div class="row"><span>Seguro de Salud</span><span>S/ ${fmt(payslip.health_insurance)}</span></div>` : "",
-      payslip.income_tax > 0 ? `<div class="row"><span>Impuesto 5ta Categoría</span><span>S/ ${fmt(payslip.income_tax)}</span></div>` : "",
-      payslip.tardiness_discount > 0 ? `<div class="row"><span>Descuento por Tardanzas</span><span>S/ ${fmt(payslip.tardiness_discount)}</span></div>` : "",
-      payslip.absence_discount > 0 ? `<div class="row"><span>Descuento por Inasistencias</span><span>S/ ${fmt(payslip.absence_discount)}</span></div>` : "",
-      payslip.advance_deduction > 0 ? `<div class="row"><span>Adelanto Quincenal</span><span>S/ ${fmt(payslip.advance_deduction)}</span></div>` : "",
-      payslip.loan_deduction > 0 ? `<div class="row"><span>Préstamos</span><span>S/ ${fmt(payslip.loan_deduction)}</span></div>` : "",
-      payslip.other_deductions > 0 ? `<div class="row"><span>Otros Descuentos</span><span>S/ ${fmt(payslip.other_deductions)}</span></div>` : "",
-    ].filter(Boolean).join("");
+/**
+ * Dado un nombre de concepto, busca su concept_code en la lista de PayrollConcepts.
+ * Busca por nombre exacto (case-insensitive) primero, luego parcial.
+ * Retorna { code, conceptId } o { code: "", conceptId: null } si no encuentra.
+ */
+function lookupCode(conceptName, conceptsMap) {
+  if (!conceptName || !conceptsMap) return { code: "", conceptId: null };
+  const nameNorm = conceptName.toLowerCase().trim();
+  // Búsqueda exacta
+  let found = conceptsMap.find(c => c.concept_name?.toLowerCase().trim() === nameNorm);
+  // Búsqueda parcial si no hay exacta
+  if (!found) found = conceptsMap.find(c => nameNorm.includes(c.concept_name?.toLowerCase().trim()) || c.concept_name?.toLowerCase().trim().includes(nameNorm));
+  if (found) return { code: found.concept_code || "", conceptId: found.id };
+  return { code: "", conceptId: null };
+}
 
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8"/>
-  <title>Boleta de Pago - ${employee?.first_name} ${employee?.last_name}</title>
-  <style>
-    @page { size: A4; margin: 15mm; }
-    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body { font-family: Arial, sans-serif; font-size: 10pt; color: #1e293b; margin: 0; }
-    .header { background: linear-gradient(135deg, #4f46e5, #2563eb); color: white; padding: 16px 20px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: flex-start; }
-    .header-left { display: flex; align-items: center; gap: 12px; }
-    .company-name { font-size: 14pt; font-weight: 700; }
-    .company-sub { font-size: 8pt; color: #c7d2fe; }
-    .header-right { text-align: right; }
-    .boleta-title { font-size: 13pt; font-weight: 700; }
-    .badge { display: inline-block; background: white; color: #4f46e5; padding: 2px 10px; border-radius: 12px; font-size: 8pt; font-weight: 600; margin-top: 4px; }
-    .body { border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px; padding: 16px 20px; }
-    .section { margin-bottom: 14px; }
-    .section-title { font-size: 11pt; font-weight: 700; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
-    .section-title.green { border-color: #bbf7d0; }
-    .section-title.red { border-color: #fecaca; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; font-size: 9pt; background: #f8fafc; padding: 10px; border-radius: 6px; }
-    .label { color: #64748b; font-size: 8pt; }
-    .value { font-weight: 600; color: #0f172a; }
-    .metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
-    .metric-box { text-align: center; padding: 8px; border-radius: 6px; }
-    .metric-box.blue { background: #eff6ff; }
-    .metric-box.amber { background: #fffbeb; }
-    .metric-box.purple { background: #faf5ff; }
-    .metric-label { font-size: 7.5pt; color: #64748b; }
-    .metric-value { font-size: 13pt; font-weight: 700; }
-    .metric-value.blue { color: #1d4ed8; }
-    .metric-value.amber { color: #d97706; }
-    .metric-value.purple { color: #7c3aed; }
-    .row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 9pt; }
-    .row span:last-child { font-weight: 600; }
-    .total-row { display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid #e2e8f0; margin-top: 4px; font-weight: 700; font-size: 10pt; }
-    .total-row.green { color: #15803d; border-color: #bbf7d0; }
-    .total-row.red { color: #dc2626; border-color: #fecaca; }
-    .neto { background: linear-gradient(135deg, #eef2ff, #dbeafe); border: 2px solid #c7d2fe; border-radius: 8px; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; }
-    .neto-label { font-size: 10pt; color: #64748b; }
-    .neto-amount { font-size: 22pt; font-weight: 700; color: #4338ca; }
-    .neto-date { font-size: 8.5pt; color: #64748b; text-align: right; }
-    .footer { text-align: center; font-size: 7.5pt; color: #94a3b8; margin-top: 14px; border-top: 2px dashed #e2e8f0; padding-top: 10px; }
-  </style>
+/**
+ * Construye la lista dinámica de conceptos a mostrar en la boleta.
+ * El código se toma siempre del PayrollConcept correspondiente (por nombre).
+ * Prioridad: calculation_summary (breakdown) → campos fijos del payslip.
+ */
+function buildConceptRows(payslip, conceptsMap = []) {
+  const ingresos      = [];
+  const descuentos    = [];
+  const aportTrab     = [];
+  const aportEmpl     = [];
+
+  const summary = payslip?.calculation_summary;
+
+  if (summary?.breakdown) {
+    // ── Ingresos desde el motor de cálculo ──────────────────────────────
+    (summary.breakdown.incomes?.items || []).forEach(item => {
+      const amt = safePayrollNumber(item.amount);
+      if (amt === 0 && !item.always_show) return;
+      // Usar concept_code del breakdown directamente (viene de la BD via PayrollCalculator)
+      // Si no está, hacer lookup por nombre como fallback
+      const code = item.concept_code || lookupCode(item.name, conceptsMap).code;
+      const conceptId = item.concept_id || lookupCode(item.name, conceptsMap).conceptId;
+      ingresos.push({ code, label: item.name, amount: amt, conceptId, missingCode: !code });
+    });
+
+    // ── Descuentos desde el motor ────────────────────────────────────────
+    (summary.breakdown.deductions?.items || []).forEach(item => {
+      const amt = safePayrollNumber(item.amount);
+      const code = item.concept_code || lookupCode(item.name, conceptsMap).code;
+      const conceptId = item.concept_id || lookupCode(item.name, conceptsMap).conceptId;
+      const isAportTrab = item.is_worker_contribution;
+      if (isAportTrab) {
+        aportTrab.push({ code, label: item.name, amount: amt, conceptId, missingCode: !code });
+      } else {
+        descuentos.push({ code, label: item.name, amount: amt, conceptId, missingCode: !code });
+      }
+    });
+
+    // ── Adelanto quincenal (siempre desde el campo del payslip) ──────────
+    const advanceAmt = safePayrollNumber(payslip.advance_deduction);
+    if (advanceAmt > 0) {
+      const alreadyIncluded = descuentos.some(d => d.label.toLowerCase().includes("quincenal") || d.label.toLowerCase().includes("adelanto"));
+      if (!alreadyIncluded) {
+        const { code, conceptId } = lookupCode("Adelanto Quincenal", conceptsMap);
+        descuentos.unshift({ code, label: "ADELANTO / PLANILLA QUINCENAL", amount: advanceAmt, conceptId, missingCode: !code });
+      }
+    }
+
+    // ── Aportes empleador ────────────────────────────────────────────────
+    (summary.breakdown.contributions?.items || []).forEach(item => {
+      const amt = safePayrollNumber(item.amount);
+      if (amt === 0) return;
+      const code = item.concept_code || lookupCode(item.name, conceptsMap).code;
+      const conceptId = item.concept_id || lookupCode(item.name, conceptsMap).conceptId;
+      aportEmpl.push({ code, label: item.name, amount: amt, conceptId, missingCode: !code });
+    });
+  }
+
+  // ── Fallback a campos fijos si el motor no proporcionó datos ─────────
+  if (ingresos.length === 0) {
+    const fixed = [
+      { field: "base_salary",     label: "REMUNERACIÓN O JORNAL BÁSICO", lookupName: "Remuneración Básica" },
+      { field: "family_allowance", label: "ASIGNACIÓN FAMILIAR",          lookupName: "Asignación Familiar" },
+      { field: "overtime_pay",    label: "HORAS EXTRAS",                  lookupName: "Horas Extras al 25%" },
+      { field: "bonuses",         label: "BONIFICACIONES",                lookupName: "Bonificación por Movilidad" },
+      { field: "commissions",     label: "COMISIONES",                    lookupName: "Comisiones" },
+      { field: "other_income",    label: "OTROS INGRESOS",               lookupName: "otros ingresos" },
+    ];
+    fixed.forEach(({ field, label, lookupName }) => {
+      const amt = safePayrollNumber(payslip[field]);
+      if (field === "base_salary" || amt > 0) {
+        const { code, conceptId } = lookupCode(lookupName, conceptsMap);
+        ingresos.push({ code, label, amount: amt, conceptId, missingCode: !code });
+      }
+    });
+  }
+
+  if (descuentos.length === 0 && aportTrab.length === 0) {
+    const fixedDesc = [
+      { field: "advance_deduction",  label: "ADELANTO / PLANILLA QUINCENAL",       lookupName: "Adelanto Quincenal",              worker: false },
+      { field: "loan_deduction",     label: "PRÉSTAMOS",                            lookupName: "Préstamos",                        worker: false },
+      { field: "tardiness_discount", label: "DESC. POR TARDANZAS",                  lookupName: "Descuento por Tardanzas",          worker: false },
+      { field: "absence_discount",   label: "DESC. POR INASISTENCIAS",              lookupName: "Descuento por Inasistencias",      worker: false },
+      { field: "other_deductions",   label: "OTROS DESCUENTOS",                     lookupName: "otros descuentos",                 worker: false },
+      { field: "pension_deduction",  label: "AFP/ONP - APORTACIÓN OBLIGATORIA",     lookupName: "AFP - Aporte Obligatorio",         worker: true  },
+      { field: "income_tax",         label: "RENTA QUINTA CATEGORÍA RETENCIONES",   lookupName: "Impuesto a la Renta 5ta Categoría",worker: true  },
+      { field: "health_insurance",   label: "PRIMA DE SEGURO / SEGURO DE SALUD",    lookupName: "SCTR Salud",                       worker: true  },
+    ];
+    fixedDesc.forEach(({ field, label, lookupName, worker }) => {
+      const amt = safePayrollNumber(payslip[field]);
+      if (amt === 0) return;
+      const { code, conceptId } = lookupCode(lookupName, conceptsMap);
+      (worker ? aportTrab : descuentos).push({ code, label, amount: amt, conceptId, missingCode: !code });
+    });
+  }
+
+  if (aportEmpl.length === 0) {
+    const fixedEmpl = [
+      { field: "seg_vida_ley",     label: "PÓLIZA DE SEGURO - D. LEG. 688",          lookupName: "Seguro Vida Ley" },
+      { field: "essalud_employer", label: "ESSALUD (REGULAR CBSSP AGRAR/AC)TRAB",    lookupName: "ESSALUD" },
+      { field: "sctr_pension",     label: "SCTR PENSIONES",                           lookupName: "SCTR Pensión" },
+      { field: "sctr_salud",       label: "COMPAÑÍA SEGURO - SCTR",                   lookupName: "SCTR Salud" },
+    ];
+    fixedEmpl.forEach(({ field, label, lookupName }) => {
+      const amt = safePayrollNumber(payslip[field]);
+      if (amt > 0) {
+        const { code, conceptId } = lookupCode(lookupName, conceptsMap);
+        aportEmpl.push({ code, label, amount: amt, conceptId, missingCode: !code });
+      }
+    });
+  }
+
+  return { ingresos, descuentos, aportTrab, aportEmpl };
+}
+
+// ── Generador de HTML para impresión (R08 fiel) ──────────────────────────────
+
+function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "", conceptsMap = [] }) {
+  const ci = company || { company_name: "Empresa", ruc: "00000000000", address: "" };
+  const emp = employee || {};
+
+  const logoHtml = ci.logo_url
+    ? `<img src="${ci.logo_url}" alt="Logo" style="height:40px;object-fit:contain;" />`
+    : "";
+
+  const { ingresos, descuentos, aportTrab, aportEmpl } = buildConceptRows(payslip, conceptsMap);
+
+  const netoPay = safePayrollNumber(payslip.net_pay);
+  const jornada = toHorasMinutos(payslip.regular_hours || 0);
+  const sobret  = toHorasMinutos(payslip.overtime_hours || 0);
+
+  const conceptRow = (code, label, ing, desc) =>
+    `<tr><td class="c-code">${code}</td><td class="c-lbl">${label}</td><td class="c-ing">${ing !== "" ? `S/ ${ing}` : ""}</td><td class="c-des">${desc !== "" ? `S/ ${desc}` : ""}</td><td class="c-net"></td></tr>`;
+
+  const totalIngresos = ingresos.reduce((s, r) => s + r.amount, 0);
+  const totalDescuentos = [...descuentos, ...aportTrab].reduce((s, r) => s + r.amount, 0);
+  const totalAportEmpl = aportEmpl.reduce((s, r) => s + r.amount, 0);
+
+  const conceptRowsHTML = [
+    ingresos.length  > 0 ? `<tr class="g-row"><td colspan="5">Ingresos</td></tr>` : "",
+    ...ingresos.map(r => conceptRow(r.code, r.label, fmt(r.amount), "")),
+    ingresos.length  > 0 ? `<tr class="subtotal-row"><td colspan="2" style="text-align:right;font-weight:700;color:#166534;">Total Ingresos</td><td class="c-ing" style="color:#166534;">S/ ${fmt(totalIngresos)}</td><td></td><td></td></tr>` : "",
+    descuentos.length > 0 ? `<tr class="g-row"><td colspan="5">Descuentos</td></tr>` : "",
+    ...descuentos.map(r => conceptRow(r.code, r.label, "", fmt(r.amount))),
+    aportTrab.length > 0 ? `<tr class="g-row"><td colspan="5">Aportes del Trabajador</td></tr>` : "",
+    ...aportTrab.map(r => conceptRow(r.code, r.label, "", fmt(r.amount))),
+    (descuentos.length > 0 || aportTrab.length > 0) ? `<tr class="subtotal-row"><td colspan="2" style="text-align:right;font-weight:700;color:#991b1b;">Total Descuentos</td><td></td><td class="c-des" style="color:#991b1b;">S/ ${fmt(totalDescuentos)}</td><td></td></tr>` : "",
+    `<tr class="neto-row"><td></td><td><b>Neto a Pagar</b></td><td></td><td></td><td class="c-net"><b>S/ ${fmt(netoPay)}</b></td></tr>`,
+  ].join("");
+
+  const aportEmplHTML = aportEmpl.length > 0
+    ? `<table class="tbl">
+        <thead><tr><th class="c-code">Código</th><th class="c-lbl">Conceptos</th><th colspan="2" class="c-ing" style="text-align:left;">Concepto</th><th class="c-net">Aporte S/.</th></tr></thead>
+        <thead><tr><td colspan="5" style="padding:1px 0 3px; font-weight:700; font-size:7.5pt;">Aportes de Empleador</td></tr></thead>
+        <tbody>${aportEmpl.map(r => `<tr><td class="c-code">${r.code}</td><td colspan="3" class="c-lbl">${r.label}</td><td class="c-net">S/ ${fmt(r.amount)}</td></tr>`).join("")}
+          <tr class="subtotal-row"><td colspan="4" style="text-align:right;font-weight:700;color:#92400e;">Total Aportes Empleador</td><td class="c-net" style="color:#92400e;">S/ ${fmt(totalAportEmpl)}</td></tr>
+        </tbody>
+      </table>`
+    : "";
+
+  const oneBoleta = `
+  <div class="boleta">
+    <!-- Cabecera empresa -->
+    <table class="hdr-tbl"><tr>
+      <td class="hdr-logo">${logoHtml}</td>
+      <td class="hdr-co">
+        <div class="ruc">RUC: ${ci.ruc}</div>
+        <div class="co-name">${ci.company_name}</div>
+        <div class="co-sub">${ci.address || ""}</div>
+      </td>
+      <td class="hdr-bp">
+        <div class="bp-title">BOLETA DE PAGO</div>
+        <div class="bp-period">Periodo: ${payslip.period || ""}</div>
+        <div class="bp-type">${payslip.payroll_type || ""}</div>
+      </td>
+    </tr></table>
+
+    <!-- Sección 1: Datos del trabajador (cuadro rojo) -->
+    <table class="tbl sec1">
+      <thead>
+        <tr>
+          <th colspan="2">Documento de Identidad</th>
+          <th colspan="3">Nombres y Apellidos</th>
+          <th>Situación</th>
+        </tr>
+        <tr class="data-row">
+          <td><b>${emp.document_type || "DNI"}</b></td>
+          <td><b>${emp.document_number || "—"}</b></td>
+          <td colspan="3"><b>${emp.first_name || ""} ${emp.last_name || ""}</b></td>
+          <td>${emp.status || "ACTIVO O SUBSIDIADO"}</td>
+        </tr>
+        <tr>
+          <th colspan="2">Fecha de Ingreso</th>
+          <th colspan="2">Tipo de Trabajador</th>
+          <th>Régimen Pensionario</th>
+          <th>CUSPP</th>
+        </tr>
+        <tr class="data-row">
+          <td colspan="2">${safeDateFmt(emp.hire_date, "dd/MM/yyyy")}</td>
+          <td colspan="2">${(emp.worker_type || "EMPLEADO").toUpperCase()}</td>
+          <td>${emp.pension_system ? `${emp.pension_system}${afpName ? " — " + afpName : ""}` : "—"}</td>
+          <td>${emp.cuspp || "—"}</td>
+        </tr>
+        <tr>
+          <th>Días<br/>Laborados</th>
+          <th>Días No<br/>Laborados</th>
+          <th>Días<br/>Subsidiados</th>
+          <th>Condición</th>
+          <th colspan="2">Jornada Ordinaria</th>
+        </tr>
+        <tr>
+          <th></th><th></th><th></th><th></th>
+          <th>Total Horas</th><th>Minutos</th>
+        </tr>
+        <tr class="data-row">
+          <td>${payslip.worked_days || 0}</td>
+          <td>${payslip.non_worked_days || 0}</td>
+          <td>${payslip.subsidized_days || 0}</td>
+          <td>${emp.tax_residence || "Domiciliado"}</td>
+          <td>${jornada.horas}</td>
+          <td>${jornada.minutos}</td>
+        </tr>
+      </thead>
+    </table>
+
+    <!-- Sección 2: Conceptos dinámicos (cuadro verde) -->
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th class="c-code">Código</th>
+          <th class="c-lbl">Conceptos</th>
+          <th class="c-ing">Ingresos S/.</th>
+          <th class="c-des">Descuentos S/.</th>
+          <th class="c-net">Neto S/.</th>
+        </tr>
+      </thead>
+      <tbody>${conceptRowsHTML}</tbody>
+    </table>
+
+    <!-- Sección 3: Aportes empleador (cuadro amarillo) -->
+    ${aportEmplHTML}
+
+    <div class="print-footer">Generado por el Sistema de Planillas RRHH — Para consultas, contacte al área de Recursos Humanos</div>
+  </div>`;
+
+  const pageStyle = copies === 2
+    ? `@page { size: A4 landscape; margin: 6mm; } .wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }`
+    : `@page { size: A4 portrait; margin: 10mm; } .wrapper {}`;
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/>
+<title>Boleta ${emp.first_name || ""} ${emp.last_name || ""} — ${payslip.period || ""}</title>
+<style>
+  ${pageStyle}
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: Arial, sans-serif; font-size: 8pt; color: #1e293b; margin: 0; }
+  .boleta { border: 1px solid #94a3b8; padding: 6px; margin-bottom: 6mm; page-break-inside: avoid; }
+  /* Header */
+  .hdr-tbl { width:100%; border-collapse:collapse; margin-bottom:6px; border-bottom:1px solid #94a3b8; padding-bottom:4px; }
+  .hdr-logo { width:50px; vertical-align:middle; padding-right:8px; }
+  .hdr-co { vertical-align:top; }
+  .ruc { font-size:7pt; color:#475569; }
+  .co-name { font-size:10pt; font-weight:700; }
+  .co-sub { font-size:7pt; color:#475569; }
+  .hdr-bp { text-align:right; vertical-align:top; }
+  .bp-title { font-size:11pt; font-weight:700; }
+  .bp-period { font-size:7.5pt; color:#475569; }
+  .bp-type { display:inline-block; background:#4f46e5; color:white; padding:1px 7px; border-radius:8px; font-size:7pt; font-weight:700; margin-top:2px; }
+  /* Tables */
+  .tbl { width:100%; border-collapse:collapse; margin-bottom:5px; font-size:7.5pt; }
+  .tbl th, .tbl td { border:1px solid #94a3b8; padding:2px 4px; }
+  .tbl th { background:#f1f5f9; font-size:7pt; text-align:center; }
+  .data-row td { font-weight:600; }
+  /* Concepts cols */
+  .c-code { width:9%; text-align:center; font-family:monospace; }
+  .c-lbl  { width:52%; }
+  .c-ing  { width:14%; text-align:right; color:#15803d; font-weight:600; }
+  .c-des  { width:14%; text-align:right; color:#dc2626; font-weight:600; }
+  .c-net  { width:11%; text-align:right; color:#4338ca; font-weight:600; }
+  .g-row td { background:#f8fafc; font-weight:700; font-size:7pt; color:#475569; padding:2px 4px; }
+  .subtotal-row td { background:#f8fafc; border-top:1px solid #94a3b8; font-size:7.5pt; }
+  .neto-row td { border-top:2px solid #94a3b8; font-size:8.5pt; }
+  /* Footer */
+  .print-footer { text-align:center; font-size:6.5pt; color:#94a3b8; border-top:1px dashed #e2e8f0; padding-top:4px; margin-top:4px; }
+</style>
 </head>
 <body>
-  <div class="header">
-    <div class="header-left">
-      ${logoHtml}
-      <div>
-        <div class="company-name">${company.company_name}</div>
-        <div class="company-sub">RUC: ${company.ruc}</div>
-        <div class="company-sub">${company.address || ""}</div>
-      </div>
-    </div>
-    <div class="header-right">
-      <div class="boleta-title">BOLETA DE PAGO</div>
-      <div style="font-size:9pt;color:#c7d2fe;">${payslip.period}</div>
-      <span class="badge">${payslip.payroll_type}</span>
-    </div>
-  </div>
-  <div class="body">
-    <div class="section">
-      <div class="section-title">👤 Información del Trabajador</div>
-      <div class="grid2">
-        <div><div class="label">Nombres y Apellidos:</div><div class="value">${employee?.first_name} ${employee?.last_name}</div></div>
-        <div><div class="label">Código:</div><div class="value">${employee?.employee_code}</div></div>
-        <div><div class="label">Documento:</div><div class="value">${employee?.document_type} ${employee?.document_number}</div></div>
-        <div><div class="label">Cargo:</div><div class="value">${employee?.position || "—"}</div></div>
-        <div><div class="label">Departamento:</div><div class="value">${employee?.department_name || "—"}</div></div>
-        <div><div class="label">Fecha Ingreso:</div><div class="value">${employee?.hire_date ? format(new Date(employee.hire_date), 'dd/MM/yyyy') : "—"}</div></div>
-        <div><div class="label">Sistema Pensiones:</div><div class="value">${employee?.pension_system || "N/A"}</div></div>
-        <div><div class="label">Tipo Trabajador:</div><div class="value">${employee?.worker_type || "Empleado"}</div></div>
-      </div>
-    </div>
-    <div class="metrics">
-      <div class="metric-box blue"><div class="metric-label">Días Trabajados</div><div class="metric-value blue">${payslip.worked_days}</div></div>
-      <div class="metric-box amber"><div class="metric-label">Días No Laborados</div><div class="metric-value amber">${payslip.non_worked_days || 0}</div></div>
-      <div class="metric-box purple"><div class="metric-label">Horas Extras</div><div class="metric-value purple">${payslip.overtime_hours || 0}</div></div>
-    </div>
-    <div class="section">
-      <div class="section-title green">INGRESOS</div>
-      ${incomeRows}
-      <div class="total-row green"><span>TOTAL INGRESOS</span><span>S/ ${fmt(payslip.total_income)}</span></div>
-    </div>
-    <div class="section">
-      <div class="section-title red">DESCUENTOS</div>
-      ${deductionRows || '<div class="row"><span style="color:#94a3b8;">Sin descuentos</span><span>S/ 0.00</span></div>'}
-      <div class="total-row red"><span>TOTAL DESCUENTOS</span><span>S/ ${fmt(payslip.total_deductions)}</span></div>
-    </div>
-    <div class="neto">
-      <div>
-        <div class="neto-label">NETO A PAGAR</div>
-        <div class="neto-amount">S/ ${fmt(payslip.net_pay)}</div>
-      </div>
-      <div class="neto-date">
-        Fecha de Pago:<br/>
-        <strong>${payslip.payment_date ? format(new Date(payslip.payment_date), "dd 'de' MMMM, yyyy", { locale: es }) : "—"}</strong>
-      </div>
-    </div>
-    <div class="footer">
-      <p>Este documento es generado automáticamente por el sistema de planillas</p>
-      <p>Para cualquier consulta, contacte con el departamento de Recursos Humanos</p>
-    </div>
-  </div>
-  <script>window.onload = function(){ window.print(); window.onafterprint = function(){ window.close(); }; }</script>
-</body>
-</html>`;
+<div class="wrapper">
+  ${oneBoleta}
+  ${copies === 2 ? oneBoleta : ""}
+</div>
+<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};</script>
+</body></html>`;
+}
 
+// ── Componente React ──────────────────────────────────────────────────────────
+
+export default function PayslipPreview({ payslip, employee, companyInfo, showPrintButton = true }) {
+  const [copies, setCopies] = useState(1);
+  const [afpMap, setAfpMap] = useState({});
+  const [conceptsMap, setConceptsMap] = useState([]);
+
+  useEffect(() => {
+    base44.entities.AFP.list().then(afps => {
+      const map = {};
+      afps.forEach(a => { map[a.id] = a.name; });
+      setAfpMap(map);
+    }).catch(() => {});
+
+    // Cargar todos los conceptos de planilla para mapear códigos
+    base44.entities.PayrollConcept.list().then(concepts => {
+      setConceptsMap(concepts || []);
+    }).catch(() => {});
+  }, []);
+
+  const ci = companyInfo || { company_name: "Empresa", ruc: "00000000000", address: "" };
+  const emp = employee || {};
+  const afpName = emp.afp_id ? (afpMap[emp.afp_id] || emp.afp_id) : "";
+
+  const handlePrint = () => {
+    const html = buildBoletaHTML({ payslip, employee: emp, company: ci, copies, afpName, conceptsMap });
     const win = window.open("", "_blank");
+    if (!win) { alert("Permite las ventanas emergentes para imprimir."); return; }
     win.document.write(html);
     win.document.close();
   };
 
+  const { ingresos, descuentos, aportTrab, aportEmpl } = buildConceptRows(payslip, conceptsMap);
+  const jornada = toHorasMinutos(payslip.regular_hours || 0);
+  const sobret  = toHorasMinutos(payslip.overtime_hours || 0);
+
   return (
-    <div>
-    {showPrintButton && (
-      <div className="flex justify-end mb-3">
-        <Button onClick={handlePrint} className="bg-indigo-600 hover:bg-indigo-700">
-          <Printer className="w-4 h-4 mr-2" />Imprimir Boleta
-        </Button>
+    <div className="bg-white rounded-xl border-2 border-slate-200 shadow-xl overflow-hidden">
+      {/* Controles impresión */}
+      {showPrintButton && (
+        <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-200">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-slate-600">Copias por página:</span>
+            {[
+              { val: 1, label: "1 copia (A4 vertical)", Icon: Printer },
+              { val: 2, label: "2 copias (A4 horizontal)", Icon: Copy },
+            ].map(({ val, label, Icon }) => (
+              <button key={val} onClick={() => setCopies(val)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors
+                  ${copies === val ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-300 hover:border-indigo-400"}`}>
+                <Icon className="w-3.5 h-3.5" />{label}
+              </button>
+            ))}
+          </div>
+          <Button onClick={handlePrint} className="bg-indigo-600 hover:bg-indigo-700">
+            <Printer className="w-4 h-4 mr-2" />Imprimir / Descargar
+          </Button>
+        </div>
+      )}
+
+      {/* ── Alertas de códigos faltantes ── */}
+      {(() => {
+        const allRows = [...ingresos, ...descuentos, ...aportTrab, ...aportEmpl];
+        const missing = allRows.filter(r => r.missingCode);
+        if (missing.length === 0) return null;
+        return (
+          <div className="mx-5 mt-4 mb-1 bg-amber-50 border border-amber-300 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs font-bold text-amber-800 mb-1">
+                  {missing.length} concepto{missing.length > 1 ? "s" : ""} sin código configurado:
+                </p>
+                <ul className="space-y-1">
+                  {missing.map((r, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2 text-xs text-amber-700">
+                      <span>• <strong>{r.label}</strong></span>
+                      <Link
+                        to="/PayrollConcepts"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 hover:bg-amber-200 border border-amber-400 rounded text-amber-800 font-medium transition-colors whitespace-nowrap"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Editar concepto
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-amber-600 mt-2">
+                  Ve a <strong>Conceptos de Planilla → Editar</strong> y completa el campo <strong>"Código"</strong> de cada concepto.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Cabecera empresa ── */}
+      <div className="flex items-start justify-between px-5 pt-4 pb-3 border-b border-slate-200">
+        <div className="flex items-center gap-3">
+          {ci.logo_url && <img src={ci.logo_url} alt="Logo" className="h-12 object-contain" />}
+          <div>
+            <div className="text-xs text-slate-400">RUC: {ci.ruc}</div>
+            <div className="text-lg font-bold text-slate-900">{ci.company_name}</div>
+            <div className="text-xs text-slate-500">{ci.address}</div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xl font-bold text-slate-900">BOLETA DE PAGO</div>
+          <div className="text-sm text-slate-500">Periodo: {payslip.period}</div>
+          <span className="inline-block mt-1 bg-indigo-600 text-white text-xs font-bold px-3 py-0.5 rounded-full">{payslip.payroll_type}</span>
+        </div>
       </div>
-    )}
-    <Card className="border-2 border-slate-300 shadow-xl">
-      <CardHeader className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white pb-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            {company.logo_url ? (
-              <img src={company.logo_url} alt="Logo" className="w-16 h-16 bg-white rounded-lg p-2" />
-            ) : (
-              <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center">
-                <Building2 className="w-8 h-8 text-indigo-600" />
-              </div>
-            )}
-            <div>
-              <h3 className="text-xl font-bold">{company.company_name}</h3>
-              <p className="text-sm text-indigo-100">RUC: {company.ruc}</p>
-              <p className="text-xs text-indigo-100">{company.address}</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <h4 className="text-lg font-bold">BOLETA DE PAGO</h4>
-            <p className="text-sm text-indigo-100">{payslip.period}</p>
-            <Badge className="bg-white text-indigo-600 mt-1">
-              {payslip.payroll_type}
-            </Badge>
-          </div>
+
+      {/* ── Sección 1: Datos del trabajador ── */}
+      <div className="px-5 py-3 border-b border-slate-200">
+        <div className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Información del Trabajador</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-100">
+                <th className="border border-slate-300 px-2 py-1 text-left" colSpan={2}>Documento de Identidad</th>
+                <th className="border border-slate-300 px-2 py-1 text-left" colSpan={3}>Nombres y Apellidos</th>
+                <th className="border border-slate-300 px-2 py-1 text-left">Situación</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-slate-300 px-2 py-1 font-bold">{emp.document_type || "DNI"}</td>
+                <td className="border border-slate-300 px-2 py-1 font-bold">{emp.document_number}</td>
+                <td className="border border-slate-300 px-2 py-1 font-bold" colSpan={3}>{emp.first_name} {emp.last_name}</td>
+                <td className="border border-slate-300 px-2 py-1">{emp.status || "ACTIVO O SUBSIDIADO"}</td>
+              </tr>
+              <tr className="bg-slate-100">
+                <th className="border border-slate-300 px-2 py-1" colSpan={2}>Fecha de Ingreso</th>
+                <th className="border border-slate-300 px-2 py-1" colSpan={2}>Tipo de Trabajador</th>
+                <th className="border border-slate-300 px-2 py-1">Régimen Pensionario</th>
+                <th className="border border-slate-300 px-2 py-1">CUSPP</th>
+              </tr>
+              <tr>
+                <td className="border border-slate-300 px-2 py-1 font-semibold" colSpan={2}>{safeDateFmt(emp.hire_date, "dd/MM/yyyy")}</td>
+                <td className="border border-slate-300 px-2 py-1 font-semibold" colSpan={2}>{(emp.worker_type || "EMPLEADO").toUpperCase()}</td>
+                <td className="border border-slate-300 px-2 py-1 font-semibold">{emp.pension_system}{afpName ? ` — ${afpName}` : ""}</td>
+                <td className="border border-slate-300 px-2 py-1 font-semibold">{emp.cuspp || "—"}</td>
+              </tr>
+              <tr className="bg-slate-100">
+                <th className="border border-slate-300 px-2 py-1">Días Laborados</th>
+                <th className="border border-slate-300 px-2 py-1">Días No Lab.</th>
+                <th className="border border-slate-300 px-2 py-1">Días Subsidiados</th>
+                <th className="border border-slate-300 px-2 py-1">Condición</th>
+                <th className="border border-slate-300 px-2 py-1">Jornada (H:M)</th>
+                <th className="border border-slate-300 px-2 py-1">Sobretiempo (H:M)</th>
+              </tr>
+              <tr>
+                <td className="border border-slate-300 px-2 py-1 font-bold text-blue-700 text-base text-center">{payslip.worked_days || 0}</td>
+                <td className="border border-slate-300 px-2 py-1 font-semibold text-center">{payslip.non_worked_days || 0}</td>
+                <td className="border border-slate-300 px-2 py-1 font-semibold text-center">{payslip.subsidized_days || 0}</td>
+                <td className="border border-slate-300 px-2 py-1">{emp.tax_residence || "Domiciliado"}</td>
+                <td className="border border-slate-300 px-2 py-1 text-center">{jornada.horas}h {jornada.minutos}m</td>
+                <td className="border border-slate-300 px-2 py-1 text-center">{sobret.horas}h {sobret.minutos}m</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="p-6 space-y-6">
-        {/* Datos del Trabajador */}
-        <div className="bg-slate-50 rounded-lg p-4">
-          <h5 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-            <User className="w-4 h-4" />
-            Información del Trabajador
-          </h5>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-slate-600">Nombres y Apellidos:</p>
-              <p className="font-semibold text-slate-900">{employee?.first_name} {employee?.last_name}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Código:</p>
-              <p className="font-semibold text-slate-900">{employee?.employee_code}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Documento:</p>
-              <p className="font-semibold text-slate-900">{employee?.document_type} {employee?.document_number}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Cargo:</p>
-              <p className="font-semibold text-slate-900">{employee?.position}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Departamento:</p>
-              <p className="font-semibold text-slate-900">{employee?.department_name}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Fecha Ingreso:</p>
-              <p className="font-semibold text-slate-900">
-                {employee?.hire_date && format(new Date(employee.hire_date), 'dd/MM/yyyy')}
-              </p>
-            </div>
-            <div>
-              <p className="text-slate-600">Sistema Pensiones:</p>
-              <p className="font-semibold text-slate-900">{employee?.pension_system || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-slate-600">Tipo Trabajador:</p>
-              <p className="font-semibold text-slate-900">{employee?.worker_type || "Empleado"}</p>
-            </div>
-          </div>
+      {/* ── Sección 2: Conceptos dinámicos ── */}
+      <div className="px-5 py-3 border-b border-slate-200">
+        <div className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Conceptos</div>
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-slate-100">
+              <th className="border border-slate-300 px-2 py-1 w-12 text-center">Código</th>
+              <th className="border border-slate-300 px-2 py-1 text-left">Conceptos</th>
+              <th className="border border-slate-300 px-2 py-1 w-24 text-right">Ingresos S/.</th>
+              <th className="border border-slate-300 px-2 py-1 w-24 text-right">Descuentos S/.</th>
+              <th className="border border-slate-300 px-2 py-1 w-20 text-right">Neto S/.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* Ingresos */}
+            {ingresos.length > 0 && (
+              <tr className="bg-slate-50"><td colSpan={5} className="border border-slate-200 px-2 py-1 font-bold text-slate-500">Ingresos</td></tr>
+            )}
+            {ingresos.map((r, i) => (
+              <tr key={i} className="hover:bg-slate-50">
+                <td className="border border-slate-200 px-2 py-1 text-slate-400 font-mono text-center">{r.code}</td>
+                <td className="border border-slate-200 px-2 py-1">{r.label}</td>
+                <td className="border border-slate-200 px-2 py-1 text-right text-green-700 font-semibold">S/ {fmt(r.amount)}</td>
+                <td className="border border-slate-200 px-2 py-1"></td>
+                <td className="border border-slate-200 px-2 py-1"></td>
+              </tr>
+            ))}
+            {/* Subtotal Ingresos */}
+            {ingresos.length > 0 && (
+              <tr className="bg-green-50">
+                <td colSpan={2} className="border border-slate-300 px-2 py-1 font-bold text-green-800 text-right">Total Ingresos</td>
+                <td className="border border-slate-300 px-2 py-1 text-right font-bold text-green-800">S/ {fmt(ingresos.reduce((s, r) => s + r.amount, 0))}</td>
+                <td className="border border-slate-300 px-2 py-1"></td>
+                <td className="border border-slate-300 px-2 py-1"></td>
+              </tr>
+            )}
+            {/* Descuentos */}
+            {descuentos.length > 0 && (
+              <tr className="bg-slate-50"><td colSpan={5} className="border border-slate-200 px-2 py-1 font-bold text-slate-500">Descuentos</td></tr>
+            )}
+            {descuentos.map((r, i) => (
+              <tr key={i} className="hover:bg-slate-50">
+                <td className="border border-slate-200 px-2 py-1 text-slate-400 font-mono text-center">{r.code}</td>
+                <td className="border border-slate-200 px-2 py-1">{r.label}</td>
+                <td className="border border-slate-200 px-2 py-1"></td>
+                <td className="border border-slate-200 px-2 py-1 text-right text-red-600 font-semibold">S/ {fmt(r.amount)}</td>
+                <td className="border border-slate-200 px-2 py-1"></td>
+              </tr>
+            ))}
+            {/* Aportes del Trabajador */}
+            {aportTrab.length > 0 && (
+              <tr className="bg-slate-50"><td colSpan={5} className="border border-slate-200 px-2 py-1 font-bold text-slate-500">Aportes del Trabajador</td></tr>
+            )}
+            {aportTrab.map((r, i) => (
+              <tr key={i} className="hover:bg-slate-50">
+                <td className="border border-slate-200 px-2 py-1 text-slate-400 font-mono text-center">{r.code}</td>
+                <td className="border border-slate-200 px-2 py-1">{r.label}</td>
+                <td className="border border-slate-200 px-2 py-1"></td>
+                <td className="border border-slate-200 px-2 py-1 text-right text-red-600 font-semibold">S/ {fmt(r.amount)}</td>
+                <td className="border border-slate-200 px-2 py-1"></td>
+              </tr>
+            ))}
+            {/* Subtotal Descuentos (descuentos + aportes trabajador) */}
+            {(descuentos.length > 0 || aportTrab.length > 0) && (
+              <tr className="bg-red-50">
+                <td colSpan={2} className="border border-slate-300 px-2 py-1 font-bold text-red-800 text-right">Total Descuentos</td>
+                <td className="border border-slate-300 px-2 py-1"></td>
+                <td className="border border-slate-300 px-2 py-1 text-right font-bold text-red-800">S/ {fmt([...descuentos, ...aportTrab].reduce((s, r) => s + r.amount, 0))}</td>
+                <td className="border border-slate-300 px-2 py-1"></td>
+              </tr>
+            )}
+            {/* Neto */}
+            <tr className="bg-indigo-50 border-t-2 border-indigo-300">
+              <td colSpan={2} className="border border-slate-300 px-2 py-2 font-bold text-slate-900">Neto a Pagar</td>
+              <td className="border border-slate-300 px-2 py-2"></td>
+              <td className="border border-slate-300 px-2 py-2"></td>
+              <td className="border border-slate-300 px-2 py-2 text-right font-bold text-indigo-700 text-base">S/ {fmt(payslip.net_pay)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Sección 3: Aportes del Empleador ── */}
+      {aportEmpl.length > 0 && (
+        <div className="px-5 py-3 border-b border-slate-200">
+          <div className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Aportes de Empleador</div>
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-100">
+                <th className="border border-slate-300 px-2 py-1 w-12 text-center">Código</th>
+                <th className="border border-slate-300 px-2 py-1 text-left">Conceptos</th>
+                <th className="border border-slate-300 px-2 py-1 w-24 text-right">Aporte S/.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {aportEmpl.map((r, i) => (
+                <tr key={i} className="hover:bg-slate-50">
+                  <td className="border border-slate-200 px-2 py-1 text-slate-400 font-mono text-center">{r.code}</td>
+                  <td className="border border-slate-200 px-2 py-1">{r.label}</td>
+                  <td className="border border-slate-200 px-2 py-1 text-right font-semibold text-slate-700">S/ {fmt(r.amount)}</td>
+                </tr>
+              ))}
+              <tr className="bg-amber-50">
+                <td colSpan={2} className="border border-slate-300 px-2 py-1 font-bold text-amber-800 text-right">Total Aportes Empleador</td>
+                <td className="border border-slate-300 px-2 py-1 text-right font-bold text-amber-800">S/ {fmt(aportEmpl.reduce((s, r) => s + r.amount, 0))}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+      )}
 
-        {/* Período Laboral */}
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          <div className="bg-blue-50 rounded-lg p-3">
-            <p className="text-slate-600 text-xs mb-1">Días Trabajados</p>
-            <p className="font-bold text-blue-700 text-lg">{payslip.worked_days}</p>
-          </div>
-          <div className="bg-amber-50 rounded-lg p-3">
-            <p className="text-slate-600 text-xs mb-1">Días No Laborados</p>
-            <p className="font-bold text-amber-700 text-lg">{payslip.non_worked_days || 0}</p>
-          </div>
-          <div className="bg-purple-50 rounded-lg p-3">
-            <p className="text-slate-600 text-xs mb-1">Horas Extras</p>
-            <p className="font-bold text-purple-700 text-lg">{payslip.overtime_hours || 0}</p>
-          </div>
-        </div>
-
-        {/* Ingresos */}
-        <div>
-          <div className="flex items-center gap-2 mb-3 pb-2 border-b-2 border-green-200">
-            <div className="w-1 h-6 bg-green-600 rounded"></div>
-            <h5 className="font-bold text-slate-900 text-lg">INGRESOS</h5>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-600">Remuneración Básica</span>
-              <span className="font-semibold text-slate-900">S/ {safePayrollNumber(payslip.base_salary).toFixed(2)}</span>
-            </div>
-            {payslip.family_allowance > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Asignación Familiar</span>
-                <span className="font-semibold text-slate-900">S/ {Number(payslip.family_allowance || 0).toFixed(2)}</span>
-              </div>
-            )}
-            {payslip.overtime_pay > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Horas Extras</span>
-                <span className="font-semibold text-slate-900">S/ {Number(payslip.overtime_pay || 0).toFixed(2)}</span>
-              </div>
-            )}
-            {payslip.bonuses > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Bonificaciones</span>
-                <span className="font-semibold text-slate-900">S/ {Number(payslip.bonuses || 0).toFixed(2)}</span>
-              </div>
-            )}
-            {payslip.commissions > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Comisiones</span>
-                <span className="font-semibold text-slate-900">S/ {Number(payslip.commissions || 0).toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex justify-between pt-2 border-t border-green-200">
-              <span className="font-bold text-green-700">TOTAL INGRESOS</span>
-              <span className="font-bold text-green-700 text-lg">S/ {safePayrollNumber(payslip.total_income).toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Descuentos */}
-        <div>
-          <div className="flex items-center gap-2 mb-3 pb-2 border-b-2 border-red-200">
-            <div className="w-1 h-6 bg-red-600 rounded"></div>
-            <h5 className="font-bold text-slate-900 text-lg">DESCUENTOS</h5>
-          </div>
-          <div className="space-y-2">
-            {payslip.pension_deduction > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">AFP/ONP</span>
-                <span className="font-semibold text-slate-900">S/ {Number(payslip.pension_deduction || 0).toFixed(2)}</span>
-              </div>
-            )}
-            {payslip.health_insurance > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Seguro de Salud</span>
-                <span className="font-semibold text-slate-900">S/ {Number(payslip.health_insurance || 0).toFixed(2)}</span>
-              </div>
-            )}
-            {payslip.income_tax > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Impuesto 5ta Categoría</span>
-                <span className="font-semibold text-slate-900">S/ {Number(payslip.income_tax || 0).toFixed(2)}</span>
-              </div>
-            )}
-            {payslip.tardiness_discount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Descuento por Tardanzas</span>
-                <span className="font-semibold text-slate-900">S/ {Number(payslip.tardiness_discount || 0).toFixed(2)}</span>
-              </div>
-            )}
-            {payslip.absence_discount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Descuento por Inasistencias</span>
-                <span className="font-semibold text-slate-900">S/ {Number(payslip.absence_discount || 0).toFixed(2)}</span>
-              </div>
-            )}
-            {payslip.advance_deduction > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Adelanto Quincenal</span>
-                <span className="font-semibold text-slate-900">S/ {Number(payslip.advance_deduction || 0).toFixed(2)}</span>
-              </div>
-            )}
-            {payslip.loan_deduction > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Préstamos</span>
-                <span className="font-semibold text-slate-900">S/ {Number(payslip.loan_deduction || 0).toFixed(2)}</span>
-              </div>
-            )}
-            {payslip.other_deductions > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Otros Descuentos</span>
-                <span className="font-semibold text-slate-900">S/ {Number(payslip.other_deductions || 0).toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex justify-between pt-2 border-t border-red-200">
-              <span className="font-bold text-red-700">TOTAL DESCUENTOS</span>
-              <span className="font-bold text-red-700 text-lg">S/ {safePayrollNumber(payslip.total_deductions).toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Neto a Pagar */}
-        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-6 border-2 border-indigo-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-slate-600 text-sm mb-1">NETO A PAGAR</p>
-              <p className="text-4xl font-bold text-indigo-600">
-                S/ {safePayrollNumber(payslip.net_pay).toFixed(2)}
-              </p>
-            </div>
-            <div className="text-right text-sm text-slate-600">
-              <p className="flex items-center gap-1 justify-end">
-                <Calendar className="w-3 h-3" />
-                Fecha de Pago:
-              </p>
-              <p className="font-semibold text-slate-900">
-                {payslip.payment_date && format(new Date(payslip.payment_date), "dd 'de' MMMM, yyyy", { locale: es })}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Resumen de Cálculos */}
-        {payslip.calculation_summary && (
-          <details className="bg-slate-50 rounded-lg p-4">
-            <summary className="text-sm font-semibold text-slate-900 cursor-pointer flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Ver Detalle de Cálculos Automáticos
-            </summary>
-            <div className="mt-3 space-y-3 text-xs">
-              {payslip.calculation_summary.breakdown.incomes.items.length > 0 && (
-                <div>
-                  <p className="font-semibold text-green-700 mb-1">Ingresos Calculados:</p>
-                  {payslip.calculation_summary.breakdown.incomes.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between ml-2 text-slate-700">
-                      <span>
-                        {item.name}
-                        {item.formula && <span className="text-slate-500 ml-1">({item.formula})</span>}
-                      </span>
-                      <span className="font-semibold">S/ {safePayrollNumber(item.amount).toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {payslip.calculation_summary.breakdown.deductions.items.length > 0 && (
-                <div>
-                  <p className="font-semibold text-red-700 mb-1">Descuentos Calculados:</p>
-                  {payslip.calculation_summary.breakdown.deductions.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between ml-2 text-slate-700">
-                      <span>
-                        {item.name}
-                        {item.formula && <span className="text-slate-500 ml-1">({item.formula})</span>}
-                      </span>
-                      <span className="font-semibold">S/ {safePayrollNumber(item.amount).toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </details>
-        )}
-
-        {/* Notas */}
-        {payslip.notes && (
-          <div className="text-xs text-slate-600 italic bg-amber-50 p-3 rounded border border-amber-200">
-            <p className="font-semibold text-amber-900 mb-1">Notas:</p>
-            {payslip.notes}
-          </div>
-        )}
-
-        {/* Firma */}
-        <div className="pt-4 border-t-2 border-dashed border-slate-300 text-center text-xs text-slate-500">
-          <p>Este documento es generado automáticamente por el sistema de planillas</p>
-          <p className="mt-1">Para cualquier consulta, contacte con el departamento de Recursos Humanos</p>
-        </div>
-      </CardContent>
-    </Card>
+      <div className="px-5 py-3 text-center text-xs text-slate-400 border-t border-dashed border-slate-200">
+        Generado por el Sistema de Planillas RRHH — Para consultas, contacte al área de Recursos Humanos
+      </div>
     </div>
   );
 }

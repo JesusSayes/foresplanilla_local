@@ -433,6 +433,7 @@ model employee {
   quincenal_amount               Decimal?                  @db.Decimal(18, 2)
   attendance_edit_request        attendance_edit_request[]
   attendance_logs                attendance_logs[]
+  historial_remunerativo         historial_remunerativo[]
 }
 
 model employee_access_mapping {
@@ -1171,4 +1172,29 @@ model incident_type {
   created_by_id String?
   created_by    String?
   is_sample     Boolean?  @default(false)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model historial_remunerativo {
+  id                   String    @id @db.VarChar(255)
+  employee_id          String    @db.VarChar(255)
+  year                 Int
+  month                Int
+  period_label         String?
+  base_salary          Decimal   @default(0) @db.Decimal(12, 2)
+  family_allowance     Decimal   @default(0) @db.Decimal(12, 2)
+  other_regular_income Decimal   @default(0) @db.Decimal(12, 2)
+  total_remuneration   Decimal   @default(0) @db.Decimal(12, 2)
+  worked_days          Int       @default(30)
+  source               String    @default("Manual")
+  notes                String?
+  created_date         DateTime? @default(now()) @db.Timestamp(6)
+  updated_date         DateTime? @default(now()) @db.Timestamp(6)
+  created_by           String?
+  created_by_id        String?   @db.VarChar(255)
+  employee             employee  @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([employee_id, year, month])
+  @@index([employee_id], map: "idx_historial_remunerativo_employee")
+  @@index([year, month], map: "idx_historial_remunerativo_period")
 }

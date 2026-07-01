@@ -48,6 +48,10 @@ import ConsultaPlanillas from "./pages/ConsultaPlanillas";
 import AsientosContables from "./pages/AsientosContables";
 import CuentasContables from "./pages/CuentasContables";
 import SunatExport from "./pages/SunatExport";
+import BeneficiosSociales from "./pages/BeneficiosSociales";
+import HistorialRemunerativo from "./pages/HistorialRemunerativo";
+import SubdiarioManagement from "./pages/SubdiarioManagement";
+import TipoAnexoManagement from "./pages/TipoAnexoManagement";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -292,6 +296,26 @@ const AuthenticatedApp = () => {
       <Route path="/SunatExport" element={
         <ProtectedRoute>
           <Layout currentPageName="SunatExport"><SunatExport /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/BeneficiosSociales" element={
+        <ProtectedRoute>
+          <Layout currentPageName="BeneficiosSociales"><BeneficiosSociales /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/HistorialRemunerativo" element={
+        <ProtectedRoute>
+          <Layout currentPageName="HistorialRemunerativo"><HistorialRemunerativo /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/SubdiarioManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="SubdiarioManagement"><SubdiarioManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/TipoAnexoManagement" element={
+        <ProtectedRoute>
+          <Layout currentPageName="TipoAnexoManagement"><TipoAnexoManagement /></Layout>
         </ProtectedRoute>
       } />
     </Routes>
