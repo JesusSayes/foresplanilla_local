@@ -7,7 +7,8 @@
  * - Si el hijo cursa estudios superiores/universitarios, el beneficio se
  *   extiende hasta que termine dichos estudios, con un tope máximo de 6 años
  *   posteriores a la mayoría de edad (hasta los 24 años).
- * - El monto es el 10% de la RMV vigente por cada hijo elegible.
+ * - El monto es FIJO: 10% de la RMV vigente, sin importar el número de hijos.
+ *   Basta con tener al menos un hijo elegible para percibir el beneficio completo.
  *
  * @param {Array} derechohabientes - Lista de derechohabientes del empleado
  * @param {number} rmvAmount - Remuneración Mínima Vital vigente (default 1025)
@@ -71,10 +72,12 @@ export function getFamilyAllowanceEligibility(
   // Solo contar hijos activos y elegibles
   const eligibleChildren = children.filter((c) => c.eligible && c.is_active);
 
+  // El monto es FIJO: 10% de la RMV vigente, sin importar el número de hijos.
+  // Basta con tener al menos un hijo elegible para percibir el beneficio completo.
   return {
     qualifies: eligibleChildren.length > 0,
     eligibleCount: eligibleChildren.length,
-    amount: eligibleChildren.length * allowancePerChild,
+    amount: eligibleChildren.length > 0 ? allowancePerChild : 0,
     allowancePerChild,
     children,
   };
