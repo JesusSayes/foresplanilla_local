@@ -68,6 +68,7 @@ import cuentasContablesRoutes from './routes/cuentasContables.js';
 import incidentTypesRoutes from './routes/incidentTypes.js';
 import subdiariosRoutes from './routes/subdiarios.js';
 import tipoAnexosRoutes from './routes/tipoAnexos.js';
+import historialRemunerativoRoutes from './routes/historialRemunerativo.js';
 
 dotenv.config();
 
@@ -169,6 +170,7 @@ app.use('/api/cuentas-contables', cuentasContablesRoutes);
 app.use('/api/incident-types', incidentTypesRoutes);
 app.use('/api/subdiarios', subdiariosRoutes);
 app.use('/api/tipo-anexos', tipoAnexosRoutes);
+app.use('/api/historial-remunerativo', historialRemunerativoRoutes);
 
 // Cron configuration
 const CRON_TIMEZONE = process.env.CRON_TIMEZONE || 'America/Lima';

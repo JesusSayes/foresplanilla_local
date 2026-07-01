@@ -12,6 +12,7 @@ const TAB_LABELS = {
   segurovida: "Seguro Vida Ley", uit: "UIT", accountingaccounts: "Cuenta Contable",
   areaunidadcargo: "Área/Unidad/Cargo", incidenttypes: "Tipo de Incidente",
   loantypes: "Tipo de Préstamo", costcentercategories: "Categoría de Centro de Costo",
+  subdiarios: "Subdiario", tiposanexo: "Tipo de Anexo",
 };
 
 export default function MasterDataFormModal({ activeTab, editingItem, formData, setFormData, onSubmit, onCancel, isSaving }) {
@@ -167,6 +168,47 @@ export default function MasterDataFormModal({ activeTab, editingItem, formData, 
               <div><Label>Nombre *</Label><Input {...F("name")} placeholder="Ej: Administración" /></div>
               <div><Label>Descripción</Label><Textarea {...F("description")} rows={3} placeholder="Descripción de la categoría..." /></div>
               {checkbox("is_active", "is_active_ccc")}
+            </>)}
+
+            {activeTab === "subdiarios" && (<>
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label>Código *</Label><Input {...F("codigo")} placeholder="Ej: 08" maxLength={5} className="font-mono" /></div>
+                <div><Label>Nombre Breve</Label><Input {...F("nombre_breve")} placeholder="Ej: PLANILLAS" maxLength={10} /></div>
+              </div>
+              <div><Label>Descripción *</Label><Input {...F("descripcion")} placeholder="Ej: Planillas de Remuneraciones" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label>Apertura</Label><Input {...F("apertura")} placeholder="Ej: A" maxLength={2} /></div>
+                <div><Label>Código SUNAT</Label><Input {...F("codigo_sunat")} placeholder="Ej: 080000" className="font-mono" /></div>
+              </div>
+              <div>
+                <Label>Estado</Label>
+                <Select value={formData.estado || "A"} onValueChange={(v) => setFormData({ ...formData, estado: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A">Activo</SelectItem>
+                    <SelectItem value="I">Inactivo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>)}
+
+            {activeTab === "tiposanexo" && (<>
+              <div>
+                <Label>Código *</Label>
+                <Input value={formData.codigo_tipo_anexo || ""} onChange={(e) => setFormData({ ...formData, codigo_tipo_anexo: e.target.value.toUpperCase() })} placeholder="Ej: P, C, T, O" maxLength={5} className="font-mono" />
+                <p className="text-xs text-slate-400 mt-1">P=Proveedor · C=Cliente · T=Trabajador · O=Otros</p>
+              </div>
+              <div><Label>Descripción *</Label><Input {...F("descripcion")} placeholder="Ej: Proveedor" /></div>
+              <div>
+                <Label>Estado</Label>
+                <Select value={formData.estado || "A"} onValueChange={(v) => setFormData({ ...formData, estado: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A">Activo</SelectItem>
+                    <SelectItem value="I">Inactivo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </>)}
 
             <div className="flex gap-3 pt-4">

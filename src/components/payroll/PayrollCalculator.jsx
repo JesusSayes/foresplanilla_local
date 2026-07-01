@@ -282,6 +282,8 @@ export class PayrollCalculator {
           count: incomes.length,
           items: incomes.map(c => ({
             name: c.concept_name,
+            concept_code: c.concept_code || "",
+            concept_id: c.id || null,
             amount: c.calculated_amount,
             method: c.calculation_method,
             formula: c.is_dynamic ? c.calculation_formula : null
@@ -292,9 +294,12 @@ export class PayrollCalculator {
           count: deductions.length,
           items: deductions.map(c => ({
             name: c.concept_name,
+            concept_code: c.concept_code || "",
+            concept_id: c.id || null,
             amount: c.calculated_amount,
             method: c.calculation_method,
-            formula: c.is_dynamic ? c.calculation_formula : null
+            formula: c.is_dynamic ? c.calculation_formula : null,
+            is_worker_contribution: c.concept_category === "AFP/ONP" || c.concept_category === "Impuestos" || c.is_worker_contribution
           })),
           total: totalDeductions
         },
@@ -302,6 +307,8 @@ export class PayrollCalculator {
           count: contributions.length,
           items: contributions.map(c => ({
             name: c.concept_name,
+            concept_code: c.concept_code || "",
+            concept_id: c.id || null,
             amount: c.calculated_amount,
             method: c.calculation_method,
             formula: c.is_dynamic ? c.calculation_formula : null

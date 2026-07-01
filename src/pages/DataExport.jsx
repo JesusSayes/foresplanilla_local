@@ -32,7 +32,7 @@ const ENTITY_SCHEMAS = {
     company: "TEXT", position: "TEXT", position_level: "TEXT", profession: "TEXT",
     department_name: "TEXT", area_trabajo: "TEXT", unidad_trabajo: "TEXT", work_unit: "TEXT", site: "TEXT",
     hire_date: "DATE", termination_date: "DATE", contract_type: "TEXT",
-    base_salary: "DECIMAL(18,2)", activity_cost: "DECIMAL(18,2)", food_cost: "DECIMAL(18,2)", transport_cost: "DECIMAL(18,2)",
+    base_salary: "DECIMAL(18,2)", quincenal_amount: "DECIMAL(18,2)", activity_cost: "DECIMAL(18,2)", food_cost: "DECIMAL(18,2)", transport_cost: "DECIMAL(18,2)",
     bank_name: "TEXT", bank_account: "TEXT",
     cci_account: "TEXT", cts_bank: "TEXT", cts_account_number: "TEXT", cts_currency: "TEXT",
     pension_system: "TEXT", afp_id: "TEXT", afp_affiliation_date: "DATE", cuspp: "TEXT",
@@ -97,7 +97,12 @@ const ENTITY_SCHEMAS = {
   },
   AttendanceRecord: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
-    employee_id: "TEXT", date: "DATE", clock_in: "TEXT", clock_out: "TEXT",
+    employee_id: "TEXT", date: "DATE",
+    clock_in: "TEXT", clock_out: "TEXT",
+    clock_in_2: "TEXT", clock_out_2: "TEXT",
+    clock_in_3: "TEXT", clock_out_3: "TEXT",
+    clock_in_4: "TEXT", clock_out_4: "TEXT",
+    segment_count: "INTEGER", is_split_day: "BOOLEAN",
     scheduled_start: "TEXT", scheduled_end: "TEXT", worked_hours: "DECIMAL(18,2)",
     regular_hours: "DECIMAL(18,2)", overtime_hours_25: "DECIMAL(18,2)", overtime_hours_35: "DECIMAL(18,2)",
     overtime_authorized: "BOOLEAN", is_late: "BOOLEAN", late_minutes: "INTEGER",
@@ -129,11 +134,12 @@ const ENTITY_SCHEMAS = {
   },
   WorkSchedule: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
-    employee_id: "TEXT", department_name: "TEXT", departments: "JSON", schedule_name: "TEXT",
+    employee_id: "TEXT", department_name: "TEXT", departments: "JSON", schedule_name: "TEXT", site: "TEXT",
+    effective_from: "DATE", effective_to: "DATE",
     monday_start: "TEXT", monday_end: "TEXT", tuesday_start: "TEXT", tuesday_end: "TEXT",
     wednesday_start: "TEXT", wednesday_end: "TEXT", thursday_start: "TEXT", thursday_end: "TEXT",
     friday_start: "TEXT", friday_end: "TEXT", saturday_start: "TEXT", saturday_end: "TEXT",
-    sunday_start: "TEXT", sunday_end: "TEXT", break_duration_minutes: "INTEGER",
+    sunday_start: "TEXT", sunday_end: "TEXT", break_duration_minutes: "INTEGER", break_start: "TEXT",
     tolerance_minutes: "INTEGER", exempt_from_clocking: "BOOLEAN",
     overtime_authorized: "BOOLEAN", is_active: "BOOLEAN"
   },
@@ -332,6 +338,15 @@ const ENTITY_SCHEMAS = {
     migrado: "BOOLEAN", fecha_migracion: "TIMESTAMP", sistema_destino: "TEXT",
     codigo_migracion: "TEXT", migrado_por: "TEXT", error_migracion: "TEXT", estado_migracion: "TEXT"
   },
+  Subdiario: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    codigo: "TEXT", descripcion: "TEXT", nombre_breve: "TEXT", apertura: "TEXT",
+    codigo_sunat: "TEXT", estado: "TEXT"
+  },
+  TipoAnexo: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    codigo_tipo_anexo: "TEXT", descripcion: "TEXT", estado: "TEXT"
+  },
   CompanyInfo: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     company_name: "TEXT", ruc: "TEXT", address: "TEXT", phone: "TEXT", email: "TEXT",
@@ -379,10 +394,10 @@ const ENTITY_GROUPS = [
   { label: "Contratos", entities: ["Contract", "ContractTemplate", "ContractClause", "ContractRenewalRule"] },
   { label: "Asistencia", entities: ["AttendanceRecord", "AttendanceEditRequest", "AttendanceIncident", "OvertimeAlert", "WorkSchedule", "AccessDevice", "EmployeeAccessMapping", "DeviceEvent", "DatabaseConnection", "SyncLog"] },
   { label: "Vacaciones", entities: ["VacationRequest", "VacationBalance"] },
-  { label: "Centros de Costo", entities: ["CostCenter", "CostCenterAssignment", "CostCenterChangeLog", "CostCenterCategory", "AccountingAccount"] },
-  { label: "Contabilidad", entities: ["AsientoContable", "CuentaContable"] },
-  { label: "Datos Maestros", entities: ["Holiday", "Position", "Department", "Bank", "Site", "AFP", "Profession", "Ubigeo", "RMV", "UIT", "SeguroVidaLey", "AreaUnidadCargo", "IncidentType"] },
   { label: "Planillas y Remuneración", entities: ["Payslip", "PayrollConcept", "LoanType", "Loan", "LoanInstallment", "PayrollConfig"] },
+  { label: "Centros de Costo", entities: ["CostCenter", "CostCenterAssignment", "CostCenterChangeLog", "CostCenterCategory", "AccountingAccount"] },
+  { label: "Contabilidad", entities: ["AsientoContable", "CuentaContable", "Subdiario", "TipoAnexo"] },
+  { label: "Datos Maestros", entities: ["Holiday", "Position", "Department", "Bank", "Site", "AFP", "Profession", "Ubigeo", "RMV", "UIT", "SeguroVidaLey", "AreaUnidadCargo", "IncidentType"] },
   { label: "Roles y Permisos", entities: ["Role"] },
   { label: "Certificados", entities: ["Certificate"] },
   { label: "Configuración de Empresa", entities: ["CompanyInfo", "PayslipTemplate", "ReportConfiguration"] },

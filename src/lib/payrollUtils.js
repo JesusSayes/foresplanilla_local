@@ -3,12 +3,9 @@
  * Evita Infinity, NaN, notación científica y valores absurdamente grandes.
  */
 
-/** Monto máximo razonable por boleta (100 UIT ≈ S/ 515,000). */
-const MAX_AMOUNT = 500_000;
-
 /**
  * Convierte cualquier valor a un número seguro para planilla.
- * Devuelve 0 si el valor es NaN, Infinity, -Infinity o mayor al límite.
+ * Devuelve 0 si el valor es NaN o Infinity.
  * @param {*} value
  * @returns {number}
  */
@@ -16,7 +13,6 @@ export function safePayrollNumber(value) {
   if (value === null || value === undefined || value === "") return 0;
   const n = typeof value === "number" ? value : parseFloat(value);
   if (!Number.isFinite(n)) return 0;
-  if (Math.abs(n) > MAX_AMOUNT) return 0;
   return n;
 }
 

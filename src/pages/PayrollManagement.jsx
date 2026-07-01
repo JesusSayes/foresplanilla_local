@@ -117,17 +117,21 @@ export default function PayrollManagement() {
 
       // Filtrar conceptos: recurrentes, del mes/año actual, sin mes/año específico, o generales
       return allConcepts.filter(c => {
-        if (c.is_applied) return false; // Ya fue aplicado
-
-        // Conceptos recurrentes: siempre incluir
+        // Conceptos recurrentes (incluyendo los generales): SIEMPRE incluir, nunca filtrar por is_applied
         if (c.is_recurring) return true;
+
+        // Conceptos generales no recurrentes: incluir siempre (aplican a todos)
+        if (c.employee_id === "general") return true;
+
+        // Para conceptos específicos no recurrentes: excluir si ya fueron aplicados
+        if (c.is_applied) return false;
 
         // Conceptos con mes/año específico: solo si coincide
         if (c.month && c.year) {
           return c.month === selectedMonth && c.year === selectedYear;
         }
 
-        // Conceptos sin mes/año específico (aplican siempre): incluir
+        // Conceptos sin mes/año específico: incluir
         return true;
       });
     },
@@ -475,17 +479,36 @@ export default function PayrollManagement() {
       const absenceDiscount = payrollType === "Quincenal" ? 0 : roundMoney(absentRecords.length * dailyRate);
 
       // Buscar adelanto quincenal si es mensual
+      // Se hace una consulta fresca para garantizar que se encuentre incluso si
+      // la quincenal fue generada en esta misma sesión sin recarga de página.
       let advanceDeduction = 0;
       let advancePaymentId = null;
       if (payrollType === "Mensual") {
-        const quincenalPayslip = existingPayslips.find(p =>
+        // Primero buscar en la cache local (existingPayslips ya cargados)
+        let quincenalPayslip = existingPayslips.find(p =>
           p.employee_id === emp.id &&
           p.payroll_type === "Quincenal" &&
-          p.month === selectedMonth &&
-          p.year === selectedYear
+          Number(p.month) === selectedMonth &&
+          Number(p.year) === selectedYear
         );
+        // Si no está en cache, hacer consulta fresca a la BD
+        if (!quincenalPayslip) {
+          const freshQuincenales = await base44.entities.Payslip.filter({
+            employee_id: emp.id,
+            payroll_type: "Quincenal",
+            month: selectedMonth,
+            year: selectedYear,
+          });
+          quincenalPayslip = freshQuincenales.length > 0 ? freshQuincenales[0] : null;
+        }
         if (quincenalPayslip) {
-          advanceDeduction = safePayrollNumber(quincenalPayslip.net_pay); // sanitizar adelanto
+          // Se descuenta el total_income de la quincenal (monto bruto adelantado),
+          // no el net_pay, porque la quincenal no tiene descuentos propios.
+          // Si total_income está disponible y es mayor a 0, usarlo; si no, usar net_pay.
+          const quincenalAmount = safePayrollNumber(quincenalPayslip.total_income) > 0
+            ? safePayrollNumber(quincenalPayslip.total_income)
+            : safePayrollNumber(quincenalPayslip.net_pay);
+          advanceDeduction = quincenalAmount;
           advancePaymentId = quincenalPayslip.id;
         }
       }
@@ -508,6 +531,8 @@ export default function PayrollManagement() {
         payroll_number: payrollNumber,
         advance_payment_id: advancePaymentId,
         worked_days: workedDays,
+        regular_hours: attendanceData.regular_hours,
+        overtime_hours: empAttendance.reduce((sum, r) => sum + (r.overtime_hours_25 || 0) + (r.overtime_hours_35 || 0), 0),
         base_salary: safePayrollNumber(emp.base_salary),
         family_allowance: 0,
         overtime_pay: 0,
@@ -1463,20 +1488,29 @@ export default function PayrollManagement() {
                                             </>
                                           )}
                                         </div>
+                                        {/* Botón Ver Boleta individual */}
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 shrink-0 text-xs"
+                                          onClick={() => setPreviewPayslip(payslip)}
+                                        >
+                                          <Eye className="w-3 h-3 mr-1" />Ver Boleta
+                                        </Button>
                                         {/* Botón eliminar del trabajador de la planilla */}
                                         {!allPagada && (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="text-red-500 border-red-200 hover:bg-red-50 shrink-0 text-xs"
-                                            onClick={() => {
-                                              if (window.confirm(`¿Eliminar a ${emp.first_name} ${emp.last_name} de esta planilla?`)) {
-                                                removeOnePayslipMutation.mutate(payslip.id);
-                                              }
-                                            }}
-                                          >
-                                            ✕ Quitar
-                                          </Button>
+                                         <Button
+                                           size="sm"
+                                           variant="outline"
+                                           className="text-red-500 border-red-200 hover:bg-red-50 shrink-0 text-xs"
+                                           onClick={() => {
+                                             if (window.confirm(`¿Eliminar a ${emp.first_name} ${emp.last_name} de esta planilla?`)) {
+                                               removeOnePayslipMutation.mutate(payslip.id);
+                                             }
+                                           }}
+                                         >
+                                           ✕ Quitar
+                                         </Button>
                                         )}
                                       </div>
                                     );

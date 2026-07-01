@@ -10,9 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Building, MapPin, Briefcase, CreditCard, Plus, Edit, Trash2, Search, DollarSign, Target, Shield
+import { 
+  Building, MapPin, Briefcase, CreditCard, Plus, Edit, Trash2, Search, DollarSign, Target, Shield, ToggleLeft, ToggleRight
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
@@ -27,6 +28,7 @@ export default function MasterDataManagement() {
   const [formData, setFormData] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [elementoFilter, setElementoFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all"); // "all" | "active" | "inactive"
 
   const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -116,6 +118,16 @@ export default function MasterDataManagement() {
     queryFn: async () => await entitiesAPI.CostCenterCategory.list("name"),
   });
 
+  const { data: subdiarios = [] } = useQuery({
+    queryKey: ["subdiarios"],
+    queryFn: async () => await entitiesAPI.Subdiario.list("codigo"),
+  });
+
+  const { data: tiposAnexo = [] } = useQuery({
+    queryKey: ["tipos_anexo"],
+    queryFn: async () => await entitiesAPI.TipoAnexo.list("codigo_tipo_anexo"),
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ entity, data }) => {
       return await entitiesAPI[entity].create(data);
@@ -171,11 +183,36 @@ export default function MasterDataManagement() {
     }
   };
 
+  // Helper: filtra por estado activo/inactivo según el campo que use cada entidad
+  const filterByStatus = (item) => {
+    if (statusFilter === "all") return true;
+    // Entidades con campo "estado" (A/I): Subdiario, TipoAnexo
+    if (item.estado !== undefined) {
+      return statusFilter === "active" ? item.estado !== "I" : item.estado === "I";
+    }
+    // Resto usan is_active (true/false, undefined = activo)
+    const isActive = item.is_active !== false;
+    return statusFilter === "active" ? isActive : !isActive;
+  };
+
   const filteredAreaUnidadCargo = areaUnidadCargos.filter(a =>
-    a.area?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (a.area?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     a.unidad?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.cargo?.toLowerCase().includes(searchTerm.toLowerCase())
+    a.cargo?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(a)
   );
+
+  // Toggle rápido activo/inactivo
+  const handleToggleStatus = (item, entity) => {
+    // Entidades con campo "estado" (A/I)
+    if (item.estado !== undefined) {
+      const newEstado = item.estado === "I" ? "A" : "I";
+      updateMutation.mutate({ entity, id: item.id, data: { estado: newEstado } });
+    } else {
+      const newActive = item.is_active === false ? true : false;
+      updateMutation.mutate({ entity, id: item.id, data: { is_active: newActive } });
+    }
+  };
 
   const handleSoftDelete = (item, entity) => {
     if (confirm(`¿Desactivar este registro?`)) {
@@ -200,6 +237,8 @@ export default function MasterDataManagement() {
       incidenttypes: "IncidentType",
       loantypes: "LoanType",
       costcentercategories: "CostCenterCategory",
+      subdiarios: "Subdiario",
+      tiposanexo: "TipoAnexo",
     };
     const entity = entityMap[activeTab];
 
@@ -229,57 +268,67 @@ export default function MasterDataManagement() {
     setShowForm(false);
   };
 
-  const filteredSites = sites.filter(s =>
-    s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.code?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredSites = sites.filter(s => 
+    (s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.code?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(s)
   );
 
-  const filteredPositions = positions.filter(p =>
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.department?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredPositions = positions.filter(p => 
+    (p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.department?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(p)
   );
 
-  const filteredDepartments = departments.filter(d =>
-    d.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.code?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredDepartments = departments.filter(d => 
+    (d.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    d.code?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(d)
   );
 
-  const filteredBanks = banks.filter(b =>
-    b.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.code?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredBanks = banks.filter(b => 
+    (b.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.code?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(b)
   );
 
-  const filteredRMVs = rmvRecords.filter(r =>
-    r.amount?.toString().includes(searchTerm) ||
-    r.notes?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredRMVs = rmvRecords.filter(r => 
+    (r.amount?.toString().includes(searchTerm) ||
+    r.notes?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(r)
   );
 
   const activeRMV = rmvRecords.find(r => r.is_active);
 
-  const filteredAFPs = afps.filter(a =>
-    a.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.code?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAFPs = afps.filter(a => 
+    (a.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.code?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(a)
   );
 
-  const filteredProfessions = professions.filter(p =>
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredProfessions = professions.filter(p => 
+    (p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.category?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(p)
   );
 
-  const filteredCostCenters = costCenters.filter(c =>
-    c.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredCostCenters = costCenters.filter(c => 
+    (c.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.category?.toLowerCase().includes(searchTerm.toLowerCase())
+    c.category?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    filterByStatus(c)
   );
 
   const filteredSeguroVida = seguroVidaLey.filter(s =>
-    s.age_range_start?.toString().includes(searchTerm) ||
-    s.age_range_end?.toString().includes(searchTerm)
+    (s.age_range_start?.toString().includes(searchTerm) ||
+    s.age_range_end?.toString().includes(searchTerm)) &&
+    filterByStatus(s)
   );
 
   const filteredUIT = uitRecords.filter(u =>
-    u.year?.toString().includes(searchTerm) ||
-    u.amount?.toString().includes(searchTerm)
+    (u.year?.toString().includes(searchTerm) ||
+    u.amount?.toString().includes(searchTerm)) &&
+    filterByStatus(u)
   );
 
   const activeUIT = uitRecords.find(u => u.year === new Date().getFullYear());
@@ -289,7 +338,7 @@ export default function MasterDataManagement() {
       a.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.elemento?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesElemento = elementoFilter === "all" || a.elemento === elementoFilter;
-    return matchesSearch && matchesElemento;
+    return matchesSearch && matchesElemento && filterByStatus(a);
   });
 
   if (!employee || permissionsLoading) {
@@ -331,174 +380,164 @@ export default function MasterDataManagement() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-11 gap-6 mb-8">
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-blue-100 rounded-xl">
-                  <MapPin className="w-6 h-6 text-blue-600" />
+        {/* Tarjeta resumen dinámica según tab activo */}
+        {(() => {
+          const tabInfo = {
+            areaunidadcargo: { label: "Área / Unidad / Cargo", icon: Building, iconBg: "bg-violet-100", iconColor: "text-violet-600", data: areaUnidadCargos,
+              stats: [
+                { label: "Total", value: areaUnidadCargos.length },
+                { label: "Activos", value: areaUnidadCargos.filter(a => a.is_active !== false).length },
+                { label: "Inactivos", value: areaUnidadCargos.filter(a => a.is_active === false).length },
+                { label: "Áreas", value: new Set(areaUnidadCargos.map(a => a.area)).size },
+              ]},
+            sites: { label: "Sedes", icon: MapPin, iconBg: "bg-blue-100", iconColor: "text-blue-600", data: sites,
+              stats: [
+                { label: "Total", value: sites.length },
+                { label: "Activas", value: sites.filter(s => s.is_active !== false).length },
+                { label: "Inactivas", value: sites.filter(s => s.is_active === false).length },
+              ]},
+            positions: { label: "Cargos", icon: Briefcase, iconBg: "bg-purple-100", iconColor: "text-purple-600", data: positions,
+              stats: [
+                { label: "Total", value: positions.length },
+                { label: "Activos", value: positions.filter(p => p.is_active !== false).length },
+                { label: "Inactivos", value: positions.filter(p => p.is_active === false).length },
+              ]},
+            departments: { label: "Departamentos", icon: Building, iconBg: "bg-orange-100", iconColor: "text-orange-600", data: departments,
+              stats: [
+                { label: "Total", value: departments.length },
+                { label: "Activos", value: departments.filter(d => d.is_active !== false).length },
+                { label: "Inactivos", value: departments.filter(d => d.is_active === false).length },
+              ]},
+            banks: { label: "Bancos", icon: CreditCard, iconBg: "bg-green-100", iconColor: "text-green-600", data: banks,
+              stats: [
+                { label: "Total", value: banks.length },
+                { label: "Activos", value: banks.filter(b => b.is_active !== false).length },
+                { label: "Inactivos", value: banks.filter(b => b.is_active === false).length },
+              ]},
+            rmv: { label: "RMV", icon: DollarSign, iconBg: "bg-indigo-100", iconColor: "text-indigo-600", data: rmvRecords,
+              stats: [
+                { label: "Vigente", value: activeRMV ? `S/ ${activeRMV.amount.toFixed(2)}` : "N/A" },
+                { label: "Registros", value: rmvRecords.length },
+                { label: "Asig. Familiar", value: activeRMV ? `S/ ${(activeRMV.amount * 0.10).toFixed(2)}` : "N/A" },
+              ]},
+            afp: { label: "AFPs", icon: Building, iconBg: "bg-teal-100", iconColor: "text-teal-600", data: afps,
+              stats: [
+                { label: "Total", value: afps.length },
+                { label: "Activas", value: afps.filter(a => a.is_active !== false).length },
+                { label: "Inactivas", value: afps.filter(a => a.is_active === false).length },
+              ]},
+            professions: { label: "Profesiones", icon: Briefcase, iconBg: "bg-cyan-100", iconColor: "text-cyan-600", data: professions,
+              stats: [
+                { label: "Total", value: professions.length },
+                { label: "Activas", value: professions.filter(p => p.is_active !== false).length },
+                { label: "Inactivas", value: professions.filter(p => p.is_active === false).length },
+              ]},
+            costcenters: { label: "Centros de Costos", icon: Target, iconBg: "bg-rose-100", iconColor: "text-rose-600", data: costCenters,
+              stats: [
+                { label: "Total", value: costCenters.length },
+                { label: "Activos", value: costCenters.filter(c => c.is_active !== false).length },
+                { label: "Inactivos", value: costCenters.filter(c => c.is_active === false).length },
+              ]},
+            segurovida: { label: "Seguro Vida Ley", icon: Shield, iconBg: "bg-red-100", iconColor: "text-red-600", data: seguroVidaLey,
+              stats: [
+                { label: "Rangos de Edad", value: seguroVidaLey.length },
+                { label: "Activos", value: seguroVidaLey.filter(s => s.is_active !== false).length },
+              ]},
+            uit: { label: "UIT", icon: DollarSign, iconBg: "bg-yellow-100", iconColor: "text-yellow-600", data: uitRecords,
+              stats: [
+                { label: `UIT ${new Date().getFullYear()}`, value: activeUIT ? `S/ ${activeUIT.amount.toFixed(0)}` : "N/A" },
+                { label: "Registros históricos", value: uitRecords.length },
+              ]},
+            accountingaccounts: { label: "Cuentas Contables", icon: DollarSign, iconBg: "bg-emerald-100", iconColor: "text-emerald-600", data: accountingAccounts,
+              stats: [
+                { label: "Total cuentas", value: accountingAccounts.length },
+                { label: "Activas", value: accountingAccounts.filter(a => a.is_active !== false).length },
+                { label: "Inactivas", value: accountingAccounts.filter(a => a.is_active === false).length },
+                { label: "Elementos", value: new Set(accountingAccounts.map(a => a.elemento)).size },
+              ]},
+            incidenttypes: { label: "Tipos de Incidente", icon: Shield, iconBg: "bg-amber-100", iconColor: "text-amber-600", data: incidentTypes,
+              stats: [
+                { label: "Total", value: incidentTypes.length },
+                { label: "Activos", value: incidentTypes.filter(t => t.is_active !== false).length },
+                { label: "Permisos", value: incidentTypes.filter(t => t.affectation === "Permiso").length },
+                { label: "Descuentos", value: incidentTypes.filter(t => t.affectation === "Descuento").length },
+              ]},
+            loantypes: { label: "Tipos de Préstamo", icon: CreditCard, iconBg: "bg-sky-100", iconColor: "text-sky-600", data: loanTypes,
+              stats: [
+                { label: "Total", value: loanTypes.length },
+                { label: "Activos", value: loanTypes.filter(t => t.is_active !== false).length },
+                { label: "Inactivos", value: loanTypes.filter(t => t.is_active === false).length },
+              ]},
+            costcentercategories: { label: "Categorías de CC", icon: Target, iconBg: "bg-pink-100", iconColor: "text-pink-600", data: costCenterCategories,
+              stats: [
+                { label: "Total", value: costCenterCategories.length },
+                { label: "Activas", value: costCenterCategories.filter(c => c.is_active !== false).length },
+              ]},
+            subdiarios: { label: "Subdiarios Contables", icon: Building, iconBg: "bg-indigo-100", iconColor: "text-indigo-600", data: subdiarios,
+              stats: [
+                { label: "Total", value: subdiarios.length },
+                { label: "Activos", value: subdiarios.filter(s => s.estado !== "I").length },
+                { label: "Inactivos", value: subdiarios.filter(s => s.estado === "I").length },
+              ]},
+            tiposanexo: { label: "Tipos de Anexo", icon: Shield, iconBg: "bg-amber-100", iconColor: "text-amber-600", data: tiposAnexo,
+              stats: [
+                { label: "Total", value: tiposAnexo.length },
+                { label: "Activos", value: tiposAnexo.filter(t => t.estado !== "I").length },
+                { label: "Inactivos", value: tiposAnexo.filter(t => t.estado === "I").length },
+              ]},
+          };
+          const info = tabInfo[activeTab];
+          if (!info) return null;
+          const Icon = info.icon;
+          return (
+            <Card className="border-0 shadow-lg mb-6 bg-gradient-to-r from-slate-50 to-white">
+              <CardContent className="p-5">
+                <div className="flex flex-wrap items-center gap-6">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`p-3 ${info.iconBg} rounded-xl shrink-0`}>
+                      <Icon className={`w-6 h-6 ${info.iconColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Sección activa</p>
+                      <p className="text-lg font-bold text-slate-900">{info.label}</p>
+                    </div>
+                  </div>
+                  <div className="h-8 w-px bg-slate-200 hidden sm:block" />
+                  <div className="flex flex-wrap gap-6">
+                    {info.stats.map((stat, i) => (
+                      <div key={i} className="text-center">
+                        <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                        <p className="text-xs text-slate-500">{stat.label}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {sites.length}
-              </div>
-              <p className="text-slate-600 text-sm">Sedes</p>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-purple-100 rounded-xl">
-                  <Briefcase className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {positions.length}
-              </div>
-              <p className="text-slate-600 text-sm">Cargos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-orange-100 rounded-xl">
-                  <Building className="w-6 h-6 text-orange-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {departments.length}
-              </div>
-              <p className="text-slate-600 text-sm">Departamentos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <CreditCard className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {banks.length}
-              </div>
-              <p className="text-slate-600 text-sm">Bancos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-indigo-100 rounded-xl">
-                  <DollarSign className="w-6 h-6 text-indigo-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {activeRMV ? `S/ ${activeRMV.amount.toFixed(2)}` : "N/A"}
-              </div>
-              <p className="text-slate-600 text-sm">RMV</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-teal-100 rounded-xl">
-                  <Building className="w-6 h-6 text-teal-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {afps.length}
-              </div>
-              <p className="text-slate-600 text-sm">AFPs</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-cyan-100 rounded-xl">
-                  <Briefcase className="w-6 h-6 text-cyan-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {professions.length}
-              </div>
-              <p className="text-slate-600 text-sm">Profesiones</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-rose-100 rounded-xl">
-                  <Target className="w-6 h-6 text-rose-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {costCenters.length}
-              </div>
-              <p className="text-slate-600 text-sm">Centros Costos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-red-100 rounded-xl">
-                  <Shield className="w-6 h-6 text-red-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {seguroVidaLey.length}
-              </div>
-              <p className="text-slate-600 text-sm">Seguro Vida</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-yellow-100 rounded-xl">
-                  <DollarSign className="w-6 h-6 text-yellow-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {activeUIT ? `S/ ${activeUIT.amount.toFixed(0)}` : "N/A"}
-              </div>
-              <p className="text-slate-600 text-sm">UIT {new Date().getFullYear()}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-emerald-100 rounded-xl">
-                  <DollarSign className="w-6 h-6 text-emerald-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {accountingAccounts.length}
-              </div>
-              <p className="text-slate-600 text-sm">Cuentas</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-3 bg-violet-100 rounded-xl">
-                  <Briefcase className="w-6 h-6 text-violet-600" />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-900 mb-1">
-                {areaUnidadCargos.filter(a => a.is_active !== false).length}
-              </div>
-              <p className="text-slate-600 text-sm">Área/Unidad/Cargo</p>
-            </CardContent>
-          </Card>
+        {/* Barra de filtros globales */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Input placeholder="Buscar en todos los datos maestros..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); }} className="pl-9" />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="active">✅ Solo Activos</SelectItem>
+              <SelectItem value="inactive">❌ Solo Inactivos</SelectItem>
+            </SelectContent>
+          </Select>
+          {(searchTerm || statusFilter !== "all") && (
+            <Button variant="outline" size="sm" onClick={() => { setSearchTerm(""); setStatusFilter("all"); }}>
+              Limpiar filtros
+            </Button>
+          )}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -518,6 +557,8 @@ export default function MasterDataManagement() {
             <TabsTrigger value="incidenttypes">Tipos Incidente</TabsTrigger>
             <TabsTrigger value="loantypes">Tipos Préstamo</TabsTrigger>
             <TabsTrigger value="costcentercategories">Categ. CC</TabsTrigger>
+            <TabsTrigger value="subdiarios">Subdiarios</TabsTrigger>
+            <TabsTrigger value="tiposanexo">Tipos Anexo</TabsTrigger>
           </TabsList>
 
           <TabsContent value="areaunidadcargo" className="space-y-6">
@@ -534,7 +575,7 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar área, unidad o cargo..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
+
                 {[...new Set(filteredAreaUnidadCargo.map(a => a.area))].sort().map(area => (
                   <div key={area} className="mb-5">
                     <h3 className="text-sm font-bold text-indigo-700 mb-2 pb-1 border-b border-indigo-100 flex items-center gap-2">
@@ -546,17 +587,14 @@ export default function MasterDataManagement() {
                           <div className="flex items-center gap-3">
                             <Badge className="bg-violet-100 text-violet-700 text-xs">{item.unidad}</Badge>
                             <span className="text-sm font-medium text-slate-900">{item.cargo}</span>
-                            {item.is_active === false && <Badge className="bg-red-100 text-red-700 text-xs">Inactivo</Badge>}
+                            <Badge className={item.is_active !== false ? "bg-green-100 text-green-700 text-xs" : "bg-red-100 text-red-700 text-xs"}>{item.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
-                          <div className="flex gap-1.5">
+                          <div className="flex items-center gap-1.5">
+                            {hasAnyPermission(["system.admin"]) && (
+                              <Switch checked={item.is_active !== false} onCheckedChange={() => handleToggleStatus(item, "AreaUnidadCargo")} title={item.is_active !== false ? "Desactivar" : "Activar"} />
+                            )}
                             {hasAnyPermission(["system.admin"]) && (
                               <Button size="sm" variant="outline" onClick={() => handleEdit(item, "areaunidadcargo")}><Edit className="w-3.5 h-3.5" /></Button>
-                            )}
-                            {hasAnyPermission(["system.admin"]) && item.is_active !== false && (
-                              <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleSoftDelete(item, "AreaUnidadCargo")}><Trash2 className="w-3.5 h-3.5" /></Button>
-                            )}
-                            {hasAnyPermission(["system.admin"]) && item.is_active === false && (
-                              <Button size="sm" variant="outline" className="text-green-600 text-xs px-2" onClick={() => updateMutation.mutate({ entity: "AreaUnidadCargo", id: item.id, data: { is_active: true } })}>Reactivar</Button>
                             )}
                           </div>
                         </div>
@@ -585,18 +623,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar sede..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredSites.map(site => (
                     <div key={site.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -604,32 +630,28 @@ export default function MasterDataManagement() {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h4 className="font-bold text-slate-900 text-lg">{site.name}</h4>
-                            <Badge className="bg-blue-100 text-blue-700">{site.code}</Badge>
-                            {!site.is_active && (
-                              <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
-                            )}
+                             <Badge className="bg-blue-100 text-blue-700">{site.code}</Badge>
+                            <Badge className={site.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{site.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
                           {site.address && (
                             <p className="text-sm text-slate-600">{site.address}</p>
                           )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-2">
                           {hasAnyPermission(["sites.edit", "sites.manage", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(site, "sites")}
-                            >
+                            <Switch
+                              checked={site.is_active !== false}
+                              onCheckedChange={() => handleToggleStatus(site, "Site")}
+                              title={site.is_active !== false ? "Desactivar" : "Activar"}
+                            />
+                          )}
+                          {hasAnyPermission(["sites.edit", "sites.manage", "system.admin"]) && (
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(site, "sites")}>
                               <Edit className="w-4 h-4" />
                             </Button>
                           )}
                           {hasAnyPermission(["sites.delete", "sites.manage", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(site, "Site")}
-                            >
+                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(site, "Site")}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
@@ -659,18 +681,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar cargo..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredPositions.map(pos => (
                     <div key={pos.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -681,9 +691,7 @@ export default function MasterDataManagement() {
                             {pos.level && (
                               <Badge className="bg-purple-100 text-purple-700">{pos.level}</Badge>
                             )}
-                            {!pos.is_active && (
-                              <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
-                            )}
+                            <Badge className={pos.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{pos.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
                           {pos.department && (
                             <p className="text-sm text-slate-600 mb-1">
@@ -694,27 +702,17 @@ export default function MasterDataManagement() {
                             <p className="text-sm text-slate-600">{pos.description}</p>
                           )}
                         </div>
-                        <div className="flex gap-2">
-                          {hasAnyPermission(["positions.edit", "positions.manage", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(pos, "positions")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {hasAnyPermission(["positions.delete", "positions.manage", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(pos, "Position")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
+                        <div className="flex items-center gap-2">
+                           {hasAnyPermission(["positions.edit", "positions.manage", "system.admin"]) && (
+                             <Switch checked={pos.is_active !== false} onCheckedChange={() => handleToggleStatus(pos, "Position")} title={pos.is_active !== false ? "Desactivar" : "Activar"} />
+                           )}
+                           {hasAnyPermission(["positions.edit", "positions.manage", "system.admin"]) && (
+                             <Button size="sm" variant="outline" onClick={() => handleEdit(pos, "positions")}><Edit className="w-4 h-4" /></Button>
+                           )}
+                           {hasAnyPermission(["positions.delete", "positions.manage", "system.admin"]) && (
+                             <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(pos, "Position")}><Trash2 className="w-4 h-4" /></Button>
+                           )}
+                         </div>
                       </div>
                     </div>
                   ))}
@@ -740,18 +738,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar departamento..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredDepartments.map(dept => (
                     <div key={dept.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -762,35 +748,23 @@ export default function MasterDataManagement() {
                             {dept.code && (
                               <Badge className="bg-orange-100 text-orange-700">{dept.code}</Badge>
                             )}
-                            {!dept.is_active && (
-                              <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
-                            )}
+                            <Badge className={dept.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{dept.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
                           {dept.description && (
                             <p className="text-sm text-slate-600">{dept.description}</p>
                           )}
                         </div>
-                        <div className="flex gap-2">
-                          {hasAnyPermission(["departments.edit", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(dept, "departments")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {hasAnyPermission(["departments.delete", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(dept, "Department")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
+                        <div className="flex items-center gap-2">
+                           {hasAnyPermission(["departments.edit", "system.admin"]) && (
+                             <Switch checked={dept.is_active !== false} onCheckedChange={() => handleToggleStatus(dept, "Department")} title={dept.is_active !== false ? "Desactivar" : "Activar"} />
+                           )}
+                           {hasAnyPermission(["departments.edit", "system.admin"]) && (
+                             <Button size="sm" variant="outline" onClick={() => handleEdit(dept, "departments")}><Edit className="w-4 h-4" /></Button>
+                           )}
+                           {hasAnyPermission(["departments.delete", "system.admin"]) && (
+                             <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(dept, "Department")}><Trash2 className="w-4 h-4" /></Button>
+                           )}
+                         </div>
                       </div>
                     </div>
                   ))}
@@ -816,18 +790,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar banco..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredBanks.map(bank => (
                     <div key={bank.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -836,34 +798,22 @@ export default function MasterDataManagement() {
                           <div className="flex items-center gap-3 mb-2">
                             <h4 className="font-bold text-slate-900 text-lg">{bank.name}</h4>
                             {bank.code && (
-                              <Badge className="bg-green-100 text-green-700">{bank.code}</Badge>
+                              <Badge className="bg-slate-100 text-slate-700">{bank.code}</Badge>
                             )}
-                            {!bank.is_active && (
-                              <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
-                            )}
+                            <Badge className={bank.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{bank.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          {hasAnyPermission(["banks.edit", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(bank, "banks")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {hasAnyPermission(["banks.delete", "system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(bank, "Bank")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
+                        <div className="flex items-center gap-2">
+                           {hasAnyPermission(["banks.edit", "system.admin"]) && (
+                             <Switch checked={bank.is_active !== false} onCheckedChange={() => handleToggleStatus(bank, "Bank")} title={bank.is_active !== false ? "Desactivar" : "Activar"} />
+                           )}
+                           {hasAnyPermission(["banks.edit", "system.admin"]) && (
+                             <Button size="sm" variant="outline" onClick={() => handleEdit(bank, "banks")}><Edit className="w-4 h-4" /></Button>
+                           )}
+                           {hasAnyPermission(["banks.delete", "system.admin"]) && (
+                             <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(bank, "Bank")}><Trash2 className="w-4 h-4" /></Button>
+                           )}
+                         </div>
                       </div>
                     </div>
                   ))}
@@ -894,18 +844,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar RMV..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredRMVs.map(rmv => (
                     <div key={rmv.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -982,18 +920,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar AFP..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredAFPs.map(afp => (
                     <div key={afp.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -1004,9 +930,7 @@ export default function MasterDataManagement() {
                             {afp.code && (
                               <Badge className="bg-teal-100 text-teal-700">{afp.code}</Badge>
                             )}
-                            {!afp.is_active && (
-                              <Badge className="bg-red-100 text-red-700">Inactiva</Badge>
-                            )}
+                            <Badge className={afp.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{afp.is_active !== false ? "Activa" : "Inactiva"}</Badge>
                           </div>
                           <div className="grid grid-cols-3 gap-4 text-sm">
                             <div className="p-2 bg-blue-50 rounded">
@@ -1026,27 +950,17 @@ export default function MasterDataManagement() {
                             <p className="text-sm text-slate-600 mt-2">{afp.notes}</p>
                           )}
                         </div>
-                        <div className="flex gap-2">
-                          {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(afp, "afp")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(afp, "AFP")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
+                        <div className="flex items-center gap-2">
+                           {hasAnyPermission(["system.admin"]) && (
+                             <Switch checked={afp.is_active !== false} onCheckedChange={() => handleToggleStatus(afp, "AFP")} title={afp.is_active !== false ? "Desactivar" : "Activar"} />
+                           )}
+                           {hasAnyPermission(["system.admin"]) && (
+                             <Button size="sm" variant="outline" onClick={() => handleEdit(afp, "afp")}><Edit className="w-4 h-4" /></Button>
+                           )}
+                           {hasAnyPermission(["system.admin"]) && (
+                             <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(afp, "AFP")}><Trash2 className="w-4 h-4" /></Button>
+                           )}
+                         </div>
                       </div>
                     </div>
                   ))}
@@ -1077,18 +991,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar profesión..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {filteredProfessions.map(prof => (
                     <div key={prof.id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-all">
@@ -1099,32 +1001,20 @@ export default function MasterDataManagement() {
                             {prof.category && (
                               <Badge className="bg-cyan-100 text-cyan-700">{prof.category}</Badge>
                             )}
-                            {!prof.is_active && (
-                              <Badge className="bg-red-100 text-red-700">Inactiva</Badge>
-                            )}
+                            <Badge className={prof.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{prof.is_active !== false ? "Activa" : "Inactiva"}</Badge>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(prof, "professions")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(prof, "Profession")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
+                        <div className="flex items-center gap-2">
+                           {hasAnyPermission(["system.admin"]) && (
+                             <Switch checked={prof.is_active !== false} onCheckedChange={() => handleToggleStatus(prof, "Profession")} title={prof.is_active !== false ? "Desactivar" : "Activar"} />
+                           )}
+                           {hasAnyPermission(["system.admin"]) && (
+                             <Button size="sm" variant="outline" onClick={() => handleEdit(prof, "professions")}><Edit className="w-4 h-4" /></Button>
+                           )}
+                           {hasAnyPermission(["system.admin"]) && (
+                             <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(prof, "Profession")}><Trash2 className="w-4 h-4" /></Button>
+                           )}
+                         </div>
                       </div>
                     </div>
                   ))}
@@ -1155,18 +1045,6 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <Input
-                      placeholder="Buscar centro de costos..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
                 {["Administración", "Ventas", "Transportes", "Oxapampa", "Lima - VES", "Operaciones Generales"].map(category => {
                   const categoryCenters = filteredCostCenters.filter(c => c.category === category);
                   if (categoryCenters.length === 0) return null;
@@ -1183,29 +1061,17 @@ export default function MasterDataManagement() {
                               <div className="flex items-center gap-3">
                                 <Badge className="bg-rose-100 text-rose-700 font-mono">{cc.code}</Badge>
                                 <span className="font-medium text-slate-900">{cc.name}</span>
-                                {!cc.is_active && (
-                                  <Badge className="bg-red-100 text-red-700">Inactivo</Badge>
-                                )}
+                                <Badge className={cc.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{cc.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                               </div>
-                              <div className="flex gap-2">
+                              <div className="flex items-center gap-2">
                                 {hasAnyPermission(["system.admin"]) && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleEdit(cc, "costcenters")}
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </Button>
+                                  <Switch checked={cc.is_active !== false} onCheckedChange={() => handleToggleStatus(cc, "CostCenter")} title={cc.is_active !== false ? "Desactivar" : "Activar"} />
                                 )}
                                 {hasAnyPermission(["system.admin"]) && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-red-600"
-                                    onClick={() => handleDelete(cc, "CostCenter")}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => handleEdit(cc, "costcenters")}><Edit className="w-4 h-4" /></Button>
+                                )}
+                                {hasAnyPermission(["system.admin"]) && (
+                                  <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(cc, "CostCenter")}><Trash2 className="w-4 h-4" /></Button>
                                 )}
                               </div>
                             </div>
@@ -1251,32 +1117,20 @@ export default function MasterDataManagement() {
                               {seguro.age_range_start}-{seguro.age_range_end === 1000 ? "más" : seguro.age_range_end} años
                             </h4>
                             <Badge className="bg-red-100 text-red-700">{seguro.commercial_rate}%</Badge>
-                            {!seguro.is_active && (
-                              <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>
-                            )}
+                            <Badge className={seguro.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{seguro.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
-                        </div>
-                        <div className="flex gap-2">
+                          </div>
+                          <div className="flex items-center gap-2">
                           {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(seguro, "segurovida")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
+                            <Switch checked={seguro.is_active !== false} onCheckedChange={() => handleToggleStatus(seguro, "SeguroVidaLey")} title={seguro.is_active !== false ? "Desactivar" : "Activar"} />
                           )}
                           {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(seguro, "SeguroVidaLey")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(seguro, "segurovida")}><Edit className="w-4 h-4" /></Button>
                           )}
-                        </div>
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(seguro, "SeguroVidaLey")}><Trash2 className="w-4 h-4" /></Button>
+                          )}
+                          </div>
                       </div>
                     </div>
                   ))}
@@ -1318,32 +1172,20 @@ export default function MasterDataManagement() {
                             {uit.year === new Date().getFullYear() && (
                               <Badge className="bg-green-100 text-green-700">Vigente</Badge>
                             )}
-                            {!uit.is_active && (
-                              <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>
-                            )}
+                            <Badge className={uit.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{uit.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                           </div>
-                        </div>
-                        <div className="flex gap-2">
+                          </div>
+                          <div className="flex items-center gap-2">
                           {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEdit(uit, "uit")}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
+                            <Switch checked={uit.is_active !== false} onCheckedChange={() => handleToggleStatus(uit, "UIT")} title={uit.is_active !== false ? "Desactivar" : "Activar"} />
                           )}
                           {hasAnyPermission(["system.admin"]) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={() => handleDelete(uit, "UIT")}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(uit, "uit")}><Edit className="w-4 h-4" /></Button>
                           )}
-                        </div>
+                          {hasAnyPermission(["system.admin"]) && (
+                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(uit, "UIT")}><Trash2 className="w-4 h-4" /></Button>
+                          )}
+                          </div>
                       </div>
                     </div>
                   ))}
@@ -1376,18 +1218,6 @@ export default function MasterDataManagement() {
               <CardContent className="p-6">
                 <div className="mb-6">
                   <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex-1 min-w-64">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-                        <Input
-                          placeholder="Buscar cuenta contable..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
-
                     <Select value={elementoFilter} onValueChange={setElementoFilter}>
                       <SelectTrigger className="w-48">
                         <SelectValue placeholder="Elemento" />
@@ -1426,29 +1256,17 @@ export default function MasterDataManagement() {
                               <div className="flex items-center gap-3">
                                 <Badge className="bg-emerald-100 text-emerald-700 font-mono">{acc.cuenta}</Badge>
                                 <span className="font-medium text-slate-900">{acc.nombre}</span>
-                                {!acc.is_active && (
-                                  <Badge className="bg-red-100 text-red-700">Inactiva</Badge>
-                                )}
+                                <Badge className={acc.is_active !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{acc.is_active !== false ? "Activa" : "Inactiva"}</Badge>
                               </div>
-                              <div className="flex gap-2">
+                              <div className="flex items-center gap-2">
                                 {hasAnyPermission(["system.admin"]) && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleEdit(acc, "accountingaccounts")}
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </Button>
+                                  <Switch checked={acc.is_active !== false} onCheckedChange={() => handleToggleStatus(acc, "AccountingAccount")} title={acc.is_active !== false ? "Desactivar" : "Activar"} />
                                 )}
                                 {hasAnyPermission(["system.admin"]) && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-red-600"
-                                    onClick={() => handleDelete(acc, "AccountingAccount")}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => handleEdit(acc, "accountingaccounts")}><Edit className="w-4 h-4" /></Button>
+                                )}
+                                {hasAnyPermission(["system.admin"]) && (
+                                  <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(acc, "AccountingAccount")}><Trash2 className="w-4 h-4" /></Button>
                                 )}
                               </div>
                             </div>
@@ -1475,23 +1293,25 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar tipo de incidente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
                 <div className="space-y-2">
-                  {incidentTypes.filter(t => t.name?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                  {incidentTypes.filter(t => t.name?.toLowerCase().includes(searchTerm.toLowerCase()) && filterByStatus(t)).map(item => (
                     <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
                       <div className="flex items-center gap-3">
                         <span className="font-medium text-slate-900">{item.name}</span>
                         <Badge className={item.affectation === "Permiso" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>{item.affectation}</Badge>
-                        {item.is_active === false && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                        <Badge className={item.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                       </div>
-                      <div className="flex gap-1.5">
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "incidenttypes")}><Edit className="w-3.5 h-3.5" /></Button>
-                        )}
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "IncidentType")}><Trash2 className="w-3.5 h-3.5" /></Button>
-                        )}
-                      </div>
+                      <div className="flex items-center gap-1.5">
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Switch checked={item.is_active !== false} onCheckedChange={() => handleToggleStatus(item, "IncidentType")} />
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" onClick={() => handleEdit(item, "incidenttypes")}><Edit className="w-3.5 h-3.5" /></Button>
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "IncidentType")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                         )}
+                       </div>
                     </div>
                   ))}
                 </div>
@@ -1513,23 +1333,25 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar tipo de préstamo..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
                 <div className="space-y-2">
-                  {loanTypes.filter(t => t.name?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                  {loanTypes.filter(t => t.name?.toLowerCase().includes(searchTerm.toLowerCase()) && filterByStatus(t)).map(item => (
                     <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
                       <div className="flex items-center gap-3">
                         <span className="font-medium text-slate-900">{item.name}</span>
                         {item.description && <span className="text-sm text-slate-500">{item.description}</span>}
-                        {item.is_active === false && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                        <Badge className={item.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                       </div>
-                      <div className="flex gap-1.5">
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "loantypes")}><Edit className="w-3.5 h-3.5" /></Button>
-                        )}
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "LoanType")}><Trash2 className="w-3.5 h-3.5" /></Button>
-                        )}
-                      </div>
+                      <div className="flex items-center gap-1.5">
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Switch checked={item.is_active !== false} onCheckedChange={() => handleToggleStatus(item, "LoanType")} />
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" onClick={() => handleEdit(item, "loantypes")}><Edit className="w-3.5 h-3.5" /></Button>
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "LoanType")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                         )}
+                       </div>
                     </div>
                   ))}
                 </div>
@@ -1551,24 +1373,108 @@ export default function MasterDataManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" /><Input placeholder="Buscar categoría..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
                 <div className="space-y-2">
-                  {costCenterCategories.filter(c => c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || c.code?.toLowerCase().includes(searchTerm.toLowerCase())).map(item => (
+                  {costCenterCategories.filter(c => (c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || c.code?.toLowerCase().includes(searchTerm.toLowerCase())) && filterByStatus(c)).map(item => (
                     <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
                       <div className="flex items-center gap-3">
                         {item.code && <Badge className="bg-rose-100 text-rose-700 font-mono">{item.code}</Badge>}
                         <span className="font-medium text-slate-900">{item.name}</span>
                         {item.description && <span className="text-sm text-slate-500">{item.description}</span>}
-                        {item.is_active === false && <Badge className="bg-gray-100 text-gray-700">Inactivo</Badge>}
+                        <Badge className={item.is_active !== false ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.is_active !== false ? "Activo" : "Inactivo"}</Badge>
                       </div>
-                      <div className="flex gap-1.5">
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(item, "costcentercategories")}><Edit className="w-3.5 h-3.5" /></Button>
-                        )}
-                        {hasAnyPermission(["system.admin"]) && (
-                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "CostCenterCategory")}><Trash2 className="w-3.5 h-3.5" /></Button>
-                        )}
+                      <div className="flex items-center gap-1.5">
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Switch checked={item.is_active !== false} onCheckedChange={() => handleToggleStatus(item, "CostCenterCategory")} />
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" onClick={() => handleEdit(item, "costcentercategories")}><Edit className="w-3.5 h-3.5" /></Button>
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "CostCenterCategory")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                         )}
+                       </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="subdiarios" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Subdiarios Contables</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">Subdiarios para clasificación de asientos contables</p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button onClick={() => handleCreate("subdiarios")} className="bg-indigo-600 hover:bg-indigo-700"><Plus className="w-4 h-4 mr-2" />Nuevo Subdiario</Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-2">
+                  {subdiarios.filter(s => (s.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) || s.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())) && filterByStatus(s)).map(item => (
+                    <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <Badge className="bg-indigo-100 text-indigo-700 font-mono">{item.codigo}</Badge>
+                        <span className="font-medium text-slate-900">{item.descripcion}</span>
+                        {item.nombre_breve && <span className="text-xs text-slate-400">{item.nombre_breve}</span>}
+                        {item.codigo_sunat && <Badge className="bg-slate-100 text-slate-600 font-mono text-xs">{item.codigo_sunat}</Badge>}
+                        <Badge className={item.estado !== "I" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.estado !== "I" ? "Activo" : "Inactivo"}</Badge>
                       </div>
+                      <div className="flex items-center gap-1.5">
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Switch checked={item.estado !== "I"} onCheckedChange={() => handleToggleStatus(item, "Subdiario")} />
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" onClick={() => handleEdit(item, "subdiarios")}><Edit className="w-3.5 h-3.5" /></Button>
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "Subdiario")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                         )}
+                       </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="tiposanexo" className="space-y-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold">Tipos de Anexo</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">P=Proveedor · C=Cliente · T=Trabajador · O=Otros</p>
+                  </div>
+                  {hasAnyPermission(["system.admin"]) && (
+                    <Button onClick={() => handleCreate("tiposanexo")} className="bg-indigo-600 hover:bg-indigo-700"><Plus className="w-4 h-4 mr-2" />Nuevo Tipo Anexo</Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-2">
+                  {tiposAnexo.filter(t => (t.codigo_tipo_anexo?.toLowerCase().includes(searchTerm.toLowerCase()) || t.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())) && filterByStatus(t)).map(item => (
+                    <div key={item.id} className="p-3 border border-slate-200 rounded-lg flex items-center justify-between hover:shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <Badge className="bg-amber-100 text-amber-700 font-mono font-bold">{item.codigo_tipo_anexo}</Badge>
+                        <span className="font-medium text-slate-900">{item.descripcion}</span>
+                        <Badge className={item.estado !== "I" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>{item.estado !== "I" ? "Activo" : "Inactivo"}</Badge>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Switch checked={item.estado !== "I"} onCheckedChange={() => handleToggleStatus(item, "TipoAnexo")} />
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" onClick={() => handleEdit(item, "tiposanexo")}><Edit className="w-3.5 h-3.5" /></Button>
+                         )}
+                         {hasAnyPermission(["system.admin"]) && (
+                           <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDelete(item, "TipoAnexo")}><Trash2 className="w-3.5 h-3.5" /></Button>
+                         )}
+                       </div>
                     </div>
                   ))}
                 </div>
