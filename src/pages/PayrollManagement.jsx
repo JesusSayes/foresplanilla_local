@@ -1485,20 +1485,29 @@ export default function PayrollManagement() {
                                             </>
                                           )}
                                         </div>
+                                        {/* Botón Ver Boleta individual */}
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 shrink-0 text-xs"
+                                          onClick={() => setPreviewPayslip(payslip)}
+                                        >
+                                          <Eye className="w-3 h-3 mr-1" />Ver Boleta
+                                        </Button>
                                         {/* Botón eliminar del trabajador de la planilla */}
                                         {!allPagada && (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="text-red-500 border-red-200 hover:bg-red-50 shrink-0 text-xs"
-                                            onClick={() => {
-                                              if (window.confirm(`¿Eliminar a ${emp.first_name} ${emp.last_name} de esta planilla?`)) {
-                                                removeOnePayslipMutation.mutate(payslip.id);
-                                              }
-                                            }}
-                                          >
-                                            ✕ Quitar
-                                          </Button>
+                                         <Button
+                                           size="sm"
+                                           variant="outline"
+                                           className="text-red-500 border-red-200 hover:bg-red-50 shrink-0 text-xs"
+                                           onClick={() => {
+                                             if (window.confirm(`¿Eliminar a ${emp.first_name} ${emp.last_name} de esta planilla?`)) {
+                                               removeOnePayslipMutation.mutate(payslip.id);
+                                             }
+                                           }}
+                                         >
+                                           ✕ Quitar
+                                         </Button>
                                         )}
                                       </div>
                                     );
