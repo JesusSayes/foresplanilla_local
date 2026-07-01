@@ -3,8 +3,9 @@ import { safePayrollNumber } from "@/lib/payrollUtils";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Printer, Copy } from "lucide-react";
+import { Printer, Copy, AlertTriangle, ExternalLink } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { Link } from "react-router-dom";
 
 const fmt = (val) => safePayrollNumber(val).toFixed(2);
 
@@ -21,10 +22,27 @@ function toHorasMinutos(decimalHours) {
 }
 
 /**
+ * Dado un nombre de concepto, busca su concept_code en la lista de PayrollConcepts.
+ * Busca por nombre exacto (case-insensitive) primero, luego parcial.
+ * Retorna { code, conceptId } o { code: "", conceptId: null } si no encuentra.
+ */
+function lookupCode(conceptName, conceptsMap) {
+  if (!conceptName || !conceptsMap) return { code: "", conceptId: null };
+  const nameNorm = conceptName.toLowerCase().trim();
+  // Búsqueda exacta
+  let found = conceptsMap.find(c => c.concept_name?.toLowerCase().trim() === nameNorm);
+  // Búsqueda parcial si no hay exacta
+  if (!found) found = conceptsMap.find(c => nameNorm.includes(c.concept_name?.toLowerCase().trim()) || c.concept_name?.toLowerCase().trim().includes(nameNorm));
+  if (found) return { code: found.concept_code || "", conceptId: found.id };
+  return { code: "", conceptId: null };
+}
+
+/**
  * Construye la lista dinámica de conceptos a mostrar en la boleta.
+ * El código se toma siempre del PayrollConcept correspondiente (por nombre).
  * Prioridad: calculation_summary (breakdown) → campos fijos del payslip.
  */
-function buildConceptRows(payslip) {
+function buildConceptRows(payslip, conceptsMap = []) {
   const ingresos      = [];
   const descuentos    = [];
   const aportTrab     = [];
@@ -37,17 +55,19 @@ function buildConceptRows(payslip) {
     (summary.breakdown.incomes?.items || []).forEach(item => {
       const amt = safePayrollNumber(item.amount);
       if (amt === 0 && !item.always_show) return;
-      ingresos.push({ code: item.plame_code || "", label: item.name, amount: amt });
+      const { code, conceptId } = lookupCode(item.name, conceptsMap);
+      ingresos.push({ code, label: item.name, amount: amt, conceptId, missingCode: !code });
     });
 
     // ── Descuentos desde el motor ────────────────────────────────────────
     (summary.breakdown.deductions?.items || []).forEach(item => {
       const amt = safePayrollNumber(item.amount);
+      const { code, conceptId } = lookupCode(item.name, conceptsMap);
       const isAportTrab = item.category === "Aportes del Trabajador" || item.is_worker_contribution;
       if (isAportTrab) {
-        aportTrab.push({ code: item.plame_code || "", label: item.name, amount: amt });
+        aportTrab.push({ code, label: item.name, amount: amt, conceptId, missingCode: !code });
       } else {
-        descuentos.push({ code: item.plame_code || "", label: item.name, amount: amt });
+        descuentos.push({ code, label: item.name, amount: amt, conceptId, missingCode: !code });
       }
     });
 
@@ -56,7 +76,8 @@ function buildConceptRows(payslip) {
     if (advanceAmt > 0) {
       const alreadyIncluded = descuentos.some(d => d.label.toLowerCase().includes("quincenal") || d.label.toLowerCase().includes("adelanto"));
       if (!alreadyIncluded) {
-        descuentos.unshift({ code: "0701", label: "ADELANTO / PLANILLA QUINCENAL", amount: advanceAmt });
+        const { code, conceptId } = lookupCode("Adelanto Quincenal", conceptsMap);
+        descuentos.unshift({ code, label: "ADELANTO / PLANILLA QUINCENAL", amount: advanceAmt, conceptId, missingCode: !code });
       }
     }
 
@@ -64,55 +85,62 @@ function buildConceptRows(payslip) {
     (summary.breakdown.contributions?.items || []).forEach(item => {
       const amt = safePayrollNumber(item.amount);
       if (amt === 0) return;
-      aportEmpl.push({ code: item.plame_code || "", label: item.name, amount: amt });
+      const { code, conceptId } = lookupCode(item.name, conceptsMap);
+      aportEmpl.push({ code, label: item.name, amount: amt, conceptId, missingCode: !code });
     });
   }
 
   // ── Fallback a campos fijos si el motor no proporcionó datos ─────────
   if (ingresos.length === 0) {
     const fixed = [
-      { code: "0121", field: "base_salary",      label: "REMUNERACIÓN O JORNAL BÁSICO" },
-      { code: "0114", field: "family_allowance",  label: "ASIGNACIÓN FAMILIAR" },
-      { code: "0201", field: "overtime_pay",      label: "HORAS EXTRAS" },
-      { code: "0313", field: "bonuses",           label: "BONIFICACIONES" },
-      { code: "0401", field: "commissions",       label: "COMISIONES" },
-      { code: "1004", field: "other_income",      label: "OTROS INGRESOS" },
+      { field: "base_salary",     label: "REMUNERACIÓN O JORNAL BÁSICO", lookupName: "Remuneración Básica" },
+      { field: "family_allowance", label: "ASIGNACIÓN FAMILIAR",          lookupName: "Asignación Familiar" },
+      { field: "overtime_pay",    label: "HORAS EXTRAS",                  lookupName: "Horas Extras al 25%" },
+      { field: "bonuses",         label: "BONIFICACIONES",                lookupName: "Bonificación por Movilidad" },
+      { field: "commissions",     label: "COMISIONES",                    lookupName: "Comisiones" },
+      { field: "other_income",    label: "OTROS INGRESOS",               lookupName: "otros ingresos" },
     ];
-    fixed.forEach(({ code, field, label }) => {
+    fixed.forEach(({ field, label, lookupName }) => {
       const amt = safePayrollNumber(payslip[field]);
-      if (field === "base_salary" || amt > 0)
-        ingresos.push({ code, label, amount: amt });
+      if (field === "base_salary" || amt > 0) {
+        const { code, conceptId } = lookupCode(lookupName, conceptsMap);
+        ingresos.push({ code, label, amount: amt, conceptId, missingCode: !code });
+      }
     });
   }
 
   if (descuentos.length === 0 && aportTrab.length === 0) {
     const fixedDesc = [
-      { code: "0701", field: "advance_deduction",  label: "ADELANTO / PLANILLA QUINCENAL",        worker: false },
-      { code: "0702", field: "loan_deduction",     label: "PRÉSTAMOS",                             worker: false },
-      { code: "0706", field: "tardiness_discount", label: "DESC. POR TARDANZAS",                   worker: false },
-      { code: "0707", field: "absence_discount",   label: "DESC. POR INASISTENCIAS",               worker: false },
-      { code: "0799", field: "other_deductions",   label: "OTROS DESCUENTOS",                      worker: false },
-      { code: "0608", field: "pension_deduction",  label: "AFP/ONP - APORTACIÓN OBLIGATORIA",      worker: true  },
-      { code: "0605", field: "income_tax",         label: "RENTA QUINTA CATEGORÍA RETENCIONES",    worker: true  },
-      { code: "0606", field: "health_insurance",   label: "PRIMA DE SEGURO / SEGURO DE SALUD",     worker: true  },
+      { field: "advance_deduction",  label: "ADELANTO / PLANILLA QUINCENAL",       lookupName: "Adelanto Quincenal",              worker: false },
+      { field: "loan_deduction",     label: "PRÉSTAMOS",                            lookupName: "Préstamos",                        worker: false },
+      { field: "tardiness_discount", label: "DESC. POR TARDANZAS",                  lookupName: "Descuento por Tardanzas",          worker: false },
+      { field: "absence_discount",   label: "DESC. POR INASISTENCIAS",              lookupName: "Descuento por Inasistencias",      worker: false },
+      { field: "other_deductions",   label: "OTROS DESCUENTOS",                     lookupName: "otros descuentos",                 worker: false },
+      { field: "pension_deduction",  label: "AFP/ONP - APORTACIÓN OBLIGATORIA",     lookupName: "AFP - Aporte Obligatorio",         worker: true  },
+      { field: "income_tax",         label: "RENTA QUINTA CATEGORÍA RETENCIONES",   lookupName: "Impuesto a la Renta 5ta Categoría",worker: true  },
+      { field: "health_insurance",   label: "PRIMA DE SEGURO / SEGURO DE SALUD",    lookupName: "SCTR Salud",                       worker: true  },
     ];
-    fixedDesc.forEach(({ code, field, label, worker }) => {
+    fixedDesc.forEach(({ field, label, lookupName, worker }) => {
       const amt = safePayrollNumber(payslip[field]);
       if (amt === 0) return;
-      (worker ? aportTrab : descuentos).push({ code, label, amount: amt });
+      const { code, conceptId } = lookupCode(lookupName, conceptsMap);
+      (worker ? aportTrab : descuentos).push({ code, label, amount: amt, conceptId, missingCode: !code });
     });
   }
 
   if (aportEmpl.length === 0) {
     const fixedEmpl = [
-      { code: "0803", field: "seg_vida_ley",      label: "PÓLIZA DE SEGURO - D. LEG. 688" },
-      { code: "0804", field: "essalud_employer",  label: "ESSALUD (REGULAR CBSSP AGRAR/AC)TRAB" },
-      { code: "0805", field: "sctr_pension",      label: "SCTR PENSIONES" },
-      { code: "0814", field: "sctr_salud",        label: "COMPAÑÍA SEGURO - SCTR" },
+      { field: "seg_vida_ley",     label: "PÓLIZA DE SEGURO - D. LEG. 688",          lookupName: "Seguro Vida Ley" },
+      { field: "essalud_employer", label: "ESSALUD (REGULAR CBSSP AGRAR/AC)TRAB",    lookupName: "ESSALUD" },
+      { field: "sctr_pension",     label: "SCTR PENSIONES",                           lookupName: "SCTR Pensión" },
+      { field: "sctr_salud",       label: "COMPAÑÍA SEGURO - SCTR",                   lookupName: "SCTR Salud" },
     ];
-    fixedEmpl.forEach(({ code, field, label }) => {
+    fixedEmpl.forEach(({ field, label, lookupName }) => {
       const amt = safePayrollNumber(payslip[field]);
-      if (amt > 0) aportEmpl.push({ code, label, amount: amt });
+      if (amt > 0) {
+        const { code, conceptId } = lookupCode(lookupName, conceptsMap);
+        aportEmpl.push({ code, label, amount: amt, conceptId, missingCode: !code });
+      }
     });
   }
 
@@ -121,7 +149,7 @@ function buildConceptRows(payslip) {
 
 // ── Generador de HTML para impresión (R08 fiel) ──────────────────────────────
 
-function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "" }) {
+function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "", conceptsMap = [] }) {
   const ci = company || { company_name: "Empresa", ruc: "00000000000", address: "" };
   const emp = employee || {};
 
@@ -129,7 +157,7 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "" 
     ? `<img src="${ci.logo_url}" alt="Logo" style="height:40px;object-fit:contain;" />`
     : "";
 
-  const { ingresos, descuentos, aportTrab, aportEmpl } = buildConceptRows(payslip);
+  const { ingresos, descuentos, aportTrab, aportEmpl } = buildConceptRows(payslip, conceptsMap);
 
   const netoPay = safePayrollNumber(payslip.net_pay);
   const jornada = toHorasMinutos(payslip.regular_hours || 0);
@@ -304,12 +332,18 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "" 
 export default function PayslipPreview({ payslip, employee, companyInfo, showPrintButton = true }) {
   const [copies, setCopies] = useState(1);
   const [afpMap, setAfpMap] = useState({});
+  const [conceptsMap, setConceptsMap] = useState([]);
 
   useEffect(() => {
     base44.entities.AFP.list().then(afps => {
       const map = {};
       afps.forEach(a => { map[a.id] = a.name; });
       setAfpMap(map);
+    }).catch(() => {});
+
+    // Cargar todos los conceptos de planilla para mapear códigos
+    base44.entities.PayrollConcept.list().then(concepts => {
+      setConceptsMap(concepts || []);
     }).catch(() => {});
   }, []);
 
@@ -318,14 +352,14 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
   const afpName = emp.afp_id ? (afpMap[emp.afp_id] || emp.afp_id) : "";
 
   const handlePrint = () => {
-    const html = buildBoletaHTML({ payslip, employee: emp, company: ci, copies, afpName });
+    const html = buildBoletaHTML({ payslip, employee: emp, company: ci, copies, afpName, conceptsMap });
     const win = window.open("", "_blank");
     if (!win) { alert("Permite las ventanas emergentes para imprimir."); return; }
     win.document.write(html);
     win.document.close();
   };
 
-  const { ingresos, descuentos, aportTrab, aportEmpl } = buildConceptRows(payslip);
+  const { ingresos, descuentos, aportTrab, aportEmpl } = buildConceptRows(payslip, conceptsMap);
   const jornada = toHorasMinutos(payslip.regular_hours || 0);
   const sobret  = toHorasMinutos(payslip.overtime_hours || 0);
 
@@ -352,6 +386,42 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
           </Button>
         </div>
       )}
+
+      {/* ── Alertas de códigos faltantes ── */}
+      {(() => {
+        const allRows = [...ingresos, ...descuentos, ...aportTrab, ...aportEmpl];
+        const missing = allRows.filter(r => r.missingCode);
+        if (missing.length === 0) return null;
+        return (
+          <div className="mx-5 mt-4 mb-1 bg-amber-50 border border-amber-300 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs font-bold text-amber-800 mb-1">
+                  {missing.length} concepto{missing.length > 1 ? "s" : ""} sin código configurado:
+                </p>
+                <ul className="space-y-1">
+                  {missing.map((r, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2 text-xs text-amber-700">
+                      <span>• <strong>{r.label}</strong></span>
+                      <Link
+                        to="/PayrollConcepts"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 hover:bg-amber-200 border border-amber-400 rounded text-amber-800 font-medium transition-colors"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Agregar código
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-amber-600 mt-2">
+                  Ve a <strong>Conceptos de Planilla</strong>, edita el concepto y completa el campo <strong>"Código"</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Cabecera empresa ── */}
       <div className="flex items-start justify-between px-5 pt-4 pb-3 border-b border-slate-200">
