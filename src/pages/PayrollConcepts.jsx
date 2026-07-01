@@ -706,19 +706,6 @@ export default function PayrollConcepts() {
     aportaciones: payrollConcepts.filter(c => c.concept_type === "Aportación").length,
   };
 
-  if (!employee || employee.role !== "admin") {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <Card className="max-w-md">
-          <CardContent className="p-8 text-center">
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
-            <p className="text-slate-600">Solo administradores pueden gestionar conceptos</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
