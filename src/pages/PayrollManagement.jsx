@@ -493,7 +493,7 @@ export default function PayrollManagement() {
         );
         // Si no está en cache, hacer consulta fresca a la BD
         if (!quincenalPayslip) {
-          const freshQuincenales = await base44.entities.Payslip.filter({
+          const freshQuincenales = await entitiesAPI.Payslip.filter({
             employee_id: emp.id,
             payroll_type: "Quincenal",
             month: selectedMonth,

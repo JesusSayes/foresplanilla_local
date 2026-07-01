@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Printer, Copy, AlertTriangle, ExternalLink } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { Link } from "react-router-dom";
 
 const fmt = (val) => safePayrollNumber(val).toFixed(2);
@@ -340,14 +340,14 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
   const [conceptsMap, setConceptsMap] = useState([]);
 
   useEffect(() => {
-    base44.entities.AFP.list().then(afps => {
+    entitiesAPI.AFP.list().then(afps => {
       const map = {};
       afps.forEach(a => { map[a.id] = a.name; });
       setAfpMap(map);
     }).catch(() => {});
 
     // Cargar todos los conceptos de planilla para mapear códigos
-    base44.entities.PayrollConcept.list().then(concepts => {
+    entitiesAPI.PayrollConcept.list().then(concepts => {
       setConceptsMap(concepts || []);
     }).catch(() => {});
   }, []);

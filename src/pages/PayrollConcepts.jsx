@@ -16,7 +16,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
-import { uploadFile } from "@/services/uploadService";
+import * as XLSX from "xlsx";
+
+const parseSpreadsheetFile = async (file) => {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+};
 
 // Conceptos predefinidos según legislación peruana
 const PREDEFINED_CONCEPTS = {
@@ -525,44 +532,14 @@ export default function PayrollConcepts() {
 
     setProcessingFile(true);
     try {
-      // const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      const { file_url } = await uploadFile(file);
+      const concepts = await parseSpreadsheetFile(file);
 
-      const extractedData = await base44.integrations.Core.ExtractDataFromUploadedFile({
-        file_url,
-        json_schema: {
-          type: "object",
-          properties: {
-            concepts: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  document_number: { type: "string" },
-                  concept_type: { type: "string" },
-                  concept_category: { type: "string" },
-                  concept_name: { type: "string" },
-                  concept_code: { type: "string" },
-                  description: { type: "string" },
-                  amount: { type: "number" },
-                  is_dynamic: { type: "boolean" },
-                  calculation_formula: { type: "string" },
-                  is_recurring: { type: "boolean" },
-                  is_mandatory: { type: "boolean" },
-                  applies_to_payroll_types: { type: "string" },
-                  notes: { type: "string" },
-                }
-              }
-            }
-          }
-        }
-      });
-
-      if (extractedData.status === "success" && extractedData.output?.concepts) {
-        setUploadPreview(extractedData.output.concepts);
-        toast.success(`${extractedData.output.concepts.length} conceptos cargados para revisión`);
+      if (concepts.length > 0) {
+        setUploadPreview(concepts);
+        setUploadedFile(file);
+        toast.success(`${concepts.length} conceptos cargados para revisión`);
       } else {
-        toast.error("Error al procesar el archivo");
+        toast.error("El archivo está vacío o no contiene conceptos válidos");
       }
     } catch (error) {
       toast.error("Error al cargar el archivo");
