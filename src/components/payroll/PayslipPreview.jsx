@@ -55,15 +55,19 @@ function buildConceptRows(payslip, conceptsMap = []) {
     (summary.breakdown.incomes?.items || []).forEach(item => {
       const amt = safePayrollNumber(item.amount);
       if (amt === 0 && !item.always_show) return;
-      const { code, conceptId } = lookupCode(item.name, conceptsMap);
+      // Usar concept_code del breakdown directamente (viene de la BD via PayrollCalculator)
+      // Si no está, hacer lookup por nombre como fallback
+      const code = item.concept_code || lookupCode(item.name, conceptsMap).code;
+      const conceptId = item.concept_id || lookupCode(item.name, conceptsMap).conceptId;
       ingresos.push({ code, label: item.name, amount: amt, conceptId, missingCode: !code });
     });
 
     // ── Descuentos desde el motor ────────────────────────────────────────
     (summary.breakdown.deductions?.items || []).forEach(item => {
       const amt = safePayrollNumber(item.amount);
-      const { code, conceptId } = lookupCode(item.name, conceptsMap);
-      const isAportTrab = item.category === "Aportes del Trabajador" || item.is_worker_contribution;
+      const code = item.concept_code || lookupCode(item.name, conceptsMap).code;
+      const conceptId = item.concept_id || lookupCode(item.name, conceptsMap).conceptId;
+      const isAportTrab = item.is_worker_contribution;
       if (isAportTrab) {
         aportTrab.push({ code, label: item.name, amount: amt, conceptId, missingCode: !code });
       } else {
@@ -85,7 +89,8 @@ function buildConceptRows(payslip, conceptsMap = []) {
     (summary.breakdown.contributions?.items || []).forEach(item => {
       const amt = safePayrollNumber(item.amount);
       if (amt === 0) return;
-      const { code, conceptId } = lookupCode(item.name, conceptsMap);
+      const code = item.concept_code || lookupCode(item.name, conceptsMap).code;
+      const conceptId = item.concept_id || lookupCode(item.name, conceptsMap).conceptId;
       aportEmpl.push({ code, label: item.name, amount: amt, conceptId, missingCode: !code });
     });
   }
@@ -406,16 +411,16 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
                       <span>• <strong>{r.label}</strong></span>
                       <Link
                         to="/PayrollConcepts"
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 hover:bg-amber-200 border border-amber-400 rounded text-amber-800 font-medium transition-colors"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 hover:bg-amber-200 border border-amber-400 rounded text-amber-800 font-medium transition-colors whitespace-nowrap"
                       >
                         <ExternalLink className="w-3 h-3" />
-                        Agregar código
+                        Editar concepto
                       </Link>
                     </li>
                   ))}
                 </ul>
                 <p className="text-xs text-amber-600 mt-2">
-                  Ve a <strong>Conceptos de Planilla</strong>, edita el concepto y completa el campo <strong>"Código"</strong>.
+                  Ve a <strong>Conceptos de Planilla → Editar</strong> y completa el campo <strong>"Código"</strong> de cada concepto.
                 </p>
               </div>
             </div>
