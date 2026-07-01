@@ -26,7 +26,10 @@ const clean = (str) => String(str ?? "").replace(/[|"'\n\r\t]/g, " ").trim();
 /** Formatea fecha DD/MM/YYYY o vacío */
 const fmtDate = (d) => {
   if (!d) return "";
-  const dt = new Date(d.split("T")[0] + "T00:00:00");
+  const datePart = d instanceof Date
+    ? d.toISOString().split("T")[0]
+    : String(d).split("T")[0];
+  const dt = new Date(datePart + "T00:00:00");
   if (isNaN(dt)) return "";
   return `${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}/${dt.getFullYear()}`;
 };
@@ -74,7 +77,7 @@ const tipoDoc = (type) => {
  * Versión 3.x de SUNAT/MTPE.
  */
 function buildTRegistroRows(employees, afps) {
-  return employees.map(emp => {
+  return asArray(employees).map(emp => {
     const afpRecord = afps.find(a => a.id === emp.afp_id);
     const afpNombre = afpRecord?.name || emp.afp_id || "";
 
@@ -128,7 +131,7 @@ function buildTRegistroRows(employees, afps) {
 function buildPlameRows(payslips, employees, selectedMonth, selectedYear) {
   const rows = [];
 
-  for (const p of payslips) {
+  for (const p of asArray(payslips)) {
     const emp = employees.find(e => e.id === p.employee_id);
     if (!emp) continue;
 
@@ -198,6 +201,8 @@ function buildPlameRows(payslips, employees, selectedMonth, selectedYear) {
 
 // ─── Exportadores ─────────────────────────────────────────────────────────────
 
+const asArray = (value) => Array.isArray(value) ? value : [];
+
 function exportToXLSX(rows, filename, sheetName = "Hoja1") {
   if (!rows || rows.length === 0) { toast.error("No hay datos para exportar"); return; }
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -233,21 +238,24 @@ export default function SunatExport() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [exportFormat, setExportFormat] = useState("xlsx");
 
-  const { data: allEmployees = [] } = useQuery({
+  const { data: employeesData = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: () => entitiesAPI.Employee.filter({}),
   });
 
-  const { data: payslips = [], isLoading: loadingPayslips } = useQuery({
+  const { data: payslipsData = [], isLoading: loadingPayslips } = useQuery({
     queryKey: ["payslips-sunat", selectedMonth, selectedYear],
     queryFn: () => entitiesAPI.Payslip.filter({ month: selectedMonth, year: selectedYear }),
   });
 
-  const { data: afps = [] } = useQuery({
+  const { data: afpsData = [] } = useQuery({
     queryKey: ["afps"],
     queryFn: () => entitiesAPI.AFP.list(),
   });
 
+  const allEmployees = asArray(employeesData);
+  const payslips = asArray(payslipsData);
+  const afps = asArray(afpsData);
   const activeEmployees = allEmployees.filter(e => e.status === "Activo" || e.status === "Suspendido");
   const periodLabel = format(new Date(selectedYear, selectedMonth - 1), "MMMM yyyy", { locale: es });
 
