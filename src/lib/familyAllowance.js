@@ -17,10 +17,10 @@
  */
 export function getFamilyAllowanceEligibility(
   derechohabientes,
-  rmvAmount = 1025,
+  rmvAmount = 1130,
   referenceDate = new Date()
 ) {
-  const allowancePerChild = (rmvAmount || 1025) * 0.10;
+  const allowancePerChild = (rmvAmount || 1130) * 0.10;
   const children = [];
 
   for (const dh of derechohabientes || []) {

@@ -150,7 +150,7 @@ export default function PayrollManagement() {
     queryKey: ["rmv"],
     queryFn: async () => {
       const rmvs = await base44.entities.RMV.filter({ is_active: true }, "-effective_date");
-      return rmvs.length > 0 ? rmvs[0] : { amount: 1025 };
+      return rmvs.length > 0 ? rmvs[0] : { amount: 1130 };
     },
   });
 
@@ -457,7 +457,7 @@ export default function PayrollManagement() {
 
       // Calcular asignación familiar automática basada en derechohabientes
       const empDerechohabientes = derechohabientesMap[emp.id] || [];
-      const familyAllowanceInfo = getFamilyAllowanceEligibility(empDerechohabientes, rmvData?.amount || 1025);
+      const familyAllowanceInfo = getFamilyAllowanceEligibility(empDerechohabientes, rmvData?.amount || 1130);
 
       let conceptsForCalc;
       if (payrollType === "Quincenal") {
@@ -501,7 +501,7 @@ export default function PayrollManagement() {
         }
       }
 
-      const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1025);
+      const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1130);
 
       // Calcular descuentos por asistencia (solo para planillas NO quincenales)
       const lateRecords = empAttendance.filter(r => r.is_late && r.late_minutes > 10);
