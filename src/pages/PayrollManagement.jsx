@@ -485,38 +485,62 @@ export default function PayrollManagement() {
       const tardinessDiscount = payrollType === "Quincenal" ? 0 : roundMoney(lateRecords.length * dailyRate);
       const absenceDiscount = payrollType === "Quincenal" ? 0 : roundMoney(absentRecords.length * dailyRate);
 
-      // Buscar adelanto quincenal si es mensual
+      // Buscar adelanto quincenal si es mensual.
+      // Solo se descuenta a empleados que fueron elegibles para la quincenal
+      // (mismo filtro de cutoff que se usa al generar la planilla quincenal).
       // Se hace una consulta fresca para garantizar que se encuentre incluso si
       // la quincenal fue generada en esta misma sesión sin recarga de página.
       let advanceDeduction = 0;
       let advancePaymentId = null;
       if (payrollType === "Mensual") {
-        // Primero buscar en la cache local (existingPayslips ya cargados)
-        let quincenalPayslip = existingPayslips.find(p => 
-          p.employee_id === emp.id && 
-          p.payroll_type === "Quincenal" &&
-          Number(p.month) === selectedMonth &&
-          Number(p.year) === selectedYear
-        );
-        // Si no está en cache, hacer consulta fresca a la BD
-        if (!quincenalPayslip) {
-          const freshQuincenales = await base44.entities.Payslip.filter({
-            employee_id: emp.id,
-            payroll_type: "Quincenal",
-            month: selectedMonth,
-            year: selectedYear,
-          });
-          quincenalPayslip = freshQuincenales.length > 0 ? freshQuincenales[0] : null;
-        }
-        if (quincenalPayslip) {
-          // Se descuenta el total_income de la quincenal (monto bruto adelantado),
-          // no el net_pay, porque la quincenal no tiene descuentos propios.
-          // Si total_income está disponible y es mayor a 0, usarlo; si no, usar net_pay.
-          const quincenalAmount = safePayrollNumber(quincenalPayslip.total_income) > 0
-            ? safePayrollNumber(quincenalPayslip.total_income)
-            : safePayrollNumber(quincenalPayslip.net_pay);
-          advanceDeduction = quincenalAmount;
-          advancePaymentId = quincenalPayslip.id;
+        // Validar elegibilidad quincenal: el empleado debió ingresar antes del día de corte
+        const cutoffDay = payrollConfig?.quincenal_cutoff_day ?? 7;
+        const wasEligibleForQuincenal = (() => {
+          if (!emp.hire_date) return true; // Sin fecha de ingreso: elegible
+          const [hireYear, hireMonth, hireDay] = emp.hire_date.split("T")[0].split("-").map(Number);
+          if (hireYear < selectedYear) return true;
+          if (hireYear === selectedYear && hireMonth < selectedMonth) return true;
+          if (hireYear === selectedYear && hireMonth === selectedMonth) {
+            return hireDay <= cutoffDay;
+          }
+          return false; // Ingresó en un mes posterior: no elegible
+        })();
+
+        if (wasEligibleForQuincenal) {
+          // Solo considerar boletas quincenales Aprobadas o Pagadas (no borradores)
+          const validStatuses = ["Aprobada", "Pagada"];
+          // Primero buscar en la cache local (existingPayslips ya cargados)
+          let quincenalPayslips = existingPayslips.filter(p =>
+            p.employee_id === emp.id &&
+            p.payroll_type === "Quincenal" &&
+            Number(p.month) === selectedMonth &&
+            Number(p.year) === selectedYear &&
+            validStatuses.includes(p.status)
+          );
+          // Si no está en cache, hacer consulta fresca a la BD
+          if (quincenalPayslips.length === 0) {
+            const freshQuincenales = await base44.entities.Payslip.filter({
+              employee_id: emp.id,
+              payroll_type: "Quincenal",
+              month: selectedMonth,
+              year: selectedYear,
+            });
+            quincenalPayslips = freshQuincenales.filter(p => validStatuses.includes(p.status));
+          }
+          if (quincenalPayslips.length > 0) {
+            // Usar la boleta más reciente si hay múltiples
+            const quincenalPayslip = quincenalPayslips.sort((a, b) =>
+              new Date(b.created_date) - new Date(a.created_date)
+            )[0];
+            // Se descuenta el total_income de la quincenal (monto bruto adelantado),
+            // no el net_pay, porque la quincenal no tiene descuentos propios.
+            // Si total_income está disponible y es mayor a 0, usarlo; si no, usar net_pay.
+            const quincenalAmount = safePayrollNumber(quincenalPayslip.total_income) > 0
+              ? safePayrollNumber(quincenalPayslip.total_income)
+              : safePayrollNumber(quincenalPayslip.net_pay);
+            advanceDeduction = quincenalAmount;
+            advancePaymentId = quincenalPayslip.id;
+          }
         }
       }
 
