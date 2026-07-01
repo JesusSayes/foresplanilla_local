@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { safePayrollNumber } from "@/lib/payrollUtils";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Printer, Copy } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 
 const fmt = (val) => safePayrollNumber(val).toFixed(2);
 
@@ -49,6 +50,15 @@ function buildConceptRows(payslip) {
         descuentos.push({ code: item.plame_code || "", label: item.name, amount: amt });
       }
     });
+
+    // ── Adelanto quincenal (siempre desde el campo del payslip) ──────────
+    const advanceAmt = safePayrollNumber(payslip.advance_deduction);
+    if (advanceAmt > 0) {
+      const alreadyIncluded = descuentos.some(d => d.label.toLowerCase().includes("quincenal") || d.label.toLowerCase().includes("adelanto"));
+      if (!alreadyIncluded) {
+        descuentos.unshift({ code: "0701", label: "ADELANTO / PLANILLA QUINCENAL", amount: advanceAmt });
+      }
+    }
 
     // ── Aportes empleador ────────────────────────────────────────────────
     (summary.breakdown.contributions?.items || []).forEach(item => {
@@ -111,7 +121,7 @@ function buildConceptRows(payslip) {
 
 // ── Generador de HTML para impresión (R08 fiel) ──────────────────────────────
 
-function buildBoletaHTML({ payslip, employee, company, copies = 1 }) {
+function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "" }) {
   const ci = company || { company_name: "Empresa", ruc: "00000000000", address: "" };
   const emp = employee || {};
 
@@ -186,7 +196,7 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1 }) {
         <tr class="data-row">
           <td colspan="2">${safeDateFmt(emp.hire_date, "dd/MM/yyyy")}</td>
           <td colspan="2">${(emp.worker_type || "EMPLEADO").toUpperCase()}</td>
-          <td>${emp.pension_system ? `${emp.pension_system}${emp.afp_id ? " " + emp.afp_id : ""}` : "—"}</td>
+          <td>${emp.pension_system ? `${emp.pension_system}${afpName ? " — " + afpName : ""}` : "—"}</td>
           <td>${emp.cuspp || "—"}</td>
         </tr>
         <tr>
@@ -284,12 +294,22 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1 }) {
 
 export default function PayslipPreview({ payslip, employee, companyInfo, showPrintButton = true }) {
   const [copies, setCopies] = useState(1);
+  const [afpMap, setAfpMap] = useState({});
+
+  useEffect(() => {
+    base44.entities.AFP.list().then(afps => {
+      const map = {};
+      afps.forEach(a => { map[a.id] = a.name; });
+      setAfpMap(map);
+    }).catch(() => {});
+  }, []);
 
   const ci = companyInfo || { company_name: "Empresa", ruc: "00000000000", address: "" };
   const emp = employee || {};
+  const afpName = emp.afp_id ? (afpMap[emp.afp_id] || emp.afp_id) : "";
 
   const handlePrint = () => {
-    const html = buildBoletaHTML({ payslip, employee: emp, company: ci, copies });
+    const html = buildBoletaHTML({ payslip, employee: emp, company: ci, copies, afpName });
     const win = window.open("", "_blank");
     if (!win) { alert("Permite las ventanas emergentes para imprimir."); return; }
     win.document.write(html);
@@ -369,7 +389,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
               <tr>
                 <td className="border border-slate-300 px-2 py-1 font-semibold" colSpan={2}>{safeDateFmt(emp.hire_date, "dd/MM/yyyy")}</td>
                 <td className="border border-slate-300 px-2 py-1 font-semibold" colSpan={2}>{(emp.worker_type || "EMPLEADO").toUpperCase()}</td>
-                <td className="border border-slate-300 px-2 py-1 font-semibold">{emp.pension_system}{emp.afp_id ? ` ${emp.afp_id}` : ""}</td>
+                <td className="border border-slate-300 px-2 py-1 font-semibold">{emp.pension_system}{afpName ? ` — ${afpName}` : ""}</td>
                 <td className="border border-slate-300 px-2 py-1 font-semibold">{emp.cuspp || "—"}</td>
               </tr>
               <tr className="bg-slate-100">

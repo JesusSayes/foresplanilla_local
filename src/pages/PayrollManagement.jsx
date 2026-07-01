@@ -538,6 +538,8 @@ export default function PayrollManagement() {
         payroll_number: payrollNumber,
         advance_payment_id: advancePaymentId,
         worked_days: workedDays,
+        regular_hours: attendanceData.regular_hours,
+        overtime_hours: empAttendance.reduce((sum, r) => sum + (r.overtime_hours_25 || 0) + (r.overtime_hours_35 || 0), 0),
         base_salary: safePayrollNumber(emp.base_salary),
         family_allowance: 0,
         overtime_pay: 0,
