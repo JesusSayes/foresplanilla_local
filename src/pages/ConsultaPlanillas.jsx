@@ -15,7 +15,7 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
-import PayslipPreview, { buildR08HTML } from "../components/payroll/PayslipPreview";
+import PayslipPreview from "../components/payroll/PayslipPreview";
 import PlanillaCompletaView from "../components/payroll/PlanillaCompletaView";
 import ConfigFirmantesModal from "../components/payroll/ConfigFirmantesModal";
 import { safePayrollNumber, formatMoney } from "@/lib/payrollUtils";
@@ -595,44 +595,163 @@ export default function ConsultaPlanillas() {
     );
   }
 
-  // --- Imprimir todas las boletas de un grupo usando el formato R08 ---
+  // --- Imprimir todas las boletas de un grupo de un solo golpe ---
   const handlePrintAllBoletas = (grupo) => {
     const ci = companyInfo || { company_name: "Empresa", ruc: "00000000000", address: "" };
-    // Generar un HTML por boleta con page-break entre ellas
+    const logoHtml = ci.logo_url
+      ? `<img src="${ci.logo_url}" alt="Logo" style="width:48px;height:48px;object-fit:contain;background:white;border-radius:6px;padding:3px;" />`
+      : `<div style="width:48px;height:48px;background:#4f46e5;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:18px;">🏢</div>`;
+
+    const fmt = (v) => safePayrollNumber(v).toFixed(2);
+
     const boletasHTML = grupo.payslips.map(p => {
       const emp = allEmployees.find(e => e.id === p.employee_id);
       if (!emp) return "";
-      // Reusar buildR08HTML pero extraer solo el contenido de la boleta
-      return buildR08HTML({ payslip: p, employee: emp, company: ci, copies: 1 });
+
+      const firmanteGG  = firmantes?.firmante_gg;
+      const firmanteD   = firmantes?.firmante_delegado;
+
+      const incomeRows = [
+        `<tr><td>Remuneración Básica</td><td>S/ ${fmt(p.base_salary)}</td></tr>`,
+        p.family_allowance > 0 ? `<tr><td>Asignación Familiar</td><td>S/ ${fmt(p.family_allowance)}</td></tr>` : "",
+        p.overtime_pay > 0 ? `<tr><td>Horas Extras</td><td>S/ ${fmt(p.overtime_pay)}</td></tr>` : "",
+        p.bonuses > 0 ? `<tr><td>Bonificaciones</td><td>S/ ${fmt(p.bonuses)}</td></tr>` : "",
+        p.commissions > 0 ? `<tr><td>Comisiones</td><td>S/ ${fmt(p.commissions)}</td></tr>` : "",
+        p.other_income > 0 ? `<tr><td>Otros Ingresos</td><td>S/ ${fmt(p.other_income)}</td></tr>` : "",
+      ].filter(Boolean).join("");
+
+      const deductRows = [
+        p.pension_deduction > 0 ? `<tr><td>AFP/ONP</td><td>S/ ${fmt(p.pension_deduction)}</td></tr>` : "",
+        p.health_insurance > 0 ? `<tr><td>Seguro de Salud</td><td>S/ ${fmt(p.health_insurance)}</td></tr>` : "",
+        p.income_tax > 0 ? `<tr><td>Impuesto 5ta Cat.</td><td>S/ ${fmt(p.income_tax)}</td></tr>` : "",
+        p.tardiness_discount > 0 ? `<tr><td>Desc. Tardanzas</td><td>S/ ${fmt(p.tardiness_discount)}</td></tr>` : "",
+        p.absence_discount > 0 ? `<tr><td>Desc. Inasistencias</td><td>S/ ${fmt(p.absence_discount)}</td></tr>` : "",
+        p.advance_deduction > 0 ? `<tr><td>Adelanto Quincenal</td><td>S/ ${fmt(p.advance_deduction)}</td></tr>` : "",
+        p.loan_deduction > 0 ? `<tr><td>Préstamos</td><td>S/ ${fmt(p.loan_deduction)}</td></tr>` : "",
+        p.other_deductions > 0 ? `<tr><td>Otros Descuentos</td><td>S/ ${fmt(p.other_deductions)}</td></tr>` : "",
+      ].filter(Boolean).join("");
+
+      return `
+        <div class="boleta">
+          <div class="header">
+            <div class="header-left">
+              ${logoHtml}
+              <div>
+                <div class="company-name">${ci.company_name}</div>
+                <div class="company-sub">RUC: ${ci.ruc}</div>
+                <div class="company-sub">${ci.address || ""}</div>
+              </div>
+            </div>
+            <div class="header-right">
+              <div class="boleta-title">BOLETA DE PAGO</div>
+              <div class="boleta-period">${p.period || ""}</div>
+              <span class="tipo-badge">${p.payroll_type}</span>
+            </div>
+          </div>
+          <div class="body">
+            <div class="section-title">Información del Trabajador</div>
+            <div class="grid2">
+              <div><span class="lbl">Nombres y Apellidos:</span><span class="val">${emp.first_name} ${emp.last_name}</span></div>
+              <div><span class="lbl">DNI:</span><span class="val">${emp.document_type || ""} ${emp.document_number || ""}</span></div>
+              <div><span class="lbl">Cargo:</span><span class="val">${emp.position || "—"}</span></div>
+              <div><span class="lbl">Área/Depto:</span><span class="val">${emp.department_name || "—"}</span></div>
+              <div><span class="lbl">Tipo Trabajador:</span><span class="val">${emp.worker_type || "Empleado"}</span></div>
+            </div>
+            <div class="metrics">
+              <div class="metric"><span class="mlbl">Días trabajados</span><span class="mval">${p.worked_days || 0}</span></div>
+              <div class="metric"><span class="mlbl">Horas extras</span><span class="mval">${p.overtime_hours || 0}</span></div>
+              <div class="metric"><span class="mlbl">Sistema pensiones</span><span class="mval">${emp.pension_system || "N/A"}</span></div>
+            </div>
+            <div class="two-cols">
+              <div class="col">
+                <div class="col-title green">INGRESOS</div>
+                <table class="items-table">
+                  <tbody>${incomeRows || '<tr><td colspan="2" style="color:#94a3b8;">Sin ingresos</td></tr>'}</tbody>
+                  <tfoot><tr class="total-row green"><td>TOTAL INGRESOS</td><td>S/ ${fmt(p.total_income)}</td></tr></tfoot>
+                </table>
+              </div>
+              <div class="col">
+                <div class="col-title red">DESCUENTOS</div>
+                <table class="items-table">
+                  <tbody>${deductRows || '<tr><td colspan="2" style="color:#94a3b8;">Sin descuentos</td></tr>'}</tbody>
+                  <tfoot><tr class="total-row red"><td>TOTAL DESCUENTOS</td><td>S/ ${fmt(p.total_deductions)}</td></tr></tfoot>
+                </table>
+              </div>
+            </div>
+            <div class="neto-box">
+              <div>
+                <div class="neto-label">NETO A PAGAR</div>
+                <div class="neto-amount">S/ ${fmt(p.net_pay)}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:8pt;color:#64748b;">Fecha de pago:</div>
+                <div style="font-size:9pt;font-weight:600;">${p.payment_date || "—"}</div>
+              </div>
+            </div>
+            ${(firmanteGG || firmanteD) ? `
+            <div class="firmantes">
+              ${firmanteGG ? `<div class="firmante">${firmanteGG.signature_url ? `<img src="${firmanteGG.signature_url}" style="height:36px;object-fit:contain;" />` : '<div style="height:36px;"></div>'}<div class="firma-line"></div><div class="firma-name">${firmanteGG.full_name || ""}</div><div class="firma-role">${firmanteGG.position || "Gerente General"}</div></div>` : ""}
+              ${firmanteD ? `<div class="firmante">${firmanteD.signature_url ? `<img src="${firmanteD.signature_url}" style="height:36px;object-fit:contain;" />` : '<div style="height:36px;"></div>'}<div class="firma-line"></div><div class="firma-name">${firmanteD.full_name || ""}</div><div class="firma-role">${firmanteD.position || "Delegado"}</div></div>` : ""}
+            </div>` : ""}
+            <div class="footer-note">Documento generado automáticamente — Para consultas, contacte a Recursos Humanos</div>
+          </div>
+        </div>
+      `;
     }).join("");
 
-    // Combinar en un único documento con page-break
-    const combined = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"/>
-<title>Boletas ${grupo.period} - ${grupo.payroll_type}</title>
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><title>Boletas ${grupo.period} - ${grupo.payroll_type}</title>
 <style>
-  @page { size: A4 portrait; margin: 12mm; }
+  @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: Arial, sans-serif; font-size: 8pt; color: #000; margin: 0; }
-  .page-break { page-break-after: always; }
+  body { font-family: Arial, sans-serif; font-size: 9pt; color: #1e293b; margin: 0; }
+  .boleta { page-break-after: always; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
+  .boleta:last-child { page-break-after: auto; }
+  .header { background: linear-gradient(135deg,#4f46e5,#2563eb); color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .company-name { font-size: 12pt; font-weight: 700; }
+  .company-sub { font-size: 7.5pt; color: #c7d2fe; }
+  .header-right { text-align: right; }
+  .boleta-title { font-size: 13pt; font-weight: 700; }
+  .boleta-period { font-size: 8.5pt; color: #c7d2fe; }
+  .tipo-badge { display: inline-block; background: white; color: #4f46e5; padding: 1px 8px; border-radius: 10px; font-size: 7.5pt; font-weight: 700; margin-top: 3px; }
+  .body { padding: 12px 16px; }
+  .section-title { font-size: 9pt; font-weight: 700; color: #0f172a; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 3px; margin-bottom: 6px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; font-size: 8pt; margin-bottom: 8px; }
+  .lbl { color: #64748b; margin-right: 4px; }
+  .val { font-weight: 600; }
+  .metrics { display: flex; gap: 10px; margin-bottom: 8px; }
+  .metric { flex: 1; text-align: center; background: #f8fafc; border-radius: 5px; padding: 5px 4px; }
+  .mlbl { display: block; font-size: 7pt; color: #64748b; }
+  .mval { display: block; font-size: 11pt; font-weight: 700; color: #1d4ed8; }
+  .two-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+  .col-title { font-size: 8.5pt; font-weight: 700; border-bottom: 1.5px solid; padding-bottom: 3px; margin-bottom: 5px; }
+  .col-title.green { color: #15803d; border-color: #bbf7d0; }
+  .col-title.red { color: #dc2626; border-color: #fecaca; }
+  .items-table { width: 100%; font-size: 8pt; border-collapse: collapse; }
+  .items-table td { padding: 1.5px 0; }
+  .items-table td:last-child { text-align: right; font-weight: 600; }
+  .total-row td { font-weight: 700; border-top: 1px solid #e2e8f0; padding-top: 3px; font-size: 8.5pt; }
+  .total-row.green td { color: #15803d; }
+  .total-row.red td { color: #dc2626; }
+  .neto-box { background: linear-gradient(135deg,#eef2ff,#dbeafe); border: 1.5px solid #c7d2fe; border-radius: 6px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .neto-label { font-size: 8pt; color: #64748b; }
+  .neto-amount { font-size: 18pt; font-weight: 700; color: #4338ca; }
+  .firmantes { display: flex; gap: 30px; justify-content: center; margin: 8px 0; }
+  .firmante { text-align: center; flex: 1; max-width: 160px; }
+  .firma-line { border-top: 1px solid #94a3b8; margin-top: 4px; margin-bottom: 2px; }
+  .firma-name { font-size: 8pt; font-weight: 700; }
+  .firma-role { font-size: 7.5pt; color: #64748b; }
+  .footer-note { text-align: center; font-size: 7pt; color: #94a3b8; border-top: 1px dashed #e2e8f0; padding-top: 5px; margin-top: 5px; }
 </style>
 </head>
-<body>
-${grupo.payslips.map((p, i) => {
-  const emp = allEmployees.find(e => e.id === p.employee_id);
-  if (!emp) return "";
-  const innerHtml = buildR08HTML({ payslip: p, employee: emp, company: ci, copies: 1 });
-  // Extraer solo el contenido del body
-  const match = innerHtml.match(/<body>([\s\S]*?)<script>/);
-  const bodyContent = match ? match[1] : "";
-  return `<div${i < grupo.payslips.length - 1 ? ' class="page-break"' : ''}>${bodyContent}</div>`;
-}).join("")}
-<script>window.onload=function(){window.print();};</script>
+<body>${boletasHTML}
+<script>window.onload=function(){window.print();}</script>
 </body></html>`;
 
     const win = window.open("", "_blank");
     if (!win) { toast.error("Permite las ventanas emergentes para imprimir."); return; }
-    win.document.write(combined);
+    win.document.write(html);
     win.document.close();
     toast.success(`Preparando ${grupo.payslips.length} boleta(s) para imprimir…`);
   };
