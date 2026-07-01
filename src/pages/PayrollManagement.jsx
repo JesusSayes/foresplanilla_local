@@ -27,6 +27,7 @@ import { useNavigate } from "react-router-dom";
 import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
 import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/lib/payrollUtils";
+import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 
 export default function PayrollManagement() {
   const navigate = useNavigate();
@@ -387,6 +388,15 @@ export default function PayrollManagement() {
       return emp;
     }));
 
+    // Obtener derechohabientes de todos los empleados para cálculo de asignación familiar
+    const allDerechohabientes = await Promise.all(
+      enrichedEmployees.map(emp => base44.entities.Derechohabiente.filter({ employee_id: emp.id }))
+    );
+    const derechohabientesMap = {};
+    enrichedEmployees.forEach((emp, idx) => {
+      derechohabientesMap[emp.id] = allDerechohabientes[idx] || [];
+    });
+
     // Re-verificar empleados aún sin salario (ni en Employee ni en contrato)
     const stillWithoutSalary = enrichedEmployees.filter(emp => !emp.base_salary || parseFloat(emp.base_salary) <= 0);
     if (stillWithoutSalary.length > 0) {
@@ -445,6 +455,10 @@ export default function PayrollManagement() {
 
       const calculator = new PayrollCalculator(emp, selectedMonth, selectedYear, payrollType, quincenalPct);
 
+      // Calcular asignación familiar automática basada en derechohabientes
+      const empDerechohabientes = derechohabientesMap[emp.id] || [];
+      const familyAllowanceInfo = getFamilyAllowanceEligibility(empDerechohabientes, rmvData?.amount || 1025);
+
       let conceptsForCalc;
       if (payrollType === "Quincenal") {
         // Para planilla quincenal: si el empleado tiene monto_quincena fijo, usarlo;
@@ -472,6 +486,19 @@ export default function PayrollManagement() {
       } else {
         // Para planillas no quincenales: usar todos los conceptos normales
         conceptsForCalc = [...allEmpConcepts];
+        // Agregar asignación familiar automática si el empleado califica
+        if (familyAllowanceInfo.qualifies) {
+          conceptsForCalc.push({
+            employee_id: emp.id,
+            concept_type: "Ingreso",
+            concept_category: "Asignaciones",
+            concept_name: "Asignación Familiar",
+            is_dynamic: false,
+            amount: familyAllowanceInfo.amount,
+            is_recurring: true,
+            applies_to_payroll_types: ["Mensual", "Adicional", "SNP"],
+          });
+        }
       }
 
       const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1025);
@@ -565,7 +592,7 @@ export default function PayrollManagement() {
         regular_hours: attendanceData.regular_hours,
         overtime_hours: empAttendance.reduce((sum, r) => sum + (r.overtime_hours_25 || 0) + (r.overtime_hours_35 || 0), 0),
         base_salary: safePayrollNumber(emp.base_salary),
-        family_allowance: 0,
+        family_allowance: familyAllowanceInfo.qualifies ? familyAllowanceInfo.amount : 0,
         overtime_pay: 0,
         bonuses: roundMoney(Math.max(0, safePayrollNumber(result.totals.totalIncome) - safePayrollNumber(emp.base_salary))),
         commissions: 0,
