@@ -626,6 +626,7 @@ export default function EmployeeManagement() {
       afp_id: emp?.afp_id || "",
       afp_affiliation_date: emp?.afp_affiliation_date || "",
       cuspp: emp?.cuspp || "",
+      afp_affiliation_date: emp?.afp_affiliation_date || "",
       bank_name: emp?.bank_name || "",
       bank_account: emp?.bank_account || "",
       cci_account: emp?.cci_account || "",
@@ -700,6 +701,10 @@ export default function EmployeeManagement() {
 
     if (formData.document_type === 'DNI' && formData.document_number && formData.document_number.length !== 8) {
       errors.push("El DNI debe tener exactamente 8 dígitos");
+    }
+
+    if (formData.pension_system === 'AFP' && !formData.cuspp) {
+      errors.push("El CUSPP es obligatorio cuando el sistema de pensiones es AFP");
     }
 
     // Validar documento duplicado
