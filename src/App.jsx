@@ -47,6 +47,7 @@ import LoanManagement from "./pages/LoanManagement";
 import ConsultaPlanillas from "./pages/ConsultaPlanillas";
 import AsientosContables from "./pages/AsientosContables";
 import CuentasContables from "./pages/CuentasContables";
+import SunatExport from "./pages/SunatExport";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -286,6 +287,11 @@ const AuthenticatedApp = () => {
       <Route path="/CuentasContables" element={
         <ProtectedRoute>
           <Layout currentPageName="CuentasContables"><CuentasContables /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/SunatExport" element={
+        <ProtectedRoute>
+          <Layout currentPageName="SunatExport"><SunatExport /></Layout>
         </ProtectedRoute>
       } />
     </Routes>
