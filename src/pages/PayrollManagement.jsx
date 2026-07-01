@@ -125,17 +125,21 @@ export default function PayrollManagement() {
       
       // Filtrar conceptos: recurrentes, del mes/año actual, sin mes/año específico, o generales
       return allConcepts.filter(c => {
-        if (c.is_applied) return false; // Ya fue aplicado
-        
-        // Conceptos recurrentes: siempre incluir
+        // Conceptos recurrentes (incluyendo los generales): SIEMPRE incluir, nunca filtrar por is_applied
         if (c.is_recurring) return true;
+        
+        // Conceptos generales no recurrentes: incluir siempre (aplican a todos)
+        if (c.employee_id === "general") return true;
+
+        // Para conceptos específicos no recurrentes: excluir si ya fueron aplicados
+        if (c.is_applied) return false;
         
         // Conceptos con mes/año específico: solo si coincide
         if (c.month && c.year) {
           return c.month === selectedMonth && c.year === selectedYear;
         }
         
-        // Conceptos sin mes/año específico (aplican siempre): incluir
+        // Conceptos sin mes/año específico: incluir
         return true;
       });
     },
