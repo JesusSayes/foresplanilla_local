@@ -124,6 +124,13 @@ export const entitiesAPI = {
   CuentaContable: createEntityAPI('/api/cuentas-contables'),
   Subdiario: createEntityAPI('/api/subdiarios'),
   TipoAnexo: createEntityAPI('/api/tipo-anexos'),
+  HistorialRemunerativo: {
+    ...createEntityAPI('/api/historial-remunerativo'),
+    bulkCreate: async (data) => {
+      const response = await localClient.post('/api/historial-remunerativo/bulk', data);
+      return response.data;
+    }
+  },
   AsientoContable: {
     ...createEntityAPI('/api/asientos-contables'),
 

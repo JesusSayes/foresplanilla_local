@@ -168,6 +168,17 @@ export default function ConsultaPlanillas() {
     totalNeto:   g.payslips.reduce((s, p) => s + safePayrollNumber(p.net_pay), 0),
   });
 
+  // Totales dinámicos calculados directo sobre payslips de los grupos filtrados
+  const filteredTotals = useMemo(() => {
+    const allPs = filteredGrupos.flatMap(g => g.payslips);
+    return {
+      empleados:    filteredGrupos.reduce((s, g) => s + g.payslips.length, 0),
+      totalIncome:  allPs.reduce((s, p) => s + (Number(p.total_income)      || 0), 0),
+      totalDesc:    allPs.reduce((s, p) => s + (Number(p.total_deductions)  || 0), 0),
+      totalNeto:    allPs.reduce((s, p) => s + (Number(p.net_pay)           || 0), 0),
+    };
+  }, [filteredGrupos]);
+
   // Verifica si un grupo ya tiene asientos generados
   const getGrupoAsientoStatus = (grupo) => {
     const existing = allAsientos.filter(
@@ -410,6 +421,7 @@ export default function ConsultaPlanillas() {
             employee={emp}
             companyInfo={companyInfo}
             firmantes={firmantes}
+            showPrintButton={true}
           />
         </div>
       </div>
@@ -554,7 +566,7 @@ export default function ConsultaPlanillas() {
                               className="h-8 px-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50 text-xs"
                               onClick={() => setPreviewPayslip(p)}
                             >
-                              <Eye className="w-3.5 h-3.5 mr-1" />Ver
+                              <Eye className="w-3.5 h-3.5 mr-1" />Ver Boleta
                             </Button>
                             <Button
                               size="sm"
@@ -752,90 +764,62 @@ export default function ConsultaPlanillas() {
   // --- Vista principal: lista de cabeceras ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 py-6">
 
-        {/* Header */}
-        <div className="mb-8 flex items-start justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-2 flex items-center gap-3">
-              <FileText className="w-9 h-9 text-indigo-600" />
-              Consulta de Planillas
-            </h1>
-            <p className="text-slate-600 text-lg">Visualiza, imprime y firma planillas por período</p>
+        {/* Fila 1: Título del módulo + botón Firmantes */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-indigo-600 shrink-0" />
+            <span className="text-xl font-bold text-slate-900">Consulta de Planillas</span>
           </div>
           <Button
             variant="outline"
-            className="border-slate-300 hover:bg-slate-50 gap-2"
+            size="sm"
+            className="border-slate-300 hover:bg-slate-50 gap-2 h-9"
             onClick={() => setShowConfigFirmantes(true)}
           >
             <Settings className="w-4 h-4" />Configurar Firmantes
           </Button>
         </div>
 
-        {/* KPIs del año */}
-        <div className="grid grid-cols-4 gap-3 mb-6">
-          {[
-            { label: `Planillas ${filterYear}`, value: gruposAnio.length, icon: FileText, color: "indigo" },
-            { label: "Empleados únicos", value: totalEmps, icon: Users, color: "blue" },
-            { label: `Total neto ${filterYear}`, value: formatMoney(totalAnio), icon: DollarSign, color: "green" },
-            { label: "Tipos de planilla", value: [...new Set(gruposAnio.map(g => g.payroll_type))].length, icon: Calendar, color: "purple" },
-          ].map(({ label, value, icon: Icon, color }) => (
-            <Card key={label} className="border-0 shadow-lg">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <div className={`p-2 bg-${color}-100 rounded-lg shrink-0`}>
-                    <Icon className={`w-4 h-4 text-${color}-600`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xl font-bold text-slate-900 leading-tight">{value}</div>
-                    <p className="text-slate-600 text-xs truncate">{label}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        {/* Fila 2: Filtros del datagrid */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm mb-4 px-4 py-3">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Input placeholder="Buscar período o número..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 h-9" />
+            </div>
+            <Select value={String(filterYear)} onValueChange={v => setFilterYear(parseInt(v))}>
+              <SelectTrigger className="w-24 h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {availableYears.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterMonth} onValueChange={setFilterMonth}>
+              <SelectTrigger className="w-40 h-9"><SelectValue placeholder="Todos los meses" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los meses</SelectItem>
+                {Array.from({length: 12}, (_, i) => (
+                  <SelectItem key={i+1} value={String(i+1)}>
+                    {format(new Date(2024, i), "MMMM", { locale: es })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterTipo} onValueChange={setFilterTipo}>
+              <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {["Quincenal","Mensual","Adicional","SNP","CTS","Gratificacion"].map(t => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-slate-500 whitespace-nowrap ml-auto">{filteredGrupos.length} planilla(s)</span>
+          </div>
         </div>
 
-        {/* Filtros */}
-        <Card className="border-0 shadow-lg mb-6">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap gap-3 items-center">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <Input placeholder="Buscar período o número..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9" />
-              </div>
-              <Select value={String(filterYear)} onValueChange={v => setFilterYear(parseInt(v))}>
-                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {availableYears.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filterMonth} onValueChange={setFilterMonth}>
-                <SelectTrigger className="w-40"><SelectValue placeholder="Todos los meses" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los meses</SelectItem>
-                  {Array.from({length: 12}, (_, i) => (
-                    <SelectItem key={i+1} value={String(i+1)}>
-                      {format(new Date(2024, i), "MMMM", { locale: es })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterTipo} onValueChange={setFilterTipo}>
-                <SelectTrigger className="w-36"><SelectValue placeholder="Tipo" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {["Quincenal","Mensual","Adicional","SNP","CTS","Gratificacion"].map(t => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-sm text-slate-500 ml-auto">{filteredGrupos.length} planilla(s) encontrada(s)</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Lista de planillas (cabecera) */}
+        {/* Lista de planillas — scroll horizontal único en este bloque */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
@@ -848,122 +832,180 @@ export default function ConsultaPlanillas() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
-            {filteredGrupos.map(g => {
-              const stats = getGrupoStats(g);
-              return (
-                <Card
-                  key={g.key}
-                  className="border-0 shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer group"
-                  onClick={() => setSelectedGroup(g)}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      {/* Info */}
-                      <div className="flex items-center gap-5 flex-1">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex flex-col items-center justify-center text-white shrink-0">
-                          <span className="text-xs font-bold leading-none">
-                            {format(new Date(g.year, g.month - 1), "MMM", { locale: es }).toUpperCase()}
-                          </span>
-                          <span className="text-lg font-bold leading-none">{g.year}</span>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="text-lg font-bold text-slate-900 capitalize">{g.period}</h3>
-                            <Badge className={TIPO_COLORS[g.payroll_type] || "bg-slate-100 text-slate-700"}>
-                              {g.payroll_type}
-                            </Badge>
-                            <Badge className={STATUS_COLORS[g.status] || "bg-slate-100"}>
-                              {g.status}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-slate-500">N° {g.payroll_number}</p>
-                        </div>
-                      </div>
+          <div className="overflow-x-auto -mx-4 px-4">
+            {/* Cabecera de columnas */}
+            <div className="grid items-center mb-1 px-1" style={{
+              minWidth: "980px",
+              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
+            }}>
+              <div className="px-4 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Período / Tipo</div>
+              <div />
+              <div className="px-2 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-center">Empl.</div>
+              <div />
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-right">Ingresos</div>
+              <div />
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-right">Descuentos</div>
+              <div />
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-right">Neto Total</div>
+              <div />
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-center">Acciones</div>
+              <div />
+              <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide text-center">Contabilidad</div>
+              <div />
+            </div>
 
-                      {/* Métricas */}
-                      <div className="hidden md:grid grid-cols-4 gap-6 text-center mx-6">
-                        <div>
-                          <p className="text-xs text-slate-400 mb-0.5">Empleados</p>
-                          <div className="flex items-center justify-center gap-1">
-                            <Users className="w-3.5 h-3.5 text-blue-500" />
-                            <span className="font-bold text-slate-900">{stats.empleados}</span>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400 mb-0.5">Ingresos</p>
-                          <p className="font-semibold text-green-600 text-sm">{formatMoney(stats.totalIncome)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400 mb-0.5">Descuentos</p>
-                          <p className="font-semibold text-red-500 text-sm">{formatMoney(stats.totalDesc)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400 mb-0.5">Neto Total</p>
-                          <p className="font-bold text-indigo-700 text-base">{formatMoney(stats.totalNeto)}</p>
-                        </div>
-                      </div>
+            <div className="space-y-2" style={{ minWidth: "980px" }}>
+              {filteredGrupos.map(g => {
+                const stats = getGrupoStats(g);
+                const asientoStatus = getGrupoAsientoStatus(g);
+                return (
+                  <Card
+                    key={g.key}
+                    className="border-0 shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer group overflow-hidden"
+                    onClick={() => setSelectedGroup(g)}
+                  >
+                    <CardContent className="p-0">
+                      {/* Grid dinámico: info crece, botones fijos y sin superposición */}
+                      <div className="grid items-center w-full min-h-[76px]" style={{
+                        gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
+                      }}>
 
-                      {/* Acciones rápidas */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        {/* Badge estado asiento */}
-                        {(() => {
-                          const asientoStatus = getGrupoAsientoStatus(g);
-                          return asientoStatus ? (
-                            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
-                              <CheckCircle className="w-3 h-3" />Asiento generado
+                        {/* Col 1 — Período + badges */}
+                        <div className="flex items-center gap-3 px-4 py-3">
+                          <div className="w-[44px] h-[44px] rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex flex-col items-center justify-center text-white shrink-0">
+                            <span className="text-[9px] font-bold leading-none uppercase">
+                              {format(new Date(g.year, g.month - 1), "MMM", { locale: es })}
                             </span>
-                          ) : null;
-                        })()}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="hidden sm:flex"
-                          onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); }}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />Ver
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="hidden sm:flex"
-                          onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); setTimeout(() => window.print(), 800); }}
-                        >
-                          <Printer className="w-4 h-4 mr-1" />Imprimir
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="hidden sm:flex text-purple-700 border-purple-200 hover:bg-purple-50"
-                          onClick={e => { e.stopPropagation(); handlePrintAllBoletas(g); }}
-                          title="Imprimir todas las boletas individuales de esta planilla"
-                        >
-                          <Printer className="w-4 h-4 mr-1" />Boletas
-                        </Button>
-                        <Button
-                          size="sm"
-                          className={`hidden sm:flex ${getGrupoAsientoStatus(g) ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
-                          disabled={generatingAsiento === g.key}
-                          onClick={e => { e.stopPropagation(); handleGenerarAsiento(g); }}
-                        >
-                          {generatingAsiento === g.key
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-                            : <BookOpen className="w-3.5 h-3.5 mr-1" />
-                          }
-                          {getGrupoAsientoStatus(g) ? "Actualizar Asiento" : "Generar Asiento"}
-                        </Button>
-                        <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                            <span className="text-sm font-bold leading-none">{g.year}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="text-sm font-bold text-slate-900 capitalize leading-tight truncate">{g.period}</h3>
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                              <Badge className={`text-[10px] px-1.5 py-0 ${TIPO_COLORS[g.payroll_type] || "bg-slate-100 text-slate-700"}`}>{g.payroll_type}</Badge>
+                              <Badge className={`text-[10px] px-1.5 py-0 ${STATUS_COLORS[g.status] || "bg-slate-100"}`}>{g.status}</Badge>
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-0.5 truncate">N° {g.payroll_number}</p>
+                          </div>
+                        </div>
+
+                        {/* Separador */}
+                        <div className="bg-slate-100 self-stretch my-3" />
+
+                        {/* Col 2 — Empleados */}
+                        <div className="flex flex-col items-center justify-center px-2 py-3">
+                          <p className="text-[10px] text-slate-400 mb-0.5 whitespace-nowrap">Empleados</p>
+                          <div className="flex items-center gap-1">
+                            <Users className="w-3 h-3 text-blue-500 shrink-0" />
+                            <span className="font-bold text-slate-900 text-sm">{stats.empleados}</span>
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-100 self-stretch my-3" />
+
+                        {/* Col 3 — Ingresos */}
+                        <div className="flex flex-col items-end justify-center px-3 py-3">
+                          <p className="text-[10px] text-slate-400 mb-0.5">Ingresos</p>
+                          <p className="font-semibold text-slate-700 text-xs whitespace-nowrap">{formatMoney(stats.totalIncome)}</p>
+                        </div>
+
+                        <div className="bg-slate-100 self-stretch my-3" />
+
+                        {/* Col 4 — Descuentos */}
+                        <div className="flex flex-col items-end justify-center px-3 py-3">
+                          <p className="text-[10px] text-slate-400 mb-0.5">Descuentos</p>
+                          <p className="font-semibold text-red-500 text-xs whitespace-nowrap">{formatMoney(stats.totalDesc)}</p>
+                        </div>
+
+                        <div className="bg-slate-100 self-stretch my-3" />
+
+                        {/* Col 5 — Neto Total */}
+                        <div className="flex flex-col items-end justify-center px-3 py-3">
+                          <p className="text-[10px] text-slate-400 mb-0.5">Neto Total</p>
+                          <p className="font-bold text-indigo-700 text-sm whitespace-nowrap">{formatMoney(stats.totalNeto)}</p>
+                        </div>
+
+                        <div className="bg-slate-100 self-stretch my-3" />
+
+                        {/* Col 6 — Botones Ver / Imprimir / Boletas */}
+                        <div className="flex items-center justify-center gap-2 px-3 py-3" onClick={e => e.stopPropagation()}>
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap"
+                            onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); }}>
+                            <Eye className="w-3 h-3 mr-1" />Ver
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap"
+                            onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); setTimeout(() => window.print(), 800); }}>
+                            <Printer className="w-3 h-3 mr-1" />Imprimir
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap text-purple-700 border-purple-200 hover:bg-purple-50"
+                            onClick={e => { e.stopPropagation(); handlePrintAllBoletas(g); }}>
+                            <Printer className="w-3 h-3 mr-1" />Boletas
+                          </Button>
+                        </div>
+
+                        <div className="bg-slate-100 self-stretch my-3" />
+
+                        {/* Col 7 — Generar Asiento */}
+                        <div className="flex items-center justify-center px-3 py-3" onClick={e => e.stopPropagation()}>
+                          {g.payroll_type !== "Quincenal" ? (
+                            <div className="flex flex-col items-stretch gap-1 w-full">
+                              {asientoStatus && (
+                                <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                                  <CheckCircle className="w-2.5 h-2.5" />Asiento generado
+                                </span>
+                              )}
+                              <Button
+                                size="sm"
+                                className={`h-8 text-xs whitespace-nowrap w-full ${asientoStatus ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                                disabled={generatingAsiento === g.key}
+                                onClick={e => { e.stopPropagation(); handleGenerarAsiento(g); }}
+                              >
+                                {generatingAsiento === g.key
+                                  ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                  : <BookOpen className="w-3 h-3 mr-1" />}
+                                {asientoStatus ? "Actualizar" : "Gen. Asiento"}
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-slate-200 text-sm">—</span>
+                          )}
+                        </div>
+
+                        {/* Flecha navegación */}
+                        <div className="flex items-center justify-center">
+                          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                        </div>
+
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Fila de totales dinámicos — al pie del datagrid */}
+            <div className="grid items-center mt-2 bg-indigo-600 rounded-xl px-1 py-3" style={{
+              minWidth: "980px",
+              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
+            }}>
+              <div className="px-4 text-xs font-bold text-white uppercase tracking-wide">
+                TOTALES — {filteredGrupos.length} planilla(s)
+              </div>
+              <div />
+              <div className="px-2 text-center text-sm font-bold text-white">{filteredTotals.empleados}</div>
+              <div />
+              <div className="px-3 text-right text-sm font-bold text-emerald-200">{formatMoney(filteredTotals.totalIncome)}</div>
+              <div />
+              <div className="px-3 text-right text-sm font-bold text-red-300">{formatMoney(filteredTotals.totalDesc)}</div>
+              <div />
+              <div className="px-3 text-right text-sm font-bold text-white">{formatMoney(filteredTotals.totalNeto)}</div>
+              <div /><div /><div /><div /><div />
+            </div>
           </div>
         )}
       </div>
 
       {/* Modal configuración de firmantes */}
+
       {showConfigFirmantes && (
         <ConfigFirmantesModal
           companyInfo={companyInfo}

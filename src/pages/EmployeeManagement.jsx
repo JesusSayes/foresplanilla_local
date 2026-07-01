@@ -637,6 +637,9 @@ export default function EmployeeManagement() {
       area_trabajo: emp?.area_trabajo || "",
       unidad_trabajo: emp?.unidad_trabajo || "",
       attendance_method: emp?.attendance_method || "",
+      activity_cost: emp?.activity_cost ?? 0,
+      food_cost: emp?.food_cost ?? 0,
+      transport_cost: emp?.transport_cost ?? 0,
       emergency_contact_name: emp?.emergency_contact_name || "",
       emergency_contact_phone: emp?.emergency_contact_phone || "",
       emergency_contact_relationship: emp?.emergency_contact_relationship || "",
@@ -695,6 +698,10 @@ export default function EmployeeManagement() {
 
     if (formData.document_type === 'DNI' && formData.document_number && formData.document_number.length !== 8) {
       errors.push("El DNI debe tener exactamente 8 dígitos");
+    }
+
+    if (formData.pension_system === 'AFP' && !formData.cuspp) {
+      errors.push("El CUSPP es obligatorio cuando el sistema de pensiones es AFP");
     }
 
     // Validar documento duplicado
