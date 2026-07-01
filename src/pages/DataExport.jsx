@@ -265,6 +265,13 @@ const ENTITY_SCHEMAS = {
     config_type: "TEXT", quincenal_percentage: "DECIMAL(18,2)", quincenal_cutoff_day: "INTEGER",
     is_active: "BOOLEAN", notes: "TEXT"
   },
+  HistorialRemunerativo: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    employee_id: "TEXT", year: "INTEGER", month: "INTEGER", period_label: "TEXT",
+    base_salary: "DECIMAL(18,2)", family_allowance: "DECIMAL(18,2)",
+    other_regular_income: "DECIMAL(18,2)", total_remuneration: "DECIMAL(18,2)",
+    worked_days: "INTEGER", source: "TEXT", notes: "TEXT"
+  },
   Holiday: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     name: "TEXT", date: "DATE", type: "TEXT", is_mandatory: "BOOLEAN", description: "TEXT"
@@ -394,7 +401,7 @@ const ENTITY_GROUPS = [
   { label: "Contratos", entities: ["Contract", "ContractTemplate", "ContractClause", "ContractRenewalRule"] },
   { label: "Asistencia", entities: ["AttendanceRecord", "AttendanceEditRequest", "AttendanceIncident", "OvertimeAlert", "WorkSchedule", "AccessDevice", "EmployeeAccessMapping", "DeviceEvent", "DatabaseConnection", "SyncLog"] },
   { label: "Vacaciones", entities: ["VacationRequest", "VacationBalance"] },
-  { label: "Planillas y Remuneración", entities: ["Payslip", "PayrollConcept", "LoanType", "Loan", "LoanInstallment", "PayrollConfig"] },
+  { label: "Planillas y Remuneración", entities: ["Payslip", "PayrollConcept", "LoanType", "Loan", "LoanInstallment", "PayrollConfig", "HistorialRemunerativo"] },
   { label: "Centros de Costo", entities: ["CostCenter", "CostCenterAssignment", "CostCenterChangeLog", "CostCenterCategory", "AccountingAccount"] },
   { label: "Contabilidad", entities: ["AsientoContable", "CuentaContable", "Subdiario", "TipoAnexo"] },
   { label: "Datos Maestros", entities: ["Holiday", "Position", "Department", "Bank", "Site", "AFP", "Profession", "Ubigeo", "RMV", "UIT", "SeguroVidaLey", "AreaUnidadCargo", "IncidentType"] },
