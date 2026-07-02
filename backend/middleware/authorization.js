@@ -8,6 +8,13 @@ export const loadAccessContext = async (req, res, next) => {
   try {
     const employee = await prisma.employee.findFirst({
       where: { work_email: req.user?.email },
+      select: {
+        id: true,
+        role: true,
+        department_name: true,
+        site: true,
+        managed_team_ids: true,
+      },
     });
 
     if (!employee) {
