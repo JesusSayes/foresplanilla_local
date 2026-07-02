@@ -827,7 +827,7 @@ export default function EmployeeManagement() {
     const matchesSite = siteFilter === "all" || emp.site === siteFilter || (siteFilter === "sin_sede" && !emp.site);
     const matchesContractType = contractTypeFilter === "all" || emp.contract_type === contractTypeFilter;
 
-    // Filtro de derechohabientes ("derecho a viente")
+    // Filtro de Derecho Habiente
     const empDhs = dhByEmployee[emp.id] || [];
     const empDhAges = empDhs.map(dh => calcDhAge(dh.birth_date)).filter(a => a !== null);
     const hasDerechohabientes = empDhs.length > 0;
@@ -1013,12 +1013,12 @@ export default function EmployeeManagement() {
 
               <Select value={derechohabienteFilter} onValueChange={setDerechohabienteFilter}>
                 <SelectTrigger className="w-52">
-                  <SelectValue placeholder="Derecho a Viente" />
+                  <SelectValue placeholder="Derecho Habiente" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="con_derecho">Con derechohabientes</SelectItem>
-                  <SelectItem value="sin_derecho">Sin derechohabientes</SelectItem>
+                  <SelectItem value="con_derecho">Con Derecho Habiente</SelectItem>
+                  <SelectItem value="sin_derecho">Sin Derecho Habiente</SelectItem>
                   <SelectItem value="menor_18">Con DH menor de 18 años</SelectItem>
                   <SelectItem value="menor_25">Con DH menor de 25 años</SelectItem>
                 </SelectContent>
