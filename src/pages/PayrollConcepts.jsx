@@ -14,6 +14,7 @@ import {
   TrendingDown, Users, AlertCircle, Edit2, CheckCircle, User, Copy, Upload, FileSpreadsheet, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
+import { SYSTEM_LOGIC_TYPES } from "../components/payroll/PayrollCalculator";
 
 // Conceptos predefinidos según legislación peruana
 const PREDEFINED_CONCEPTS = {
@@ -28,9 +29,10 @@ const PREDEFINED_CONCEPTS = {
     },
     { 
       name: "Asignación Familiar", 
-      description: "10% de RMV para trabajadores con hijos menores",
+      description: "10% de RMV para trabajadores con hijos menores (calculado automáticamente según derechohabientes)",
       is_dynamic: true,
-      calculation_formula: "rmv * 0.10"
+      system_logic_type: "family_allowance",
+      calculation_formula: ""
     },
     { 
       name: "Horas Extras al 25%", 
@@ -102,13 +104,17 @@ const PREDEFINED_CONCEPTS = {
     },
     { 
       name: "Adelanto Quincenal", 
-      description: "Adelanto de primera quincena",
-      is_dynamic: false
+      description: "Adelanto de primera quincena (calculado automáticamente según configuración)",
+      is_dynamic: true,
+      system_logic_type: "salary_advance",
+      calculation_formula: ""
     },
     { 
       name: "Descuento por Tardanzas", 
-      description: "Según reglamento interno",
-      is_dynamic: false
+      description: "Descuento automático según minutos de tardanza (reglamento interno)",
+      is_dynamic: true,
+      system_logic_type: "tardiness_discount",
+      calculation_formula: ""
     },
     { 
       name: "Descuento por Inasistencias", 
@@ -198,6 +204,7 @@ export default function PayrollConcepts() {
     amount: "",
     is_dynamic: false,
     calculation_formula: "",
+    system_logic_type: "",
     is_recurring: false,
     is_mandatory: false,
     applies_to_payroll_types: ["Mensual"],
@@ -402,7 +409,8 @@ export default function PayrollConcepts() {
       concept_name: concept.name,
       amount: concept.is_dynamic ? 0 : "",
       is_dynamic: concept.is_dynamic || false,
-      calculation_formula: formula,
+      calculation_formula: concept.system_logic_type ? "" : formula,
+      system_logic_type: concept.system_logic_type || "",
       month: selectedMonth,
       year: selectedYear,
       is_recurring: false,
@@ -425,14 +433,14 @@ export default function PayrollConcepts() {
       errors.concept_name = "El nombre del concepto es obligatorio";
     }
 
-    if (!formData.is_dynamic) {
+    if (!formData.is_dynamic && !formData.system_logic_type) {
       const amountVal = parseFloat(formData.amount);
       if (formData.amount === "" || formData.amount === null || formData.amount === undefined || isNaN(amountVal)) {
         errors.amount = "Ingresa un monto válido (puede ser 0.00)";
       }
     }
 
-    if (formData.is_dynamic && !formData.calculation_formula?.trim()) {
+    if (formData.is_dynamic && !formData.system_logic_type && !formData.calculation_formula?.trim()) {
       errors.calculation_formula = "La fórmula de cálculo es obligatoria";
     }
 
@@ -455,7 +463,8 @@ export default function PayrollConcepts() {
     const conceptData = {
       ...formData,
       employee_id: activeTab === "general" ? "general" : selectedEmployee,
-      amount: formData.is_dynamic ? 0 : parseFloat(formData.amount),
+      amount: (formData.is_dynamic || formData.system_logic_type) ? 0 : parseFloat(formData.amount),
+      calculation_formula: formData.system_logic_type ? "" : formData.calculation_formula,
       month: formData.month || selectedMonth,
       year: formData.year || selectedYear,
     };
@@ -499,6 +508,7 @@ export default function PayrollConcepts() {
       amount: concept.amount?.toString() || "0",
       is_dynamic: concept.is_dynamic || false,
       calculation_formula: concept.calculation_formula || "",
+      system_logic_type: concept.system_logic_type || "",
       is_recurring: concept.is_recurring || false,
       is_mandatory: concept.is_mandatory || false,
       applies_to_payroll_types: concept.applies_to_payroll_types || ["Mensual"],
@@ -518,6 +528,7 @@ export default function PayrollConcepts() {
       amount: concept.amount?.toString() || "0",
       is_dynamic: concept.is_dynamic || false,
       calculation_formula: concept.calculation_formula || "",
+      system_logic_type: concept.system_logic_type || "",
       is_recurring: concept.is_recurring || false,
       is_mandatory: concept.is_mandatory || false,
       applies_to_payroll_types: concept.applies_to_payroll_types || ["Mensual"],
@@ -554,6 +565,7 @@ export default function PayrollConcepts() {
                   amount: { type: "number" },
                   is_dynamic: { type: "boolean" },
                   calculation_formula: { type: "string" },
+                  system_logic_type: { type: "string" },
                   is_recurring: { type: "boolean" },
                   is_mandatory: { type: "boolean" },
                   applies_to_payroll_types: { type: "string" },
@@ -612,6 +624,7 @@ export default function PayrollConcepts() {
             amount: concept.is_dynamic ? 0 : parseFloat(concept.amount || 0),
             is_dynamic: concept.is_dynamic || false,
             calculation_formula: concept.calculation_formula || "",
+            system_logic_type: concept.system_logic_type || "",
             is_recurring: concept.is_recurring || false,
             is_mandatory: concept.is_mandatory || false,
             applies_to_payroll_types: payrollTypes,
@@ -677,6 +690,7 @@ export default function PayrollConcepts() {
       amount: "",
       is_dynamic: false,
       calculation_formula: "",
+      system_logic_type: "",
       is_recurring: false,
       is_mandatory: false,
       applies_to_payroll_types: ["Mensual"],
@@ -1099,7 +1113,16 @@ export default function PayrollConcepts() {
                                     </div>
                                   )}
 
-                                  {concept.is_dynamic ? (
+                                  {concept.system_logic_type ? (
+                                    <div className="mt-2">
+                                      <Badge className="bg-teal-100 text-teal-700 text-xs">
+                                        ⚙ Lógica del Sistema
+                                      </Badge>
+                                      <p className="text-xs text-slate-600 mt-1">
+                                        {SYSTEM_LOGIC_TYPES[concept.system_logic_type]?.label || concept.system_logic_type}
+                                      </p>
+                                    </div>
+                                  ) : concept.is_dynamic ? (
                                     <div className="mt-2">
                                       <Badge className="bg-purple-100 text-purple-700 text-xs">
                                         Dinámico
@@ -1288,7 +1311,11 @@ export default function PayrollConcepts() {
                                   {concept.concept_code}
                                 </Badge>
                               )}
-                              {concept.is_dynamic && (
+                              {concept.system_logic_type ? (
+                                <Badge className="bg-teal-100 text-teal-700 text-xs">
+                                  ⚙ Lógica del Sistema
+                                </Badge>
+                              ) : concept.is_dynamic && (
                                 <Badge className="bg-purple-100 text-purple-700 text-xs">
                                   Dinámico
                                 </Badge>
@@ -1313,7 +1340,11 @@ export default function PayrollConcepts() {
                               </div>
                             )}
                             
-                            {concept.is_dynamic ? (
+                            {concept.system_logic_type ? (
+                              <p className="text-xs text-slate-600 mt-2">
+                                {SYSTEM_LOGIC_TYPES[concept.system_logic_type]?.label || concept.system_logic_type}
+                              </p>
+                            ) : concept.is_dynamic ? (
                               <p className="text-xs text-slate-600 mt-2 font-mono bg-slate-50 p-1 rounded">
                                 {concept.calculation_formula}
                               </p>
@@ -1422,7 +1453,16 @@ export default function PayrollConcepts() {
                                     ))}
                                   </div>
                                 )}
-                                {concept.is_dynamic ? (
+                                {concept.system_logic_type ? (
+                                  <div className="mt-2">
+                                    <Badge className="bg-teal-100 text-teal-700 text-xs">
+                                      ⚙ Lógica del Sistema
+                                    </Badge>
+                                    <p className="text-sm text-slate-600 mt-2">
+                                      {SYSTEM_LOGIC_TYPES[concept.system_logic_type]?.label || concept.system_logic_type}
+                                    </p>
+                                  </div>
+                                ) : concept.is_dynamic ? (
                                   <div className="mt-2">
                                     <Badge className="bg-purple-100 text-purple-700 text-xs">
                                       Cálculo Dinámico
@@ -1627,7 +1667,9 @@ export default function PayrollConcepts() {
                               <td className="p-2 font-medium text-xs">{item.concept_name}</td>
                               <td className="p-2 text-xs font-mono">{item.concept_code || "-"}</td>
                               <td className="p-2 text-right text-xs">
-                                {item.is_dynamic ? (
+                                {item.system_logic_type ? (
+                                  <Badge className="bg-teal-100 text-teal-700 text-xs">⚙ Sistema</Badge>
+                                ) : item.is_dynamic ? (
                                   <Badge className="bg-purple-100 text-purple-700 text-xs">Dinámico</Badge>
                                 ) : (
                                   `S/ ${parseFloat(item.amount || 0).toFixed(2)}`
@@ -1771,12 +1813,13 @@ export default function PayrollConcepts() {
               <div>
                 <Label>Tipo de Cálculo</Label>
                 <Select 
-                  value={formData.is_dynamic ? "dynamic" : "fixed"} 
+                  value={formData.system_logic_type ? "system" : formData.is_dynamic ? "dynamic" : "fixed"} 
                   onValueChange={(v) => setFormData({
                     ...formData, 
-                    is_dynamic: v === "dynamic",
-                    amount: v === "dynamic" ? "0" : "",
-                    calculation_formula: v === "fixed" ? "" : formData.calculation_formula
+                    is_dynamic: v === "dynamic" || v === "system",
+                    system_logic_type: v === "system" ? (formData.system_logic_type || "family_allowance") : "",
+                    amount: v === "dynamic" || v === "system" ? "0" : "",
+                    calculation_formula: v === "fixed" || v === "system" ? "" : formData.calculation_formula
                   })}
                 >
                   <SelectTrigger>
@@ -1784,18 +1827,45 @@ export default function PayrollConcepts() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="fixed">Monto Fijo</SelectItem>
-                    <SelectItem value="dynamic">Cálculo Dinámico</SelectItem>
+                    <SelectItem value="dynamic">Cálculo Dinámico (Fórmula)</SelectItem>
+                    <SelectItem value="system">Lógica del Sistema</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-slate-500 mt-1">
-                  {formData.is_dynamic 
+                  {formData.system_logic_type 
+                    ? "El sistema calcula automáticamente según la lógica implementada" 
+                    : formData.is_dynamic 
                     ? "El monto se calculará automáticamente según la fórmula" 
                     : "Ingresa un monto específico"
                   }
                 </p>
               </div>
 
-              {formData.is_dynamic ? (
+              {formData.system_logic_type ? (
+                <div className="space-y-3">
+                  <div>
+                    <Label>Lógica del Sistema *</Label>
+                    <Select 
+                      value={formData.system_logic_type} 
+                      onValueChange={(v) => setFormData({...formData, system_logic_type: v})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(SYSTEM_LOGIC_TYPES).map(([key, info]) => (
+                          <SelectItem key={key} value={key}>{info.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {SYSTEM_LOGIC_TYPES[formData.system_logic_type] && (
+                      <p className="text-xs text-slate-500 mt-1 bg-teal-50 border border-teal-200 rounded p-2">
+                        ⚙ {SYSTEM_LOGIC_TYPES[formData.system_logic_type].description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : formData.is_dynamic ? (
                 <div>
                   <Label>Fórmula de Cálculo *</Label>
                   <Input

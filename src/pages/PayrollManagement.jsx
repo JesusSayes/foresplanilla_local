@@ -486,8 +486,12 @@ export default function PayrollManagement() {
       } else {
         // Para planillas no quincenales: usar todos los conceptos normales
         conceptsForCalc = [...allEmpConcepts];
-        // Agregar asignación familiar automática si el empleado califica
-        if (familyAllowanceInfo.qualifies) {
+        // Si NO existe un concepto de "Asignación Familiar" configurado (ya sea por fórmula o lógica del sistema),
+        // agregar la asignación familiar automática basada en derechohabientes como fallback.
+        const hasFamilyAllowanceConcept = allEmpConcepts.some(c => 
+          c.concept_name === "Asignación Familiar" || c.system_logic_type === "family_allowance"
+        );
+        if (!hasFamilyAllowanceConcept && familyAllowanceInfo.qualifies) {
           conceptsForCalc.push({
             employee_id: emp.id,
             concept_type: "Ingreso",
@@ -501,11 +505,19 @@ export default function PayrollManagement() {
         }
       }
 
-      const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1130);
-
       // Calcular descuentos por asistencia (solo para planillas NO quincenales)
       const lateRecords = empAttendance.filter(r => r.is_late && r.late_minutes > 10);
       const absentRecords = empAttendance.filter(r => r.is_absent);
+
+      // Datos adicionales para lógica del sistema (derechohabientes, tardanzas, inasistencias)
+      const extraContext = {
+        derechohabientes: empDerechohabientes,
+        late_records: lateRecords,
+        absent_records: absentRecords,
+      };
+
+      const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1130, extraContext);
+
       const baseSalaryForCalc = safePayrollNumber(emp.base_salary); // Siempre usar el salario del contrato
       const dailyRate = baseSalaryForCalc > 0 ? roundMoney(baseSalaryForCalc / 30) : 0;
       // Regla quincenal: NO aplicar descuentos por inasistencias/tardanzas
