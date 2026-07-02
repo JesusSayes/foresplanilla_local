@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Users, Trash2, Plus, Edit, Loader2, Search, AlertTriangle, FileText, Lock } from "lucide-react";
+import { Users, Trash2, Plus, Edit, Loader2, Search, AlertTriangle, FileText, Lock, UploadCloud, GraduationCap, Baby, CheckCircle2 } from "lucide-react";
 import UbigeoSelect from "./UbigeoSelect";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -113,6 +113,21 @@ export default function EmployeeForm({
   const [editingDH, setEditingDH] = React.useState(null);
   const [dhFormData, setDhFormData] = React.useState({});
   const [savingDH, setSavingDH] = React.useState(false);
+  const [uploadingStudyProof, setUploadingStudyProof] = React.useState(false);
+
+  const handleUploadStudyProof = async (file) => {
+    if (!file) return;
+    setUploadingStudyProof(true);
+    try {
+      const { file_url } = await uploadFile(file);
+      setDhFormData((prev) => ({ ...prev, study_proof_url: file_url }));
+      toast.success("Constancia de estudios adjuntada correctamente");
+    } catch {
+      toast.error("Error al subir el archivo");
+    } finally {
+      setUploadingStudyProof(false);
+    }
+  };
 
   const departamentos = [...new Set(ubigeos.map(u => u.departamento))].sort();
   const provincias = selectedDepartamento
@@ -331,7 +346,6 @@ export default function EmployeeForm({
                         if (!file) return;
                         setUploadingPhoto(true);
                         try {
-                          // const { file_url } = await base44.integrations.Core.UploadFile({ file });
                           const { file_url } = await uploadFile(file);
                           setFormData({ ...formData, photo_url: file_url });
                           toast.success("Foto subida");
@@ -700,7 +714,7 @@ export default function EmployeeForm({
               {editingEmployee && (
                 <>
                   <div className="flex justify-end">
-                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => { setDhFormData({ employee_id: editingEmployee.id, document_type: "DNI", document_number: "", first_name: "", last_name: "", gender: "M", birth_date: "", relationship: "Hijo/a", registration_date: new Date().toISOString().split('T')[0], is_active: true }); setEditingDH(null); setShowDerechohabienteForm(true); }}>
+                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => { setDhFormData({ employee_id: editingEmployee.id, document_type: "DNI", document_number: "", first_name: "", last_name: "", gender: "M", birth_date: "", relationship: "Hijo/a", registration_date: new Date().toISOString().split('T')[0], is_active: true, is_studying: false, study_proof_url: "" }); setEditingDH(null); setShowDerechohabienteForm(true); }}>
                       <Plus className="w-4 h-4 mr-2" />Agregar Derechohabiente
                     </Button>
                   </div>
@@ -723,6 +737,22 @@ export default function EmployeeForm({
                                 {dh.ubigeo && <span className="col-span-2"><strong>Ubigeo:</strong> {dh.ubigeo}</span>}
                               </div>
                               <Badge className={`mt-2 ${dh.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{dh.is_active ? "Activo" : "Inactivo"}</Badge>
+                              {(dh.relationship === "Hijo/a" || dh.relationship === "Hijo Menor de Edad") && (() => {
+                                const dhAge = calculateAge(dh.birth_date);
+                                if (dhAge < 18) {
+                                  return <Badge className="mt-2 ml-2 bg-emerald-100 text-emerald-700 border border-emerald-300"><CheckCircle2 className="w-3 h-3 mr-1 inline" />Asig. Familiar</Badge>;
+                                }
+                                if (dhAge >= 18 && dhAge <= 24 && dh.is_studying && dh.study_proof_url) {
+                                  return <Badge className="mt-2 ml-2 bg-emerald-100 text-emerald-700 border border-emerald-300"><GraduationCap className="w-3 h-3 mr-1 inline" />Asig. Familiar (estudiante)</Badge>;
+                                }
+                                if (dhAge >= 18 && dhAge <= 24 && dh.is_studying && !dh.study_proof_url) {
+                                  return <Badge className="mt-2 ml-2 bg-amber-100 text-amber-700 border border-amber-300"><AlertTriangle className="w-3 h-3 mr-1 inline" />Falta constancia</Badge>;
+                                }
+                                if (dhAge > 24) {
+                                  return <Badge className="mt-2 ml-2 bg-slate-100 text-slate-500 border border-slate-300">Sin derecho (mayor 24)</Badge>;
+                                }
+                                return <Badge className="mt-2 ml-2 bg-slate-100 text-slate-500 border border-slate-300">Sin derecho (+18)</Badge>;
+                              })()}
                             </div>
                             <div className="flex gap-2">
                               <Button size="sm" variant="outline" onClick={() => { setDhFormData(dh); setEditingDH(dh); setShowDerechohabienteForm(true); }}><Edit className="w-4 h-4" /></Button>
@@ -850,6 +880,58 @@ export default function EmployeeForm({
                               <div><Label>Código Ciudad</Label><Input value={dhFormData.city_code || ""} onChange={(e) => setDhFormData({...dhFormData, city_code: e.target.value})} /></div>
                             </div>
                           </div>
+
+                          {/* Estudios Superiores — visible para hijos, con mensajes contextuales según edad */}
+                          {(dhFormData.relationship === "Hijo/a" || dhFormData.relationship === "Hijo Menor de Edad") && (() => {
+                            const dhAge = dhFormData.birth_date ? calculateAge(dhFormData.birth_date) : null;
+                            const isMinor = dhAge !== null && dhAge < 18;
+                            const isOver24 = dhAge !== null && dhAge > 24;
+                            const is18to24 = dhAge !== null && dhAge >= 18 && dhAge <= 24;
+                            return (
+                              <div className={`p-4 border rounded-lg space-y-3 ${isOver24 ? "bg-red-50 border-red-200" : is18to24 ? "bg-blue-50 border-blue-200" : "bg-green-50 border-green-200"}`}>
+                                <div className="flex items-center gap-2">
+                                  {isOver24 ? <AlertTriangle className="w-4 h-4 text-red-600" /> : is18to24 ? <GraduationCap className="w-4 h-4 text-blue-600" /> : <Baby className="w-4 h-4 text-green-600" />}
+                                  <p className={`text-sm font-semibold ${isOver24 ? "text-red-900" : is18to24 ? "text-blue-900" : "text-green-900"}`}>Asignación Familiar</p>
+                                </div>
+                                {dhAge !== null && (
+                                  <p className={`text-xs ${isOver24 ? "text-red-700" : is18to24 ? "text-blue-700" : "text-green-700"}`}>
+                                    {isMinor && <>Hijo de <strong>{dhAge} años</strong> — otorga asignación familiar automáticamente (menor de 18).</>}
+                                    {is18to24 && <>Hijo de <strong>{dhAge} años</strong>. Para mantener el derecho a asignación familiar, marque si está estudiando y adjunte la constancia.</>}
+                                    {isOver24 && <>Hijo de <strong>{dhAge} años</strong> — excede el tope de 24 años. No otorga asignación familiar.</>}
+                                  </p>
+                                )}
+                                {!isOver24 && (
+                                  <>
+                                    <div className="flex items-center gap-3 pt-1">
+                                      <input type="checkbox" id="dh_is_studying" checked={dhFormData.is_studying || false} onChange={(e) => setDhFormData({ ...dhFormData, is_studying: e.target.checked })} className="w-4 h-4" />
+                                      <label htmlFor="dh_is_studying" className="text-sm font-medium text-slate-700 cursor-pointer">Está cursando estudios superiores / universitarios</label>
+                                    </div>
+                                    {dhFormData.is_studying && (
+                                      <div className="space-y-2">
+                                        <Label className="text-sm">Constancia de Estudios *</Label>
+                                        {dhFormData.study_proof_url ? (
+                                          <div className="flex items-center gap-2 p-2 bg-white border border-green-300 rounded-lg">
+                                            <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                                            <a href={dhFormData.study_proof_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate flex-1">Ver constancia adjuntada</a>
+                                            <Button type="button" size="sm" variant="ghost" className="text-red-600 h-7 px-2" onClick={() => setDhFormData({ ...dhFormData, study_proof_url: "" })}><Trash2 className="w-3 h-3" /></Button>
+                                          </div>
+                                        ) : (
+                                          <label className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors">
+                                            {uploadingStudyProof ? (
+                                              <><Loader2 className="w-4 h-4 animate-spin text-blue-600" /><span className="text-sm text-blue-600">Subiendo...</span></>
+                                            ) : (
+                                              <><UploadCloud className="w-4 h-4 text-blue-600" /><span className="text-sm text-blue-600">Adjuntar constancia (PDF o imagen)</span></>
+                                            )}
+                                            <input type="file" accept=".pdf,image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadStudyProof(f); e.target.value = ""; }} />
+                                          </label>
+                                        )}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           {/* Estado */}
                           <div className="grid grid-cols-2 gap-4">

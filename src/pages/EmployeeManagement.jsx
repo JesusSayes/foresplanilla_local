@@ -44,6 +44,7 @@ export default function EmployeeManagement() {
   const [derechohabienteFormData, setDerechohabienteFormData] = useState({});
   const [formErrors, setFormErrors] = useState([]);
   const [showImportDH, setShowImportDH] = useState(false);
+  const [derechohabienteFilter, setDerechohabienteFilter] = useState("all");
 
   const { hasPermission, getAccessibleSites, canViewFinancials, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -157,6 +158,14 @@ export default function EmployeeManagement() {
     queryFn: async () => {
       const companies = await entitiesAPI.CompanyInfo.list("-created_date", 1);
       return companies[0] || null;
+    },
+  });
+
+  // Todos los derechohabientes — para el filtro de "derecho a viente"
+  const { data: allDerechohabientes = [] } = useQuery({
+    queryKey: ["allDerechohabientes"],
+    queryFn: async () => {
+      return await entitiesAPI.Derechohabiente.list();
     },
   });
 
@@ -785,6 +794,26 @@ export default function EmployeeManagement() {
   const departmentNames = [...new Set(siteAllowedEmployees.map(e => e.department_name))].filter(Boolean);
   const contractTypes = [...new Set(siteAllowedEmployees.map(e => e.contract_type))].filter(Boolean);
 
+  // Edad de un derechohabiente según su fecha de nacimiento
+  const calcDhAge = (birthDate) => {
+    if (!birthDate) return null;
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
+  };
+
+  // Mapa de derechohabientes por empleado (solo activos)
+  const dhByEmployee = {};
+  allDerechohabientes.forEach(dh => {
+    if (dh.is_active !== false) {
+      if (!dhByEmployee[dh.employee_id]) dhByEmployee[dh.employee_id] = [];
+      dhByEmployee[dh.employee_id].push(dh);
+    }
+  });
+
   const filteredEmployees = siteAllowedEmployees.filter(emp => {
     const matchesSearch = emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -794,7 +823,34 @@ export default function EmployeeManagement() {
     const matchesDept = departmentFilter === "all" || emp.department_name === departmentFilter;
     const matchesSite = siteFilter === "all" || emp.site === siteFilter || (siteFilter === "sin_sede" && !emp.site);
     const matchesContractType = contractTypeFilter === "all" || emp.contract_type === contractTypeFilter;
-    return matchesSearch && matchesStatus && matchesDept && matchesSite && matchesContractType;
+
+    // Filtro de Derecho Habiente
+    const empDhs = dhByEmployee[emp.id] || [];
+    const empDhAges = empDhs.map(dh => calcDhAge(dh.birth_date)).filter(a => a !== null);
+    const hasDerechohabientes = empDhs.length > 0;
+    let matchesDerechohabiente = true;
+    if (derechohabienteFilter === "con_derecho") {
+      matchesDerechohabiente = hasDerechohabientes;
+    } else if (derechohabienteFilter === "sin_derecho") {
+      matchesDerechohabiente = !hasDerechohabientes;
+    } else if (derechohabienteFilter === "menor_18") {
+      matchesDerechohabiente = empDhAges.some(a => a < 18);
+    } else if (derechohabienteFilter === "menor_25") {
+      matchesDerechohabiente = empDhAges.some(a => a < 25);
+    } else if (derechohabienteFilter === "mayor_25") {
+      matchesDerechohabiente = empDhs.some(dh => {
+        const a = calcDhAge(dh.birth_date);
+        return a !== null && a > 25;
+      });
+    } else if (derechohabienteFilter === "sin_estudio_18") {
+      // DH mayor de 18 años que NO estudia → no le corresponde asignación familiar
+      matchesDerechohabiente = empDhs.some(dh => {
+        const a = calcDhAge(dh.birth_date);
+        return a !== null && a >= 18 && !dh.is_studying;
+      });
+    }
+
+    return matchesSearch && matchesStatus && matchesDept && matchesSite && matchesContractType && matchesDerechohabiente;
   });
 
 
@@ -895,20 +951,20 @@ export default function EmployeeManagement() {
         <Card className="border-0 shadow-lg">
           <CardHeader className="border-b bg-slate-50/50">
             <div className="flex flex-wrap items-center gap-4">
-              <div className="flex-1 min-w-64">
+              <div className="flex-1 min-w-[140px]">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                   <Input
-                    placeholder="Buscar por nombre, código o documento..."
+                    placeholder="Buscar..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-9 h-9 text-sm"
                   />
                 </div>
               </div>
 
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-[110px] h-9 text-sm">
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
@@ -920,7 +976,7 @@ export default function EmployeeManagement() {
               </Select>
 
               <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-[130px] h-9 text-sm">
                   <SelectValue placeholder="Departamento" />
                 </SelectTrigger>
                 <SelectContent>
@@ -933,7 +989,7 @@ export default function EmployeeManagement() {
 
               <div className="relative">
                 <Select value={siteFilter} onValueChange={setSiteFilter} disabled={hasSingleSite}>
-                  <SelectTrigger className={`w-40 ${hasSingleSite ? "opacity-70 cursor-not-allowed bg-slate-100" : ""}`}>
+                  <SelectTrigger className={`w-[110px] h-9 text-sm ${hasSingleSite ? "opacity-70 cursor-not-allowed bg-slate-100" : ""}`}>
                     <SelectValue placeholder="Sede" />
                   </SelectTrigger>
                   <SelectContent>
@@ -953,8 +1009,8 @@ export default function EmployeeManagement() {
               </div>
 
               <Select value={contractTypeFilter} onValueChange={setContractTypeFilter}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Tipo de Contrato" />
+                <SelectTrigger className="w-[130px] h-9 text-sm">
+                  <SelectValue placeholder="Contrato" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
@@ -964,9 +1020,24 @@ export default function EmployeeManagement() {
                 </SelectContent>
               </Select>
 
-              <div className="px-4 py-2 bg-indigo-50 border border-indigo-200 rounded-lg">
-                <p className="text-sm font-medium text-indigo-900">
-                  {filteredEmployees.length} / {allEmployees.length}
+              <Select value={derechohabienteFilter} onValueChange={setDerechohabienteFilter}>
+                <SelectTrigger className="w-[135px] h-9 text-sm">
+                  <SelectValue placeholder="Derecho Hab." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="con_derecho">Con Derecho Hab.</SelectItem>
+                  <SelectItem value="sin_derecho">Sin Derecho Hab.</SelectItem>
+                  <SelectItem value="menor_18">Con DH menor de 18 años</SelectItem>
+                  <SelectItem value="menor_25">Con DH menor de 25 años</SelectItem>
+                  <SelectItem value="mayor_25">Con DH mayor de 25 años</SelectItem>
+                  <SelectItem value="sin_estudio_18">Con DH mayor de 18 sin estudio (no califica)</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg shrink-0">
+                <p className="text-sm font-medium text-indigo-900 whitespace-nowrap">
+                  {filteredEmployees.length}/{allEmployees.length}
                 </p>
               </div>
             </div>

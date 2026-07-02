@@ -26,10 +26,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.codellm
 
 .env
 .codellm
+AGENTS.md
 
 Apuntes
 backend/node_modules
