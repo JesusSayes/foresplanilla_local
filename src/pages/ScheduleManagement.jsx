@@ -790,7 +790,7 @@ export default function ScheduleManagement() {
                                 <Edit className="w-4 h-4" />
                               </Button>
                             )}
-                            {employee?.role === "super_admin" && (
+                            {effectiveEmployee?.role === "super_admin" && (
                               <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDeleteSchedule(schedule)}>
                                 <Trash2 className="w-4 h-4" />
                               </Button>
