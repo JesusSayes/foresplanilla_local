@@ -46,6 +46,8 @@ export default function CostCenterManagement() {
   const [unassignedSearchTerm, setUnassignedSearchTerm] = useState("");
   const [historySearchTerm, setHistorySearchTerm] = useState("");
   const [openCCCombobox, setOpenCCCombobox] = useState(false);
+  const [openEmployeeCombobox, setOpenEmployeeCombobox] = useState(false);
+  const [openDeptCombobox, setOpenDeptCombobox] = useState(false);
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
 
   const queryClient = useQueryClient();
@@ -1163,64 +1165,102 @@ export default function CostCenterManagement() {
               {assignmentFormData.assignment_type === "Empleado" && (
                 <div>
                   <Label>Empleado *</Label>
-                  <Select 
-                    value={assignmentFormData.employee_id} 
-                    onValueChange={(v) => setAssignmentFormData({ ...assignmentFormData, employee_id: v })}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Seleccionar empleado" /></SelectTrigger>
-                    <SelectContent align="start" sideOffset={4}>
-                      <div className="p-2 border-b sticky top-0 bg-white">
-                        <Input
-                          placeholder="Buscar..."
-                          value={employeeSearchTerm}
-                          onChange={(e) => setEmployeeSearchTerm(e.target.value)}
-                          className="h-8"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      {allEmployees
-                        .filter(e => 
-                          e.first_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-                          e.last_name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
-                        )
-                        .map(emp => (
-                          <SelectItem key={emp.id} value={emp.id}>
-                            {emp.employee_code} - {emp.first_name} {emp.last_name} ({emp.status})
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={openEmployeeCombobox} onOpenChange={setOpenEmployeeCombobox}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openEmployeeCombobox}
+                        className="w-full justify-between font-normal"
+                      >
+                        {assignmentFormData.employee_id
+                          ? (() => {
+                              const emp = allEmployees.find(e => e.id === assignmentFormData.employee_id);
+                              return emp ? `${emp.employee_code} - ${emp.first_name} ${emp.last_name}` : "Seleccionar empleado";
+                            })()
+                          : "Seleccionar empleado"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0" sideOffset={4}>
+                      <Command>
+                        <CommandInput placeholder="Buscar empleado..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontró empleado.</CommandEmpty>
+                          <CommandGroup>
+                            {allEmployees.map((emp) => (
+                              <CommandItem
+                                key={emp.id}
+                                value={`${emp.employee_code} ${emp.first_name} ${emp.last_name}`}
+                                onSelect={() => {
+                                  setAssignmentFormData({ ...assignmentFormData, employee_id: emp.id });
+                                  setEmployeeSearchTerm("");
+                                  setOpenEmployeeCombobox(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    assignmentFormData.employee_id === emp.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {emp.employee_code} - {emp.first_name} {emp.last_name} ({emp.status})
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
 
               {assignmentFormData.assignment_type === "Departamento" && (
                 <div>
                   <Label>Departamento *</Label>
-                  <Select 
-                    value={assignmentFormData.department_name} 
-                    onValueChange={(v) => setAssignmentFormData({ ...assignmentFormData, department_name: v })}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
-                    <SelectContent align="start" sideOffset={4}>
-                      <div className="p-2 border-b sticky top-0 bg-white z-10">
-                        <Input
-                          placeholder="Buscar departamento..."
-                          value={departmentSearchTerm}
-                          onChange={(e) => setDepartmentSearchTerm(e.target.value)}
-                          className="h-8"
-                          onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      {departments
-                        .filter(dept => dept.name.toLowerCase().includes(departmentSearchTerm.toLowerCase()))
-                        .map(dept => (
-                          <SelectItem key={dept.id} value={dept.name}>
-                            {dept.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={openDeptCombobox} onOpenChange={setOpenDeptCombobox}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openDeptCombobox}
+                        className="w-full justify-between font-normal"
+                      >
+                        {assignmentFormData.department_name
+                          ? assignmentFormData.department_name
+                          : "Seleccionar departamento"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0" sideOffset={4}>
+                      <Command>
+                        <CommandInput placeholder="Buscar departamento..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontró departamento.</CommandEmpty>
+                          <CommandGroup>
+                            {departments.map((dept) => (
+                              <CommandItem
+                                key={dept.id}
+                                value={dept.name}
+                                onSelect={() => {
+                                  setAssignmentFormData({ ...assignmentFormData, department_name: dept.name });
+                                  setOpenDeptCombobox(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    assignmentFormData.department_name === dept.name ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {dept.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
 
