@@ -877,62 +877,53 @@ export default function EmployeeForm({
                             </div>
                           </div>
 
-                          {/* Estudios Superiores (solo para hijos — extensión hasta 24 años) */}
-                          {(dhFormData.relationship === "Hijo/a" || dhFormData.relationship === "Hijo Menor de Edad") && dhFormData.birth_date && (() => {
-                            const dhAge = calculateAge(dhFormData.birth_date);
-                            if (dhAge < 18) {
-                              return (
-                                <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-                                  <Baby className="w-4 h-4 text-green-600 shrink-0" />
-                                  <p className="text-sm text-green-800">
-                                    Hijo de <strong>{dhAge} años</strong> — otorga asignación familiar automáticamente (menor de 18).
-                                  </p>
-                                </div>
-                              );
-                            }
-                            if (dhAge > 24) {
-                              return (
-                                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-                                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
-                                  <p className="text-sm text-red-800">
-                                    Hijo de <strong>{dhAge} años</strong> — excede el tope de 24 años. No otorga asignación familiar.
-                                  </p>
-                                </div>
-                              );
-                            }
+                          {/* Estudios Superiores — visible para hijos, con mensajes contextuales según edad */}
+                          {(dhFormData.relationship === "Hijo/a" || dhFormData.relationship === "Hijo Menor de Edad") && (() => {
+                            const dhAge = dhFormData.birth_date ? calculateAge(dhFormData.birth_date) : null;
+                            const isMinor = dhAge !== null && dhAge < 18;
+                            const isOver24 = dhAge !== null && dhAge > 24;
+                            const is18to24 = dhAge !== null && dhAge >= 18 && dhAge <= 24;
                             return (
-                              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                              <div className={`p-4 border rounded-lg space-y-3 ${isOver24 ? "bg-red-50 border-red-200" : is18to24 ? "bg-blue-50 border-blue-200" : "bg-green-50 border-green-200"}`}>
                                 <div className="flex items-center gap-2">
-                                  <GraduationCap className="w-4 h-4 text-blue-600" />
-                                  <p className="text-sm font-semibold text-blue-900">Estudios Superiores (18-24 años)</p>
+                                  {isOver24 ? <AlertTriangle className="w-4 h-4 text-red-600" /> : is18to24 ? <GraduationCap className="w-4 h-4 text-blue-600" /> : <Baby className="w-4 h-4 text-green-600" />}
+                                  <p className={`text-sm font-semibold ${isOver24 ? "text-red-900" : is18to24 ? "text-blue-900" : "text-green-900"}`}>Asignación Familiar</p>
                                 </div>
-                                <p className="text-xs text-blue-700">
-                                  Hijo de <strong>{dhAge} años</strong>. Para mantener el derecho a asignación familiar, marque si está estudiando y adjunte la constancia.
-                                </p>
-                                <div className="flex items-center gap-3">
-                                  <input type="checkbox" id="dh_is_studying" checked={dhFormData.is_studying || false} onChange={(e) => setDhFormData({ ...dhFormData, is_studying: e.target.checked })} className="w-4 h-4" />
-                                  <label htmlFor="dh_is_studying" className="text-sm font-medium text-slate-700 cursor-pointer">Está cursando estudios superiores / universitarios</label>
-                                </div>
-                                {dhFormData.is_studying && (
-                                  <div className="space-y-2">
-                                    <Label className="text-sm">Constancia de Estudios *</Label>
-                                    {dhFormData.study_proof_url ? (
-                                      <div className="flex items-center gap-2 p-2 bg-white border border-green-300 rounded-lg">
-                                        <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                                        <a href={dhFormData.study_proof_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate flex-1">Ver constancia adjuntada</a>
-                                        <Button type="button" size="sm" variant="ghost" className="text-red-600 h-7 px-2" onClick={() => setDhFormData({ ...dhFormData, study_proof_url: "" })}><Trash2 className="w-3 h-3" /></Button>
-                                      </div>
-                                    ) : (
-                                      <label className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors">
-                                        {uploadingStudyProof ? (
-                                          <><Loader2 className="w-4 h-4 animate-spin text-blue-600" /><span className="text-sm text-blue-600">Subiendo...</span></>
+                                {dhAge !== null && (
+                                  <p className={`text-xs ${isOver24 ? "text-red-700" : is18to24 ? "text-blue-700" : "text-green-700"}`}>
+                                    {isMinor && <>Hijo de <strong>{dhAge} años</strong> — otorga asignación familiar automáticamente (menor de 18).</>}
+                                    {is18to24 && <>Hijo de <strong>{dhAge} años</strong>. Para mantener el derecho a asignación familiar, marque si está estudiando y adjunte la constancia.</>}
+                                    {isOver24 && <>Hijo de <strong>{dhAge} años</strong> — excede el tope de 24 años. No otorga asignación familiar.</>}
+                                  </p>
+                                )}
+                                {!isOver24 && (
+                                  <>
+                                    <div className="flex items-center gap-3 pt-1">
+                                      <input type="checkbox" id="dh_is_studying" checked={dhFormData.is_studying || false} onChange={(e) => setDhFormData({ ...dhFormData, is_studying: e.target.checked })} className="w-4 h-4" />
+                                      <label htmlFor="dh_is_studying" className="text-sm font-medium text-slate-700 cursor-pointer">Está cursando estudios superiores / universitarios</label>
+                                    </div>
+                                    {dhFormData.is_studying && (
+                                      <div className="space-y-2">
+                                        <Label className="text-sm">Constancia de Estudios *</Label>
+                                        {dhFormData.study_proof_url ? (
+                                          <div className="flex items-center gap-2 p-2 bg-white border border-green-300 rounded-lg">
+                                            <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                                            <a href={dhFormData.study_proof_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate flex-1">Ver constancia adjuntada</a>
+                                            <Button type="button" size="sm" variant="ghost" className="text-red-600 h-7 px-2" onClick={() => setDhFormData({ ...dhFormData, study_proof_url: "" })}><Trash2 className="w-3 h-3" /></Button>
+                                          </div>
                                         ) : (
-                                          <><UploadCloud className="w-4 h-4 text-blue-600" /><span className="text-sm text-blue-600">Adjuntar constancia (PDF o imagen)</span></>
+                                          <label className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors">
+                                            {uploadingStudyProof ? (
+                                              <><Loader2 className="w-4 h-4 animate-spin text-blue-600" /><span className="text-sm text-blue-600">Subiendo...</span></>
+                                            ) : (
+                                              <><UploadCloud className="w-4 h-4 text-blue-600" /><span className="text-sm text-blue-600">Adjuntar constancia (PDF o imagen)</span></>
+                                            )}
+                                            <input type="file" accept=".pdf,image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadStudyProof(f); e.target.value = ""; }} />
+                                          </label>
                                         )}
-                                        <input type="file" accept=".pdf,image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadStudyProof(f); e.target.value = ""; }} />
-                                      </label>
+                                      </div>
                                     )}
-                                  </div>
+                                  </>
                                 )}
                               </div>
                             );
