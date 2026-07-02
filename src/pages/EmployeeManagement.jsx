@@ -840,6 +840,17 @@ export default function EmployeeManagement() {
       matchesDerechohabiente = empDhAges.some(a => a < 18);
     } else if (derechohabienteFilter === "menor_25") {
       matchesDerechohabiente = empDhAges.some(a => a < 25);
+    } else if (derechohabienteFilter === "mayor_25") {
+      matchesDerechohabiente = empDhs.some(dh => {
+        const a = calcDhAge(dh.birth_date);
+        return a !== null && a > 25;
+      });
+    } else if (derechohabienteFilter === "sin_estudio_18") {
+      // DH mayor de 18 años que NO estudia → no le corresponde asignación familiar
+      matchesDerechohabiente = empDhs.some(dh => {
+        const a = calcDhAge(dh.birth_date);
+        return a !== null && a >= 18 && !dh.is_studying;
+      });
     }
 
     return matchesSearch && matchesStatus && matchesDept && matchesSite && matchesContractType && matchesDerechohabiente;
@@ -1021,6 +1032,8 @@ export default function EmployeeManagement() {
                   <SelectItem value="sin_derecho">Sin Derecho Hab.</SelectItem>
                   <SelectItem value="menor_18">Con DH menor de 18 años</SelectItem>
                   <SelectItem value="menor_25">Con DH menor de 25 años</SelectItem>
+                  <SelectItem value="mayor_25">Con DH mayor de 25 años</SelectItem>
+                  <SelectItem value="sin_estudio_18">Con DH mayor de 18 sin estudio (no califica)</SelectItem>
                 </SelectContent>
               </Select>
 
