@@ -1168,7 +1168,7 @@ export default function CostCenterManagement() {
                     onValueChange={(v) => setAssignmentFormData({ ...assignmentFormData, employee_id: v })}
                   >
                     <SelectTrigger><SelectValue placeholder="Seleccionar empleado" /></SelectTrigger>
-                    <SelectContent>
+                    <SelectContent align="start" sideOffset={4}>
                       <div className="p-2 border-b sticky top-0 bg-white">
                         <Input
                           placeholder="Buscar..."
@@ -1201,7 +1201,7 @@ export default function CostCenterManagement() {
                     onValueChange={(v) => setAssignmentFormData({ ...assignmentFormData, department_name: v })}
                   >
                     <SelectTrigger><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
-                    <SelectContent>
+                    <SelectContent align="start" sideOffset={4}>
                       <div className="p-2 border-b sticky top-0 bg-white z-10">
                         <Input
                           placeholder="Buscar departamento..."
