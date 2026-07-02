@@ -1155,7 +1155,7 @@ export default function CostCenterManagement() {
                           <SelectItem key={emp.id} value={emp.id}>
                             {emp.employee_code} - {emp.first_name} {emp.last_name} ({emp.status})
                           </SelectItem>
-                        ))}
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1186,7 +1186,7 @@ export default function CostCenterManagement() {
                           <SelectItem key={dept.id} value={dept.name}>
                             {dept.name}
                           </SelectItem>
-                        ))}
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
