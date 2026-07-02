@@ -1,7 +1,43 @@
 /**
  * Módulo de cálculo automático de conceptos de planilla
- * Evalúa fórmulas dinámicas y aplica conceptos según periodicidad
+ * Evalúa fórmulas dinámicas, aplica lógica del sistema y maneja montos fijos
  */
+
+import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
+
+// Catálogo de lógicas del sistema disponibles
+export const SYSTEM_LOGIC_TYPES = {
+  family_allowance: {
+    label: "Asignación Familiar",
+    description: "Calcula automáticamente según derechohabientes (10% RMV si tiene hijos elegibles)",
+    concept_type: "Ingreso",
+    concept_category: "Asignaciones",
+  },
+  tardiness_discount: {
+    label: "Descuento por Tardanzas",
+    description: "Calcula descuento según minutos de tardanza (reglamento interno)",
+    concept_type: "Descuento",
+    concept_category: "Descuentos Varios",
+  },
+  absence_discount: {
+    label: "Descuento por Inasistencias",
+    description: "Calcula descuento proporcional por días de inasistencia",
+    concept_type: "Descuento",
+    concept_category: "Descuentos Varios",
+  },
+  salary_advance: {
+    label: "Adelanto Quincenal",
+    description: "Monto del adelanto de sueldo quincenal según configuración",
+    concept_type: "Descuento",
+    concept_category: "Descuentos Varios",
+  },
+  loan_installment: {
+    label: "Cuota de Préstamo",
+    description: "Cuota mensual de préstamo según tabla de amortización",
+    concept_type: "Descuento",
+    concept_category: "Préstamos",
+  },
+};
 
 export class PayrollCalculator {
   constructor(employee, month, year, payrollType = "Mensual", quincenalPct = 0.40) {
@@ -27,7 +63,7 @@ export class PayrollCalculator {
         worked_days: context.worked_days || 30,
         regular_hours: context.regular_hours || 0,
         overtime_hours: context.overtime_hours || 0,
-        rmv: context.rmv || 1025,
+        rmv: context.rmv || 1130,
         horas_extras_25: context.horas_extras_25 || 0,
         horas_extras_35: context.horas_extras_35 || 0,
         horas_nocturnas: context.horas_nocturnas || 0,
@@ -99,10 +135,110 @@ export class PayrollCalculator {
   }
 
   /**
-   * Calcula todos los conceptos de planilla para el empleado
+   * Aplica la lógica del sistema según el tipo configurado en el concepto
    */
-  async calculatePayroll(concepts, attendanceData, rmvAmount) {
-    const context = this.buildContext(attendanceData, rmvAmount);
+  applySystemLogic(concept, context) {
+    const logicType = concept.system_logic_type;
+
+    try {
+      let result = 0;
+      let detail = "";
+
+      switch (logicType) {
+        case "family_allowance": {
+          // Asignación familiar: 10% RMV si tiene hijos elegibles (menores de 18 o estudiantes 18-24)
+          const info = getFamilyAllowanceEligibility(
+            context.derechohabientes || [],
+            context.rmv || 1130
+          );
+          result = info.amount;
+          detail = info.qualifies
+            ? `Califica: ${info.eligibleCount} hijo(s) elegible(s)`
+            : "No califica (sin hijos elegibles)";
+          break;
+        }
+
+        case "tardiness_discount": {
+          // Descuento por tardanzas: (salario_diario / 8) * minutos_tardanza / 60
+          // Aplica para tardanzas mayores a 10 minutos (tolerancia)
+          const lateRecords = context.late_records || [];
+          const totalLateMinutes = lateRecords.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
+          const dailySalary = (context.base_salary || 0) / 30;
+          const hourlyRate = dailySalary / 8;
+          result = -(hourlyRate * (totalLateMinutes / 60));
+          detail = `${totalLateMinutes} min de tardanza en ${lateRecords.length} día(s)`;
+          break;
+        }
+
+        case "absence_discount": {
+          // Descuento por inasistencias: salario_diario * días_falta
+          const absentRecords = context.absent_records || [];
+          const dailySalary = (context.base_salary || 0) / 30;
+          result = -(dailySalary * absentRecords.length);
+          detail = `${absentRecords.length} día(s) de inasistencia`;
+          break;
+        }
+
+        case "salary_advance": {
+          // Adelanto quincenal: base_salary * porcentaje quincenal
+          result = -(context.quincenal_amount || 0);
+          detail = `Adelanto quincenal`;
+          break;
+        }
+
+        case "loan_installment": {
+          // Cuota de préstamo: suma de cuotas pendientes del mes
+          const installments = context.loan_installments || [];
+          result = -(installments.reduce((sum, i) => sum + (i.amount || 0), 0));
+          detail = `${installments.length} cuota(s) de préstamo`;
+          break;
+        }
+
+        default:
+          detail = `Lógica del sistema no reconocida: "${logicType}"`;
+          this.errors.push({ concept: concept.concept_name, error: detail });
+      }
+
+      this.logCalculation({
+        concept: concept.concept_name,
+        system_logic_type: logicType,
+        result: result,
+        detail: detail,
+        status: 'success'
+      });
+
+      return result;
+    } catch (error) {
+      this.errors.push({
+        concept: concept.concept_name,
+        system_logic_type: logicType,
+        error: error.message
+      });
+
+      this.logCalculation({
+        concept: concept.concept_name,
+        system_logic_type: logicType,
+        error: error.message,
+        status: 'error'
+      });
+
+      return 0;
+    }
+  }
+
+  /**
+   * Calcula todos los conceptos de planilla para el empleado
+   * @param {Array} concepts - Lista de conceptos
+   * @param {Object} attendanceData - Datos de asistencia
+   * @param {number} rmvAmount - RMV vigente
+   * @param {Object} extraContext - Datos adicionales para lógica del sistema:
+   *   - derechohabientes: lista de derechohabientes del empleado
+   *   - late_records: registros de tardanza
+   *   - absent_records: registros de inasistencia
+   *   - loan_installments: cuotas de préstamo pendientes
+   */
+  async calculatePayroll(concepts, attendanceData, rmvAmount, extraContext = {}) {
+    const context = this.buildContext(attendanceData, rmvAmount, extraContext);
     
     // Separar conceptos por tipo
     const incomes = [];
@@ -156,7 +292,7 @@ export class PayrollCalculator {
   /**
    * Construye el contexto de variables para cálculos
    */
-  buildContext(attendanceData, rmvAmount) {
+  buildContext(attendanceData, rmvAmount, extraContext = {}) {
     // base_salary SIEMPRE es el salario del contrato (sin modificar)
     // Para fórmulas dinámicas en quincenal, el contexto expone quincenal_amount = base_salary * pct
     const rawSalary = this.employee.base_salary || 0;
@@ -180,7 +316,7 @@ export class PayrollCalculator {
       worked_days: workedDays,
       regular_hours: regularHours,
       overtime_hours: overtimeHours,
-      rmv: rmvAmount || 1025,
+      rmv: rmvAmount || 1130,
       horas_extras_25: attendanceData?.horas_extras_25 || 0,
       horas_extras_35: attendanceData?.horas_extras_35 || 0,
       horas_nocturnas: attendanceData?.horas_nocturnas || 0,
@@ -189,6 +325,11 @@ export class PayrollCalculator {
       transport_cost: this.employee.transport_cost || 0,
       food_cost: this.employee.food_cost || 0,
       activity_cost: this.employee.activity_cost || 0,
+      // Datos adicionales para lógica del sistema
+      derechohabientes: extraContext.derechohabientes || [],
+      late_records: extraContext.late_records || [],
+      absent_records: extraContext.absent_records || [],
+      loan_installments: extraContext.loan_installments || [],
     };
   }
 
@@ -197,13 +338,20 @@ export class PayrollCalculator {
    */
   calculateConcept(concept, context) {
     let calculatedAmount = 0;
+    let method = 'fixed';
 
-    if (concept.is_dynamic && concept.calculation_formula) {
+    if (concept.system_logic_type) {
+      // Lógica del sistema: el sistema calcula según la lógica implementada
+      calculatedAmount = this.applySystemLogic(concept, context);
+      method = 'system_logic';
+    } else if (concept.is_dynamic && concept.calculation_formula) {
       // Cálculo dinámico usando fórmula
       calculatedAmount = this.evaluateFormula(concept.calculation_formula, context);
+      method = 'dynamic';
     } else {
       // Monto fijo
       calculatedAmount = parseFloat(concept.amount) || 0;
+      method = 'fixed';
     }
 
     // Sanitizar resultado: evitar Infinity, NaN y valores absurdos
@@ -214,7 +362,7 @@ export class PayrollCalculator {
     return {
       ...concept,
       calculated_amount: Math.round(safeAmount * 100) / 100,
-      calculation_method: concept.is_dynamic ? 'dynamic' : 'fixed',
+      calculation_method: method,
       applied_date: new Date().toISOString()
     };
   }
@@ -271,6 +419,16 @@ export class PayrollCalculator {
    * Genera un resumen legible de los cálculos
    */
   generateSummary(incomes, deductions, contributions, totalIncome, totalDeductions, netPay) {
+    const mapItem = (c) => ({
+      name: c.concept_name,
+      concept_code: c.concept_code || "",
+      concept_id: c.id || null,
+      amount: c.calculated_amount,
+      method: c.calculation_method,
+      formula: c.is_dynamic && !c.system_logic_type ? c.calculation_formula : null,
+      system_logic_type: c.system_logic_type || null,
+    });
+
     return {
       employee: {
         code: this.employee.employee_code,
@@ -286,39 +444,20 @@ export class PayrollCalculator {
       breakdown: {
         incomes: {
           count: incomes.length,
-          items: incomes.map(c => ({
-            name: c.concept_name,
-            concept_code: c.concept_code || "",
-            concept_id: c.id || null,
-            amount: c.calculated_amount,
-            method: c.calculation_method,
-            formula: c.is_dynamic ? c.calculation_formula : null
-          })),
+          items: incomes.map(mapItem),
           total: totalIncome
         },
         deductions: {
           count: deductions.length,
           items: deductions.map(c => ({
-            name: c.concept_name,
-            concept_code: c.concept_code || "",
-            concept_id: c.id || null,
-            amount: c.calculated_amount,
-            method: c.calculation_method,
-            formula: c.is_dynamic ? c.calculation_formula : null,
+            ...mapItem(c),
             is_worker_contribution: c.concept_category === "AFP/ONP" || c.concept_category === "Impuestos" || c.is_worker_contribution
           })),
           total: totalDeductions
         },
         contributions: {
           count: contributions.length,
-          items: contributions.map(c => ({
-            name: c.concept_name,
-            concept_code: c.concept_code || "",
-            concept_id: c.id || null,
-            amount: c.calculated_amount,
-            method: c.calculation_method,
-            formula: c.is_dynamic ? c.calculation_formula : null
-          })),
+          items: contributions.map(mapItem),
           total: contributions.reduce((sum, c) => sum + c.calculated_amount, 0)
         }
       },
@@ -347,9 +486,9 @@ export class PayrollCalculator {
  * Hook para usar el calculador de planilla
  */
 export function usePayrollCalculator() {
-  const calculateEmployeePayroll = async (employee, month, year, payrollType, concepts, attendanceData, rmvAmount, quincenalPct = 0.40) => {
+  const calculateEmployeePayroll = async (employee, month, year, payrollType, concepts, attendanceData, rmvAmount, quincenalPct = 0.40, extraContext = {}) => {
     const calculator = new PayrollCalculator(employee, month, year, payrollType, quincenalPct);
-    return await calculator.calculatePayroll(concepts, attendanceData, rmvAmount);
+    return await calculator.calculatePayroll(concepts, attendanceData, rmvAmount, extraContext);
   };
 
   return { calculateEmployeePayroll };

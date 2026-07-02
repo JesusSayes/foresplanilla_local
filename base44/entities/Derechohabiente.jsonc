@@ -135,6 +135,15 @@
       "type": "boolean",
       "default": true,
       "description": "Derechohabiente activo"
+    },
+    "is_studying": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica si el hijo est\u00e1 cursando estudios superiores/universitarios. Extiende el derecho a asignaci\u00f3n familiar hasta los 24 a\u00f1os."
+    },
+    "study_proof_url": {
+      "type": "string",
+      "description": "URL de la constancia de estudios adjunta (obligatoria para hijos de 18 a 24 a\u00f1os que mantienen el derecho a asignaci\u00f3n familiar)"
     }
   },
   "required": [

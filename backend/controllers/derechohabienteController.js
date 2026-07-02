@@ -59,6 +59,8 @@ export const create = async (req, res) => {
         gender: data.gender,
         relationship: data.relationship,
         is_active: data.is_active,
+        is_studying: data.is_studying,
+        study_proof_url: data.study_proof_url,
 
         birth_date: data.birth_date
           ? new Date(data.birth_date)
@@ -94,6 +96,8 @@ export const update = async (req, res) => {
         gender: data.gender,
         relationship: data.relationship,
         is_active: data.is_active,
+        is_studying: data.is_studying,
+        study_proof_url: data.study_proof_url,
 
         birth_date: data.birth_date
           ? new Date(data.birth_date)

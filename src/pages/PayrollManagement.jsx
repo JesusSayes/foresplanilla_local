@@ -10,13 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  DollarSign, FileText, Calendar, Users, Download,
+  DollarSign, FileText, Calendar, Download,
   Eye, CheckCircle, AlertCircle, Plus, Search, Lock, Edit2, Settings
 } from "lucide-react";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
@@ -28,7 +27,8 @@ import { useNavigate } from "react-router-dom";
 import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
-import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/lib/payrollUtils";
+import { safePayrollNumber, roundMoney, sanitizePayslip } from "@/lib/payrollUtils";
+import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 
 export default function PayrollManagement() {
   const { user: currentUser } = useAuth();
@@ -141,7 +141,7 @@ export default function PayrollManagement() {
     queryKey: ["rmv"],
     queryFn: async () => {
       const rmvs = await entitiesAPI.RMV.filter({ is_active: true }, "-effective_date");
-      return rmvs.length > 0 ? rmvs[0] : { amount: 1025 };
+      return rmvs.length > 0 ? rmvs[0] : { amount: 1130 };
     },
   });
 
@@ -380,6 +380,15 @@ export default function PayrollManagement() {
       return emp;
     }));
 
+    // Obtener derechohabientes de todos los empleados para cálculo de asignación familiar
+    const allDerechohabientes = await Promise.all(
+      enrichedEmployees.map(emp => entitiesAPI.Derechohabiente.filter({ employee_id: emp.id }))
+    );
+    const derechohabientesMap = {};
+    enrichedEmployees.forEach((emp, idx) => {
+      derechohabientesMap[emp.id] = allDerechohabientes[idx] || [];
+    });
+
     // Re-verificar empleados aún sin salario (ni en Employee ni en contrato)
     const stillWithoutSalary = enrichedEmployees.filter(emp => !emp.base_salary || parseFloat(emp.base_salary) <= 0);
     if (stillWithoutSalary.length > 0) {
@@ -438,6 +447,10 @@ export default function PayrollManagement() {
 
       const calculator = new PayrollCalculator(emp, selectedMonth, selectedYear, payrollType, quincenalPct);
 
+      // Calcular asignación familiar automática basada en derechohabientes
+      const empDerechohabientes = derechohabientesMap[emp.id] || [];
+      const familyAllowanceInfo = getFamilyAllowanceEligibility(empDerechohabientes, rmvData?.amount || 1130);
+
       let conceptsForCalc;
       if (payrollType === "Quincenal") {
         // Para planilla quincenal: si el empleado tiene monto_quincena fijo, usarlo;
@@ -465,13 +478,38 @@ export default function PayrollManagement() {
       } else {
         // Para planillas no quincenales: usar todos los conceptos normales
         conceptsForCalc = [...allEmpConcepts];
+        // Si NO existe un concepto de "Asignación Familiar" configurado (ya sea por fórmula o lógica del sistema),
+        // agregar la asignación familiar automática basada en derechohabientes como fallback.
+        const hasFamilyAllowanceConcept = allEmpConcepts.some(c =>
+          c.concept_name === "Asignación Familiar" || c.system_logic_type === "family_allowance"
+        );
+        if (!hasFamilyAllowanceConcept && familyAllowanceInfo.qualifies) {
+          conceptsForCalc.push({
+            employee_id: emp.id,
+            concept_type: "Ingreso",
+            concept_category: "Asignaciones",
+            concept_name: "Asignación Familiar",
+            is_dynamic: false,
+            amount: familyAllowanceInfo.amount,
+            is_recurring: true,
+            applies_to_payroll_types: ["Mensual", "Adicional", "SNP"],
+          });
+        }
       }
-
-      const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1025);
 
       // Calcular descuentos por asistencia (solo para planillas NO quincenales)
       const lateRecords = empAttendance.filter(r => r.is_late && r.late_minutes > 10);
       const absentRecords = empAttendance.filter(r => r.is_absent);
+
+      // Datos adicionales para lógica del sistema (derechohabientes, tardanzas, inasistencias)
+      const extraContext = {
+        derechohabientes: empDerechohabientes,
+        late_records: lateRecords,
+        absent_records: absentRecords,
+      };
+
+      const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1130, extraContext);
+
       const baseSalaryForCalc = safePayrollNumber(emp.base_salary); // Siempre usar el salario del contrato
       const dailyRate = baseSalaryForCalc > 0 ? roundMoney(baseSalaryForCalc / 30) : 0;
       // Regla quincenal: NO aplicar descuentos por inasistencias/tardanzas
@@ -558,7 +596,7 @@ export default function PayrollManagement() {
         regular_hours: attendanceData.regular_hours,
         overtime_hours: empAttendance.reduce((sum, r) => sum + (r.overtime_hours_25 || 0) + (r.overtime_hours_35 || 0), 0),
         base_salary: safePayrollNumber(emp.base_salary),
-        family_allowance: 0,
+        family_allowance: familyAllowanceInfo.qualifies ? familyAllowanceInfo.amount : 0,
         overtime_pay: 0,
         bonuses: roundMoney(Math.max(0, safePayrollNumber(result.totals.totalIncome) - safePayrollNumber(emp.base_salary))),
         commissions: 0,
