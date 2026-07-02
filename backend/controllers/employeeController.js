@@ -4,6 +4,21 @@ import { canAccessEmployee, hasPermission, resolveAccessibleEmployeeIds } from '
 import { ACCESSIBLE_EMPLOYEE_PERMISSION_KEYS } from '../config/permissions.js';
 
 const ALLOWED_ACCESS_PERMISSIONS = new Set(ACCESSIBLE_EMPLOYEE_PERMISSION_KEYS);
+let employeeColumnCache = null;
+
+const getEmployeeColumns = async () => {
+  if (employeeColumnCache) return employeeColumnCache;
+
+  const result = await query(
+    `SELECT column_name
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'employee'`
+  );
+
+  employeeColumnCache = new Set(result.rows.map(row => row.column_name));
+  return employeeColumnCache;
+};
 
 export const listAccessibleEmployees = async (req, res) => {
   try {
@@ -113,12 +128,13 @@ export const createEmployee = async (req, res) => {
         afp_affiliation_date, cuspp, worker_type, tax_residence, photo_url,
         status, role, managed_team_ids, supervisor_id, supervisor_name,
         emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+        attendance_method, activity_cost, food_cost, transport_cost,
         id, created_date, updated_date, created_by_id, created_by
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
         $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
         $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44,
-        $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55
+        $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59
       ) RETURNING *
     `;
 
@@ -138,6 +154,7 @@ export const createEmployee = async (req, res) => {
       data.role || 'empleado', data.managed_team_ids ? JSON.stringify(data.managed_team_ids) : null,
       data.supervisor_id, data.supervisor_name, data.emergency_contact_name,
       data.emergency_contact_phone, data.emergency_contact_relationship,
+      data.attendance_method, data.activity_cost ?? 0, data.food_cost ?? 0, data.transport_cost ?? 0,
       id, new Date(), new Date(), userId, userEmail
     ];
 
@@ -171,6 +188,7 @@ export const updateEmployee = async (req, res) => {
     const fields = [];
     const values = [];
     let paramIndex = 1;
+    const employeeColumns = await getEmployeeColumns();
 
     const dateFields = [ 'birth_date', 'hire_date', 'termination_date', 'afp_affiliation_date'];
 
@@ -179,7 +197,13 @@ export const updateEmployee = async (req, res) => {
         value = null;
       }
 
-      if (key !== 'id' && key !== 'created_date' && key !== 'created_by_id' && key !== 'created_by') {
+      if (
+        employeeColumns.has(key) &&
+        key !== 'id' &&
+        key !== 'created_date' &&
+        key !== 'created_by_id' &&
+        key !== 'created_by'
+      ) {
         fields.push(`${key} = $${paramIndex}`);
         values.push(value);
         paramIndex++;
