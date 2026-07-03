@@ -1,6 +1,7 @@
 import { query } from '../config/database.js';
 import { generate24HexId } from '../utils/idGenerator.js';
 import { buildFilterQuery, buildSortQuery } from '../utils/queryBuilder.js';
+import { canAccessEmployee } from '../middleware/authorization.js';
 
 const TABLE = 'historial_remunerativo';
 const WRITABLE_FIELDS = [
@@ -30,8 +31,13 @@ const cleanData = (data = {}) => {
 export const getAll = async (req, res) => {
   try {
     const { sort = '-year' } = req.query;
-    const sql = buildSortQuery(`SELECT * FROM ${TABLE}`, sort);
-    const result = await query(sql);
+    let sql = `SELECT * FROM ${TABLE}`;
+    const params = [];
+    if (req.accessibleEmployeeIds !== null) {
+      sql += ' WHERE employee_id = ANY($1::varchar[])';
+      params.push(req.accessibleEmployeeIds || []);
+    }
+    const result = await query(buildSortQuery(sql, sort), params);
     res.json(result.rows);
   } catch (error) {
     console.error('Error listing historial remunerativo:', error);
@@ -42,7 +48,13 @@ export const getAll = async (req, res) => {
 export const filter = async (req, res) => {
   try {
     const { sort = '-year' } = req.query;
-    const { query: sql, params } = buildFilterQuery(`SELECT * FROM ${TABLE}`, req.body || {});
+    const { query: baseSql, params } = buildFilterQuery(`SELECT * FROM ${TABLE}`, req.body || {});
+    let sql = baseSql;
+    if (req.accessibleEmployeeIds !== null) {
+      const connector = sql.includes(' WHERE ') ? ' AND ' : ' WHERE ';
+      sql += `${connector}employee_id = ANY($${params.length + 1}::varchar[])`;
+      params.push(req.accessibleEmployeeIds || []);
+    }
     const result = await query(buildSortQuery(sql, sort), params);
     res.json(result.rows);
   } catch (error) {
@@ -55,6 +67,9 @@ export const getById = async (req, res) => {
   try {
     const result = await query(`SELECT * FROM ${TABLE} WHERE id = $1`, [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Registro no encontrado' });
+    if (!canAccessEmployee(req, result.rows[0].employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
     res.json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
