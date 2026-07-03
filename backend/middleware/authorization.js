@@ -161,6 +161,27 @@ export const attachEmployeeScope = (...permissions) => async (req, res, next) =>
   }
 };
 
+export const attachOwnOrAdminScope = (req, res, next) => {
+  if (hasPermission(req.access, 'system.admin')) {
+    req.accessibleEmployeeIds = null;
+  } else {
+    req.accessibleEmployeeIds = req.access?.employee?.id ? [req.access.employee.id] : [];
+  }
+  next();
+};
+
 export const canAccessEmployee = (req, employeeId) => (
   req.accessibleEmployeeIds === null || req.accessibleEmployeeIds?.includes(employeeId)
 );
+
+export const employeeScopeWhere = (req, field = 'employee_id') => (
+  req.accessibleEmployeeIds === null
+    ? {}
+    : { [field]: { in: req.accessibleEmployeeIds || [] } }
+);
+
+export const requireEmployeeAccess = (req, res, employeeId) => {
+  if (!employeeId || canAccessEmployee(req, employeeId)) return true;
+  res.status(403).json({ error: 'Acceso denegado al empleado' });
+  return false;
+};

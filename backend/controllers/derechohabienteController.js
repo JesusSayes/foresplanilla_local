@@ -1,4 +1,5 @@
 import prisma from "../config/prisma.js"
+import { canAccessEmployee, employeeScopeWhere } from "../middleware/authorization.js"
 
 import { generate24HexId } from '../utils/idGenerator.js'
 
@@ -10,6 +11,7 @@ export const getAll = async (req, res) => {
     const field = sort.replace('-', '')
 
     const derechohabientes = await prisma.derechohabiente.findMany({
+      where: employeeScopeWhere(req),
       orderBy: {
         [field]: desc ? 'desc' : 'asc'
       }
@@ -31,6 +33,9 @@ export const getById = async (req, res) => {
 
     if (!derechohabiente)
       return res.status(404).json({ error: 'Derechohabiente not found' })
+    if (!canAccessEmployee(req, derechohabiente.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' })
+    }
 
     res.json(derechohabiente)
 
@@ -171,6 +176,7 @@ export const filter = async (req, res) => {
     if (filters.is_active !== undefined) {
       where.is_active = filters.is_active
     }
+    Object.assign(where, employeeScopeWhere(req))
 
     const derechohabientes = await prisma.derechohabiente.findMany({
       where,

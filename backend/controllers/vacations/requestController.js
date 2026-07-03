@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import { canAccessEmployee, employeeScopeWhere, requireEmployeeAccess } from "../../middleware/authorization.js";
 
 import { generate24HexId } from '../../utils/idGenerator.js'
 import { parseDate, pick } from '../../utils/date.util.js';
@@ -8,6 +9,7 @@ const MODEL = prisma.vacation_request;
 export const getAll = async (req, res) => {
   try {
     const requests = await MODEL.findMany({
+      where: employeeScopeWhere(req),
       orderBy: { created_date: 'desc' },
       // include: { employee: true },
     });
@@ -25,6 +27,9 @@ export const getById = async (req, res) => {
       // include: { employee: true },
     });
     if (!request) return res.status(404).json({ error: 'Request not found' });
+    if (!canAccessEmployee(req, request.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
     res.json(request);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -45,6 +50,7 @@ export const create = async (req, res) => {
     const parsedStart = parseDate(start_date);
     const parsedEnd = parseDate(end_date);
     const parsedApproved = parseDate(approved_date);
+    if (!requireEmployeeAccess(req, res, data.employee_id)) return;
 
     if (!parsedStart || !parsedEnd) {
       return res.status(400).json({ error: 'Fechas inválidas (start_date / end_date)' });
@@ -175,6 +181,7 @@ export const filter = async (req, res) => {
     if (filters.employee_id) {
       where.employee_id = filters.employee_id;
     }
+    Object.assign(where, employeeScopeWhere(req));
     // if (filters.status) {
       // where.status = filters.status;
     // }

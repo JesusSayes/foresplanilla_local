@@ -52,9 +52,14 @@ export const listEmployees = async (req, res) => {
     const { sort = '-created_date' } = req.query;
 
     let sql = 'SELECT * FROM employee';
+    const params = [];
+    if (req.accessibleEmployeeIds !== null) {
+      sql += ' WHERE id = ANY($1::varchar[])';
+      params.push(req.accessibleEmployeeIds || []);
+    }
     sql = buildSortQuery(sql, sort);
 
-    const result = await query(sql);
+    const result = await query(sql, params);
     res.json(result.rows);
   } catch (error) {
     console.error('Error listing employees:', error);
@@ -67,10 +72,16 @@ export const filterEmployees = async (req, res) => {
     const filters = req.body || {};
     const { sort = '-created_date' } = req.query;
 
-    const { query: sql, params } = buildFilterQuery(
+    const { query: baseSql, params } = buildFilterQuery(
       'SELECT * FROM employee',
       filters
     );
+    let sql = baseSql;
+    if (req.accessibleEmployeeIds !== null) {
+      const connector = sql.includes(' WHERE ') ? ' AND ' : ' WHERE ';
+      sql += `${connector}id = ANY($${params.length + 1}::varchar[])`;
+      params.push(req.accessibleEmployeeIds || []);
+    }
 
     const finalQuery = buildSortQuery(sql, sort);
     const result = await query(finalQuery, params);
@@ -89,6 +100,9 @@ export const getEmployee = async (req, res) => {
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Empleado no encontrado' });
+    }
+    if (!canAccessEmployee(req, result.rows[0].id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
 
     res.json(result.rows[0]);

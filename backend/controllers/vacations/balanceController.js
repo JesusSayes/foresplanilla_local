@@ -1,10 +1,12 @@
 import prisma from "../../config/prisma.js";
+import { canAccessEmployee, employeeScopeWhere } from "../../middleware/authorization.js";
 
 const MODEL = prisma.vacation_balance;
 
 export const getAll = async (req, res) => {
   try {
     const balances = await MODEL.findMany({
+      where: employeeScopeWhere(req),
       // include: { employee: true }, // solo si tienes relación definida
       orderBy: { year: 'desc' }
     });
@@ -21,6 +23,9 @@ export const getById = async (req, res) => {
       // include: { employee: true }
     });
     if (!balance) return res.status(404).json({ error: 'Balance not found' });
+    if (!canAccessEmployee(req, balance.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
     res.json(balance);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -66,12 +71,13 @@ export const filter = async (req, res) => {
     const filters = req.body || {};
     const where = {};
 
-    if (filters.employee_id && !Number.isNaN(Number(filters.employee_id))) {
-      where.employee_id = Number(filters.employee_id);
+    if (filters.employee_id) {
+      where.employee_id = filters.employee_id;
     }
     if (filters.is_active !== undefined) {
       where.is_active = filters.is_active;
     }
+    Object.assign(where, employeeScopeWhere(req));
 
     const balances = await MODEL.findMany({
       where,

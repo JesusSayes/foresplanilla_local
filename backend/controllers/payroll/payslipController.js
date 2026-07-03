@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import { canAccessEmployee, employeeScopeWhere } from "../../middleware/authorization.js";
 
 import { generate24HexId } from '../../utils/idGenerator.js'
 
@@ -11,6 +12,7 @@ export const getAll = async (req, res) => {
     const sortField = 'id'
 
     const payslips = await MODEL.findMany({
+      where: employeeScopeWhere(req),
       orderBy: { [sortField]: desc ? 'desc' : 'asc' },
     });
 
@@ -32,6 +34,10 @@ export const getById = async (req, res) => {
 
     if (!payslip)
       return res.status(404).json({ error: 'Payslip not found' });
+
+    if (!canAccessEmployee(req, payslip.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
 
     res.json(payslip);
 
@@ -200,8 +206,14 @@ export const filter = async (req, res) => {
 
     const desc = true;
     const field = 'id';
+    const filters = req.body || {};
+    const scopeWhere = employeeScopeWhere(req);
 
     const payslips = await MODEL.findMany({
+      where: {
+        ...filters,
+        ...scopeWhere,
+      },
       orderBy: { [field]: desc ? 'desc' : 'asc' }
     });
 
