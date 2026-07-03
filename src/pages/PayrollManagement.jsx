@@ -29,8 +29,21 @@ import PayslipPreview from "../components/payroll/PayslipPreview";
 import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/lib/payrollUtils";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 
+// Retry con backoff exponencial para errores de rate-limit
+const withRetry = async (fn, retries = 3) => {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isRateLimit = err?.message?.includes("Rate limit") || err?.code === 429;
+      if (!isRateLimit || attempt === retries) throw err;
+      await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+    }
+  }
+};
+
 // Procesa un array con concurrencia limitada para evitar rate-limit de la API
-const mapWithConcurrency = async (items, mapper, concurrency = 5) => {
+const mapWithConcurrency = async (items, mapper, concurrency = 2) => {
   const results = new Array(items.length);
   let index = 0;
   const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
@@ -44,7 +57,7 @@ const mapWithConcurrency = async (items, mapper, concurrency = 5) => {
 };
 
 // Semáforo global para limitar llamadas API concurrentes (usado dentro de Promise.all)
-const createLimiter = (maxConcurrent = 5) => {
+const createLimiter = (maxConcurrent = 2) => {
   let active = 0;
   const queue = [];
   const drain = () => { while (active < maxConcurrent && queue.length) { active++; queue.shift()(); } };
@@ -56,7 +69,7 @@ const createLimiter = (maxConcurrent = 5) => {
     else queue.push(run);
   });
 };
-const apiLimiter = createLimiter(5);
+const apiLimiter = createLimiter(2);
 
 export default function PayrollManagement() {
   const navigate = useNavigate();
@@ -212,9 +225,7 @@ export default function PayrollManagement() {
       }));
       
       if (conceptsToUpdate.length > 0) {
-        await Promise.all(conceptsToUpdate.map(c => 
-          base44.entities.PayrollConcept.create(c)
-        ));
+        await mapWithConcurrency(conceptsToUpdate, c => base44.entities.PayrollConcept.create(c));
       }
       
       return createdPayslips;
@@ -253,7 +264,7 @@ export default function PayrollManagement() {
     mutationFn: async ({ year, month, payrollType }) => {
       const fresh = await base44.entities.Payslip.filter({ month, year, payroll_type: payrollType });
       const toApprove = fresh.filter(p => p.status !== "Aprobada" && p.status !== "Pagada");
-      await Promise.all(toApprove.map(p => base44.entities.Payslip.update(p.id, { status: "Aprobada" })));
+      await mapWithConcurrency(toApprove, p => base44.entities.Payslip.update(p.id, { status: "Aprobada" }));
       return toApprove.length;
     },
     onSuccess: (count) => {
@@ -269,7 +280,7 @@ export default function PayrollManagement() {
     mutationFn: async ({ year, month, payrollType }) => {
       const fresh = await base44.entities.Payslip.filter({ month, year, payroll_type: payrollType });
       const toPay = fresh.filter(p => p.status === "Aprobada");
-      await Promise.all(toPay.map(p => base44.entities.Payslip.update(p.id, { status: "Pagada" })));
+      await mapWithConcurrency(toPay, p => base44.entities.Payslip.update(p.id, { status: "Pagada" }));
       return toPay.length;
     },
     onSuccess: (count) => {
@@ -405,12 +416,12 @@ export default function PayrollManagement() {
     const enrichedEmployees = await mapWithConcurrency(filteredEmployees, async (emp) => {
       if (!emp.base_salary || parseFloat(emp.base_salary) <= 0) {
         // Buscar contrato vigente del empleado
-        const contracts = await base44.entities.Contract.filter({ employee_id: emp.id, status: "Vigente" });
+        const contracts = await withRetry(() => base44.entities.Contract.filter({ employee_id: emp.id, status: "Vigente" }));
         const activeContract = contracts.find(c => c.salary && parseFloat(c.salary) > 0);
         if (activeContract) {
           const salaryFromContract = parseFloat(activeContract.salary);
           // Actualizar el empleado con el salario del contrato
-          await base44.entities.Employee.update(emp.id, { base_salary: salaryFromContract });
+          await withRetry(() => base44.entities.Employee.update(emp.id, { base_salary: salaryFromContract }));
           return { ...emp, base_salary: salaryFromContract };
         }
       }
@@ -419,7 +430,7 @@ export default function PayrollManagement() {
 
     // Obtener derechohabientes de todos los empleados para cálculo de asignación familiar
     const allDerechohabientes = await mapWithConcurrency(
-      enrichedEmployees, emp => base44.entities.Derechohabiente.filter({ employee_id: emp.id })
+      enrichedEmployees, emp => withRetry(() => base44.entities.Derechohabiente.filter({ employee_id: emp.id }))
     );
     const derechohabientesMap = {};
     enrichedEmployees.forEach((emp, idx) => {
@@ -433,7 +444,7 @@ export default function PayrollManagement() {
       toast.warning(`⚠️ ${stillWithoutSalary.length} empleado(s) sin salario ni contrato vigente: ${names}`, { duration: 8000 });
     }
 
-    const payslipsData = await Promise.all(enrichedEmployees.map(async (emp) => {
+    const payslipsData = await mapWithConcurrency(enrichedEmployees, async (emp) => {
       // Preparar datos de asistencia
       const empAttendance = attendanceRecords.filter(r => {
         if (r.employee_id !== emp.id) return false;
@@ -587,12 +598,12 @@ export default function PayrollManagement() {
           );
           // Si no está en cache, hacer consulta fresca a la BD
           if (quincenalPayslips.length === 0) {
-            const freshQuincenales = await apiLimiter(() => base44.entities.Payslip.filter({
+            const freshQuincenales = await apiLimiter(() => withRetry(() => base44.entities.Payslip.filter({
               employee_id: emp.id,
               payroll_type: "Quincenal",
               month: selectedMonth,
               year: selectedYear,
-            }));
+            })));
             quincenalPayslips = freshQuincenales.filter(p => validStatuses.includes(p.status));
           }
           if (quincenalPayslips.length > 0) {
@@ -663,7 +674,7 @@ export default function PayrollManagement() {
         console.warn(`[Planilla] Valores corregidos para ${rawPayslip.employee_name}:`, warnings);
       }
       return { ...sanitized, employee_name: rawPayslip.employee_name, employee_code: rawPayslip.employee_code, department: rawPayslip.department };
-    }));
+    });
 
     setPreviewData(payslipsData);
     setShowPreview(true);
@@ -822,7 +833,7 @@ export default function PayrollManagement() {
     );
     
     try {
-      await Promise.all(toDelete.map(p => base44.entities.Payslip.delete(p.id)));
+      await mapWithConcurrency(toDelete, p => base44.entities.Payslip.delete(p.id));
       queryClient.invalidateQueries(["payslips"]);
       queryClient.invalidateQueries(["allPayslips"]);
       toast.success(`${toDelete.length} planilla(s) eliminada(s)`);
