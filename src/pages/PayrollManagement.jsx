@@ -426,15 +426,20 @@ export default function PayrollManagement() {
     // Excluir empleados que el usuario haya quitado
     filteredEmployees = filteredEmployees.filter(emp => !excludedEmployees.includes(emp.id));
 
-    // Para cada empleado sin base_salary, buscar en su contrato vigente y actualizar
+    // Batch fetch: una sola llamada para contratos vigentes (en lugar de N por empleado)
+    const employeesNeedingSalary = filteredEmployees.filter(emp => !emp.base_salary || parseFloat(emp.base_salary) <= 0);
+    let allActiveContracts = [];
+    if (employeesNeedingSalary.length > 0) {
+      allActiveContracts = await withRetry(() => base44.entities.Contract.filter({ status: "Vigente" }));
+    }
+
+    // Enriquecer empleados sin salario usando los contratos ya cargados (client-side filter)
     const enrichedEmployees = await mapWithConcurrency(filteredEmployees, async (emp) => {
       if (!emp.base_salary || parseFloat(emp.base_salary) <= 0) {
-        // Buscar contrato vigente del empleado
-        const contracts = await withRetry(() => base44.entities.Contract.filter({ employee_id: emp.id, status: "Vigente" }));
-        const activeContract = contracts.find(c => c.salary && parseFloat(c.salary) > 0);
+        const empContracts = allActiveContracts.filter(c => c.employee_id === emp.id);
+        const activeContract = empContracts.find(c => c.salary && parseFloat(c.salary) > 0);
         if (activeContract) {
           const salaryFromContract = parseFloat(activeContract.salary);
-          // Actualizar el empleado con el salario del contrato
           await withRetry(() => base44.entities.Employee.update(emp.id, { base_salary: salaryFromContract }));
           return { ...emp, base_salary: salaryFromContract };
         }
@@ -442,13 +447,13 @@ export default function PayrollManagement() {
       return emp;
     });
 
-    // Obtener derechohabientes de todos los empleados para cálculo de asignación familiar
-    const allDerechohabientes = await mapWithConcurrency(
-      enrichedEmployees, emp => withRetry(() => base44.entities.Derechohabiente.filter({ employee_id: emp.id }))
-    );
+    // Batch fetch: una sola llamada para todos los derechohabientes (en lugar de N por empleado)
+    const allDerechohabientesRaw = enrichedEmployees.length > 0
+      ? await withRetry(() => base44.entities.Derechohabiente.list())
+      : [];
     const derechohabientesMap = {};
-    enrichedEmployees.forEach((emp, idx) => {
-      derechohabientesMap[emp.id] = allDerechohabientes[idx] || [];
+    enrichedEmployees.forEach(emp => {
+      derechohabientesMap[emp.id] = allDerechohabientesRaw.filter(d => d.employee_id === emp.id);
     });
 
     // Re-verificar empleados aún sin salario (ni en Employee ni en contrato)
@@ -456,6 +461,16 @@ export default function PayrollManagement() {
     if (stillWithoutSalary.length > 0) {
       const names = stillWithoutSalary.map(e => `${e.employee_code} - ${e.first_name} ${e.last_name}`).join(", ");
       toast.warning(`⚠️ ${stillWithoutSalary.length} empleado(s) sin salario ni contrato vigente: ${names}`, { duration: 8000 });
+    }
+
+    // Batch fetch: todas las boletas quincenales del mes en una sola llamada (para descuento de adelanto)
+    let batchQuincenalPayslips = [];
+    if (payrollType === "Mensual") {
+      batchQuincenalPayslips = await withRetry(() => base44.entities.Payslip.filter({
+        payroll_type: "Quincenal",
+        month: selectedMonth,
+        year: selectedYear,
+      }));
     }
 
     const payslipsData = await mapWithConcurrency(enrichedEmployees, async (emp) => {
@@ -602,24 +617,11 @@ export default function PayrollManagement() {
         if (wasEligibleForQuincenal) {
           // Solo considerar boletas quincenales Aprobadas o Pagadas (no borradores)
           const validStatuses = ["Aprobada", "Pagada"];
-          // Primero buscar en la cache local (existingPayslips ya cargados)
-          let quincenalPayslips = existingPayslips.filter(p =>
+          // Usar el batch de boletas quincenales precargado (sin llamada API por empleado)
+          let quincenalPayslips = batchQuincenalPayslips.filter(p =>
             p.employee_id === emp.id &&
-            p.payroll_type === "Quincenal" &&
-            Number(p.month) === selectedMonth &&
-            Number(p.year) === selectedYear &&
             validStatuses.includes(p.status)
           );
-          // Si no está en cache, hacer consulta fresca a la BD
-          if (quincenalPayslips.length === 0) {
-            const freshQuincenales = await apiLimiter(() => withRetry(() => base44.entities.Payslip.filter({
-              employee_id: emp.id,
-              payroll_type: "Quincenal",
-              month: selectedMonth,
-              year: selectedYear,
-            })));
-            quincenalPayslips = freshQuincenales.filter(p => validStatuses.includes(p.status));
-          }
           if (quincenalPayslips.length > 0) {
             // Usar la boleta más reciente si hay múltiples
             const quincenalPayslip = quincenalPayslips.sort((a, b) =>
