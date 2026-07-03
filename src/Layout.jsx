@@ -73,6 +73,11 @@ export default function Layout({ children, currentPageName }) {
           const emp = employees[0];
           setEmployee(emp);
 
+          // Sincronizar employee_id al usuario para RLS de entidades
+          if (user.data?.employee_id !== emp.id) {
+            base44.auth.updateMe({ employee_id: emp.id }).catch(() => {});
+          }
+
           // Super admin siempre tiene acceso total
           if (emp.role === "super_admin") {
             setUserPermissions(["system.admin"]);
