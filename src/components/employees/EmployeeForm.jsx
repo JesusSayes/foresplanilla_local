@@ -330,7 +330,9 @@ export default function EmployeeForm({
                   <div className="mt-2">
                     {formData.photo_url ? (
                       <div className="relative group">
-                        <img src={getPublicAssetUrl(formData.photo_url)} alt="Foto" className="w-[150px] h-[150px] rounded-lg object-cover border-2 border-indigo-200" />
+                        <a href={getPublicAssetUrl(formData.photo_url)} target="_blank" rel="noopener noreferrer">
+                          <img src={getPublicAssetUrl(formData.photo_url)} alt="Foto" className="w-[150px] h-[150px] rounded-lg object-cover border-2 border-indigo-200" />
+                        </a>
                         <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100" onClick={() => setFormData({ ...formData, photo_url: "" })}>
                           <Trash2 className="w-3 h-3" />
                         </Button>
@@ -912,7 +914,7 @@ export default function EmployeeForm({
                                         {dhFormData.study_proof_url ? (
                                           <div className="flex items-center gap-2 p-2 bg-white border border-green-300 rounded-lg">
                                             <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                                            <a href={dhFormData.study_proof_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate flex-1">Ver constancia adjuntada</a>
+                                            <a href={getPublicAssetUrl(dhFormData.study_proof_url)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate flex-1">Ver constancia adjuntada</a>
                                             <Button type="button" size="sm" variant="ghost" className="text-red-600 h-7 px-2" onClick={() => setDhFormData({ ...dhFormData, study_proof_url: "" })}><Trash2 className="w-3 h-3" /></Button>
                                           </div>
                                         ) : (
