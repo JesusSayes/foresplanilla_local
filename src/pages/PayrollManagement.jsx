@@ -30,6 +30,62 @@ import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUp
 import { safePayrollNumber, roundMoney, sanitizePayslip } from "@/lib/payrollUtils";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 
+// Rate limiter global + retry con backoff exponencial para errores de rate-limit
+// Garantiza un gap mínimo entre TODAS las llamadas API y reintenta en caso de 429
+let _lastApiAt = 0;
+const MIN_API_GAP = 400; // ms entre llamadas — máx ~2.5 req/seg
+
+const withRetry = async (fn, retries = 5) => {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    // Throttle global: esperar el gap mínimo desde la última llamada API
+    const wait = MIN_API_GAP - (Date.now() - _lastApiAt);
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    _lastApiAt = Date.now();
+
+    try {
+      return await fn();
+    } catch (err) {
+      // Detección robusta de rate-limit en múltiples formatos de error
+      const msg = String(err?.message || err?.response?.data?.message || err?.response?.data?.detail || err || "").toLowerCase();
+      const status = err?.response?.status || err?.status || err?.statusCode || err?.code;
+      const isRateLimit = msg.includes("rate limit") || msg.includes("429")
+        || msg.includes("too many") || msg.includes("throttl") || status === 429 || status === "429";
+      if (!isRateLimit || attempt === retries) throw err;
+      // Backoff exponencial: 1s, 2s, 4s, 8s, 16s
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+    }
+  }
+};
+
+// Procesa un array con concurrencia limitada para evitar rate-limit de la API
+const mapWithConcurrency = async (items, mapper, concurrency = 1) => {
+  const results = new Array(items.length);
+  let index = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (index < items.length) {
+      const i = index++;
+      results[i] = await mapper(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+};
+
+// Semáforo global para limitar llamadas API concurrentes (usado dentro de Promise.all)
+const createLimiter = (maxConcurrent = 1) => {
+  let active = 0;
+  const queue = [];
+  const drain = () => { while (active < maxConcurrent && queue.length) { active++; queue.shift()(); } };
+  return (fn) => new Promise((resolve, reject) => {
+    const run = () => fn()
+      .then(r => { resolve(r); active--; drain(); })
+      .catch(e => { reject(e); active--; drain(); });
+    if (active < maxConcurrent) { active++; run(); }
+    else queue.push(run);
+  });
+};
+const apiLimiter = createLimiter(2);
+
 export default function PayrollManagement() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
@@ -73,17 +129,17 @@ export default function PayrollManagement() {
     queryKey: ["allEmployees"],
     queryFn: async () => {
       // Incluir Activos y Cesados (los Cesados pueden tener días parciales en el periodo)
-      return await entitiesAPI.Employee.filter({});
+      return await withRetry(() => entitiesAPI.Employee.filter({}));
     },
   });
 
   const { data: existingPayslips = [] } = useQuery({
     queryKey: ["payslips", selectedMonth, selectedYear],
     queryFn: async () => {
-      return await entitiesAPI.Payslip.filter({
+      return await withRetry(() => entitiesAPI.Payslip.filter({
         month: selectedMonth,
         year: selectedYear
-      }, "-created_date");
+      }, "-created_date"));
     },
     staleTime: 0,
     refetchOnMount: true,
@@ -92,7 +148,7 @@ export default function PayrollManagement() {
   const { data: allPayslips = [] } = useQuery({
     queryKey: ["allPayslips"],
     queryFn: async () => {
-      return await entitiesAPI.Payslip.list("-created_date");
+      return await withRetry(() => entitiesAPI.Payslip.list("-created_date"));
     },
   });
 
@@ -102,7 +158,7 @@ export default function PayrollManagement() {
       const startDate = new Date(selectedYear, selectedMonth - 1, 1);
       const endDate = new Date(selectedYear, selectedMonth, 0);
 
-      const records = await entitiesAPI.AttendanceRecord.list("-date");
+      const records = await withRetry(() => entitiesAPI.AttendanceRecord.list("-date"));
       return records.filter(r => {
         const recordDate = new Date(r.date);
         return recordDate >= startDate && recordDate <= endDate;
@@ -113,7 +169,7 @@ export default function PayrollManagement() {
   const { data: payrollConcepts = [] } = useQuery({
     queryKey: ["payrollConcepts", selectedMonth, selectedYear],
     queryFn: async () => {
-      const allConcepts = await entitiesAPI.PayrollConcept.list();
+      const allConcepts = await withRetry(() => entitiesAPI.PayrollConcept.list());
 
       // Filtrar conceptos: recurrentes, del mes/año actual, sin mes/año específico, o generales
       return allConcepts.filter(c => {
@@ -140,7 +196,7 @@ export default function PayrollManagement() {
   const { data: rmvData } = useQuery({
     queryKey: ["rmv"],
     queryFn: async () => {
-      const rmvs = await entitiesAPI.RMV.filter({ is_active: true }, "-effective_date");
+      const rmvs = await withRetry(() => entitiesAPI.RMV.filter({ is_active: true }, "-effective_date"));
       return rmvs.length > 0 ? rmvs[0] : { amount: 1130 };
     },
   });
@@ -148,7 +204,7 @@ export default function PayrollManagement() {
   const { data: companyInfo } = useQuery({
     queryKey: ["companyInfo"],
     queryFn: async () => {
-      const companies = await entitiesAPI.CompanyInfo.filter({ is_active: true });
+      const companies = await withRetry(() => entitiesAPI.CompanyInfo.filter({ is_active: true }));
       return companies.length > 0 ? companies[0] : null;
     },
   });
@@ -156,7 +212,7 @@ export default function PayrollManagement() {
   const { data: payrollConfig } = useQuery({
     queryKey: ["payrollConfig"],
     queryFn: async () => {
-      const configs = await entitiesAPI.PayrollConfig.filter({ config_type: "Quincenal", is_active: true });
+      const configs = await withRetry(() => entitiesAPI.PayrollConfig.filter({ config_type: "Quincenal", is_active: true }));
       return configs.length > 0 ? configs[0] : { quincenal_percentage: 40, quincenal_cutoff_day: 7 };
     },
     staleTime: 0, // Siempre refetch al invalidar para reflejar cambios de configuración inmediatamente
@@ -174,9 +230,7 @@ export default function PayrollManagement() {
       }));
 
       if (conceptsToUpdate.length > 0) {
-        await Promise.all(conceptsToUpdate.map(c =>
-          entitiesAPI.PayrollConcept.create(c)
-        ));
+        await mapWithConcurrency(conceptsToUpdate, c => entitiesAPI.PayrollConcept.create(c));
       }
 
       return createdPayslips;
@@ -216,7 +270,7 @@ export default function PayrollManagement() {
       // Re-fetch para asegurar datos frescos
       const fresh = await entitiesAPI.Payslip.filter({ month, year, payroll_type: payrollType });
       const toApprove = fresh.filter(p => p.status !== "Aprobada" && p.status !== "Pagada");
-      await Promise.all(toApprove.map(p => entitiesAPI.Payslip.update(p.id, { status: "Aprobada" })));
+      await mapWithConcurrency(toApprove, p => entitiesAPI.Payslip.update(p.id, { status: "Aprobada" }));
       return toApprove.length;
     },
     onSuccess: (count) => {
@@ -232,7 +286,7 @@ export default function PayrollManagement() {
     mutationFn: async ({ year, month, payrollType }) => {
       const fresh = await entitiesAPI.Payslip.filter({ month, year, payroll_type: payrollType });
       const toPay = fresh.filter(p => p.status === "Aprobada");
-      await Promise.all(toPay.map(p => entitiesAPI.Payslip.update(p.id, { status: "Pagada" })));
+      await mapWithConcurrency(toPay, p => entitiesAPI.Payslip.update(p.id, { status: "Pagada" }));
       return toPay.length;
     },
     onSuccess: (count) => {
@@ -281,10 +335,6 @@ export default function PayrollManagement() {
     // Resetear vista previa para forzar recálculo con datos frescos
     setShowPreview(false);
     setPreviewData([]);
-    // Invalidar queries para obtener datos actualizados
-    queryClient.invalidateQueries({ queryKey: ["payrollConcepts"] });
-    queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
-    queryClient.invalidateQueries({ queryKey: ["payrollConfig"] });
     setPendingAction(action);
     setShowPeriodModal(true);
   };
@@ -364,29 +414,34 @@ export default function PayrollManagement() {
     // Excluir empleados que el usuario haya quitado
     filteredEmployees = filteredEmployees.filter(emp => !excludedEmployees.includes(emp.id));
 
-    // Para cada empleado sin base_salary, buscar en su contrato vigente y actualizar
-    const enrichedEmployees = await Promise.all(filteredEmployees.map(async (emp) => {
+    // Batch fetch: una sola llamada para contratos vigentes (en lugar de N por empleado)
+    const employeesNeedingSalary = filteredEmployees.filter(emp => !emp.base_salary || parseFloat(emp.base_salary) <= 0);
+    let allActiveContracts = [];
+    if (employeesNeedingSalary.length > 0) {
+      allActiveContracts = await withRetry(() => entitiesAPI.Contract.filter({ status: "Vigente" }));
+    }
+
+    // Enriquecer empleados sin salario usando los contratos ya cargados (client-side filter)
+    const enrichedEmployees = await mapWithConcurrency(filteredEmployees, async (emp) => {
       if (!emp.base_salary || parseFloat(emp.base_salary) <= 0) {
-        // Buscar contrato vigente del empleado
-        const contracts = await entitiesAPI.Contract.filter({ employee_id: emp.id, status: "Vigente" });
-        const activeContract = contracts.find(c => c.salary && parseFloat(c.salary) > 0);
+        const empContracts = allActiveContracts.filter(c => c.employee_id === emp.id);
+        const activeContract = empContracts.find(c => c.salary && parseFloat(c.salary) > 0);
         if (activeContract) {
           const salaryFromContract = parseFloat(activeContract.salary);
-          // Actualizar el empleado con el salario del contrato
-          await entitiesAPI.Employee.update(emp.id, { base_salary: salaryFromContract });
+          await withRetry(() => entitiesAPI.Employee.update(emp.id, { base_salary: salaryFromContract }));
           return { ...emp, base_salary: salaryFromContract };
         }
       }
       return emp;
-    }));
+    });
 
-    // Obtener derechohabientes de todos los empleados para cálculo de asignación familiar
-    const allDerechohabientes = await Promise.all(
-      enrichedEmployees.map(emp => entitiesAPI.Derechohabiente.filter({ employee_id: emp.id }))
-    );
+    // Batch fetch: una sola llamada para todos los derechohabientes (en lugar de N por empleado)
+    const allDerechohabientesRaw = enrichedEmployees.length > 0
+      ? await withRetry(() => entitiesAPI.Derechohabiente.list())
+      : [];
     const derechohabientesMap = {};
-    enrichedEmployees.forEach((emp, idx) => {
-      derechohabientesMap[emp.id] = allDerechohabientes[idx] || [];
+    enrichedEmployees.forEach(emp => {
+      derechohabientesMap[emp.id] = allDerechohabientesRaw.filter(d => d.employee_id === emp.id);
     });
 
     // Re-verificar empleados aún sin salario (ni en Employee ni en contrato)
@@ -396,7 +451,17 @@ export default function PayrollManagement() {
       toast.warning(`⚠️ ${stillWithoutSalary.length} empleado(s) sin salario ni contrato vigente: ${names}`, { duration: 8000 });
     }
 
-    const payslipsData = await Promise.all(enrichedEmployees.map(async (emp) => {
+    // Batch fetch: todas las boletas quincenales del mes en una sola llamada (para descuento de adelanto)
+    let batchQuincenalPayslips = [];
+    if (payrollType === "Mensual") {
+      batchQuincenalPayslips = await withRetry(() => entitiesAPI.Payslip.filter({
+        payroll_type: "Quincenal",
+        month: selectedMonth,
+        year: selectedYear,
+      }));
+    }
+
+    const payslipsData = await mapWithConcurrency(enrichedEmployees, async (emp) => {
       // Preparar datos de asistencia
       const empAttendance = attendanceRecords.filter(r => {
         if (r.employee_id !== emp.id) return false;
@@ -538,26 +603,19 @@ export default function PayrollManagement() {
         })();
 
         if (wasEligibleForQuincenal) {
-          // Solo considerar boletas quincenales Aprobadas o Pagadas (no borradores)
-          const validStatuses = ["Aprobada", "Pagada"];
-          // Primero buscar en la cache local (existingPayslips ya cargados)
-          let quincenalPayslips = existingPayslips.filter(p =>
-            p.employee_id === emp.id &&
-            p.payroll_type === "Quincenal" &&
-            Number(p.month) === selectedMonth &&
-            Number(p.year) === selectedYear &&
-            validStatuses.includes(p.status)
-          );
-          // Si no está en cache, hacer consulta fresca a la BD
-          if (quincenalPayslips.length === 0) {
-            const freshQuincenales = await entitiesAPI.Payslip.filter({
-              employee_id: emp.id,
-              payroll_type: "Quincenal",
-              month: selectedMonth,
-              year: selectedYear,
-            });
-            quincenalPayslips = freshQuincenales.filter(p => validStatuses.includes(p.status));
-          }
+          // Considerar boletas quincenales Calculadas, Aprobadas o Pagadas.
+          // Si la quincenal ya fue generada (Calculada), el adelanto se pagó al
+          // empleado y debe descontarse de la mensual.
+          const validStatuses = ["Calculada", "Aprobada", "Pagada"];
+          // Combinar batch fresco + cache local (existingPayslips) para máxima cobertura
+          const quincenalSource = [
+            ...batchQuincenalPayslips,
+            ...existingPayslips.filter(p => p.payroll_type === "Quincenal" &&
+              Number(p.month) === selectedMonth && Number(p.year) === selectedYear)
+          ];
+          let quincenalPayslips = quincenalSource
+            .filter((p, i, arr) => arr.findIndex(x => x.id === p.id) === i) // dedup por ID
+            .filter(p => p.employee_id === emp.id && validStatuses.includes(p.status));
           if (quincenalPayslips.length > 0) {
             // Usar la boleta más reciente si hay múltiples
             const quincenalPayslip = quincenalPayslips.sort((a, b) =>
@@ -626,7 +684,7 @@ export default function PayrollManagement() {
         console.warn(`[Planilla] Valores corregidos para ${rawPayslip.employee_name}:`, warnings);
       }
       return { ...sanitized, employee_name: rawPayslip.employee_name, employee_code: rawPayslip.employee_code, department: rawPayslip.department };
-    }));
+    });
 
     setPreviewData(payslipsData);
     setShowPreview(true);
@@ -789,7 +847,7 @@ export default function PayrollManagement() {
     );
 
     try {
-      await Promise.all(toDelete.map(p => entitiesAPI.Payslip.delete(p.id)));
+      await mapWithConcurrency(toDelete, p => entitiesAPI.Payslip.delete(p.id));
       queryClient.invalidateQueries({ queryKey: ["payslips"] });
       queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
       toast.success(`${toDelete.length} planilla(s) eliminada(s)`);
@@ -1886,6 +1944,7 @@ export default function PayrollManagement() {
                 employee={allEmployees.find(e => e.id === previewPayslip.employee_id)}
                 companyInfo={companyInfo}
                 showPrintButton={true}
+                conceptsMap={payrollConcepts}
               />
             </div>
           </div>

@@ -129,6 +129,13 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Verificar que el caller sea admin/super_admin
+    const callerEmp = await base44.asServiceRole.entities.Employee.filter({ work_email: user.email });
+    const callerRole = callerEmp?.[0]?.role;
+    if (!callerRole || !['admin', 'super_admin'].includes(callerRole)) {
+      return Response.json({ error: 'Solo administradores pueden recalcular asistencia' }, { status: 403 });
+    }
+
     const body = await req.json();
     const { employee_id, date_from, date_to } = body;
 

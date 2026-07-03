@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import Layout from "./Layout";
 import Login from "./pages/Login";
+import PageGuard from '@/components/PageGuard';
+import { PAGE_PERMISSIONS } from './pagePermissions';
 
 // Importar todas las páginas
 import Home from "./pages/Home";
@@ -76,6 +78,13 @@ const ProtectedRoute = ({ children }) => {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  const currentPageName = children?.props?.currentPageName;
+  const permissions = currentPageName ? PAGE_PERMISSIONS[currentPageName] : null;
+
+  if (permissions) {
+    return <PageGuard {...permissions}>{children}</PageGuard>;
   }
 
   return children;
