@@ -86,6 +86,19 @@ const createLimiter = (maxConcurrent = 1) => {
 };
 const apiLimiter = createLimiter(2);
 
+const DEDICATED_PAYSLIP_DEDUCTION_TYPES = new Set([
+  "salary_advance",
+  "tardiness_discount",
+  "absence_discount",
+]);
+
+const isDedicatedPayslipDeduction = (concept) => {
+  const systemLogicType = String(concept?.system_logic_type || "").trim();
+  const formula = String(concept?.calculation_formula || "").trim();
+  return DEDICATED_PAYSLIP_DEDUCTION_TYPES.has(systemLogicType)
+    || DEDICATED_PAYSLIP_DEDUCTION_TYPES.has(formula);
+};
+
 export default function PayrollManagement() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
@@ -542,7 +555,7 @@ export default function PayrollManagement() {
         ];
       } else {
         // Para planillas no quincenales: usar todos los conceptos normales
-        conceptsForCalc = [...allEmpConcepts];
+        conceptsForCalc = allEmpConcepts.filter(c => !isDedicatedPayslipDeduction(c));
         // Si NO existe un concepto de "Asignación Familiar" configurado (ya sea por fórmula o lógica del sistema),
         // agregar la asignación familiar automática basada en derechohabientes como fallback.
         const hasFamilyAllowanceConcept = allEmpConcepts.some(c =>
