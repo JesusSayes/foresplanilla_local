@@ -29,21 +29,35 @@ import PayslipPreview from "../components/payroll/PayslipPreview";
 import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/lib/payrollUtils";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 
-// Retry con backoff exponencial para errores de rate-limit
-const withRetry = async (fn, retries = 3) => {
+// Rate limiter global + retry con backoff exponencial para errores de rate-limit
+// Garantiza un gap mínimo entre TODAS las llamadas API y reintenta en caso de 429
+let _lastApiAt = 0;
+const MIN_API_GAP = 400; // ms entre llamadas — máx ~2.5 req/seg
+
+const withRetry = async (fn, retries = 5) => {
   for (let attempt = 0; attempt <= retries; attempt++) {
+    // Throttle global: esperar el gap mínimo desde la última llamada API
+    const wait = MIN_API_GAP - (Date.now() - _lastApiAt);
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    _lastApiAt = Date.now();
+
     try {
       return await fn();
     } catch (err) {
-      const isRateLimit = err?.message?.includes("Rate limit") || err?.code === 429;
+      // Detección robusta de rate-limit en múltiples formatos de error
+      const msg = String(err?.message || err?.response?.data?.message || err?.response?.data?.detail || err || "").toLowerCase();
+      const status = err?.response?.status || err?.status || err?.statusCode || err?.code;
+      const isRateLimit = msg.includes("rate limit") || msg.includes("429")
+        || msg.includes("too many") || msg.includes("throttl") || status === 429 || status === "429";
       if (!isRateLimit || attempt === retries) throw err;
-      await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+      // Backoff exponencial: 1s, 2s, 4s, 8s, 16s
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
     }
   }
 };
 
 // Procesa un array con concurrencia limitada para evitar rate-limit de la API
-const mapWithConcurrency = async (items, mapper, concurrency = 2) => {
+const mapWithConcurrency = async (items, mapper, concurrency = 1) => {
   const results = new Array(items.length);
   let index = 0;
   const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
@@ -57,7 +71,7 @@ const mapWithConcurrency = async (items, mapper, concurrency = 2) => {
 };
 
 // Semáforo global para limitar llamadas API concurrentes (usado dentro de Promise.all)
-const createLimiter = (maxConcurrent = 2) => {
+const createLimiter = (maxConcurrent = 1) => {
   let active = 0;
   const queue = [];
   const drain = () => { while (active < maxConcurrent && queue.length) { active++; queue.shift()(); } };
