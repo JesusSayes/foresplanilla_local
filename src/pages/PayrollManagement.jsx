@@ -29,6 +29,35 @@ import PayslipPreview from "../components/payroll/PayslipPreview";
 import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/lib/payrollUtils";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 
+// Procesa un array con concurrencia limitada para evitar rate-limit de la API
+const mapWithConcurrency = async (items, mapper, concurrency = 5) => {
+  const results = new Array(items.length);
+  let index = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (index < items.length) {
+      const i = index++;
+      results[i] = await mapper(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+};
+
+// Semáforo global para limitar llamadas API concurrentes (usado dentro de Promise.all)
+const createLimiter = (maxConcurrent = 5) => {
+  let active = 0;
+  const queue = [];
+  const drain = () => { while (active < maxConcurrent && queue.length) { active++; queue.shift()(); } };
+  return (fn) => new Promise((resolve, reject) => {
+    const run = () => fn()
+      .then(r => { resolve(r); active--; drain(); })
+      .catch(e => { reject(e); active--; drain(); });
+    if (active < maxConcurrent) { active++; run(); }
+    else queue.push(run);
+  });
+};
+const apiLimiter = createLimiter(5);
+
 export default function PayrollManagement() {
   const navigate = useNavigate();
   const { hasPermission, canAccessDepartment, loading: permissionsLoading } = usePermissions();
@@ -373,7 +402,7 @@ export default function PayrollManagement() {
     filteredEmployees = filteredEmployees.filter(emp => !excludedEmployees.includes(emp.id));
 
     // Para cada empleado sin base_salary, buscar en su contrato vigente y actualizar
-    const enrichedEmployees = await Promise.all(filteredEmployees.map(async (emp) => {
+    const enrichedEmployees = await mapWithConcurrency(filteredEmployees, async (emp) => {
       if (!emp.base_salary || parseFloat(emp.base_salary) <= 0) {
         // Buscar contrato vigente del empleado
         const contracts = await base44.entities.Contract.filter({ employee_id: emp.id, status: "Vigente" });
@@ -386,11 +415,11 @@ export default function PayrollManagement() {
         }
       }
       return emp;
-    }));
+    });
 
     // Obtener derechohabientes de todos los empleados para cálculo de asignación familiar
-    const allDerechohabientes = await Promise.all(
-      enrichedEmployees.map(emp => base44.entities.Derechohabiente.filter({ employee_id: emp.id }))
+    const allDerechohabientes = await mapWithConcurrency(
+      enrichedEmployees, emp => base44.entities.Derechohabiente.filter({ employee_id: emp.id })
     );
     const derechohabientesMap = {};
     enrichedEmployees.forEach((emp, idx) => {
@@ -558,12 +587,12 @@ export default function PayrollManagement() {
           );
           // Si no está en cache, hacer consulta fresca a la BD
           if (quincenalPayslips.length === 0) {
-            const freshQuincenales = await base44.entities.Payslip.filter({
+            const freshQuincenales = await apiLimiter(() => base44.entities.Payslip.filter({
               employee_id: emp.id,
               payroll_type: "Quincenal",
               month: selectedMonth,
               year: selectedYear,
-            });
+            }));
             quincenalPayslips = freshQuincenales.filter(p => validStatuses.includes(p.status));
           }
           if (quincenalPayslips.length > 0) {
