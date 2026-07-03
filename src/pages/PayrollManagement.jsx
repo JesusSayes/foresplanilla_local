@@ -611,8 +611,10 @@ export default function PayrollManagement() {
         })();
 
         if (wasEligibleForQuincenal) {
-          // Solo considerar boletas quincenales Aprobadas o Pagadas (no borradores)
-          const validStatuses = ["Aprobada", "Pagada"];
+          // Considerar boletas quincenales Calculadas, Aprobadas o Pagadas.
+          // Si la quincenal ya fue generada (Calculada), el adelanto se pagó al
+          // empleado y debe descontarse de la mensual.
+          const validStatuses = ["Calculada", "Aprobada", "Pagada"];
           // Combinar batch fresco + cache local (existingPayslips) para máxima cobertura
           const quincenalSource = [
             ...batchQuincenalPayslips,
