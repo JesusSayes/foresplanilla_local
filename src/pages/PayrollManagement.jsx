@@ -138,17 +138,17 @@ export default function PayrollManagement() {
     queryKey: ["allEmployees"],
     queryFn: async () => {
       // Incluir Activos y Cesados (los Cesados pueden tener días parciales en el periodo)
-      return await base44.entities.Employee.filter({});
+      return await withRetry(() => base44.entities.Employee.filter({}));
     },
   });
 
   const { data: existingPayslips = [] } = useQuery({
     queryKey: ["payslips", selectedMonth, selectedYear],
     queryFn: async () => {
-      return await base44.entities.Payslip.filter({ 
+      return await withRetry(() => base44.entities.Payslip.filter({
         month: selectedMonth,
         year: selectedYear
-      }, "-created_date");
+      }, "-created_date"));
     },
     staleTime: 0,
     refetchOnMount: true,
@@ -157,7 +157,7 @@ export default function PayrollManagement() {
   const { data: allPayslips = [] } = useQuery({
     queryKey: ["allPayslips"],
     queryFn: async () => {
-      return await base44.entities.Payslip.list("-created_date", 500);
+      return await withRetry(() => base44.entities.Payslip.list("-created_date", 500));
     },
   });
 
@@ -167,7 +167,7 @@ export default function PayrollManagement() {
       const startDate = new Date(selectedYear, selectedMonth - 1, 1);
       const endDate = new Date(selectedYear, selectedMonth, 0);
       
-      const records = await base44.entities.AttendanceRecord.list("-date");
+      const records = await withRetry(() => base44.entities.AttendanceRecord.list("-date"));
       return records.filter(r => {
         const recordDate = new Date(r.date);
         return recordDate >= startDate && recordDate <= endDate;
@@ -178,7 +178,7 @@ export default function PayrollManagement() {
   const { data: payrollConcepts = [] } = useQuery({
     queryKey: ["payrollConcepts", selectedMonth, selectedYear],
     queryFn: async () => {
-      const allConcepts = await base44.entities.PayrollConcept.list();
+      const allConcepts = await withRetry(() => base44.entities.PayrollConcept.list());
       
       // Filtrar conceptos: recurrentes, del mes/año actual, sin mes/año específico, o generales
       return allConcepts.filter(c => {
@@ -205,7 +205,7 @@ export default function PayrollManagement() {
   const { data: rmvData } = useQuery({
     queryKey: ["rmv"],
     queryFn: async () => {
-      const rmvs = await base44.entities.RMV.filter({ is_active: true }, "-effective_date");
+      const rmvs = await withRetry(() => base44.entities.RMV.filter({ is_active: true }, "-effective_date"));
       return rmvs.length > 0 ? rmvs[0] : { amount: 1130 };
     },
   });
@@ -213,7 +213,7 @@ export default function PayrollManagement() {
   const { data: companyInfo } = useQuery({
     queryKey: ["companyInfo"],
     queryFn: async () => {
-      const companies = await base44.entities.CompanyInfo.filter({ is_active: true });
+      const companies = await withRetry(() => base44.entities.CompanyInfo.filter({ is_active: true }));
       return companies.length > 0 ? companies[0] : null;
     },
   });
@@ -221,7 +221,7 @@ export default function PayrollManagement() {
   const { data: payrollConfig } = useQuery({
     queryKey: ["payrollConfig"],
     queryFn: async () => {
-      const configs = await base44.entities.PayrollConfig.filter({ config_type: "Quincenal", is_active: true });
+      const configs = await withRetry(() => base44.entities.PayrollConfig.filter({ config_type: "Quincenal", is_active: true }));
       return configs.length > 0 ? configs[0] : { quincenal_percentage: 40, quincenal_cutoff_day: 7 };
     },
     staleTime: 0, // Siempre refetch al invalidar para reflejar cambios de configuración inmediatamente
@@ -343,10 +343,6 @@ export default function PayrollManagement() {
     // Resetear vista previa para forzar recálculo con datos frescos
     setShowPreview(false);
     setPreviewData([]);
-    // Invalidar queries para obtener datos actualizados
-    queryClient.invalidateQueries({ queryKey: ["payrollConcepts"] });
-    queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
-    queryClient.invalidateQueries({ queryKey: ["payrollConfig"] });
     setPendingAction(action);
     setShowPeriodModal(true);
   };
