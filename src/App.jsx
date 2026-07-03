@@ -10,6 +10,8 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import BeneficiosSociales from './pages/BeneficiosSociales';
 import HistorialRemunerativo from './pages/HistorialRemunerativo';
+import PageGuard from '@/components/PageGuard';
+import { PAGE_PERMISSIONS } from './pagePermissions';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -50,19 +52,25 @@ const AuthenticatedApp = () => {
           <MainPage />
         </LayoutWrapper>
       } />
-      {Object.entries(Pages).map(([path, Page]) => (
-        <Route
-          key={path}
-          path={`/${path}`}
-          element={
-            <LayoutWrapper currentPageName={path}>
-              <Page />
-            </LayoutWrapper>
-          }
-        />
-      ))}
-      <Route path="/BeneficiosSociales" element={<LayoutWrapper currentPageName="BeneficiosSociales"><BeneficiosSociales /></LayoutWrapper>} />
-      <Route path="/HistorialRemunerativo" element={<LayoutWrapper currentPageName="HistorialRemunerativo"><HistorialRemunerativo /></LayoutWrapper>} />
+      {Object.entries(Pages).map(([path, Page]) => {
+        const perm = PAGE_PERMISSIONS[path];
+        const guardedPage = perm
+          ? <PageGuard {...perm}><Page /></PageGuard>
+          : <Page />;
+        return (
+          <Route
+            key={path}
+            path={`/${path}`}
+            element={
+              <LayoutWrapper currentPageName={path}>
+                {guardedPage}
+              </LayoutWrapper>
+            }
+          />
+        );
+      })}
+      <Route path="/BeneficiosSociales" element={<LayoutWrapper currentPageName="BeneficiosSociales"><PageGuard requiredPermission="payroll.view_all"><BeneficiosSociales /></PageGuard></LayoutWrapper>} />
+      <Route path="/HistorialRemunerativo" element={<LayoutWrapper currentPageName="HistorialRemunerativo"><PageGuard requiredPermission="payroll.view_all"><HistorialRemunerativo /></PageGuard></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
