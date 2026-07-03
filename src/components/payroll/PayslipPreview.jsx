@@ -364,10 +364,13 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
 
 // ── Componente React ──────────────────────────────────────────────────────────
 
-export default function PayslipPreview({ payslip, employee, companyInfo, showPrintButton = true }) {
+export default function PayslipPreview({ payslip, employee, companyInfo, showPrintButton = true, conceptsMap: externalConceptsMap = null }) {
   const [copies, setCopies] = useState(1);
   const [afpMap, setAfpMap] = useState({});
-  const [conceptsMap, setConceptsMap] = useState([]);
+  const [internalConcepts, setInternalConcepts] = useState([]);
+
+  // Usar conceptsMap del parent si se pasa; sino cargar internamente como fallback
+  const conceptsMap = externalConceptsMap || internalConcepts;
 
   useEffect(() => {
     base44.entities.AFP.list().then(afps => {
@@ -376,11 +379,13 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
       setAfpMap(map);
     }).catch(() => {});
 
-    // Cargar todos los conceptos de planilla para mapear códigos
-    base44.entities.PayrollConcept.list().then(concepts => {
-      setConceptsMap(concepts || []);
-    }).catch(() => {});
-  }, []);
+    // Solo cargar conceptos si el parent no los pasó
+    if (!externalConceptsMap) {
+      base44.entities.PayrollConcept.list().then(concepts => {
+        setInternalConcepts(concepts || []);
+      }).catch(() => {});
+    }
+  }, [externalConceptsMap]);
 
   const ci = companyInfo || { company_name: "Empresa", ruc: "00000000000", address: "" };
   const emp = employee || {};

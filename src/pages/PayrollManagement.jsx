@@ -613,11 +613,15 @@ export default function PayrollManagement() {
         if (wasEligibleForQuincenal) {
           // Solo considerar boletas quincenales Aprobadas o Pagadas (no borradores)
           const validStatuses = ["Aprobada", "Pagada"];
-          // Usar el batch de boletas quincenales precargado (sin llamada API por empleado)
-          let quincenalPayslips = batchQuincenalPayslips.filter(p =>
-            p.employee_id === emp.id &&
-            validStatuses.includes(p.status)
-          );
+          // Combinar batch fresco + cache local (existingPayslips) para máxima cobertura
+          const quincenalSource = [
+            ...batchQuincenalPayslips,
+            ...existingPayslips.filter(p => p.payroll_type === "Quincenal" &&
+              Number(p.month) === selectedMonth && Number(p.year) === selectedYear)
+          ];
+          let quincenalPayslips = quincenalSource
+            .filter((p, i, arr) => arr.findIndex(x => x.id === p.id) === i) // dedup por ID
+            .filter(p => p.employee_id === emp.id && validStatuses.includes(p.status));
           if (quincenalPayslips.length > 0) {
             // Usar la boleta más reciente si hay múltiples
             const quincenalPayslip = quincenalPayslips.sort((a, b) =>
@@ -1942,6 +1946,7 @@ export default function PayrollManagement() {
                 employee={allEmployees.find(e => e.id === previewPayslip.employee_id)}
                 companyInfo={companyInfo}
                 showPrintButton={true}
+                conceptsMap={payrollConcepts}
               />
             </div>
           </div>
