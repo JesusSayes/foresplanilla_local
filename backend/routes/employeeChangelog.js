@@ -1,11 +1,12 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { loadAccessContext, requireAnyPermission } from '../middleware/authorization.js';
 import crypto from 'crypto';
 
 const router = express.Router();
 
-router.use(authenticateToken);
+router.use(authenticateToken, loadAccessContext, requireAnyPermission('system.admin'));
 
 router.get('/', async (req, res) => {
   try {

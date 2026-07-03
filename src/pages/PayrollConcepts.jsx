@@ -200,6 +200,7 @@ export default function PayrollConcepts() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
   const [activeTab, setActiveTab] = useState("general");
+  const [incorporatedFilter, setIncorporatedFilter] = useState("Todos");
   const [showForm, setShowForm] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -678,6 +679,9 @@ export default function PayrollConcepts() {
   );
 
   const generalConcepts = payrollConcepts.filter(c => c.employee_id === "general");
+  const filteredIncorporatedConcepts = incorporatedFilter === "Todos"
+    ? generalConcepts
+    : generalConcepts.filter(c => c.concept_type === incorporatedFilter);
   const individualConcepts = selectedEmployee
     ? payrollConcepts.filter(c => c.employee_id === selectedEmployee)
     : [];
@@ -1017,15 +1021,49 @@ export default function PayrollConcepts() {
                       </h3>
                       <p className="text-xs text-slate-600 mb-4">Estos conceptos se aplican a todos los empleados</p>
 
+                      {/* Pestañas por tipo de concepto */}
+                      <div className="flex flex-wrap gap-1.5 mb-4 border-b border-green-200 pb-3">
+                        {[
+                          { key: "Todos", label: "Todos", count: generalConcepts.length },
+                          { key: "Ingreso", label: "Ingresos", count: generalConcepts.filter(c => c.concept_type === "Ingreso").length },
+                          { key: "Descuento", label: "Descuentos", count: generalConcepts.filter(c => c.concept_type === "Descuento").length },
+                          { key: "Aportación", label: "Aportaciones", count: generalConcepts.filter(c => c.concept_type === "Aportación").length },
+                          { key: "Otros", label: "Otros", count: generalConcepts.filter(c => c.concept_type === "Otros").length },
+                        ].map(tab => (
+                          <button
+                            key={tab.key}
+                            onClick={() => setIncorporatedFilter(tab.key)}
+                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                              incorporatedFilter === tab.key
+                                ? "bg-green-600 text-white shadow-sm"
+                                : "bg-white text-slate-600 border border-green-200 hover:bg-green-100"
+                            }`}
+                          >
+                            {tab.label}
+                            <span className={`ml-1.5 ${incorporatedFilter === tab.key ? "text-green-100" : "text-slate-400"}`}>
+                              ({tab.count})
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+
                       <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
-                        {generalConcepts.length === 0 ? (
+                        {filteredIncorporatedConcepts.length === 0 ? (
                           <div className="text-center py-12 text-slate-500">
                             <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                            <p className="text-sm">No hay conceptos incorporados aún</p>
-                            <p className="text-xs mt-1">Agrega conceptos desde la columna izquierda</p>
+                            <p className="text-sm">
+                              {generalConcepts.length === 0
+                                ? "No hay conceptos incorporados aún"
+                                : `No hay conceptos en "${incorporatedFilter}"`}
+                            </p>
+                            <p className="text-xs mt-1">
+                              {generalConcepts.length === 0
+                                ? "Agrega conceptos desde la columna izquierda"
+                                : "Selecciona otra pestaña o agrega más conceptos"}
+                            </p>
                           </div>
                         ) : (
-                          generalConcepts.map(concept => (
+                          filteredIncorporatedConcepts.map(concept => (
                             <div key={concept.id} className="p-3 bg-white border border-slate-200 rounded-lg hover:shadow-md transition-all">
                               <div className="flex items-start justify-between gap-2 mb-2">
                                 <div className="flex-1">

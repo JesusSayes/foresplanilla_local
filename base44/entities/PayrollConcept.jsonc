@@ -69,7 +69,7 @@
         "loan_installment"
       ],
       "default": "",
-      "description": "Tipo de l\u00f3gica del sistema. Cuando est\u00e1 definido, el sistema calcula el monto autom\u00e1ticamente seg\u00fan la l\u00f3gica implementada (no usa f\u00f3rmula ni monto fijo). Opciones: family_allowance (asignaci\u00f3n familiar por derechohabientes), tardiness_discount (descuento por tardanzas), absence_discount (descuento por inasistencias), salary_advance (adelanto quincenal), loan_installment (cuota de pr\u00e9stamo)."
+      "description": "Tipo de l\u00f3gica del sistema. Cuando est\u00e1 definido, el sistema calcula el monto autom\u00e1ticamente seg\u00fan la l\u00f3gica implementada (no usa f\u00f3rmula ni monto fijo)."
     },
     "period": {
       "type": "string",
@@ -126,5 +126,27 @@
     "concept_name",
     "month",
     "year"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

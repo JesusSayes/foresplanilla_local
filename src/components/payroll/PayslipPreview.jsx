@@ -85,6 +85,36 @@ function buildConceptRows(payslip, conceptsMap = []) {
       }
     }
 
+    // ── Descuento por tardanzas (campo del payslip, no viene en el breakdown) ──
+    const tardinessAmt = safePayrollNumber(payslip.tardiness_discount);
+    if (tardinessAmt > 0) {
+      const alreadyIncluded = descuentos.some(d => d.label.toLowerCase().includes("tardanza"));
+      if (!alreadyIncluded) {
+        const { code, conceptId } = lookupCode("Descuento por Tardanzas", conceptsMap);
+        descuentos.push({ code, label: "DESC. POR TARDANZAS", amount: tardinessAmt, conceptId, missingCode: !code });
+      }
+    }
+
+    // ── Descuento por inasistencias (campo del payslip, no viene en el breakdown) ──
+    const absenceAmt = safePayrollNumber(payslip.absence_discount);
+    if (absenceAmt > 0) {
+      const alreadyIncluded = descuentos.some(d => d.label.toLowerCase().includes("inasistencia") || d.label.toLowerCase().includes("falta"));
+      if (!alreadyIncluded) {
+        const { code, conceptId } = lookupCode("Descuento por Inasistencias", conceptsMap);
+        descuentos.push({ code, label: "DESC. POR INASISTENCIAS", amount: absenceAmt, conceptId, missingCode: !code });
+      }
+    }
+
+    // ── Préstamos (campo del payslip, no viene en el breakdown) ──
+    const loanAmt = safePayrollNumber(payslip.loan_deduction);
+    if (loanAmt > 0) {
+      const alreadyIncluded = descuentos.some(d => d.label.toLowerCase().includes("préstamo") || d.label.toLowerCase().includes("prestamo"));
+      if (!alreadyIncluded) {
+        const { code, conceptId } = lookupCode("Préstamos", conceptsMap);
+        descuentos.push({ code, label: "PRÉSTAMOS", amount: loanAmt, conceptId, missingCode: !code });
+      }
+    }
+
     // ── Aportes empleador ────────────────────────────────────────────────
     (summary.breakdown.contributions?.items || []).forEach(item => {
       const amt = safePayrollNumber(item.amount);
@@ -164,25 +194,25 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
 
   const { ingresos, descuentos, aportTrab, aportEmpl } = buildConceptRows(payslip, conceptsMap);
 
-  const netoPay = safePayrollNumber(payslip.net_pay);
   const jornada = toHorasMinutos(payslip.regular_hours || 0);
   const sobret  = toHorasMinutos(payslip.overtime_hours || 0);
 
   const conceptRow = (code, label, ing, desc) =>
     `<tr><td class="c-code">${code}</td><td class="c-lbl">${label}</td><td class="c-ing">${ing !== "" ? `S/ ${ing}` : ""}</td><td class="c-des">${desc !== "" ? `S/ ${desc}` : ""}</td><td class="c-net"></td></tr>`;
 
-  const totalIngresos = ingresos.reduce((s, r) => s + r.amount, 0);
-  const totalDescuentos = [...descuentos, ...aportTrab].reduce((s, r) => s + r.amount, 0);
-  const totalAportEmpl = aportEmpl.reduce((s, r) => s + r.amount, 0);
+  const totalIngresos = ingresos.reduce((s, r) => s + Math.abs(r.amount), 0);
+  const totalDescuentos = [...descuentos, ...aportTrab].reduce((s, r) => s + Math.abs(r.amount), 0);
+  const totalAportEmpl = aportEmpl.reduce((s, r) => s + Math.abs(r.amount), 0);
+  const netoPay = totalIngresos - totalDescuentos;
 
   const conceptRowsHTML = [
     ingresos.length  > 0 ? `<tr class="g-row"><td colspan="5">Ingresos</td></tr>` : "",
     ...ingresos.map(r => conceptRow(r.code, r.label, fmt(r.amount), "")),
     ingresos.length  > 0 ? `<tr class="subtotal-row"><td colspan="2" style="text-align:right;font-weight:700;color:#166534;">Total Ingresos</td><td class="c-ing" style="color:#166534;">S/ ${fmt(totalIngresos)}</td><td></td><td></td></tr>` : "",
     descuentos.length > 0 ? `<tr class="g-row"><td colspan="5">Descuentos</td></tr>` : "",
-    ...descuentos.map(r => conceptRow(r.code, r.label, "", fmt(r.amount))),
+    ...descuentos.map(r => conceptRow(r.code, r.label, "", fmt(Math.abs(r.amount)))),
     aportTrab.length > 0 ? `<tr class="g-row"><td colspan="5">Aportes del Trabajador</td></tr>` : "",
-    ...aportTrab.map(r => conceptRow(r.code, r.label, "", fmt(r.amount))),
+    ...aportTrab.map(r => conceptRow(r.code, r.label, "", fmt(Math.abs(r.amount)))),
     (descuentos.length > 0 || aportTrab.length > 0) ? `<tr class="subtotal-row"><td colspan="2" style="text-align:right;font-weight:700;color:#991b1b;">Total Descuentos</td><td></td><td class="c-des" style="color:#991b1b;">S/ ${fmt(totalDescuentos)}</td><td></td></tr>` : "",
     `<tr class="neto-row"><td></td><td><b>Neto a Pagar</b></td><td></td><td></td><td class="c-net"><b>S/ ${fmt(netoPay)}</b></td></tr>`,
   ].join("");
@@ -334,10 +364,13 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
 
 // ── Componente React ──────────────────────────────────────────────────────────
 
-export default function PayslipPreview({ payslip, employee, companyInfo, showPrintButton = true }) {
+export default function PayslipPreview({ payslip, employee, companyInfo, showPrintButton = true, conceptsMap: externalConceptsMap = null }) {
   const [copies, setCopies] = useState(1);
   const [afpMap, setAfpMap] = useState({});
-  const [conceptsMap, setConceptsMap] = useState([]);
+  const [internalConcepts, setInternalConcepts] = useState([]);
+
+  // Usar conceptsMap del parent si se pasa; sino cargar internamente como fallback
+  const conceptsMap = externalConceptsMap || internalConcepts;
 
   useEffect(() => {
     entitiesAPI.AFP.list().then(afps => {
@@ -346,11 +379,13 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
       setAfpMap(map);
     }).catch(() => {});
 
-    // Cargar todos los conceptos de planilla para mapear códigos
-    entitiesAPI.PayrollConcept.list().then(concepts => {
-      setConceptsMap(concepts || []);
-    }).catch(() => {});
-  }, []);
+    // Solo cargar conceptos si el parent no los pasó
+    if (!externalConceptsMap) {
+      entitiesAPI.PayrollConcept.list().then(concepts => {
+        setInternalConcepts(concepts || []);
+      }).catch(() => {});
+    }
+  }, [externalConceptsMap]);
 
   const ci = companyInfo || { company_name: "Empresa", ruc: "00000000000", address: "" };
   const emp = employee || {};
@@ -367,6 +402,11 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
   const { ingresos, descuentos, aportTrab, aportEmpl } = buildConceptRows(payslip, conceptsMap);
   const jornada = toHorasMinutos(payslip.regular_hours || 0);
   const sobret  = toHorasMinutos(payslip.overtime_hours || 0);
+
+  // Totales calculados desde los ítems mostrados (garantiza consistencia)
+  const totalIngresosDisplay = ingresos.reduce((s, r) => s + Math.abs(r.amount), 0);
+  const totalDescuentosDisplay = [...descuentos, ...aportTrab].reduce((s, r) => s + Math.abs(r.amount), 0);
+  const netoCalculado = totalIngresosDisplay - totalDescuentosDisplay;
 
   return (
     <div className="bg-white rounded-xl border-2 border-slate-200 shadow-xl overflow-hidden">
@@ -528,7 +568,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
             {ingresos.length > 0 && (
               <tr className="bg-green-50">
                 <td colSpan={2} className="border border-slate-300 px-2 py-1 font-bold text-green-800 text-right">Total Ingresos</td>
-                <td className="border border-slate-300 px-2 py-1 text-right font-bold text-green-800">S/ {fmt(ingresos.reduce((s, r) => s + r.amount, 0))}</td>
+                <td className="border border-slate-300 px-2 py-1 text-right font-bold text-green-800">S/ {fmt(totalIngresosDisplay)}</td>
                 <td className="border border-slate-300 px-2 py-1"></td>
                 <td className="border border-slate-300 px-2 py-1"></td>
               </tr>
@@ -542,7 +582,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
                 <td className="border border-slate-200 px-2 py-1 text-slate-400 font-mono text-center">{r.code}</td>
                 <td className="border border-slate-200 px-2 py-1">{r.label}</td>
                 <td className="border border-slate-200 px-2 py-1"></td>
-                <td className="border border-slate-200 px-2 py-1 text-right text-red-600 font-semibold">S/ {fmt(r.amount)}</td>
+                <td className="border border-slate-200 px-2 py-1 text-right text-red-600 font-semibold">S/ {fmt(Math.abs(r.amount))}</td>
                 <td className="border border-slate-200 px-2 py-1"></td>
               </tr>
             ))}
@@ -555,7 +595,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
                 <td className="border border-slate-200 px-2 py-1 text-slate-400 font-mono text-center">{r.code}</td>
                 <td className="border border-slate-200 px-2 py-1">{r.label}</td>
                 <td className="border border-slate-200 px-2 py-1"></td>
-                <td className="border border-slate-200 px-2 py-1 text-right text-red-600 font-semibold">S/ {fmt(r.amount)}</td>
+                <td className="border border-slate-200 px-2 py-1 text-right text-red-600 font-semibold">S/ {fmt(Math.abs(r.amount))}</td>
                 <td className="border border-slate-200 px-2 py-1"></td>
               </tr>
             ))}
@@ -564,7 +604,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
               <tr className="bg-red-50">
                 <td colSpan={2} className="border border-slate-300 px-2 py-1 font-bold text-red-800 text-right">Total Descuentos</td>
                 <td className="border border-slate-300 px-2 py-1"></td>
-                <td className="border border-slate-300 px-2 py-1 text-right font-bold text-red-800">S/ {fmt([...descuentos, ...aportTrab].reduce((s, r) => s + r.amount, 0))}</td>
+                <td className="border border-slate-300 px-2 py-1 text-right font-bold text-red-800">S/ {fmt(totalDescuentosDisplay)}</td>
                 <td className="border border-slate-300 px-2 py-1"></td>
               </tr>
             )}
@@ -573,7 +613,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
               <td colSpan={2} className="border border-slate-300 px-2 py-2 font-bold text-slate-900">Neto a Pagar</td>
               <td className="border border-slate-300 px-2 py-2"></td>
               <td className="border border-slate-300 px-2 py-2"></td>
-              <td className="border border-slate-300 px-2 py-2 text-right font-bold text-indigo-700 text-base">S/ {fmt(payslip.net_pay)}</td>
+              <td className="border border-slate-300 px-2 py-2 text-right font-bold text-indigo-700 text-base">S/ {fmt(netoCalculado)}</td>
             </tr>
           </tbody>
         </table>
@@ -601,7 +641,7 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
               ))}
               <tr className="bg-amber-50">
                 <td colSpan={2} className="border border-slate-300 px-2 py-1 font-bold text-amber-800 text-right">Total Aportes Empleador</td>
-                <td className="border border-slate-300 px-2 py-1 text-right font-bold text-amber-800">S/ {fmt(aportEmpl.reduce((s, r) => s + r.amount, 0))}</td>
+                <td className="border border-slate-300 px-2 py-1 text-right font-bold text-amber-800">S/ {fmt(aportEmpl.reduce((s, r) => s + Math.abs(r.amount), 0))}</td>
               </tr>
             </tbody>
           </table>

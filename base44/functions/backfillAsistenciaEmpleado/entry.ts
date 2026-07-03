@@ -100,10 +100,15 @@ Deno.serve(async (req) => {
 
     try {
       const user = await base44.auth.me();
-      if (user && user.role !== "admin" && user.role !== "super_admin") {
-        return Response.json({ error: "Solo administradores pueden ejecutar esta función" }, { status: 403 });
+      if (user) {
+        // Llamada manual: verificar rol admin via Employee
+        const callerEmp = await db.entities.Employee.filter({ work_email: user.email });
+        const callerRole = callerEmp?.[0]?.role;
+        if (!callerRole || !['admin', 'super_admin'].includes(callerRole)) {
+          return Response.json({ error: "Solo administradores pueden ejecutar esta función" }, { status: 403 });
+        }
       }
-    } catch {}
+    } catch { /* scheduler sin sesión de usuario → ok (gateway Base44 valida el token de servicio) */ }
 
     let body = {};
     try { body = await req.json(); } catch {}

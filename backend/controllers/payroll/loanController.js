@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import { canAccessEmployee, employeeScopeWhere } from "../../middleware/authorization.js";
 
 export const getAll = async (req, res) => {
   try {
@@ -6,6 +7,7 @@ export const getAll = async (req, res) => {
     const desc = sort.startsWith('-');
     const field = sort.replace('-', '');
     const items = await prisma.loan.findMany({
+      where: employeeScopeWhere(req),
       orderBy: { [field]: desc ? 'desc' : 'asc' }
     });
     res.json(items);
@@ -20,6 +22,9 @@ export const getById = async (req, res) => {
       where: { id: req.params.id }
     });
     if (!item) return res.status(404).json({ error: 'Loan not found' });
+    if (!canAccessEmployee(req, item.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
     res.json(item);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -62,7 +67,10 @@ export const filter = async (req, res) => {
     const desc = sort.startsWith('-');
     const field = sort.replace('-', '');
     const items = await prisma.loan.findMany({
-      where: filters,
+      where: {
+        ...filters,
+        ...employeeScopeWhere(req),
+      },
       orderBy: { [field]: desc ? 'desc' : 'asc' }
     });
     res.json(items);
