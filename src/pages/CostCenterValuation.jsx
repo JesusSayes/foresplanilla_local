@@ -80,15 +80,17 @@ export default function CostCenterValuation() {
         .filter(a => a.assignment_type === "Empleado")
         .forEach(assignment => {
           const emp = allEmployees.find(e => e.id === assignment.employee_id);
-          if (emp && emp.status === "Activo" && emp.base_salary) {
-            const salaryPortion = (emp.base_salary * assignment.percentage) / 100;
+          const salary = Number(emp?.base_salary || 0);
+          const percentage = Number(assignment.percentage || 0);
+          if (emp && emp.status === "Activo" && salary > 0) {
+            const salaryPortion = (salary * percentage) / 100;
             totalSalary += salaryPortion;
             employeeDetails.push({
               code: emp.employee_code,
               name: `${emp.first_name} ${emp.last_name}`,
               position: emp.position,
-              salary: emp.base_salary,
-              percentage: assignment.percentage,
+              salary,
+              percentage,
               allocated: salaryPortion,
               department: emp.department_name,
             });
@@ -102,18 +104,20 @@ export default function CostCenterValuation() {
           const deptEmployees = allEmployees.filter(e =>
             e.department_name === assignment.department_name &&
             e.status === "Activo" &&
-            e.base_salary
+            Number(e.base_salary || 0) > 0
           );
 
           deptEmployees.forEach(emp => {
-            const salaryPortion = (emp.base_salary * assignment.percentage) / 100;
+            const salary = Number(emp.base_salary || 0);
+            const percentage = Number(assignment.percentage || 0);
+            const salaryPortion = (salary * percentage) / 100;
             totalSalary += salaryPortion;
             departmentDetails.push({
               code: emp.employee_code,
               name: `${emp.first_name} ${emp.last_name}`,
               position: emp.position,
-              salary: emp.base_salary,
-              percentage: assignment.percentage,
+              salary,
+              percentage,
               allocated: salaryPortion,
               department: emp.department_name,
               assignmentType: "Departamental",
