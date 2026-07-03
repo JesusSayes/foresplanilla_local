@@ -39,6 +39,7 @@ export default function CostCenterManagement() {
   const [assignmentFormData, setAssignmentFormData] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [costCenterSearchTerm, setCostCenterSearchTerm] = useState("");
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [historyFilter, setHistoryFilter] = useState(null);
@@ -336,7 +337,9 @@ export default function CostCenterManagement() {
     setAssignmentFormData({});
     setEditingAssignment(null);
     setShowAssignmentForm(false);
+    setCostCenterSearchTerm("");
     setEmployeeSearchTerm("");
+    setDepartmentSearchTerm("");
   };
 
   const exportToExcel = () => {
@@ -1101,15 +1104,35 @@ export default function CostCenterManagement() {
                 <Label>Centro de Costo *</Label>
                 <Select
                   value={assignmentFormData.cost_center_id}
-                  onValueChange={(v) => setAssignmentFormData({ ...assignmentFormData, cost_center_id: v })}
+                  onValueChange={(v) => {
+                    setAssignmentFormData({ ...assignmentFormData, cost_center_id: v });
+                    setCostCenterSearchTerm("");
+                  }}
                 >
                   <SelectTrigger><SelectValue placeholder="Seleccionar centro" /></SelectTrigger>
                   <SelectContent>
-                    {costCenters.filter(c => c.is_active).map(cc => (
-                      <SelectItem key={cc.id} value={cc.id}>
-                        {cc.code} - {cc.name}
-                      </SelectItem>
-                    ))}
+                    <div className="p-2 border-b sticky top-0 bg-white z-10">
+                      <Input
+                        placeholder="Buscar centro de costo..."
+                        value={costCenterSearchTerm}
+                        onChange={(e) => setCostCenterSearchTerm(e.target.value)}
+                        className="h-8"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    {costCenters
+                      .filter(c => c.is_active)
+                      .filter(cc => {
+                        const term = costCenterSearchTerm.toLowerCase();
+                        return (cc.code || "").toLowerCase().includes(term) ||
+                          (cc.name || "").toLowerCase().includes(term);
+                      })
+                      .map(cc => (
+                        <SelectItem key={cc.id} value={cc.id}>
+                          {cc.code} - {cc.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
