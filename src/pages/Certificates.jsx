@@ -20,7 +20,12 @@ import { toast } from "sonner";
 export default function Certificates() {
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
-  const { getAccessibleSites, loading: permissionsLoading } = usePermissions();
+  const { getAccessibleSites, permissions: userPermissions = [], loading: permissionsLoading } = usePermissions();
+
+  const canManageAllCertificates = userPermissions.includes("certificates.view_all") ||
+                                    userPermissions.includes("certificates.create") ||
+                                    userPermissions.includes("certificates.approve") ||
+                                    userPermissions.includes("system.admin");
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestType, setRequestType] = useState("Certificado de Trabajo");
   const [requestDescription, setRequestDescription] = useState("");
@@ -55,7 +60,7 @@ export default function Certificates() {
     queryFn: async () => {
       return await base44.entities.Employee.filter({ status: "Activo" });
     },
-    enabled: employee?.role === "admin",
+    enabled: canManageAllCertificates,
   });
 
   const accessibleSites = getAccessibleSites ? getAccessibleSites() : null;
@@ -64,7 +69,7 @@ export default function Certificates() {
     ? allEmployees.filter(emp => accessibleSites.includes(emp.site))
     : allEmployees;
 
-  const targetEmployeeId = employee?.role === "admin" ? selectedEmployeeId : employee?.id;
+  const targetEmployeeId = canManageAllCertificates ? (selectedEmployeeId || employee?.id) : employee?.id;
 
   const { data: certificates = [], isLoading } = useQuery({
     queryKey: ["certificates", targetEmployeeId],
@@ -101,9 +106,9 @@ export default function Certificates() {
       return;
     }
 
-    const employeeIdToUse = employee.role === "admin" ? selectedEmployeeId : employee.id;
+    const employeeIdToUse = canManageAllCertificates ? selectedEmployeeId : employee.id;
 
-    if (employee.role === "admin" && !employeeIdToUse) {
+    if (canManageAllCertificates && !employeeIdToUse) {
       toast.error("Por favor selecciona un empleado");
       return;
     }
@@ -112,7 +117,7 @@ export default function Certificates() {
       employee_id: employeeIdToUse,
       certificate_type: requestType,
       description: requestDescription || `Solicitud de ${requestType}`,
-      requested_by_employee: employee.role !== "admin",
+      requested_by_employee: !canManageAllCertificates,
       status: "Solicitado",
     };
 
@@ -283,7 +288,7 @@ export default function Certificates() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="space-y-6">
-                    {employee.role === "admin" ? (
+                    {canManageAllCertificates ? (
                       <div>
                         <Label className="text-sm font-semibold text-slate-900 mb-2 block">
                           Empleado *
@@ -355,11 +360,11 @@ export default function Certificates() {
                       </p>
                     </div>
 
-                    {((employee.role === "admin" && selectedEmployeeId) || employee.role !== "admin") && (
+                    {((canManageAllCertificates && selectedEmployeeId) || !canManageAllCertificates) && (
                       <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                         <h4 className="font-semibold text-slate-900 mb-2">Datos del empleado:</h4>
                         <div className="grid grid-cols-2 gap-4 text-sm">
-                          {employee.role === "admin" && selectedEmployeeId ? (
+                          {canManageAllCertificates && selectedEmployeeId ? (
                             <>
                               {(() => {
                                 const selectedEmp = allEmployees.find(e => e.id === selectedEmployeeId);
@@ -456,7 +461,7 @@ export default function Certificates() {
             <Card className="border-0 shadow-lg sticky top-8">
               <CardHeader className="border-b">
                 <CardTitle className="text-xl font-bold">
-                  {employee.role === "admin" && selectedEmployeeId ? "Solicitudes del Empleado" : "Mis Solicitudes"}
+                  {canManageAllCertificates && selectedEmployeeId ? "Solicitudes del Empleado" : "Mis Solicitudes"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">

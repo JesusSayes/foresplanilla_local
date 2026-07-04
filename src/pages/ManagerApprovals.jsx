@@ -15,6 +15,7 @@ import { es } from "date-fns/locale";
 import { parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
+import { usePermissions } from "@/components/hooks/usePermissions";
 
 export default function ManagerApprovals() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -29,6 +30,7 @@ export default function ManagerApprovals() {
   });
 
   const queryClient = useQueryClient();
+  const { permissions: userPermissions = [], loading: permissionsLoading } = usePermissions();
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -51,7 +53,10 @@ export default function ManagerApprovals() {
     loadUserData();
   }, []);
 
-  const isAdmin = employee?.role === "admin" || employee?.role === "super_admin";
+  const isAdmin = userPermissions.includes("vacations.approve") ||
+                   userPermissions.includes("vacations.view_all") ||
+                   userPermissions.includes("vacations.manage") ||
+                   userPermissions.includes("system.admin");
 
   const { data: allRequests = [], isLoading } = useQuery({
     queryKey: ["allVacationRequests", employee?.id, isAdmin],

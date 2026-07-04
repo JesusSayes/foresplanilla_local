@@ -65,9 +65,11 @@ export default function VacationRequest() {
   }, []);
 
   const isHR = userPermissions.includes("vacations.manage") || 
+               userPermissions.includes("vacations.view_all") ||
+               userPermissions.includes("vacations.approve") ||
+               userPermissions.includes("vacations.view_department") ||
                userPermissions.includes("system.admin") ||
-               userPermissions.includes("employees.create") ||
-               userPermissions.includes("employees.edit");
+               userPermissions.includes("employees.view");
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
