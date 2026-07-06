@@ -26,6 +26,7 @@ export default function Certificates() {
     "certificates.view_all",
     "certificates.create",
     "certificates.approve",
+    "system.admin",
   ]);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestType, setRequestType] = useState("Certificado de Trabajo");
@@ -54,7 +55,7 @@ export default function Certificates() {
     ? allEmployees.filter(emp => accessibleSites.includes(emp.site))
     : allEmployees;
 
-  const targetEmployeeId = canSelectEmployee ? selectedEmployeeId : employee?.id;
+  const targetEmployeeId = canSelectEmployee ? (selectedEmployeeId || employee?.id) : employee?.id;
 
   const { data: certificates = [], isLoading } = useQuery({
     queryKey: ["certificates", targetEmployeeId],

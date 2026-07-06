@@ -44,9 +44,11 @@ export default function VacationRequest() {
   const queryClient = useQueryClient();
 
   const isHR = userPermissions.includes("vacations.manage") ||
+               userPermissions.includes("vacations.view_all") ||
+               userPermissions.includes("vacations.approve") ||
+               userPermissions.includes("vacations.view_department") ||
                userPermissions.includes("system.admin") ||
-               userPermissions.includes("employees.create") ||
-               userPermissions.includes("employees.edit");
+               userPermissions.includes("employees.view");
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
@@ -175,7 +177,6 @@ export default function VacationRequest() {
     if (!file) return;
 
     try {
-      // const { file_url } = await base44.integrations.Core.UploadFile({ file });
       const { file_url } = await uploadFile(file);
       setFormData({ ...formData, supporting_document_url: file_url });
       toast.success("Archivo cargado exitosamente");
