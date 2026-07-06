@@ -1,20 +1,29 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { loadAccessContext, requireAnyPermission } from '../middleware/authorization.js';
+import {
+  attachEmployeeReadScope,
+  attachEmployeeScope,
+  canAccessEmployee,
+  loadAccessContext,
+  requireAnyPermission,
+} from '../middleware/authorization.js';
 import crypto from 'crypto';
 
 const router = express.Router();
 
-router.use(authenticateToken, loadAccessContext, requireAnyPermission('system.admin'));
+router.use(authenticateToken, loadAccessContext);
 
-router.get('/', async (req, res) => {
+router.get('/', requireAnyPermission('system.admin', 'employees.view'), attachEmployeeReadScope, async (req, res) => {
   try {
     const { sort = '-created_date' } = req.query;
     const orderBy = sort.startsWith('-') ? `${sort.substring(1)} DESC` : `${sort} ASC`;
 
     const result = await pool.query(
-      `SELECT * FROM employee_change_log ORDER BY ${orderBy}`
+      req.accessibleEmployeeIds === null
+        ? `SELECT * FROM employee_change_log ORDER BY ${orderBy}`
+        : `SELECT * FROM employee_change_log WHERE employee_id = ANY($1::varchar[]) ORDER BY ${orderBy}`,
+      req.accessibleEmployeeIds === null ? [] : [req.accessibleEmployeeIds || []]
     );
     res.json(result.rows);
   } catch (error) {
@@ -23,7 +32,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/filter', async (req, res) => {
+router.post('/filter', requireAnyPermission('system.admin', 'employees.view'), attachEmployeeReadScope, async (req, res) => {
   try {
     const filters = req.body;
     const { sort = '-created_date' } = req.query;
@@ -40,6 +49,11 @@ router.post('/filter', async (req, res) => {
         paramCount++;
       }
     });
+    if (req.accessibleEmployeeIds !== null) {
+      conditions.push(`employee_id = ANY($${paramCount}::varchar[])`);
+      values.push(req.accessibleEmployeeIds || []);
+      paramCount++;
+    }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const query = `SELECT * FROM employee_change_log ${whereClause} ORDER BY ${orderBy}`;
@@ -52,7 +66,7 @@ router.post('/filter', async (req, res) => {
   }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAnyPermission('system.admin', 'employees.view'), attachEmployeeReadScope, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
@@ -63,6 +77,9 @@ router.get('/:id', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Change log not found' });
     }
+    if (!canAccessEmployee(req, result.rows[0].employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -71,7 +88,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAnyPermission('system.admin', 'employees.create', 'employees.edit'), attachEmployeeScope('system.admin', 'employees.create', 'employees.edit'), async (req, res) => {
   const {
     employee_id,
     field_changed,
@@ -86,6 +103,10 @@ router.post('/', async (req, res) => {
   const id = crypto.randomBytes(12).toString('hex');
 
   try {
+    if (!canAccessEmployee(req, employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
+
     const result = await pool.query(
       `INSERT INTO employee_change_log
        (id, employee_id, field_changed, old_value, new_value, change_type, changed_by, change_date, notes)
@@ -118,7 +139,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAnyPermission('system.admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -143,7 +164,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAnyPermission('system.admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
