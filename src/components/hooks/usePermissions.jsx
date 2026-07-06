@@ -174,11 +174,12 @@ export const usePermissions = () => {
             const basicPermissions = getBasicPermissionsByRole(emp.role);
             setPermissions(basicPermissions);
             // Calcular restricción de sede para roles legacy:
-            // admin, super_admin y hr_readonly: sin restricción (tienen permisos view_all)
-            // manager y empleado: restringido a su propia sede
-            if (emp.role === "admin" || emp.role === "super_admin" || emp.role === "hr_readonly") {
+            // admin y super_admin: sin restricción
+            // cualquier otro rol: restringido a su propia sede
+            if (emp.role === "admin" || emp.role === "super_admin") {
               setFallbackSiteRestriction(null);
             } else {
+              // Roles como manager, hr_readonly, empleado: solo su sede
               setFallbackSiteRestriction(emp.site ? [emp.site] : []);
             }
           }
@@ -241,9 +242,9 @@ export const usePermissions = () => {
 
       // Combinar sedes de TODOS los roles site_restricted
       const allowedSites = [...new Set(siteRestrictedRoles.flatMap(r => r.allowed_sites || []))];
-      // Si ningún rol tiene sedes específicas, NO restringir (vacío = todas, según schema del Role)
+      // Si ningún rol tiene sedes específicas, restringir a la sede propia
       if (allowedSites.length === 0) {
-        return null;
+        return employee?.site ? [employee.site] : [];
       }
       return allowedSites;
     }
