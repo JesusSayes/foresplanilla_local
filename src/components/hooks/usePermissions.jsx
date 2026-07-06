@@ -97,6 +97,12 @@ export const usePermissions = () => {
   const [roles, setRoles] = useState([]);
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [employeePermissionFlags, setEmployeePermissionFlags] = useState({
+    can_view_all_employees: false,
+    can_create_employees: false,
+    can_edit_employees: false,
+    can_delete_employees: false,
+  });
   // fallbackSiteRestriction: undefined=cargando, null=todas, []|[...]=restricción
   const [fallbackSiteRestriction, setFallbackSiteRestriction] = useState(undefined);
 
@@ -129,6 +135,12 @@ export const usePermissions = () => {
           if (emp.role === "super_admin") {
             setPermissions(Object.keys(AVAILABLE_PERMISSIONS));
             setRoles([{ name: "Super Admin", permissions: Object.keys(AVAILABLE_PERMISSIONS), priority: 1000 }]);
+            setEmployeePermissionFlags({
+              can_view_all_employees: true,
+              can_create_employees: true,
+              can_edit_employees: true,
+              can_delete_employees: true,
+            });
             setFallbackSiteRestriction(null);
             setLoading(false);
             return;
@@ -140,6 +152,7 @@ export const usePermissions = () => {
             employee_id: emp.id
           });
 
+          let effectivePermissions;
           if (userRoles.length > 0) {
             const roleIds = userRoles.map(ur => ur.role_id);
             const allRoles = await entitiesAPI.Role.list();
@@ -156,11 +169,12 @@ export const usePermissions = () => {
               }
             });
 
-            setPermissions([...allPermissions]);
+            effectivePermissions = [...allPermissions];
+            setPermissions(effectivePermissions);
           } else {
             // Fallback al rol básico del empleado si no tiene roles asignados en UserRole
-            const basicPermissions = getBasicPermissionsByRole(emp.role);
-            setPermissions(basicPermissions);
+            effectivePermissions = getBasicPermissionsByRole(emp.role);
+            setPermissions(effectivePermissions);
             // Calcular restricción de sede para roles legacy:
             // admin y super_admin: sin restricción
             // cualquier otro rol: restringido a su propia sede
@@ -171,6 +185,14 @@ export const usePermissions = () => {
               setFallbackSiteRestriction(emp.site ? [emp.site] : []);
             }
           }
+
+          const hasAdmin = effectivePermissions.includes("system.admin");
+          setEmployeePermissionFlags({
+            can_view_all_employees: hasAdmin || effectivePermissions.includes("employees.view"),
+            can_create_employees: hasAdmin || effectivePermissions.includes("employees.create"),
+            can_edit_employees: hasAdmin || effectivePermissions.includes("employees.edit"),
+            can_delete_employees: hasAdmin || effectivePermissions.includes("employees.delete"),
+          });
         }
       } catch (error) {
         console.error("Error loading permissions:", error);
@@ -327,6 +349,7 @@ export const usePermissions = () => {
     canAccessEmployee,
     getAccessibleEmployeeIds,
     canViewFinancials,
+    employeePermissionFlags,
   };
 };
 
