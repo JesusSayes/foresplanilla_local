@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { computePermissionFlags } from "@/lib/permissionFlags";
 
 // Lista completa de permisos disponibles en el sistema
 export const AVAILABLE_PERMISSIONS = {
@@ -187,13 +188,7 @@ export const usePermissions = () => {
           }
 
           // Sincronizar flags de permisos al user.data para que el RLS los pueda validar
-          const hasAdmin = effectivePermissions.includes("system.admin");
-          const permFlags = {
-            can_view_all_employees: hasAdmin || effectivePermissions.includes("employees.view"),
-            can_create_employees: hasAdmin || effectivePermissions.includes("employees.create"),
-            can_edit_employees: hasAdmin || effectivePermissions.includes("employees.edit"),
-            can_delete_employees: hasAdmin || effectivePermissions.includes("employees.delete"),
-          };
+          const permFlags = computePermissionFlags(effectivePermissions);
           const currentData = user.data || {};
           const needsSync = Object.keys(permFlags).some(k => currentData[k] !== permFlags[k]);
           if (needsSync) {
@@ -355,7 +350,7 @@ export const usePermissions = () => {
 };
 
 // Permisos básicos por rol antiguo (para compatibilidad)
-const getBasicPermissionsByRole = (role) => {
+export const getBasicPermissionsByRole = (role) => {
   const basicPermissions = {
     super_admin: Object.keys(AVAILABLE_PERMISSIONS),
     admin: [

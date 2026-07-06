@@ -11,18 +11,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import NotificationCenter from "./components/notifications/NotificationCenter";
+import { computePermissionFlags } from "@/lib/permissionFlags";
+import { getBasicPermissionsByRole } from "./components/hooks/usePermissions";
 
-// Permisos básicos fallback por rol legacy
-const getBasicPermissionsByRole = (role) => {
-  const basicPermissions = {
-    super_admin: ["system.admin"],
-    admin: ["system.admin", "employees.view", "attendance.view_all", "vacations.view_all", "payroll.view_all", "contracts.view", "cost_centers.view", "reports.view", "roles.view", "schedules.view", "holidays.view", "certificates.view_all"],
-    hr_readonly: ["employees.view", "attendance.view_all", "vacations.view_all", "payroll.view_all", "reports.view", "schedules.view", "holidays.view", "certificates.view_all"],
-    manager: ["employees.view", "attendance.view_department", "attendance.approve_incidents", "vacations.view_department", "vacations.approve", "payroll.view_own", "certificates.view_own", "schedules.view", "holidays.view", "reports.view"],
-    empleado: ["attendance.view_own", "vacations.view_own", "payroll.view_own", "certificates.view_own", "schedules.view", "holidays.view"],
-  };
-  return basicPermissions[role] || basicPermissions.empleado;
-};
+// getBasicPermissionsByRole se importa desde usePermissions (fuente única de verdad)
 
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
@@ -78,13 +70,6 @@ export default function Layout({ children, currentPageName }) {
             base44.auth.updateMe({ employee_id: emp.id }).catch(() => {});
           }
 
-          // Super admin siempre tiene acceso total
-          if (emp.role === "super_admin") {
-            setUserPermissions(["system.admin"]);
-            setLoading(false);
-            return;
-          }
-
           // Cargar roles asignados al empleado
           const userRoles = await base44.entities.UserRole.filter({ employee_id: emp.id });
           
@@ -105,13 +90,7 @@ export default function Layout({ children, currentPageName }) {
           }
 
           // Sincronizar flags de permisos al user.data para que el RLS los pueda validar
-          const hasAdmin = effectivePermissions.includes("system.admin");
-          const permFlags = {
-            can_view_all_employees: hasAdmin || effectivePermissions.includes("employees.view"),
-            can_create_employees: hasAdmin || effectivePermissions.includes("employees.create"),
-            can_edit_employees: hasAdmin || effectivePermissions.includes("employees.edit"),
-            can_delete_employees: hasAdmin || effectivePermissions.includes("employees.delete"),
-          };
+          const permFlags = computePermissionFlags(effectivePermissions);
           const currentData = user.data || {};
           const needsSync = Object.keys(permFlags).some(k => currentData[k] !== permFlags[k]);
           if (needsSync) {
