@@ -78,6 +78,7 @@ export default function EmployeeManagement() {
     queryFn: async () => {
       return await base44.entities.Employee.list("-created_date");
     },
+    enabled: !permissionsLoading,
   });
 
   const { data: positions = [] } = useQuery({

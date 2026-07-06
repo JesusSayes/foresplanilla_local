@@ -152,6 +152,7 @@ export const usePermissions = () => {
             employee_id: emp.id 
           });
 
+          let effectivePermissions;
           if (userRoles.length > 0) {
             const roleIds = userRoles.map(ur => ur.role_id);
             const allRoles = await base44.entities.Role.list();
@@ -168,11 +169,12 @@ export const usePermissions = () => {
               }
             });
 
-            setPermissions([...allPermissions]);
+            effectivePermissions = [...allPermissions];
+            setPermissions(effectivePermissions);
           } else {
             // Fallback al rol básico del empleado si no tiene roles asignados en UserRole
-            const basicPermissions = getBasicPermissionsByRole(emp.role);
-            setPermissions(basicPermissions);
+            effectivePermissions = getBasicPermissionsByRole(emp.role);
+            setPermissions(effectivePermissions);
             // Calcular restricción de sede para roles legacy:
             // admin y super_admin: sin restricción
             // cualquier otro rol: restringido a su propia sede
@@ -182,6 +184,20 @@ export const usePermissions = () => {
               // Roles como manager, hr_readonly, empleado: solo su sede
               setFallbackSiteRestriction(emp.site ? [emp.site] : []);
             }
+          }
+
+          // Sincronizar flags de permisos al user.data para que el RLS los pueda validar
+          const hasAdmin = effectivePermissions.includes("system.admin");
+          const permFlags = {
+            can_view_all_employees: hasAdmin || effectivePermissions.includes("employees.view"),
+            can_create_employees: hasAdmin || effectivePermissions.includes("employees.create"),
+            can_edit_employees: hasAdmin || effectivePermissions.includes("employees.edit"),
+            can_delete_employees: hasAdmin || effectivePermissions.includes("employees.delete"),
+          };
+          const currentData = user.data || {};
+          const needsSync = Object.keys(permFlags).some(k => currentData[k] !== permFlags[k]);
+          if (needsSync) {
+            await base44.auth.updateMe(permFlags).catch(() => {});
           }
         }
       } catch (error) {

@@ -88,6 +88,7 @@ export default function Layout({ children, currentPageName }) {
           // Cargar roles asignados al empleado
           const userRoles = await base44.entities.UserRole.filter({ employee_id: emp.id });
           
+          let effectivePermissions;
           if (userRoles && userRoles.length > 0) {
             const allRoles = await base44.entities.Role.list();
             const assignedRoles = allRoles.filter(r => userRoles.some(ur => ur.role_id === r.id));
@@ -95,10 +96,26 @@ export default function Layout({ children, currentPageName }) {
             assignedRoles.forEach(role => {
               (role.permissions || []).forEach(p => allPerms.add(p));
             });
-            setUserPermissions([...allPerms]);
+            effectivePermissions = [...allPerms];
+            setUserPermissions(effectivePermissions);
           } else {
             // Fallback al rol legacy
-            setUserPermissions(getBasicPermissionsByRole(emp.role));
+            effectivePermissions = getBasicPermissionsByRole(emp.role);
+            setUserPermissions(effectivePermissions);
+          }
+
+          // Sincronizar flags de permisos al user.data para que el RLS los pueda validar
+          const hasAdmin = effectivePermissions.includes("system.admin");
+          const permFlags = {
+            can_view_all_employees: hasAdmin || effectivePermissions.includes("employees.view"),
+            can_create_employees: hasAdmin || effectivePermissions.includes("employees.create"),
+            can_edit_employees: hasAdmin || effectivePermissions.includes("employees.edit"),
+            can_delete_employees: hasAdmin || effectivePermissions.includes("employees.delete"),
+          };
+          const currentData = user.data || {};
+          const needsSync = Object.keys(permFlags).some(k => currentData[k] !== permFlags[k]);
+          if (needsSync) {
+            await base44.auth.updateMe(permFlags).catch(() => {});
           }
         }
       } catch (error) {
