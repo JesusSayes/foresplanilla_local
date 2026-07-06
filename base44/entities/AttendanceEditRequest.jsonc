@@ -98,19 +98,53 @@
           }
         },
         {
+          "user_condition": {
+            "data.can_approve_attendance_edits": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_attendance": true
+          }
+        },
+        {
           "data.employee_id": "{{user.data.employee_id}}"
         }
       ]
     },
     "update": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_approve_attendance_edits": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_attendance": true
+          }
+        },
+        {
+          "data.employee_id": "{{user.data.employee_id}}"
+        }
+      ]
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.employee_id": "{{user.data.employee_id}}"
+        }
+      ]
     }
   }
 }
