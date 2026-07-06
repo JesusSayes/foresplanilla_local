@@ -10,7 +10,7 @@ import {
 } from '../controllers/employeeController.js';
 import { listAccessibleEmployees } from '../controllers/employeeController.js';
 import {
-  attachOwnOrAdminScope,
+  attachEmployeeReadScope,
   attachEmployeeScope,
   loadAccessContext,
   requireAnyPermission,
@@ -21,11 +21,11 @@ const router = express.Router();
 router.use(authenticateToken);
 
 router.get('/accessible', loadAccessContext, listAccessibleEmployees);
-router.get('/', loadAccessContext, attachOwnOrAdminScope, listEmployees);
-router.post('/filter', loadAccessContext, attachOwnOrAdminScope, filterEmployees);
-router.get('/:id', loadAccessContext, attachOwnOrAdminScope, getEmployee);
-router.post('/', loadAccessContext, requireAnyPermission('system.admin'), createEmployee);
-router.put('/:id', loadAccessContext, requireAnyPermission('system.admin'), attachEmployeeScope('system.admin'), updateEmployee);
-router.delete('/:id', loadAccessContext, requireAnyPermission('system.admin'), attachEmployeeScope('system.admin'), deleteEmployee);
+router.get('/', loadAccessContext, attachEmployeeReadScope, listEmployees);
+router.post('/filter', loadAccessContext, attachEmployeeReadScope, filterEmployees);
+router.get('/:id', loadAccessContext, attachEmployeeReadScope, getEmployee);
+router.post('/', loadAccessContext, requireAnyPermission('system.admin', 'employees.create'), createEmployee);
+router.put('/:id', loadAccessContext, requireAnyPermission('system.admin', 'employees.edit'), attachEmployeeScope('system.admin', 'employees.edit'), updateEmployee);
+router.delete('/:id', loadAccessContext, requireAnyPermission('system.admin', 'employees.delete'), attachEmployeeScope('system.admin', 'employees.delete'), deleteEmployee);
 
 export default router;

@@ -170,6 +170,19 @@ export const attachOwnOrAdminScope = (req, res, next) => {
   next();
 };
 
+export const attachEmployeeReadScope = async (req, res, next) => {
+  try {
+    if (hasPermission(req.access, 'employees.view')) {
+      req.accessibleEmployeeIds = await resolveAccessibleEmployeeIds(req.access, ['employees.view']);
+    } else {
+      req.accessibleEmployeeIds = req.access?.employee?.id ? [req.access.employee.id] : [];
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const canAccessEmployee = (req, employeeId) => (
   req.accessibleEmployeeIds === null || req.accessibleEmployeeIds?.includes(employeeId)
 );
