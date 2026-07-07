@@ -13,18 +13,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import NotificationCenter from "./components/notifications/NotificationCenter";
+import { getBasicPermissionsByRole } from "./components/hooks/usePermissions";
 
-// Permisos básicos fallback por rol legacy
-const getBasicPermissionsByRole = (role) => {
-  const basicPermissions = {
-    super_admin: ["system.admin"],
-    admin: ["system.admin", "employees.view", "attendance.view_all", "vacations.view_all", "payroll.view_all", "contracts.view", "cost_centers.view", "reports.view", "roles.view", "schedules.view", "holidays.view", "certificates.view_all"],
-    hr_readonly: ["employees.view", "attendance.view_all", "vacations.view_all", "payroll.view_all", "reports.view", "schedules.view", "holidays.view", "certificates.view_all"],
-    manager: ["employees.view", "attendance.view_department", "attendance.approve_incidents", "vacations.view_department", "vacations.approve", "payroll.view_own", "certificates.view_own", "schedules.view", "holidays.view", "reports.view"],
-    empleado: ["attendance.view_own", "vacations.view_own", "payroll.view_own", "certificates.view_own", "schedules.view", "holidays.view"],
-  };
-  return basicPermissions[role] || basicPermissions.empleado;
-};
+// getBasicPermissionsByRole se importa desde usePermissions (fuente única de verdad)
 
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();

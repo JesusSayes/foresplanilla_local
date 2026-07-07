@@ -59,6 +59,11 @@
           }
         },
         {
+          "user_condition": {
+            "data.can_create_certificates": true
+          }
+        },
+        {
           "data.employee_id": "{{user.data.employee_id}}"
         }
       ]
@@ -71,19 +76,42 @@
           }
         },
         {
+          "user_condition": {
+            "data.can_view_all_certificates": true
+          }
+        },
+        {
           "data.employee_id": "{{user.data.employee_id}}"
         }
       ]
     },
     "update": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_approve_certificates": true
+          }
+        }
+      ]
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_approve_certificates": true
+          }
+        }
+      ]
     }
   }
 }
