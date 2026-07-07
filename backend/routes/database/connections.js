@@ -4,7 +4,7 @@ import controller from '../../controllers/database/connectionController.js';
 import { authenticateToken } from '../../middleware/auth.js';
 import { loadAccessContext, requireAnyPermission } from '../../middleware/authorization.js';
 
-router.use(authenticateToken, loadAccessContext, requireAnyPermission('system.admin'));
+router.use(authenticateToken, loadAccessContext, requireAnyPermission('system.admin', 'system.settings'));
 
 router.get('/', controller.getAll);
 router.get('/:id', controller.getById);

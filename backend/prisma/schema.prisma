@@ -489,17 +489,47 @@ model holiday {
 }
 
 model notification {
-  id           String    @id @db.VarChar(255)
-  created_date DateTime? @db.Timestamp(6)
-  updated_date DateTime? @db.Timestamp(6)
-  created_by   String?
+  id                  String    @id @db.VarChar(255)
+  created_date        DateTime? @db.Timestamp(6)
+  updated_date        DateTime? @db.Timestamp(6)
+  created_by          String?
+  user_email          String?   @db.VarChar(255)
+  employee_id         String?   @db.VarChar(255)
+  type                String?   @db.VarChar(100)
+  title               String?
+  message             String?
+  link                String?
+  link_page           String?   @db.VarChar(255)
+  is_read             Boolean?  @default(false)
+  priority            String?   @default("normal") @db.VarChar(20)
+  related_entity_id   String?   @db.VarChar(255)
+  related_entity_type String?   @db.VarChar(100)
+
+  @@index([employee_id], map: "idx_notification_employee_id")
+  @@index([user_email], map: "idx_notification_user_email")
 }
 
 model notification_preference {
-  id           String    @id(map: "notificationpreference_pkey") @db.VarChar(255)
-  created_date DateTime? @db.Timestamp(6)
-  updated_date DateTime? @db.Timestamp(6)
-  created_by   String?
+  id                  String    @id(map: "notificationpreference_pkey") @db.VarChar(255)
+  created_date        DateTime? @db.Timestamp(6)
+  updated_date        DateTime? @db.Timestamp(6)
+  created_by          String?
+  user_email          String?   @db.VarChar(255)
+  employee_id         String?   @db.VarChar(255)
+  incident_pending    Boolean?  @default(true)
+  incident_approved   Boolean?  @default(true)
+  incident_rejected   Boolean?  @default(true)
+  vacation_pending    Boolean?  @default(true)
+  vacation_approved   Boolean?  @default(true)
+  vacation_rejected   Boolean?  @default(true)
+  contract_expiring   Boolean?  @default(true)
+  payslip_ready       Boolean?  @default(true)
+  attendance_alert    Boolean?  @default(true)
+  system              Boolean?  @default(true)
+  email_notifications Boolean?  @default(false)
+
+  @@index([employee_id], map: "idx_notification_preference_employee_id")
+  @@index([user_email], map: "idx_notification_preference_user_email")
 }
 
 model payroll_concept {

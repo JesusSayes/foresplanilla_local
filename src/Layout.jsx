@@ -269,7 +269,7 @@ export default function Layout({ children, currentPageName }) {
     // Planillas — visible si tiene cualquier permiso de planillas O centros de costo O contabilidad
     if (hasAnyPermission([
       "payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create", "payroll.calculate", "payroll.view_own",
-      "cost_centers.view"
+      "cost_centers.view", "accounting.view", "accounting.manage", "loans.view", "loans.manage"
     ])) {
       const submenu = [];
       if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create", "payroll.calculate"])) {
@@ -281,16 +281,18 @@ export default function Layout({ children, currentPageName }) {
       if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create", "payroll.calculate"])) {
         submenu.push({ name: "Consulta de Planillas", path: "ConsultaPlanillas" });
       }
-      if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create"])) {
+      if (hasAnyPermission(["loans.view", "loans.manage", "payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create"])) {
         submenu.push({ name: "Préstamos", path: "LoanManagement" });
       }
       if (hasPermission("cost_centers.view")) {
         submenu.push({ name: "Centros de Costo", path: "CostCenterManagement" });
         submenu.push({ name: "Consulta Valorizada", path: "CostCenterValuation" });
       }
-      if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create", "payroll.calculate"])) {
+      if (hasAnyPermission(["accounting.view", "accounting.manage", "payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create", "payroll.calculate"])) {
         submenu.push({ name: "Asientos Contables", path: "AsientosContables" });
         submenu.push({ name: "Cuentas Contables", path: "CuentasContables" });
+      }
+      if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create", "payroll.calculate"])) {
         submenu.push({ name: "Exportar SUNAT (T-Registro / PLAME)", path: "SunatExport" });
       }
       if (hasAnyPermission(["payroll.view_all", "payroll.create", "payroll.calculate"])) {

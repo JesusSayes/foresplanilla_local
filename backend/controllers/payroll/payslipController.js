@@ -48,6 +48,9 @@ export const getById = async (req, res) => {
 
 export const create = async (req, res) => {
   try {
+    if (req.body?.employee_id && !canAccessEmployee(req, req.body.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
 
     const payslip = await prisma.payslip.create({
       data: req.body
@@ -74,6 +77,11 @@ export const bulkCreate = async (req, res) => {
         message: "No hay payslips para insertar",
         data: []
       });
+    }
+
+    const forbiddenPayslip = payslips.find(p => p?.employee_id && !canAccessEmployee(req, p.employee_id));
+    if (forbiddenPayslip) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
 
     const formattedPayslips = payslips.map(p => {
@@ -174,6 +182,15 @@ export const bulkCreate = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
+    const current = await prisma.payslip.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!current) return res.status(404).json({ error: 'Payslip not found' });
+    if (!canAccessEmployee(req, current.employee_id) ||
+        (req.body?.employee_id && !canAccessEmployee(req, req.body.employee_id))) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
 
     const payslip = await prisma.payslip.update({
       where: { id: req.params.id },
@@ -189,6 +206,14 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
+    const current = await prisma.payslip.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!current) return res.status(404).json({ error: 'Payslip not found' });
+    if (!canAccessEmployee(req, current.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
 
     await prisma.payslip.delete({
       where: { id: req.params.id }

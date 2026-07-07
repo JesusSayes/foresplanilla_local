@@ -336,6 +336,12 @@ export default function RoleManagement() {
       "payroll.view_own", "payroll.view_all", "payroll.view_department", "payroll.view_amounts",
       "payroll.edit", "payroll.create", "payroll.delete", "payroll.calculate", "payroll.approve"
     ],
+    "Contabilidad": [
+      "accounting.view", "accounting.manage"
+    ],
+    "Préstamos": [
+      "loans.view", "loans.manage"
+    ],
     "Contratos": [
       "contracts.view", "contracts.view_amounts", "contracts.create", "contracts.edit", "contracts.delete"
     ],

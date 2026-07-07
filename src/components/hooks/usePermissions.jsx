@@ -45,6 +45,14 @@ export const AVAILABLE_PERMISSIONS = {
   "payroll.manage_concepts": "Gestionar conceptos de planilla",
   "payroll.view_amounts": "Ver montos en planillas",
 
+  // Contabilidad
+  "accounting.view": "Ver asientos contables",
+  "accounting.manage": "Gestionar asientos contables",
+
+  // Préstamos
+  "loans.view": "Ver préstamos",
+  "loans.manage": "Gestionar préstamos",
+
   // Contratos
   "contracts.view": "Ver contratos",
   "contracts.view_amounts": "Ver montos de contratos",

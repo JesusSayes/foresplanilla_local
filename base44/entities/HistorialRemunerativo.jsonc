@@ -65,9 +65,18 @@
   ],
   "rls": {
     "create": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_create_payroll": true
+          }
+        }
+      ]
     },
     "read": {
       "$or": [
@@ -77,19 +86,42 @@
           }
         },
         {
+          "user_condition": {
+            "data.can_view_all_payroll": true
+          }
+        },
+        {
           "data.employee_id": "{{user.data.employee_id}}"
         }
       ]
     },
     "update": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_edit_payroll": true
+          }
+        }
+      ]
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_delete_payroll": true
+          }
+        }
+      ]
     }
   }
 }

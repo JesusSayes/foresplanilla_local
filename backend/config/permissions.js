@@ -113,6 +113,14 @@ export const BASE44_PERMISSIONS = Object.freeze({
   'payroll.view_amounts': 'Ver montos en planillas',
   'payroll.view_department': 'Ver planillas del departamento',
 
+  // Contabilidad
+  'accounting.view': 'Ver asientos contables',
+  'accounting.manage': 'Gestionar asientos contables',
+
+  // Préstamos
+  'loans.view': 'Ver préstamos',
+  'loans.manage': 'Gestionar préstamos',
+
   // Contratos
   'contracts.view': 'Ver contratos',
   'contracts.view_amounts': 'Ver montos de contratos',

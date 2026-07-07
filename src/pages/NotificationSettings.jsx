@@ -4,16 +4,16 @@ import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
   Bell, Clock, Calendar, FileText, AlertCircle, CheckCircle,
   XCircle, Mail
 } from "lucide-react";
 import { toast } from "sonner";
+import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 
 export default function NotificationSettings() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [employee, setEmployee] = useState(null);
+  const { user: currentUser } = useAuth();
+  const employee = currentUser?.employee || null;
   const [preferences, setPreferences] = useState(null);
 
   const queryClient = useQueryClient();

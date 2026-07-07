@@ -79,6 +79,9 @@ export const getById = async (req, res) => {
 export const create = async (req, res) => {
   try {
     const data = cleanData(req.body);
+    if (!canAccessEmployee(req, data.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
     const id = generate24HexId();
     const fields = Object.keys(data);
     const values = Object.values(data);
@@ -101,6 +104,11 @@ export const bulkCreate = async (req, res) => {
   try {
     const rows = Array.isArray(req.body) ? req.body : [];
     if (rows.length === 0) return res.status(400).json({ error: 'No hay registros para insertar' });
+
+    const forbiddenRow = rows.find(row => !canAccessEmployee(req, row?.employee_id));
+    if (forbiddenRow) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
 
     const created = [];
     for (const raw of rows) {
@@ -140,6 +148,13 @@ export const update = async (req, res) => {
     const fields = Object.keys(data);
     if (fields.length === 0) return res.status(400).json({ error: 'No hay campos para actualizar' });
 
+    const current = await query(`SELECT employee_id FROM ${TABLE} WHERE id = $1`, [req.params.id]);
+    if (current.rows.length === 0) return res.status(404).json({ error: 'Registro no encontrado' });
+    if (!canAccessEmployee(req, current.rows[0].employee_id) ||
+        (data.employee_id && !canAccessEmployee(req, data.employee_id))) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
+
     const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
     const result = await query(
       `UPDATE ${TABLE}
@@ -158,6 +173,12 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
+    const current = await query(`SELECT employee_id FROM ${TABLE} WHERE id = $1`, [req.params.id]);
+    if (current.rows.length === 0) return res.status(404).json({ error: 'Registro no encontrado' });
+    if (!canAccessEmployee(req, current.rows[0].employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
+
     const result = await query(`DELETE FROM ${TABLE} WHERE id = $1 RETURNING id`, [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Registro no encontrado' });
     res.json({ success: true });

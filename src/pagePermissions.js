@@ -20,13 +20,14 @@ export const PAGE_PERMISSIONS = {
   PayslipTemplateConfig: { requiredPermission: "system.settings" },
 
   // ── Payroll / Financial ──
-  ConsultaPlanillas: { requiredPermission: "payroll.view_all" },
+  ConsultaPlanillas: { requiredAnyPermissions: ["payroll.view_all", "payroll.view_department"] },
   SunatExport: { requiredPermission: "payroll.view_all" },
-  AsientosContables: { requiredPermission: "payroll.view_all" },
-  CuentasContables: { requiredPermission: "payroll.view_all" },
+  AsientosContables: { requiredAnyPermissions: ["accounting.view", "accounting.manage", "payroll.view_all"] },
+  CuentasContables: { requiredAnyPermissions: ["accounting.view", "accounting.manage", "payroll.view_all"] },
+  LoanManagement: { requiredAnyPermissions: ["loans.view", "loans.manage", "payroll.view_all"] },
   BeneficiosSociales: { requiredPermission: "payroll.view_all" },
-  HistorialRemunerativo: { requiredPermission: "payroll.view_all" },
-  PayrollConcepts: { requiredPermission: "payroll.view_all" },
+  HistorialRemunerativo: { requiredAnyPermissions: ["payroll.view_all", "payroll.view_department"] },
+  PayrollConcepts: { requiredAnyPermissions: ["payroll.view_all", "payroll.view_department"] },
   CostCenterValuation: { requiredPermission: "cost_centers.view" },
 
   // ── Contracts ──
