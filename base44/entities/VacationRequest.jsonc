@@ -87,6 +87,16 @@
           }
         },
         {
+          "user_condition": {
+            "data.can_manage_vacations": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_approve_vacations": true
+          }
+        },
+        {
           "data.employee_id": "{{user.data.employee_id}}"
         }
       ]
@@ -104,6 +114,11 @@
           }
         },
         {
+          "user_condition": {
+            "data.can_approve_vacations": true
+          }
+        },
+        {
           "data.employee_id": "{{user.data.employee_id}}"
         }
       ]
@@ -113,6 +128,11 @@
         {
           "user_condition": {
             "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_vacations": true
           }
         },
         {
@@ -130,6 +150,11 @@
         {
           "user_condition": {
             "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_vacations": true
           }
         },
         {
