@@ -13,7 +13,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   Calendar as CalendarIcon, Plus, Clock, CheckCircle, 
-  XCircle, AlertCircle, Upload, FileText, Trash2, Search, ChevronDown
+  XCircle, AlertCircle, FileText, Trash2, Search, ChevronDown
 } from "lucide-react";
 import { format, differenceInBusinessDays, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -64,12 +64,13 @@ export default function VacationRequest() {
     loadUserData();
   }, []);
 
-  const isHR = userPermissions.includes("vacations.manage") || 
+  const canManageOtherVacationRequests = userPermissions.includes("vacations.manage") ||
+                                         userPermissions.includes("vacations.approve") ||
+                                         userPermissions.includes("system.admin");
+
+  const isHR = canManageOtherVacationRequests ||
                userPermissions.includes("vacations.view_all") ||
-               userPermissions.includes("vacations.approve") ||
-               userPermissions.includes("vacations.view_department") ||
-               userPermissions.includes("system.admin") ||
-               userPermissions.includes("employees.view");
+               userPermissions.includes("vacations.view_department");
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
@@ -137,9 +138,9 @@ export default function VacationRequest() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const employeeIdToUse = isHR ? selectedEmployeeId : employee.id;
+    const employeeIdToUse = canManageOtherVacationRequests ? selectedEmployeeId : employee.id;
 
-    if (isHR && !employeeIdToUse) {
+    if (canManageOtherVacationRequests && !employeeIdToUse) {
       toast.error("Por favor selecciona un empleado");
       return;
     }
@@ -376,7 +377,7 @@ export default function VacationRequest() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {isHR ? (
+                    {canManageOtherVacationRequests ? (
                       <div>
                         <label className="block text-sm font-semibold text-slate-900 mb-2">
                           Empleado *
