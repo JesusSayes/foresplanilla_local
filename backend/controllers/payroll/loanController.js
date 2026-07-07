@@ -33,6 +33,9 @@ export const getById = async (req, res) => {
 
 export const create = async (req, res) => {
   try {
+    if (req.body?.employee_id && !canAccessEmployee(req, req.body.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
     const item = await prisma.loan.create({ data: req.body });
     res.status(201).json(item);
   } catch (error) {
@@ -42,6 +45,14 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
+    const current = await prisma.loan.findUnique({
+      where: { id: req.params.id }
+    });
+    if (!current) return res.status(404).json({ error: 'Loan not found' });
+    if (!canAccessEmployee(req, current.employee_id) ||
+        (req.body?.employee_id && !canAccessEmployee(req, req.body.employee_id))) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
     const item = await prisma.loan.update({
       where: { id: req.params.id },
       data: req.body
@@ -54,6 +65,13 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
+    const current = await prisma.loan.findUnique({
+      where: { id: req.params.id }
+    });
+    if (!current) return res.status(404).json({ error: 'Loan not found' });
+    if (!canAccessEmployee(req, current.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
     await prisma.loan.delete({ where: { id: req.params.id } });
     res.status(204).send();
   } catch (error) {

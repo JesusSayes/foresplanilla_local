@@ -44,6 +44,14 @@ const PERMISSION_GROUPS = {
     { key: "payroll.calculate", label: "Calcular nómina" },
     { key: "payroll.approve", label: "Aprobar nómina" },
   ],
+  "Contabilidad": [
+    { key: "accounting.view", label: "Ver asientos contables" },
+    { key: "accounting.manage", label: "Gestionar asientos contables" },
+  ],
+  "Préstamos": [
+    { key: "loans.view", label: "Ver préstamos" },
+    { key: "loans.manage", label: "Gestionar préstamos" },
+  ],
   "Contratos": [
     { key: "contracts.view", label: "Ver contratos" },
     { key: "contracts.view_amounts", label: "Ver montos de contratos" },

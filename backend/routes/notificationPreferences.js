@@ -1,8 +1,9 @@
 import express from 'express';
-const router = express.Router();
-import controller from '../controllers/notificationController.js';
+import controller from '../controllers/notificationPreferenceController.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { loadAccessContext } from '../middleware/authorization.js';
+
+const router = express.Router();
 
 router.use(authenticateToken, loadAccessContext);
 
@@ -13,4 +14,4 @@ router.post('/', controller.create);
 router.put('/:id', controller.update);
 router.delete('/:id', controller.delete);
 
-export default router
+export default router;
