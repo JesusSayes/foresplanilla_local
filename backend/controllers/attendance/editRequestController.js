@@ -16,9 +16,25 @@ const TIME_FIELDS = new Set([
 const SEGMENT_FIELDS = new Set(["segment_count", "is_split_day"]);
 const EDITABLE_FIELDS = new Set([...TIME_FIELDS, ...SEGMENT_FIELDS, "status", "notes"]);
 const VALID_STATUSES = new Set(["Completo", "Incompleto", "Ausente", "Justificado", "Vacaciones", "Revisar", "Sin marcar"]);
+const SEGMENTS = [
+  { label: "Segmento 1", inKey: "clock_in", outKey: "clock_out" },
+  { label: "Segmento 2", inKey: "clock_in_2", outKey: "clock_out_2" },
+  { label: "Segmento 3", inKey: "clock_in_3", outKey: "clock_out_3" },
+  { label: "Segmento 4", inKey: "clock_in_4", outKey: "clock_out_4" },
+];
 
 const reviewerName = employee =>
   `${employee?.first_name || ""} ${employee?.last_name || ""}`.trim();
+
+const validateDistinctSegmentTimes = (values, base = {}) => {
+  for (const segment of SEGMENTS) {
+    const clockIn = values[segment.inKey] !== undefined ? values[segment.inKey] : base[segment.inKey];
+    const clockOut = values[segment.outKey] !== undefined ? values[segment.outKey] : base[segment.outKey];
+    if (clockIn && clockOut && clockIn === clockOut) {
+      throw new Error(`${segment.label}: la hora de salida no puede ser igual a la de entrada`);
+    }
+  }
+};
 
 const normalizeRequestedValues = values => {
   if (!values || typeof values !== "object" || Array.isArray(values)) {
@@ -133,6 +149,7 @@ export const create = async (req, res) => {
     }
 
     const requestedValues = normalizeRequestedValues(req.body?.requested_values);
+    validateDistinctSegmentTimes(requestedValues, attendanceRecord);
     const editReason = String(req.body?.edit_reason || "").trim();
     if (!editReason) return res.status(400).json({ error: "El motivo de edición es obligatorio" });
 
@@ -189,6 +206,7 @@ export const approve = async (req, res) => {
       if (!record) throw new Error("Registro de asistencia no encontrado");
 
       const requestedValues = normalizeRequestedValues(request.requested_values);
+      validateDistinctSegmentTimes(requestedValues, record);
       const protectedFields = [...new Set([
         ...(Array.isArray(record.manually_protected_fields) ? record.manually_protected_fields : []),
         ...Object.keys(requestedValues),

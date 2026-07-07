@@ -134,9 +134,9 @@ export default function AttendanceEditRequestModal({ record, employee, onClose, 
           return;
         }
       }
-      // Subsequent segments must be diurnal and out > in
-      if (i > 0 && inVal && outVal && inVal >= outVal) {
-        setErrorMsg(`${seg.label}: la hora de salida debe ser posterior a la de entrada.`);
+      // Subsequent segments allow crossing midnight (out < in = next day), but not equal
+      if (i > 0 && inVal && outVal && inVal === outVal) {
+        setErrorMsg(`${seg.label}: la hora de salida no puede ser igual a la de entrada.`);
         return;
       }
     }
