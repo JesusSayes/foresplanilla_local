@@ -2,7 +2,6 @@ import express from 'express';
 import pool from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 import {
-  attachEmployeeReadScope,
   attachEmployeeScope,
   canAccessEmployee,
   loadAccessContext,
@@ -14,16 +13,24 @@ const router = express.Router();
 
 router.use(authenticateToken, loadAccessContext);
 
-router.get('/', requireAnyPermission('system.admin', 'employees.view'), attachEmployeeReadScope, async (req, res) => {
+const VIEW_PERMISSIONS = ['system.admin', 'employees.view'];
+const CREATE_PERMISSIONS = ['system.admin', 'employees.edit'];
+const UPDATE_PERMISSIONS = ['system.admin', 'employees.edit'];
+const DELETE_PERMISSIONS = ['system.admin', 'employees.delete'];
+
+router.get('/', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), async (req, res) => {
   try {
     const { sort = '-created_date' } = req.query;
     const orderBy = sort.startsWith('-') ? `${sort.substring(1)} DESC` : `${sort} ASC`;
+    const values = [];
+    const whereClause = req.accessibleEmployeeIds === null
+      ? ''
+      : 'WHERE employee_id = ANY($1::varchar[])';
+    if (req.accessibleEmployeeIds !== null) values.push(req.accessibleEmployeeIds || []);
 
     const result = await pool.query(
-      req.accessibleEmployeeIds === null
-        ? `SELECT * FROM employee_change_log ORDER BY ${orderBy}`
-        : `SELECT * FROM employee_change_log WHERE employee_id = ANY($1::varchar[]) ORDER BY ${orderBy}`,
-      req.accessibleEmployeeIds === null ? [] : [req.accessibleEmployeeIds || []]
+      `SELECT * FROM employee_change_log ${whereClause} ORDER BY ${orderBy}`,
+      values
     );
     res.json(result.rows);
   } catch (error) {
@@ -32,7 +39,7 @@ router.get('/', requireAnyPermission('system.admin', 'employees.view'), attachEm
   }
 });
 
-router.post('/filter', requireAnyPermission('system.admin', 'employees.view'), attachEmployeeReadScope, async (req, res) => {
+router.post('/filter', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), async (req, res) => {
   try {
     const filters = req.body;
     const { sort = '-created_date' } = req.query;
@@ -49,10 +56,10 @@ router.post('/filter', requireAnyPermission('system.admin', 'employees.view'), a
         paramCount++;
       }
     });
+
     if (req.accessibleEmployeeIds !== null) {
       conditions.push(`employee_id = ANY($${paramCount}::varchar[])`);
       values.push(req.accessibleEmployeeIds || []);
-      paramCount++;
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -66,7 +73,7 @@ router.post('/filter', requireAnyPermission('system.admin', 'employees.view'), a
   }
 });
 
-router.get('/:id', requireAnyPermission('system.admin', 'employees.view'), attachEmployeeReadScope, async (req, res) => {
+router.get('/:id', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
@@ -88,7 +95,7 @@ router.get('/:id', requireAnyPermission('system.admin', 'employees.view'), attac
   }
 });
 
-router.post('/', requireAnyPermission('system.admin', 'employees.create', 'employees.edit'), attachEmployeeScope('system.admin', 'employees.create', 'employees.edit'), async (req, res) => {
+router.post('/', requireAnyPermission(...CREATE_PERMISSIONS), attachEmployeeScope(...CREATE_PERMISSIONS), async (req, res) => {
   const {
     employee_id,
     field_changed,
@@ -139,10 +146,18 @@ router.post('/', requireAnyPermission('system.admin', 'employees.create', 'emplo
   }
 });
 
-router.put('/:id', requireAnyPermission('system.admin'), async (req, res) => {
+router.put('/:id', requireAnyPermission(...UPDATE_PERMISSIONS), attachEmployeeScope(...UPDATE_PERMISSIONS), async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    const current = await pool.query('SELECT employee_id FROM employee_change_log WHERE id = $1', [id]);
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: 'Change log not found' });
+    }
+    if (!canAccessEmployee(req, current.rows[0].employee_id) ||
+        (updates.employee_id && !canAccessEmployee(req, updates.employee_id))) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
 
     const fields = Object.keys(updates);
     const values = Object.values(updates);
@@ -164,9 +179,17 @@ router.put('/:id', requireAnyPermission('system.admin'), async (req, res) => {
   }
 });
 
-router.delete('/:id', requireAnyPermission('system.admin'), async (req, res) => {
+router.delete('/:id', requireAnyPermission(...DELETE_PERMISSIONS), attachEmployeeScope(...DELETE_PERMISSIONS), async (req, res) => {
   try {
     const { id } = req.params;
+    const current = await pool.query('SELECT employee_id FROM employee_change_log WHERE id = $1', [id]);
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: 'Change log not found' });
+    }
+    if (!canAccessEmployee(req, current.rows[0].employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
+
     const result = await pool.query(
       'DELETE FROM employee_change_log WHERE id = $1 RETURNING *',
       [id]

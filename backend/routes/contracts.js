@@ -2,7 +2,7 @@ import express from 'express';
 import pool from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 import {
-  attachOwnOrAdminScope,
+  attachEmployeeScope,
   canAccessEmployee,
   loadAccessContext,
   requireAnyPermission,
@@ -13,7 +13,12 @@ const router = express.Router();
 
 router.use(authenticateToken, loadAccessContext);
 
-router.get('/', attachOwnOrAdminScope, async (req, res) => {
+const VIEW_PERMISSIONS = ['system.admin', 'contracts.view'];
+const CREATE_PERMISSIONS = ['system.admin', 'contracts.create'];
+const UPDATE_PERMISSIONS = ['system.admin', 'contracts.edit'];
+const DELETE_PERMISSIONS = ['system.admin', 'contracts.delete'];
+
+router.get('/', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), async (req, res) => {
   try {
     const { sort = '-created_date' } = req.query;
     const orderBy = sort.startsWith('-') ? `${sort.substring(1)} DESC` : `${sort} ASC`;
@@ -31,7 +36,7 @@ router.get('/', attachOwnOrAdminScope, async (req, res) => {
   }
 });
 
-router.post('/filter', attachOwnOrAdminScope, async (req, res) => {
+router.post('/filter', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), async (req, res) => {
   try {
     const filters = req.body;
     const { sort = '-created_date' } = req.query;
@@ -65,7 +70,7 @@ router.post('/filter', attachOwnOrAdminScope, async (req, res) => {
   }
 });
 
-router.get('/:id', attachOwnOrAdminScope, async (req, res) => {
+router.get('/:id', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
@@ -87,9 +92,12 @@ router.get('/:id', attachOwnOrAdminScope, async (req, res) => {
   }
 });
 
-router.post('/', requireAnyPermission('system.admin'), async (req, res) => {
+router.post('/', requireAnyPermission(...CREATE_PERMISSIONS), attachEmployeeScope(...CREATE_PERMISSIONS), async (req, res) => {
   try {
     const data = req.body;
+    if (data.employee_id && !canAccessEmployee(req, data.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
     const contractToInsert = {
       id: generate24HexId(),
 
@@ -126,10 +134,18 @@ router.post('/', requireAnyPermission('system.admin'), async (req, res) => {
   }
 });
 
-router.put('/:id', requireAnyPermission('system.admin'), async (req, res) => {
+router.put('/:id', requireAnyPermission(...UPDATE_PERMISSIONS), attachEmployeeScope(...UPDATE_PERMISSIONS), async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    const current = await pool.query('SELECT employee_id FROM contract WHERE id = $1', [id]);
+    if (current.rows.length === 0) return res.status(404).json({ error: 'Contract not found' });
+    if (!canAccessEmployee(req, current.rows[0].employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
+    if (updates.employee_id && !canAccessEmployee(req, updates.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
 
     // evitar que el id sea actualizado
     delete updates.id;
@@ -162,9 +178,14 @@ router.put('/:id', requireAnyPermission('system.admin'), async (req, res) => {
   }
 });
 
-router.delete('/:id', requireAnyPermission('system.admin'), async (req, res) => {
+router.delete('/:id', requireAnyPermission(...DELETE_PERMISSIONS), attachEmployeeScope(...DELETE_PERMISSIONS), async (req, res) => {
   try {
     const { id } = req.params;
+    const current = await pool.query('SELECT employee_id FROM contract WHERE id = $1', [id]);
+    if (current.rows.length === 0) return res.status(404).json({ error: 'Contract not found' });
+    if (!canAccessEmployee(req, current.rows[0].employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
     const result = await pool.query(
       'DELETE FROM contract WHERE id = $1 RETURNING *',
       [id]

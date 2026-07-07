@@ -5,14 +5,14 @@ import { loadAccessContext, requireAnyPermission } from '../middleware/authoriza
 
 const router = express.Router();
 
-router.use(authenticateToken, loadAccessContext, requireAnyPermission('system.admin'));
+router.use(authenticateToken, loadAccessContext);
 
-router.get('/', asientoContableController.getAll);
-router.get('/:id', asientoContableController.getById);
-router.post('/filter', asientoContableController.filter);
-router.post('/bulk', asientoContableController.bulkCreate);
-router.post('/', asientoContableController.create);
-router.put('/:id', asientoContableController.update);
-router.delete('/:id', asientoContableController.delete);
+router.get('/', requireAnyPermission('system.admin', 'accounting.view', 'accounting.manage', 'payroll.view_all'), asientoContableController.getAll);
+router.get('/:id', requireAnyPermission('system.admin', 'accounting.view', 'accounting.manage', 'payroll.view_all'), asientoContableController.getById);
+router.post('/filter', requireAnyPermission('system.admin', 'accounting.view', 'accounting.manage', 'payroll.view_all'), asientoContableController.filter);
+router.post('/bulk', requireAnyPermission('system.admin', 'accounting.manage'), asientoContableController.bulkCreate);
+router.post('/', requireAnyPermission('system.admin', 'accounting.manage'), asientoContableController.create);
+router.put('/:id', requireAnyPermission('system.admin', 'accounting.manage'), asientoContableController.update);
+router.delete('/:id', requireAnyPermission('system.admin', 'accounting.manage'), asientoContableController.delete);
 
 export default router;

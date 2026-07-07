@@ -2,19 +2,21 @@ import { query } from "../config/database.js";
 import { hasPermission } from "../middleware/authorization.js";
 import { generate24HexId } from "../utils/idGenerator.js";
 
-const TABLE = "notification";
+const TABLE = "notification_preference";
 const FIELDS = [
   "user_email",
   "employee_id",
-  "type",
-  "title",
-  "message",
-  "link",
-  "link_page",
-  "is_read",
-  "priority",
-  "related_entity_id",
-  "related_entity_type",
+  "incident_pending",
+  "incident_approved",
+  "incident_rejected",
+  "vacation_pending",
+  "vacation_approved",
+  "vacation_rejected",
+  "contract_expiring",
+  "payslip_ready",
+  "attendance_alert",
+  "system",
+  "email_notifications",
 ];
 
 const isAdmin = (req) => hasPermission(req.access, "system.admin");
@@ -43,28 +45,21 @@ const appendOwnerScope = (req, sql, params) => {
   };
 };
 
-const canOwnNotification = (req, row) => (
+const canReadOrWrite = (req, row) => (
   isAdmin(req) ||
   row?.user_email === currentEmail(req) ||
   row?.employee_id === currentEmployeeId(req)
 );
 
-const canWriteNotification = (req, data) => (
+const canDelete = (req, row) => (
   isAdmin(req) ||
-  data?.user_email === currentEmail(req) ||
-  data?.employee_id === currentEmployeeId(req)
+  row?.user_email === currentEmail(req)
 );
 
 export const getAll = async (req, res) => {
   try {
-    const { sort = "-created_date" } = req.query;
-    const desc = sort.startsWith("-");
-    const field = desc ? sort.slice(1) : sort;
-    const orderField = FIELDS.includes(field) || ["id", "created_date", "updated_date", "created_by"].includes(field)
-      ? field
-      : "created_date";
     const scoped = appendOwnerScope(req, `SELECT * FROM ${TABLE}`, []);
-    const result = await query(`${scoped.sql} ORDER BY ${orderField} ${desc ? "DESC" : "ASC"}`, scoped.params);
+    const result = await query(`${scoped.sql} ORDER BY created_date DESC`, scoped.params);
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -73,12 +68,6 @@ export const getAll = async (req, res) => {
 
 export const filter = async (req, res) => {
   try {
-    const { sort = "-created_date" } = req.query;
-    const desc = sort.startsWith("-");
-    const field = desc ? sort.slice(1) : sort;
-    const orderField = FIELDS.includes(field) || ["id", "created_date", "updated_date", "created_by"].includes(field)
-      ? field
-      : "created_date";
     const filters = req.body || {};
     const params = [];
     const conditions = [];
@@ -92,7 +81,7 @@ export const filter = async (req, res) => {
 
     const baseSql = `SELECT * FROM ${TABLE}${conditions.length ? ` WHERE ${conditions.join(" AND ")}` : ""}`;
     const scoped = appendOwnerScope(req, baseSql, params);
-    const result = await query(`${scoped.sql} ORDER BY ${orderField} ${desc ? "DESC" : "ASC"}`, scoped.params);
+    const result = await query(`${scoped.sql} ORDER BY created_date DESC`, scoped.params);
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -102,10 +91,10 @@ export const filter = async (req, res) => {
 export const getById = async (req, res) => {
   try {
     const result = await query(`SELECT * FROM ${TABLE} WHERE id = $1`, [req.params.id]);
-    const notification = result.rows[0];
-    if (!notification) return res.status(404).json({ error: "Notification not found" });
-    if (!canOwnNotification(req, notification)) return res.status(403).json({ error: "Acceso denegado a la notificación" });
-    res.json(notification);
+    const preference = result.rows[0];
+    if (!preference) return res.status(404).json({ error: "NotificationPreference not found" });
+    if (!canReadOrWrite(req, preference)) return res.status(403).json({ error: "Acceso denegado a las preferencias" });
+    res.json(preference);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -114,7 +103,7 @@ export const getById = async (req, res) => {
 export const create = async (req, res) => {
   try {
     const data = cleanData(req.body);
-    if (!canWriteNotification(req, data)) return res.status(403).json({ error: "Acceso denegado a la notificación" });
+    if (!canReadOrWrite(req, data)) return res.status(403).json({ error: "Acceso denegado a las preferencias" });
 
     const fields = Object.keys(data);
     const values = Object.values(data);
@@ -134,12 +123,12 @@ export const create = async (req, res) => {
 export const update = async (req, res) => {
   try {
     const current = await query(`SELECT * FROM ${TABLE} WHERE id = $1`, [req.params.id]);
-    if (current.rows.length === 0) return res.status(404).json({ error: "Notification not found" });
+    if (current.rows.length === 0) return res.status(404).json({ error: "NotificationPreference not found" });
 
     const data = cleanData(req.body);
     const nextRow = { ...current.rows[0], ...data };
-    if (!canOwnNotification(req, current.rows[0]) || !canWriteNotification(req, nextRow)) {
-      return res.status(403).json({ error: "Acceso denegado a la notificación" });
+    if (!canReadOrWrite(req, current.rows[0]) || !canReadOrWrite(req, nextRow)) {
+      return res.status(403).json({ error: "Acceso denegado a las preferencias" });
     }
 
     const fields = Object.keys(data);
@@ -158,8 +147,8 @@ export const update = async (req, res) => {
 export const remove = async (req, res) => {
   try {
     const current = await query(`SELECT * FROM ${TABLE} WHERE id = $1`, [req.params.id]);
-    if (current.rows.length === 0) return res.status(404).json({ error: "Notification not found" });
-    if (!canOwnNotification(req, current.rows[0])) return res.status(403).json({ error: "Acceso denegado a la notificación" });
+    if (current.rows.length === 0) return res.status(404).json({ error: "NotificationPreference not found" });
+    if (!canDelete(req, current.rows[0])) return res.status(403).json({ error: "Acceso denegado a las preferencias" });
 
     await query(`DELETE FROM ${TABLE} WHERE id = $1`, [req.params.id]);
     res.status(204).send();

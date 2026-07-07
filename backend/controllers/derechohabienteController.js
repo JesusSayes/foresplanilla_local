@@ -48,6 +48,9 @@ export const create = async (req, res) => {
   try {
 
     const { id, created_date, updated_date, created_by, ...data } = req.body
+    if (!canAccessEmployee(req, data.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' })
+    }
 
     const derechohabiente = await prisma.derechohabiente.create({
       data: {
@@ -88,6 +91,16 @@ export const update = async (req, res) => {
   try {
 
     const { id, created_date, updated_date, created_by, ...data } = req.body
+    const current = await prisma.derechohabiente.findUnique({
+      where: { id: req.params.id }
+    })
+
+    if (!current)
+      return res.status(404).json({ error: 'Derechohabiente not found' })
+    const nextEmployeeId = data.employee_id || current.employee_id
+    if (!canAccessEmployee(req, current.employee_id) || !canAccessEmployee(req, nextEmployeeId)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' })
+    }
 
     const derechohabiente = await prisma.derechohabiente.update({
       where: { id: req.params.id },
@@ -125,6 +138,15 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
+    const current = await prisma.derechohabiente.findUnique({
+      where: { id: req.params.id }
+    })
+
+    if (!current)
+      return res.status(404).json({ error: 'Derechohabiente not found' })
+    if (!canAccessEmployee(req, current.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' })
+    }
 
     await prisma.derechohabiente.delete({
       where: { id: req.params.id }

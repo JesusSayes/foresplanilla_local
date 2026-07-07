@@ -104,6 +104,7 @@ export const entitiesAPI = {
   PayrollConfig: createEntityAPI('/api/payroll/config'),
   Certificate: createEntityAPI('/api/certificates'),
   Notification: createEntityAPI('/api/notifications'),
+  NotificationPreference: createEntityAPI('/api/notification-preferences'),
   CompanyInfo: createEntityAPI('/api/company/info'),
   CostCenter: createEntityAPI('/api/cost-centers'),
   CostCenterCategory: createEntityAPI('/api/cost-center-categories'),
