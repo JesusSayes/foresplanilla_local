@@ -104,9 +104,9 @@ export default function VacationRequest() {
     },
   });
 
-  const deleteRequestMutation = useMutation({
+  const cancelRequestMutation = useMutation({
     mutationFn: async (id) => {
-      return await entitiesAPI.VacationRequest.delete(id);
+      return await entitiesAPI.VacationRequest.update(id, { status: "Cancelada" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["vacationRequests", targetEmployeeId]);
@@ -692,7 +692,7 @@ export default function VacationRequest() {
                               className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
                               onClick={() => {
                                 if (confirm("¿Estás seguro de cancelar esta solicitud?")) {
-                                  deleteRequestMutation.mutate(request.id);
+                                  cancelRequestMutation.mutate(request.id);
                                 }
                               }}
                             >

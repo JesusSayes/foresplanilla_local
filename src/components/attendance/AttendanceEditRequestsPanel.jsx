@@ -36,7 +36,10 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
   const [loading, setLoading] = useState(false);
 
   const employee = allEmployees.find(e => e.id === req.employee_id);
+  const reviewedEmployee = allEmployees.find(e => e.id === req.reviewed_by_id);
   const isPending = req.status === "Pendiente";
+  const reviewedByName = req.reviewed_by_name || (reviewedEmployee ? `${reviewedEmployee.first_name} ${reviewedEmployee.last_name}` : "");
+  const reviewedAt = req.reviewed_at || req.updated_date;
 
   const handleApprove = async () => {
     if (!window.confirm("¿Aprobar esta solicitud de edición? Se aplicarán los cambios al registro de asistencia.")) return;
@@ -136,11 +139,12 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
       </div>
 
       {/* Info de revisión */}
-      {!isPending && req.reviewed_by_name && (
+      {!isPending && (reviewedByName || reviewedAt || req.review_comment) && (
         <div className={`mb-3 p-2.5 rounded-lg text-xs ${req.status === "Aprobada" ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
           <p className="font-semibold mb-0.5">
-            {req.status === "Aprobada" ? "✓ Aprobada" : req.status === "Rechazada" ? "✗ Rechazada" : "Cancelada"} por {req.reviewed_by_name}
-            {req.reviewed_at && ` · ${format(new Date(req.reviewed_at), "dd/MM/yyyy HH:mm")}`}
+            {req.status === "Aprobada" ? "✓ Aprobada" : req.status === "Rechazada" ? "✗ Rechazada" : "Cancelada"}
+            {reviewedByName && ` por ${reviewedByName}`}
+            {reviewedAt && ` · ${format(new Date(reviewedAt), "dd/MM/yyyy HH:mm")}`}
           </p>
           {req.review_comment && <p className="text-slate-600">{req.review_comment}</p>}
         </div>
