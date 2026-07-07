@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { entitiesAPI } from "@/api/entitiesClient";
+import { computePermissionFlags } from "@/lib/permissionFlags";
 
 // Lista completa de permisos disponibles en el sistema
 export const AVAILABLE_PERMISSIONS = {
@@ -186,13 +187,8 @@ export const usePermissions = () => {
             }
           }
 
-          const hasAdmin = effectivePermissions.includes("system.admin");
-          setEmployeePermissionFlags({
-            can_view_all_employees: hasAdmin || effectivePermissions.includes("employees.view"),
-            can_create_employees: hasAdmin || effectivePermissions.includes("employees.create"),
-            can_edit_employees: hasAdmin || effectivePermissions.includes("employees.edit"),
-            can_delete_employees: hasAdmin || effectivePermissions.includes("employees.delete"),
-          });
+          const permFlags = computePermissionFlags(effectivePermissions);
+          setEmployeePermissionFlags(permFlags);
         }
       } catch (error) {
         console.error("Error loading permissions:", error);
@@ -354,7 +350,7 @@ export const usePermissions = () => {
 };
 
 // Permisos básicos por rol antiguo (para compatibilidad)
-const getBasicPermissionsByRole = (role) => {
+export const getBasicPermissionsByRole = (role) => {
   const basicPermissions = {
     super_admin: Object.keys(AVAILABLE_PERMISSIONS),
     admin: [

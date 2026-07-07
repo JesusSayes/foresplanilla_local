@@ -1,5 +1,5 @@
 import prisma from "../../config/prisma.js";
-import { canAccessEmployee, employeeScopeWhere } from "../../middleware/authorization.js";
+import { canAccessEmployee, employeeScopeWhere, requireEmployeeAccess } from "../../middleware/authorization.js";
 
 const MODEL = prisma.vacation_balance;
 
@@ -34,6 +34,8 @@ export const getById = async (req, res) => {
 
 export const create = async (req, res) => {
   try {
+    if (!requireEmployeeAccess(req, res, req.body?.employee_id)) return;
+
     const balance = await MODEL.create({
       data: req.body
     });
@@ -45,6 +47,15 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
+    const existing = await MODEL.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Balance not found' });
+    if (!canAccessEmployee(req, existing.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
+    if (req.body?.employee_id && !canAccessEmployee(req, req.body.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
+
     const balance = await MODEL.update({
       where: { id: req.params.id },
       data: req.body
@@ -57,6 +68,12 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
+    const existing = await MODEL.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Balance not found' });
+    if (!canAccessEmployee(req, existing.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
+
     await MODEL.delete({
       where: { id: req.params.id }
     });
