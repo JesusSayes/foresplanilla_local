@@ -97,6 +97,12 @@ export const create = async (req, res) => {
 
 export const update = async (req, res) => {
   try {
+    const existing = await MODEL.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Request not found' });
+    if (!canAccessEmployee(req, existing.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
+
     const {
       created_date,
       created_by,
@@ -110,6 +116,9 @@ export const update = async (req, res) => {
     const parsedStart = parseDate(start_date);
     const parsedEnd = parseDate(end_date);
     const parsedApproved = parseDate(approved_date);
+    if (data.employee_id && !canAccessEmployee(req, data.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
 
     // Reglas de negocio (clave)
     if (data.status === 'Aprobada') {
@@ -163,6 +172,12 @@ export const update = async (req, res) => {
 
 export const remove = async (req, res) => {
   try {
+    const existing = await MODEL.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Request not found' });
+    if (!canAccessEmployee(req, existing.employee_id)) {
+      return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    }
+
     await MODEL.delete({
       where: { id: req.params.id },
     });

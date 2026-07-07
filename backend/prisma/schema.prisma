@@ -112,10 +112,19 @@ model bank {
 }
 
 model certificate {
-  id           String    @id @db.VarChar(255)
-  created_date DateTime? @db.Timestamp(6)
-  updated_date DateTime? @db.Timestamp(6)
-  created_by   String?
+  id                    String    @id @db.VarChar(255)
+  created_date          DateTime? @db.Timestamp(6)
+  updated_date          DateTime? @db.Timestamp(6)
+  created_by            String?
+  employee_id           String?   @db.VarChar(255)
+  certificate_type      String?
+  issue_date            DateTime? @db.Date
+  description           String?
+  pdf_url               String?
+  requested_by_employee Boolean?  @default(false)
+  status                String?   @default("Solicitado")
+
+  @@index([employee_id], map: "idx_certificate_employee_id")
 }
 
 model company_info {

@@ -16,10 +16,10 @@ router.use(authenticateToken, loadAccessContext);
 
 router.get("/", requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.getAll);
 router.post("/filter", requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.filter);
-router.post("/:id/approve", requireAnyPermission("attendance.approve_edits"), attachEmployeeScope("attendance.approve_edits"), controller.approve);
-router.post("/:id/reject", requireAnyPermission("attendance.approve_edits"), attachEmployeeScope("attendance.approve_edits"), controller.reject);
-router.post("/:id/cancel", requireAnyPermission("attendance.edit", "attendance.approve_edits"), attachEmployeeScope("attendance.edit", "attendance.approve_edits"), controller.cancel);
+router.post("/:id/approve", requireAnyPermission("attendance.approve_edits", "attendance.manage"), attachEmployeeScope("attendance.approve_edits", "attendance.manage"), controller.approve);
+router.post("/:id/reject", requireAnyPermission("attendance.approve_edits", "attendance.manage"), attachEmployeeScope("attendance.approve_edits", "attendance.manage"), controller.reject);
+router.post("/:id/cancel", requireAnyPermission("attendance.edit", "attendance.approve_edits", "attendance.manage"), attachEmployeeScope("attendance.edit", "attendance.approve_edits", "attendance.manage"), controller.cancel);
 router.get("/:id", requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.getById);
-router.post("/", requireAnyPermission("attendance.edit"), attachEmployeeScope("attendance.edit"), controller.create);
+router.post("/", requireAnyPermission("attendance.edit", "attendance.manage"), attachEmployeeScope("attendance.edit", "attendance.manage"), controller.create);
 
 export default router;
