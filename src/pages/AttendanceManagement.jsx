@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Clock, Calendar as CalendarIcon, Edit, CheckCircle, XCircle, 
-  AlertCircle, Users, Search, FileText, Download, Database, History, Printer, Palmtree, CalendarClock, Trash2
+  AlertCircle, Users, Search, FileText, Download, Database, History, Printer, Palmtree, CalendarClock
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
@@ -517,39 +517,6 @@ export default function AttendanceManagement() {
         review_comments: reviewComments,
       }
     });
-  };
-
-  // Eliminación lógica de justificación aprobada: cambia el estado a "Eliminada"
-  // y recalcula la asistencia del empleado para revertir el impacto de la justificación.
-  const [deletingIncidentId, setDeletingIncidentId] = useState(null);
-  const canDeleteIncidents = hasPermission("attendance.manage") || hasPermission("system.admin");
-
-  const handleDeleteIncident = async (incident) => {
-    if (!window.confirm("¿Eliminar lógicamente esta justificación aprobada?\n\nSe recalculará la asistencia del empleado para corregir todo el impacto que tuvo esta justificación (estado, horas, tardanzas).")) return;
-    setDeletingIncidentId(incident.id);
-    try {
-      await base44.entities.AttendanceIncident.update(incident.id, {
-        status: "Eliminada",
-        reviewed_by: `${effectiveEmployee?.first_name} ${effectiveEmployee?.last_name}`,
-        review_date: todayLima(),
-        review_comments: `Justificación eliminada lógicamente por ${effectiveEmployee?.first_name} ${effectiveEmployee?.last_name}`,
-      });
-
-      // Recalcular asistencia para revertir el impacto de la justificación
-      await base44.functions.invoke("recalcularAsistencia", {
-        employee_id: incident.employee_id,
-        date_from: incident.incident_date,
-        date_to: incident.incident_date,
-      });
-
-      queryClient.invalidateQueries(["allIncidents"]);
-      queryClient.invalidateQueries(["todayAttendance"]);
-      toast.success("Justificación eliminada y asistencia recalculada correctamente");
-    } catch (e) {
-      toast.error("Error al eliminar la justificación: " + (e.message || "Error desconocido"));
-    } finally {
-      setDeletingIncidentId(null);
-    }
   };
 
   const [justifyingSchedule, setJustifyingSchedule] = useState(null);
@@ -1174,7 +1141,7 @@ export default function AttendanceManagement() {
                 </TabsTrigger>
                 <TabsTrigger value="incidents">
                   Justificaciones
-                  {allIncidents.filter(i => i.status !== "Eliminada").length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{allIncidents.filter(i => i.status !== "Eliminada").length}</Badge>}
+                  {allIncidents.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{allIncidents.length}</Badge>}
                 </TabsTrigger>
                 <TabsTrigger value="overtime-alerts">
                   Alertas HE
@@ -1857,20 +1824,6 @@ export default function AttendanceManagement() {
                                   <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
                                   <span>Fecha: {incident.review_date ? format(parseDateLima(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
                                 </div>
-                                {canDeleteIncidents && (
-                                  <div className="mt-3 pt-3 border-t border-green-200">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="text-red-600 border-red-200 hover:bg-red-50"
-                                      onClick={() => handleDeleteIncident(incident)}
-                                      disabled={deletingIncidentId === incident.id}
-                                    >
-                                      <Trash2 className="w-3 h-3 mr-1" />
-                                      {deletingIncidentId === incident.id ? "Eliminando..." : "Eliminar Justificación"}
-                                    </Button>
-                                  </div>
-                                )}
                               </div>
                             );
                           })}
