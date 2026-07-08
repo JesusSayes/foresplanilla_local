@@ -74,7 +74,8 @@
       "enum": [
         "Pendiente",
         "Aprobada",
-        "Rechazada"
+        "Rechazada",
+        "Eliminada"
       ],
       "default": "Pendiente",
       "description": "Estado de la justificaci\u00f3n"

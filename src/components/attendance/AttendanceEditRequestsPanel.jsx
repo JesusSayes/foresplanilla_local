@@ -8,13 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  CheckCircle, XCircle, Clock, Search, ArrowRight, X, AlertCircle, Ban
+  CheckCircle, XCircle, Clock, Search, ArrowRight, X, AlertCircle, Ban, Download
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima } from "@/lib/dateUtils";
 import PaginationBar from "@/components/ui/PaginationBar";
+import * as XLSX from "xlsx";
 
 const FIELD_LABELS = {
   clock_in: "Hora de entrada",
@@ -264,6 +265,45 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
 
   const pendingCount = requests.filter((r) => r.status === "Pendiente").length;
 
+  const handleExportExcel = () => {
+    if (requests.length === 0) {
+      toast.info("No hay solicitudes de edición para exportar");
+      return;
+    }
+    const dataToExport = requests.map((req) => {
+      const emp = allEmployees.find((e) => e.id === req.employee_id);
+      const changes = Object.entries(req.requested_values || {})
+        .map(([k, newVal]) => {
+          const label = FIELD_LABELS[k] || k;
+          const oldVal = req.original_values?.[k];
+          return `${label}: ${oldVal || "—"} → ${newVal || "—"}`;
+        })
+        .join("; ");
+      return {
+        "Estado": req.status,
+        "Fecha Asistencia": req.attendance_date || "",
+        "Tipo Doc": emp?.document_type || "",
+        "DNI": emp?.document_number || "",
+        "Nombres": emp?.first_name || "",
+        "Apellidos": emp?.last_name || "",
+        "Cargo": emp?.position || "",
+        "Departamento": emp?.department_name || "",
+        "Solicitado por": req.requested_by_name || "",
+        "Fecha Solicitud": req.requested_at ? format(new Date(req.requested_at), "dd/MM/yyyy HH:mm") : "",
+        "Motivo": req.edit_reason || "",
+        "Cambios Solicitados": changes,
+        "Revisado por": req.reviewed_by_name || "",
+        "Fecha Revisión": req.reviewed_at ? format(new Date(req.reviewed_at), "dd/MM/yyyy HH:mm") : "",
+        "Comentario Revisión": req.review_comment || "",
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ediciones");
+    XLSX.writeFile(wb, `Solicitudes_Edicion_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`);
+    toast.success("✓ Archivo Excel generado correctamente");
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -273,7 +313,9 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
         </div>
         <Input type="date" value={dateFilter} onChange={(e) => { setDateFilter(e.target.value); setEditPage(1); }} className="w-40" title="Filtrar por fecha de asistencia" />
         {dateFilter && <Button size="sm" variant="outline" onClick={() => { setDateFilter(""); setEditPage(1); }}>✕ Fecha</Button>}
-
+        <Button onClick={handleExportExcel} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap text-xs sm:text-sm">
+          <Download className="w-4 h-4 mr-1 sm:mr-2" /><span className="hidden sm:inline">Excel</span><span className="sm:hidden">XLS</span>
+        </Button>
       </div>
 
       <Tabs defaultValue="pending">
