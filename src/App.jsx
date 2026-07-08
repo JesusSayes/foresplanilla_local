@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import BeneficiosSociales from './pages/BeneficiosSociales';
 import HistorialRemunerativo from './pages/HistorialRemunerativo';
+import CompensacionTardanzas from './pages/CompensacionTardanzas';
 import PageGuard from '@/components/PageGuard';
 import { PAGE_PERMISSIONS } from './pagePermissions';
 
@@ -71,6 +72,7 @@ const AuthenticatedApp = () => {
       })}
       <Route path="/BeneficiosSociales" element={<LayoutWrapper currentPageName="BeneficiosSociales"><PageGuard requiredPermission="payroll.view_all"><BeneficiosSociales /></PageGuard></LayoutWrapper>} />
       <Route path="/HistorialRemunerativo" element={<LayoutWrapper currentPageName="HistorialRemunerativo"><PageGuard requiredPermission="payroll.view_all"><HistorialRemunerativo /></PageGuard></LayoutWrapper>} />
+      <Route path="/CompensacionTardanzas" element={<LayoutWrapper currentPageName="CompensacionTardanzas"><PageGuard {...PAGE_PERMISSIONS.CompensacionTardanzas}><CompensacionTardanzas /></PageGuard></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

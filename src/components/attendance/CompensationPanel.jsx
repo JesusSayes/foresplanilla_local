@@ -188,7 +188,7 @@ export default function CompensationPanel({
     setShowModal(true);
   };
 
-  const handleSubmitCompensation = async (selectedList, reason) => {
+  const handleSubmitCompensation = async (selectedList, reason, authorizer) => {
     setSubmitting(true);
     try {
       // Crear un AttendanceIncident por cada día seleccionado
@@ -203,6 +203,8 @@ export default function CompensationPanel({
         full_day_justification: false,
         justified_time_start: item.record?.clock_in || null,
         justified_time_end: item.record?.clock_out || null,
+        authorizer_id: authorizer.id,
+        authorizer_name: `${authorizer.first_name} ${authorizer.last_name}`,
         status: "Pendiente",
       }));
 
@@ -242,7 +244,9 @@ export default function CompensationPanel({
   };
 
   const canManage =
-    hasPermission("attendance.manage") || hasPermission("system.admin");
+    hasPermission("attendance.manage") ||
+    hasPermission("attendance.approve_compensations") ||
+    hasPermission("system.admin");
 
   return (
     <Card className="border-0 shadow-lg">
@@ -544,6 +548,7 @@ export default function CompensationPanel({
           employee={selectedEmployee}
           periodRecords={periodRecords}
           existingCompensations={existingCompensations}
+          allEmployees={allEmployees}
           onClose={() => {
             setShowModal(false);
             setSelectedEmployee(null);

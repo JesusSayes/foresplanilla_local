@@ -246,6 +246,9 @@ export default function Layout({ children, currentPageName }) {
         submenu.push({ name: "Base de Datos Externa", path: "DatabaseConfig" });
         submenu.push({ name: "Control de Acceso Físico", path: "AccessDeviceConfig" });
       }
+      if (hasAnyPermission(["attendance.approve_compensations", "attendance.manage", "attendance.view_all"])) {
+        submenu.push({ name: "Compensación de Tardanzas", path: "CompensacionTardanzas" });
+      }
       submenu.push({ name: "Mi Asistencia", path: "Attendance" });
       items.push({ name: "Gestión Asistencia", icon: CheckSquare, path: "AttendanceManagement", submenu });
     } else if (hasPermission("attendance.view_own")) {

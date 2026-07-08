@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Clock, X, AlertCircle, CheckCircle2, TrendingUp } from "lucide-react";
+import { Clock, X, AlertCircle, CheckCircle2, TrendingUp, UserCheck, Search } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima } from "@/lib/dateUtils";
@@ -14,11 +14,15 @@ export default function CompensationModal({
   employee,
   periodRecords,
   existingCompensations = [],
+  allEmployees = [],
   onClose,
   onSubmit,
 }) {
   const [selectedDays, setSelectedDays] = useState({});
   const [compensationReason, setCompensationReason] = useState("");
+  const [authorizer, setAuthorizer] = useState(null);
+  const [authorizerSearch, setAuthorizerSearch] = useState("");
+  const [showAuthorizerList, setShowAuthorizerList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Filtrar registros con tardanza u horas extras del empleado seleccionado
@@ -42,6 +46,27 @@ export default function CompensationModal({
         .map((c) => c.incident_date)
     );
   }, [existingCompensations, employee]);
+
+  // Filtrar empleados para el selector de autorizador
+  const filteredAuthorizers = useMemo(() => {
+    if (!authorizerSearch.trim()) {
+      return allEmployees
+        .filter((e) => e.status === "Activo" && e.id !== employee?.id)
+        .slice(0, 50);
+    }
+    const term = authorizerSearch.toLowerCase().trim();
+    return allEmployees
+      .filter(
+        (e) =>
+          e.status === "Activo" &&
+          e.id !== employee?.id &&
+          (`${e.first_name} ${e.last_name}`.toLowerCase().includes(term) ||
+            `${e.last_name} ${e.first_name}`.toLowerCase().includes(term) ||
+            (e.document_number || "").toLowerCase().includes(term) ||
+            (e.position || "").toLowerCase().includes(term))
+      )
+      .slice(0, 50);
+  }, [allEmployees, authorizerSearch, employee]);
 
   const toggleDay = (recordId, date) => {
     setSelectedDays((prev) => {
@@ -82,9 +107,10 @@ export default function CompensationModal({
   const handleSubmit = async () => {
     if (selectedList.length === 0) return;
     if (!compensationReason.trim()) return;
+    if (!authorizer) return;
     setSubmitting(true);
     try {
-      await onSubmit(selectedList, compensationReason);
+      await onSubmit(selectedList, compensationReason, authorizer);
     } finally {
       setSubmitting(false);
     }
@@ -164,6 +190,87 @@ export default function CompensationModal({
             </div>
           </div>
 
+          {/* Selector de autorizador */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-900 mb-2">
+              Persona que debe autorizar *
+            </label>
+            {authorizer ? (
+              <div className="flex items-center justify-between p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold bg-gradient-to-br from-indigo-500 to-purple-600">
+                    {authorizer.first_name[0]}{authorizer.last_name[0]}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-900 text-sm">
+                      {authorizer.first_name} {authorizer.last_name}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {authorizer.position || "Sin cargo"} · {authorizer.department_name || "Sin área"}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setAuthorizer(null); setAuthorizerSearch(""); setShowAuthorizerList(true); }}
+                  className="text-slate-500 hover:text-red-500"
+                >
+                  <X className="w-4 h-4" /> Cambiar
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input
+                  placeholder="Buscar por nombre, DNI o cargo..."
+                  value={authorizerSearch}
+                  onChange={(e) => {
+                    setAuthorizerSearch(e.target.value);
+                    setShowAuthorizerList(true);
+                  }}
+                  onFocus={() => setShowAuthorizerList(true)}
+                  className="pl-9"
+                />
+                {showAuthorizerList && (
+                  <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg">
+                    {filteredAuthorizers.length === 0 ? (
+                      <p className="text-sm text-slate-400 text-center py-4">
+                        No se encontraron empleados
+                      </p>
+                    ) : (
+                      filteredAuthorizers.map((emp) => (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          onClick={() => {
+                            setAuthorizer(emp);
+                            setShowAuthorizerList(false);
+                            setAuthorizerSearch("");
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-50 transition-colors text-left border-b border-slate-50 last:border-b-0"
+                        >
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 bg-gradient-to-br from-slate-400 to-slate-500">
+                            {emp.first_name[0]}{emp.last_name[0]}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-slate-900 text-sm truncate">
+                              {emp.first_name} {emp.last_name}
+                            </p>
+                            <p className="text-xs text-slate-400 truncate">
+                              {emp.document_type} {emp.document_number} · {emp.position || ""}
+                            </p>
+                          </div>
+                          <UserCheck className="w-4 h-4 text-slate-300 shrink-0" />
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Tabla de días con incidencias */}
           <div>
             <p className="text-sm font-semibold text-slate-900 mb-2">
@@ -177,7 +284,7 @@ export default function CompensationModal({
                 </p>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-lg overflow-hidden max-h-[320px] overflow-y-auto">
+              <div className="border border-slate-200 rounded-lg overflow-hidden max-h-[280px] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-100 sticky top-0">
                     <tr>
@@ -343,6 +450,12 @@ export default function CompensationModal({
                   </span>
                 </div>
               </div>
+              {authorizer && (
+                <p className="text-xs text-indigo-700 mt-2">
+                  <UserCheck className="w-3 h-3 inline mr-1" />
+                  Autorizador: {authorizer.first_name} {authorizer.last_name}
+                </p>
+              )}
             </div>
           )}
 
@@ -362,7 +475,8 @@ export default function CompensationModal({
               disabled={
                 submitting ||
                 selectedList.length === 0 ||
-                !compensationReason.trim()
+                !compensationReason.trim() ||
+                !authorizer
               }
             >
               {submitting

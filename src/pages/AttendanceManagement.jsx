@@ -31,7 +31,6 @@ import AttendanceEditRequestModal from "../components/attendance/AttendanceEditR
 import AttendanceEditRequestsPanel from "../components/attendance/AttendanceEditRequestsPanel";
 import AttendanceValidationModal from "../components/attendance/AttendanceValidationModal";
 import IncidentDetailModal from "../components/attendance/IncidentDetailModal";
-import CompensationPanel from "../components/attendance/CompensationPanel";
 import PaginationBar from "@/components/ui/PaginationBar";
 
 
@@ -1290,7 +1289,7 @@ export default function AttendanceManagement() {
 
           <Tabs defaultValue="attendance" className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full sm:w-auto">
+              <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full sm:w-auto">
                 <TabsTrigger value="attendance">
                   Asistencia del Día
                   {employeesWithRecords.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{employeesWithRecords.length}</Badge>}
@@ -1302,9 +1301,6 @@ export default function AttendanceManagement() {
                 <TabsTrigger value="overtime-alerts">
                   Alertas HE
                   {overtimeAlerts.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{overtimeAlerts.length}</Badge>}
-                </TabsTrigger>
-                <TabsTrigger value="compensation">
-                  Compensación
                 </TabsTrigger>
                 <TabsTrigger value="edit-requests">
                   Ediciones
@@ -2054,16 +2050,6 @@ export default function AttendanceManagement() {
                           </TabsContent>
                           </Tabs>
                           </TabsContent>
-
-                                  {/* Compensation Tab */}
-                                  <TabsContent value="compensation" className="space-y-6">
-                                    <CompensationPanel
-                                      allEmployees={allEmployees}
-                                      effectiveEmployee={effectiveEmployee}
-                                      accessibleEmployeeIds={accessibleEmployeeIds}
-                                      hasPermission={hasPermission}
-                                    />
-                                  </TabsContent>
 
                                   {/* Edit Requests Tab */}
                                   <TabsContent value="edit-requests" className="space-y-6">
