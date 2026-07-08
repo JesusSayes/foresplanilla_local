@@ -1,12 +1,16 @@
-import React from "react";
+import React, { useState } from "react";
 import { usePermissions } from "@/components/hooks/usePermissions";
 import CompensationPanel from "@/components/attendance/CompensationPanel";
 import PendingCompensationsApproval from "@/components/attendance/PendingCompensationsApproval";
+import CompensationHistory from "@/components/attendance/CompensationHistory";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { Clock, History } from "lucide-react";
 
 export default function CompensacionTardanzas() {
+  const [activeTab, setActiveTab] = useState("pendientes");
   const { hasPermission, getAccessibleSites, loading: permissionsLoading } =
     usePermissions();
 
@@ -66,14 +70,33 @@ export default function CompensacionTardanzas() {
           </p>
         </div>
 
-        <PendingCompensationsApproval allEmployees={allEmployees} />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="pendientes">
+              <Clock className="w-4 h-4 mr-2" />
+              Solicitudes
+            </TabsTrigger>
+            <TabsTrigger value="historico">
+              <History className="w-4 h-4 mr-2" />
+              Histórico
+            </TabsTrigger>
+          </TabsList>
 
-        <CompensationPanel
-          allEmployees={allEmployees}
-          accessibleEmployeeIds={accessibleEmployeeIds}
-          hasPermission={hasPermission}
-          standalone
-        />
+          <TabsContent value="pendientes" className="mt-6 space-y-6">
+            <PendingCompensationsApproval allEmployees={allEmployees} />
+
+            <CompensationPanel
+              allEmployees={allEmployees}
+              accessibleEmployeeIds={accessibleEmployeeIds}
+              hasPermission={hasPermission}
+              standalone
+            />
+          </TabsContent>
+
+          <TabsContent value="historico" className="mt-6">
+            <CompensationHistory allEmployees={allEmployees} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
