@@ -244,10 +244,26 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
       toast.info("No hay solicitudes para exportar");
       return;
     }
+
+    // Convierte "HH:mm" a fracción de día para Excel
+    const timeStrToExcelFraction = (t) => {
+      if (!t || typeof t !== "string") return null;
+      const m = t.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+      if (!m) return null;
+      const h = parseInt(m[1], 10);
+      const min = parseInt(m[2], 10);
+      const sec = m[3] ? parseInt(m[3], 10) : 0;
+      if (isNaN(h) || isNaN(min) || isNaN(sec)) return null;
+      return (h + min / 60 + sec / 3600) / 24;
+    };
+
     const dataToExport = items.map(req => {
       const emp = allEmployees.find(e => e.id === req.employee_id);
-      const changes = Object.entries(req.requested_values || {})
-        .map(([k, v]) => `${FIELD_LABELS[k] || k}: ${req.original_values?.[k] || "—"} → ${v || "—"}`)
+      const rv = req.requested_values || {};
+      const ov = req.original_values || {};
+      const changes = Object.entries(rv)
+        .filter(([k]) => k !== 'clock_in' && k !== 'clock_out' && k !== 'clock_in_2' && k !== 'clock_out_2')
+        .map(([k, v]) => `${FIELD_LABELS[k] || k}: ${ov[k] || "—"} → ${v || "—"}`)
         .join("; ");
       return {
         "Fecha Asistencia": req.attendance_date || "",
@@ -260,7 +276,11 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
         "Solicitado por": req.requested_by_name || "",
         "Fecha Solicitud": req.requested_at ? format(new Date(req.requested_at), "dd/MM/yyyy HH:mm") : "",
         "Motivo": req.edit_reason || "",
-        "Cambios Solicitados": changes,
+        "Entrada Original": timeStrToExcelFraction(ov.clock_in) ?? ov.clock_in,
+        "Entrada Solicitada": timeStrToExcelFraction(rv.clock_in) ?? rv.clock_in,
+        "Salida Original": timeStrToExcelFraction(ov.clock_out) ?? ov.clock_out,
+        "Salida Solicitada": timeStrToExcelFraction(rv.clock_out) ?? rv.clock_out,
+        "Otros Cambios": changes,
         "Estado": req.status || "",
         "Revisado por": req.reviewed_by_name || "",
         "Fecha Revisión": req.reviewed_at ? format(new Date(req.reviewed_at), "dd/MM/yyyy HH:mm") : "",
@@ -268,6 +288,20 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
       };
     });
     const ws = XLSX.utils.json_to_sheet(dataToExport);
+    // Aplicar formato hh:mm a columnas de horas
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const timeCols = ["Entrada Original", "Entrada Solicitada", "Salida Original", "Salida Solicitada"];
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const headerCell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+      if (headerCell && timeCols.includes(headerCell.v)) {
+        for (let r = 1; r <= range.e.r; r++) {
+          const cellRef = XLSX.utils.encode_cell({ r, c });
+          if (ws[cellRef] && typeof ws[cellRef].v === 'number') {
+            ws[cellRef].z = 'hh:mm';
+          }
+        }
+      }
+    }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Ediciones");
     XLSX.writeFile(wb, `Ediciones_${statusMap[activeTab]}_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`);

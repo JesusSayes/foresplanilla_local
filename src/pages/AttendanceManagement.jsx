@@ -878,7 +878,7 @@ export default function AttendanceManagement() {
         "Justificación": incident.justification || "",
         "Día Completo": incident.full_day_justification ? "Sí" : "No",
         "Período Justificado": periodStr,
-        "Horas a Ajustar": incident.hours_to_adjust?.toFixed(2) || "0.00",
+        "Horas a Ajustar": hoursDecimalToExcelFraction(incident.hours_to_adjust ?? 0),
         "Documento Adjunto": incident.supporting_document_url || "",
         "Estado": incident.status || "",
         "Revisado por": incident.reviewed_by || "",
@@ -887,10 +887,42 @@ export default function AttendanceManagement() {
       };
     });
     const ws = XLSX.utils.json_to_sheet(dataToExport);
+    // Aplicar formato hora a "Horas a Ajustar"
+    const rangeInc = XLSX.utils.decode_range(ws['!ref']);
+    for (let c = rangeInc.s.c; c <= rangeInc.e.c; c++) {
+      const headerCell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+      if (headerCell && headerCell.v === "Horas a Ajustar") {
+        for (let r = 1; r <= rangeInc.e.r; r++) {
+          const cellRef = XLSX.utils.encode_cell({ r, c });
+          if (ws[cellRef] && typeof ws[cellRef].v === 'number') {
+            ws[cellRef].z = 'hh:mm';
+          }
+        }
+        break;
+      }
+    }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Justificaciones");
     XLSX.writeFile(wb, `Justificaciones_${statusLabel}_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`);
     toast.success(`✓ ${items.length} justificación(es) exportada(s)`);
+  };
+
+  // Convierte "HH:mm" (o "HH:mm:ss") a una fracción de día para Excel (0–1)
+  const timeStrToExcelFraction = (t) => {
+    if (!t || typeof t !== "string") return null;
+    const m = t.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return null;
+    const h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    const sec = m[3] ? parseInt(m[3], 10) : 0;
+    if (isNaN(h) || isNaN(min) || isNaN(sec)) return null;
+    return (h + min / 60 + sec / 3600) / 24;
+  };
+
+  // Convierte horas decimales (ej: 8.5) a fracción de día para Excel
+  const hoursDecimalToExcelFraction = (n) => {
+    if (n === null || n === undefined || isNaN(n)) return null;
+    return n / 24;
   };
 
   const handleExportToExcel = async () => {
@@ -986,11 +1018,11 @@ export default function AttendanceManagement() {
       }
 
       // Para vacaciones: mostrar horario programado como marcación
-      let entradaExcel = emp.record?.clock_in || '--:--';
-      let salidaExcel  = emp.record?.clock_out || '--:--';
+      let entradaExcel = timeStrToExcelFraction(emp.record?.clock_in);
+      let salidaExcel  = timeStrToExcelFraction(emp.record?.clock_out);
       if (estadoMarcacion === 'Vacaciones') {
-        entradaExcel = schedStartEx;
-        salidaExcel  = schedEndEx;
+        entradaExcel = timeStrToExcelFraction(schedStartEx);
+        salidaExcel  = timeStrToExcelFraction(schedEndEx);
       }
 
       return {
@@ -1005,11 +1037,11 @@ export default function AttendanceManagement() {
         'Sede': emp.site || 'Sin sede',
         'Entrada': entradaExcel,
         'Salida': salidaExcel,
-        'Horas Marcadas': (emp.record?.regular_hours ?? emp.record?.worked_hours ?? 0).toFixed(2),
-        'Horas Efectivas (marcadas+justificadas)': excelHours.toFixed(2),
+        'Horas Marcadas': hoursDecimalToExcelFraction(emp.record?.regular_hours ?? emp.record?.worked_hours ?? 0),
+        'Horas Efectivas (marcadas+justificadas)': hoursDecimalToExcelFraction(excelHours),
         'Tardanza Efectiva (min)': excelLate,
-        'HE 25%': (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
-        'HE 35%': (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
+        'HE 25%': hoursDecimalToExcelFraction(emp.record?.overtime_hours_25 ?? 0),
+        'HE 35%': hoursDecimalToExcelFraction(emp.record?.overtime_hours_35 ?? 0),
         'Estado Marcación': estadoMarcacion,
         'Tiene Justificación': approvedIncsEx.length > 0 ? 'Sí' : 'No',
         'Tipo Incidente': incident ? incident.incident_type : '',
@@ -1019,7 +1051,9 @@ export default function AttendanceManagement() {
               ? `Día completo (${incident.justified_time_start || schedStartEx} - ${incident.justified_time_end || schedEndEx})`
               : `${incident.justified_time_start || ''} - ${incident.justified_time_end || ''}`)
           : '',
-        'Horas Justificadas': tiempoPapeleta,
+        'Horas Justificadas': tiempoPapeleta
+          ? hoursDecimalToExcelFraction(parseFloat(tiempoPapeleta))
+          : '',
         'Detalle Justificación': incident ? incident.justification : '',
         'Documento Adjunto': incident?.supporting_document_url || '',
         'Revisado por': incident?.reviewed_by || '',
@@ -1028,6 +1062,25 @@ export default function AttendanceManagement() {
       };
     });
     const ws = XLSX.utils.json_to_sheet(dataToExport);
+    // Aplicar formato hora (hh:mm) a las columnas de horas
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const timeCols = ['Entrada', 'Salida', 'Horas Marcadas',
+      'Horas Efectivas (marcadas+justificadas)', 'HE 25%', 'HE 35%', 'Horas Justificadas'];
+    const timeColIndexes = [];
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const headerCell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+      if (headerCell && timeCols.includes(headerCell.v)) {
+        timeColIndexes.push(c);
+      }
+    }
+    timeColIndexes.forEach(c => {
+      for (let r = 1; r <= range.e.r; r++) {
+        const cellRef = XLSX.utils.encode_cell({ r, c });
+        if (ws[cellRef] && typeof ws[cellRef].v === 'number') {
+          ws[cellRef].z = 'hh:mm';
+        }
+      }
+    });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Asistencia');
     const filterText = attendanceFilter === "all" ? "Todos" : attendanceFilter === "sin_entrada" ? "Sin_Entrada" : attendanceFilter === "sin_salida" ? "Sin_Salida" : "Con_Tardanza";
