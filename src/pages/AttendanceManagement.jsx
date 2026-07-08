@@ -66,6 +66,7 @@ export default function AttendanceManagement() {
   const [incidentDateFilter, setIncidentDateFilter] = useState("");
   const [incidentTypeFilter, setIncidentTypeFilter] = useState("all");
   const [incidentPage, setIncidentPage] = useState(1);
+  const [incidentSubTab, setIncidentSubTab] = useState("pending");
   const INCIDENT_PAGE_SIZE = 20;
 
   const [overtimeSearchTerm, setOvertimeSearchTerm] = useState("");
@@ -847,6 +848,49 @@ export default function AttendanceManagement() {
     setRecalculandoTodo(false);
     queryClient.invalidateQueries(["todayAttendance"]);
     toast.success(`✓ Recálculo completado para ${done} empleados`);
+  };
+
+  const handleExportIncidentsExcel = () => {
+    const statusMap = { pending: "Pendiente", approved: "Aprobada", rejected: "Rechazada" };
+    const statusLabel = statusMap[incidentSubTab];
+    const sourceList = incidentSubTab === "pending" ? pendingIncidents
+      : incidentSubTab === "approved" ? approvedIncidents
+      : rejectedIncidents;
+    const items = applyIncidentFilters(sourceList);
+    if (items.length === 0) {
+      toast.info("No hay justificaciones para exportar");
+      return;
+    }
+    const dataToExport = items.map(incident => {
+      const emp = allEmployees.find(e => e.id === incident.employee_id);
+      const periodStr = incident.full_day_justification
+        ? `Día completo (${incident.justified_time_start || ""} - ${incident.justified_time_end || ""})`
+        : `${incident.justified_time_start || ""} - ${incident.justified_time_end || ""}`;
+      return {
+        "Fecha": incident.incident_date || "",
+        "Tipo Doc": emp?.document_type || "",
+        "DNI": emp?.document_number || "",
+        "Nombres": emp?.first_name || "",
+        "Apellidos": emp?.last_name || "",
+        "Cargo": emp?.position || "",
+        "Departamento": emp?.department_name || "",
+        "Tipo Incidente": incident.incident_type || "",
+        "Justificación": incident.justification || "",
+        "Día Completo": incident.full_day_justification ? "Sí" : "No",
+        "Período Justificado": periodStr,
+        "Horas a Ajustar": incident.hours_to_adjust?.toFixed(2) || "0.00",
+        "Documento Adjunto": incident.supporting_document_url || "",
+        "Estado": incident.status || "",
+        "Revisado por": incident.reviewed_by || "",
+        "Fecha Revisión": incident.review_date || "",
+        "Comentarios Revisión": incident.review_comments || "",
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Justificaciones");
+    XLSX.writeFile(wb, `Justificaciones_${statusLabel}_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`);
+    toast.success(`✓ ${items.length} justificación(es) exportada(s)`);
   };
 
   const handleExportToExcel = async () => {
@@ -1774,11 +1818,14 @@ export default function AttendanceManagement() {
                 </Select>
                 <Input type="date" value={incidentDateFilter} onChange={(e) => { setIncidentDateFilter(e.target.value); setIncidentPage(1); }} className="w-40" title="Filtrar por fecha" />
                 {incidentDateFilter && <Button size="sm" variant="outline" onClick={() => { setIncidentDateFilter(""); setIncidentPage(1); }}>✕ Fecha</Button>}
+                <Button size="sm" variant="outline" className="bg-green-600 text-white hover:bg-green-700" onClick={handleExportIncidentsExcel}>
+                  <Download className="w-4 h-4 mr-1" />Excel
+                </Button>
                 <div className="ml-auto">
                   <PaginationBar inline currentPage={incidentPage} totalItems={applyIncidentFilters(allIncidents).length} pageSize={INCIDENT_PAGE_SIZE} onPageChange={setIncidentPage} />
                 </div>
               </div>
-              <Tabs defaultValue="pending">
+              <Tabs value={incidentSubTab} onValueChange={(v) => { setIncidentSubTab(v); setIncidentPage(1); }}>
                 <TabsList className="grid w-full max-w-xl grid-cols-3 mb-6">
                   <TabsTrigger value="pending">Pendientes {pendingIncidents.length > 0 && <Badge className="ml-2 bg-orange-600 text-white">{pendingIncidents.length}</Badge>}</TabsTrigger>
                   <TabsTrigger value="approved">Aprobadas {approvedIncidents.length > 0 && <Badge className="ml-2 bg-green-600 text-white">{approvedIncidents.length}</Badge>}</TabsTrigger>
