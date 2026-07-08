@@ -15,12 +15,42 @@ export default function CompensationModal({
   periodRecords,
   existingCompensations = [],
   allEmployees = [],
+  editMode = false,
+  pendingCompensations = [],
   onClose,
   onSubmit,
 }) {
-  const [selectedDays, setSelectedDays] = useState({});
-  const [compensationReason, setCompensationReason] = useState("");
-  const [authorizer, setAuthorizer] = useState(null);
+  const [selectedDays, setSelectedDays] = useState(() => {
+    if (editMode && pendingCompensations?.length) {
+      const initial = {};
+      for (const comp of pendingCompensations) {
+        if (
+          comp.attendance_record_id &&
+          (comp.status === "Pendiente" || comp.status === "Rechazada")
+        ) {
+          initial[comp.attendance_record_id] = {
+            date: comp.incident_date,
+            lateMinutes: comp.late_minutes_to_adjust || 0,
+            overtimeMinutes: Math.round((comp.hours_to_adjust || 0) * 60),
+          };
+        }
+      }
+      return initial;
+    }
+    return {};
+  });
+  const [compensationReason, setCompensationReason] = useState(
+    editMode && pendingCompensations?.length
+      ? pendingCompensations[0]?.justification || ""
+      : ""
+  );
+  const [authorizer, setAuthorizer] = useState(
+    editMode && pendingCompensations?.length && allEmployees?.length
+      ? allEmployees.find(
+          (e) => e.id === pendingCompensations[0]?.authorizer_id
+        ) || null
+      : null
+  );
   const [authorizerSearch, setAuthorizerSearch] = useState("");
   const [showAuthorizerList, setShowAuthorizerList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -28,24 +58,45 @@ export default function CompensationModal({
   // Filtrar registros con tardanza u horas extras del empleado seleccionado
   const daysWithIncidents = useMemo(() => {
     if (!employee) return [];
-    return periodRecords
+    const base = periodRecords
       .filter((r) => r.employee_id === employee.id)
       .filter(
         (r) =>
           (r.late_minutes > 0) ||
           ((r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0) > 0)
-      )
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [employee, periodRecords]);
+      );
+
+    // In edit mode, also include days with existing editable compensations
+    if (editMode && pendingCompensations?.length) {
+      const existingIds = new Set(base.map((r) => r.id));
+      for (const comp of pendingCompensations) {
+        if (
+          comp.attendance_record_id &&
+          !existingIds.has(comp.attendance_record_id)
+        ) {
+          const rec = periodRecords.find(
+            (r) => r.id === comp.attendance_record_id
+          );
+          if (rec) {
+            base.push(rec);
+            existingIds.add(rec.id);
+          }
+        }
+      }
+    }
+
+    return base.sort((a, b) => a.date.localeCompare(b.date));
+  }, [employee, periodRecords, editMode, pendingCompensations]);
 
   // Fechas que ya tienen compensación registrada
   const compensatedDates = useMemo(() => {
     return new Set(
       existingCompensations
         .filter((c) => c.employee_id === employee?.id)
+        .filter((c) => (editMode ? c.status === "Aprobada" : true))
         .map((c) => c.incident_date)
     );
-  }, [existingCompensations, employee]);
+  }, [existingCompensations, employee, editMode]);
 
   // Filtrar empleados para el selector de autorizador
   const filteredAuthorizers = useMemo(() => {
@@ -131,7 +182,9 @@ export default function CompensationModal({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-xl font-bold">
-                Solicitar Compensación de Tardanzas
+                {editMode
+                  ? "Editar Compensación de Tardanzas"
+                  : "Solicitar Compensación de Tardanzas"}
               </CardTitle>
               <p className="text-sm text-slate-600 mt-1">
                 {employee.first_name} {employee.last_name} —{" "}
@@ -480,8 +533,10 @@ export default function CompensationModal({
               }
             >
               {submitting
-                ? "Registrando..."
-                : `Registrar compensación (${selectedList.length})`}
+                ? "Guardando..."
+                : `${editMode ? "Actualizar" : "Registrar"} compensación (${
+                    selectedList.length
+                  })`}
             </Button>
           </div>
         </CardContent>

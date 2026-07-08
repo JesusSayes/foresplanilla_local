@@ -25,6 +25,7 @@ import {
   Search,
   Calendar as CalendarIcon,
   Plus,
+  Pencil,
   CheckCircle2,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -55,6 +56,8 @@ export default function CompensationPanel({
   const [showModal, setShowModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [pendingCompsForEdit, setPendingCompsForEdit] = useState([]);
 
   // Cargar registros del período
   const periodStart = useCustomRange
@@ -183,8 +186,30 @@ export default function CompensationPanel({
     return new Set(existingCompensations.map((c) => c.employee_id));
   }, [existingCompensations]);
 
+  // Compensaciones editables (Pendiente o Rechazada) por empleado
+  const editableCompsByEmployee = useMemo(() => {
+    const map = new Map();
+    for (const c of existingCompensations) {
+      if (c.status === "Pendiente" || c.status === "Rechazada") {
+        if (!map.has(c.employee_id)) map.set(c.employee_id, []);
+        map.get(c.employee_id).push(c);
+      }
+    }
+    return map;
+  }, [existingCompensations]);
+
   const handleOpenModal = (stat) => {
     setSelectedEmployee(stat.employee);
+    setEditMode(false);
+    setPendingCompsForEdit([]);
+    setShowModal(true);
+  };
+
+  const handleOpenEditModal = (stat) => {
+    const editable = editableCompsByEmployee.get(stat.employee_id) || [];
+    setSelectedEmployee(stat.employee);
+    setEditMode(true);
+    setPendingCompsForEdit(editable);
     setShowModal(true);
   };
 
@@ -238,6 +263,64 @@ export default function CompensationPanel({
       setSelectedEmployee(null);
     } catch (error) {
       toast.error("Error al registrar compensación: " + (error.message || ""));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleEditCompensation = async (selectedList, reason, authorizer) => {
+    setSubmitting(true);
+    try {
+      // Eliminar compensaciones editables existentes para este empleado
+      const toDelete = editableCompsByEmployee.get(selectedEmployee.id) || [];
+      for (const comp of toDelete) {
+        await base44.entities.AttendanceIncident.delete(comp.id);
+      }
+
+      // Crear las compensaciones actualizadas
+      const incidentsToCreate = selectedList.map((item) => ({
+        employee_id: selectedEmployee.id,
+        attendance_record_id: item.recordId,
+        incident_date: item.date,
+        incident_type: "Compensación de Tardanza",
+        justification: reason,
+        late_minutes_to_adjust: item.lateMinutes || 0,
+        hours_to_adjust: (item.overtimeMinutes || 0) / 60,
+        full_day_justification: false,
+        justified_time_start: item.record?.clock_in || null,
+        justified_time_end: item.record?.clock_out || null,
+        authorizer_id: authorizer.id,
+        authorizer_name: `${authorizer.first_name} ${authorizer.last_name}`,
+        status: "Pendiente",
+      }));
+
+      if (incidentsToCreate.length > 0) {
+        await base44.entities.AttendanceIncident.bulkCreate(incidentsToCreate);
+      }
+
+      // Asegurar que los registros seleccionados tengan estado "Compensación"
+      for (const item of selectedList) {
+        if (item.recordId && item.record?.status !== "Compensación") {
+          await base44.entities.AttendanceRecord.update(item.recordId, {
+            status: "Compensación",
+          });
+        }
+      }
+
+      queryClient.invalidateQueries(["compensationIncidents"]);
+      queryClient.invalidateQueries(["compensationRecords"]);
+      queryClient.invalidateQueries(["allIncidents"]);
+      queryClient.invalidateQueries(["todayAttendance"]);
+
+      toast.success(
+        `✓ Compensación actualizada (${selectedList.length} día(s))`
+      );
+      setShowModal(false);
+      setSelectedEmployee(null);
+      setEditMode(false);
+      setPendingCompsForEdit([]);
+    } catch (error) {
+      toast.error("Error al actualizar compensación: " + (error.message || ""));
     } finally {
       setSubmitting(false);
     }
@@ -457,6 +540,9 @@ export default function CompensationPanel({
                     const hasComp = employeesWithCompensation.has(
                       stat.employee_id
                     );
+                    const hasEditableComp = editableCompsByEmployee.has(
+                      stat.employee_id
+                    );
                     return (
                       <tr
                         key={stat.employee_id}
@@ -522,15 +608,28 @@ export default function CompensationPanel({
                         </td>
                         <td className="px-2 py-2 text-center">
                           {canManage && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 px-2 text-xs shrink-0 whitespace-nowrap text-indigo-700 border-indigo-300 hover:bg-indigo-50"
-                              onClick={() => handleOpenModal(stat)}
-                            >
-                              <Plus className="w-3 h-3 mr-1" />
-                              Solicitar compensación
-                            </Button>
+                            <div className="flex gap-1 justify-center">
+                              {hasEditableComp && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs shrink-0 whitespace-nowrap text-blue-700 border-blue-300 hover:bg-blue-50"
+                                  onClick={() => handleOpenEditModal(stat)}
+                                >
+                                  <Pencil className="w-3 h-3 mr-1" />
+                                  Editar
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-xs shrink-0 whitespace-nowrap text-indigo-700 border-indigo-300 hover:bg-indigo-50"
+                                onClick={() => handleOpenModal(stat)}
+                              >
+                                <Plus className="w-3 h-3 mr-1" />
+                                {hasEditableComp ? "Agregar" : "Solicitar"}
+                              </Button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -549,11 +648,15 @@ export default function CompensationPanel({
           periodRecords={periodRecords}
           existingCompensations={existingCompensations}
           allEmployees={allEmployees}
+          editMode={editMode}
+          pendingCompensations={pendingCompsForEdit}
           onClose={() => {
             setShowModal(false);
             setSelectedEmployee(null);
+            setEditMode(false);
+            setPendingCompsForEdit([]);
           }}
-          onSubmit={handleSubmitCompensation}
+          onSubmit={editMode ? handleEditCompensation : handleSubmitCompensation}
         />
       )}
     </Card>
