@@ -1,6 +1,7 @@
 import React from "react";
 import { usePermissions } from "@/components/hooks/usePermissions";
 import CompensationPanel from "@/components/attendance/CompensationPanel";
+import PendingCompensationsApproval from "@/components/attendance/PendingCompensationsApproval";
 import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
@@ -64,6 +65,8 @@ export default function CompensacionTardanzas() {
             Gestión de compensaciones de tardanzas y horas extras del personal
           </p>
         </div>
+
+        <PendingCompensationsApproval allEmployees={allEmployees} />
 
         <CompensationPanel
           allEmployees={allEmployees}
