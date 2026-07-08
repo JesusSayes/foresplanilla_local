@@ -69,6 +69,7 @@ export default function AttendanceManagement() {
   const [showIncidentDetail, setShowIncidentDetail] = useState(false);
   const [incidentDetailData, setIncidentDetailData] = useState(null);
   const [incidentDetailEmployee, setIncidentDetailEmployee] = useState(null);
+  const [isApproving, setIsApproving] = useState(false);
   const [showEditRequestModal, setShowEditRequestModal] = useState(false);
   const [editRequestRecord, setEditRequestRecord] = useState(null);
   const [editRequestEmployee, setEditRequestEmployee] = useState(null);
@@ -76,6 +77,7 @@ export default function AttendanceManagement() {
   const [incidentDateFilter, setIncidentDateFilter] = useState("");
   const [incidentTypeFilter, setIncidentTypeFilter] = useState("all");
   const [incidentPage, setIncidentPage] = useState(1);
+  const [incidentSubTab, setIncidentSubTab] = useState("pending");
   const INCIDENT_PAGE_SIZE = 20;
 
   const [overtimeSearchTerm, setOvertimeSearchTerm] = useState("");
@@ -172,6 +174,11 @@ export default function AttendanceManagement() {
   const { data: allIncidents = [] } = useQuery({
     queryKey: ["allIncidents"],
     queryFn: async () => await entitiesAPI.AttendanceIncident.list("-created_date", 2000),
+  });
+
+  const { data: incidentTypes = [] } = useQuery({
+    queryKey: ["incidentTypes"],
+    queryFn: async () => await entitiesAPI.IncidentType.list(),
   });
 
   // Los incidentes se filtrarán después de calcular accessibleEmployeeIds (ver abajo)
@@ -406,6 +413,7 @@ export default function AttendanceManagement() {
 
     const isNightShift = schedEndTotal < schedTotal;
     const fullJornada = isNightShift ? (schedEndTotal - schedTotal + 1440) : Math.max(0, schedEndTotal - schedTotal);
+    const effectiveBreakMinutes = fullJornada < 360 ? 0 : breakMinutes;
     const norm = (t) => isNightShift ? (t - schedTotal + 1440) % 1440 : t;
     const normSchedStart = isNightShift ? 0 : schedTotal;
     const normSchedEnd   = isNightShift ? fullJornada : schedEndTotal;
@@ -420,10 +428,10 @@ export default function AttendanceManagement() {
       const normOut = norm(outTotal);
       const effectiveNormIn = (isNightShift && normIn > fullJornada) ? 0 : normIn;
 
-      const totalMinutes = (normOut >= effectiveNormIn ? normOut - effectiveNormIn : 0) - breakMinutes;
+      const totalMinutes = (normOut >= effectiveNormIn ? normOut - effectiveNormIn : 0) - effectiveBreakMinutes;
       workedHours = Math.max(0, totalMinutes / 60);
       const effectiveStart = Math.max(effectiveNormIn, normSchedStart);
-      const regularMinutes = Math.max(0, normSchedEnd - effectiveStart - breakMinutes);
+      const regularMinutes = Math.max(0, normSchedEnd - effectiveStart - effectiveBreakMinutes);
       const normalHoursMax = regularMinutes / 60;
       if (workedHours <= normalHoursMax) {
         regularHours = workedHours;
@@ -479,11 +487,14 @@ export default function AttendanceManagement() {
           const outTotal   = outH * 60 + outM;
           const schedEndMin = endH * 60 + endM;
           const schedStartMin = stH * 60 + stM;
+          let scheduledMinutes = schedEndMin - schedStartMin;
+          if (scheduledMinutes < 0) scheduledMinutes += 1440;
+          const effectiveBreakMin = scheduledMinutes < 360 ? 0 : breakMin;
 
-          const workedMin  = outTotal - inTotal - breakMin;
+          const workedMin  = outTotal - inTotal - effectiveBreakMin;
           const workedHrs  = Math.max(0, workedMin / 60);
           // Horas normales = desde cuando empezó (o desde su hora programada si llegó tarde) hasta fin de jornada, menos break
-          const normalHrs  = Math.max(0, (schedEndMin - Math.max(inTotal, schedStartMin) - breakMin) / 60);
+          const normalHrs  = Math.max(0, (schedEndMin - Math.max(inTotal, schedStartMin) - effectiveBreakMin) / 60);
           const extraHrs   = Math.max(0, workedHrs - normalHrs);
 
           // overtime_authorized: usa el valor actual del registro (ya persistido) o el del horario
@@ -524,11 +535,6 @@ export default function AttendanceManagement() {
       //    El backend respeta overtime_authorized del registro:
       //    - Si es false (o no hay alerta aprobada), HE quedan en 0.
       //    - Si es true (alerta aprobada), calcula HE 25% y 35%.
-      // await base44.functions.invoke("recalcularAsistencia", {
-        // employee_id: editingRecord.employee_id,
-        // date_from:   recordDate,
-        // date_to:     recordDate,
-      // });
       await recalcularAsistenciaService.invoke(
         editingRecord.employee_id,
         recordDate,
@@ -546,18 +552,68 @@ export default function AttendanceManagement() {
   };
 
   const handleApproveIncident = async (incident) => {
-    // No modificar clock_in, clock_out, worked_hours ni regular_hours del AttendanceRecord.
-    // Las horas justificadas viven en attendance_incident.hours_to_adjust.
-    // Solo actualizamos el status del incidente vía reviewIncidentMutation.
-    reviewIncidentMutation.mutate({
-      id: incident.id,
-      data: {
+    setIsApproving(true);
+    try {
+      await entitiesAPI.AttendanceIncident.update(incident.id, {
         status: "Aprobada",
         reviewed_by: `${effectiveEmployee?.first_name} ${effectiveEmployee?.last_name}`,
         review_date: todayLima(),
         review_comments: reviewComments || "Aprobada",
+      });
+
+      // Si el tipo de incidente es "Permiso", actualizar clock_in/clock_out del registro
+      const incType = incidentTypes.find(t => t.name === incident.incident_type);
+      if (incType?.affectation === "Permiso") {
+        const dateStr = incident.incident_date;
+        const sched = getEmployeeScheduleForDate(incident.employee_id, dateStr);
+        const dow = new Date(dateStr + "T00:00:00").getDay();
+        const dayStarts = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+        const dayEnds = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+        const sStart = sched?.[dayStarts[dow]] || "09:00";
+        const sEnd = sched?.[dayEnds[dow]] || "18:00";
+
+        const existingRecords = await entitiesAPI.AttendanceRecord.filter({
+          employee_id: incident.employee_id,
+          date: dateStr,
+        });
+        const record = existingRecords?.[0];
+        if (record) {
+          await entitiesAPI.AttendanceRecord.update(record.id, {
+            clock_in: sStart,
+            clock_out: sEnd,
+          });
+        } else {
+          await entitiesAPI.AttendanceRecord.create({
+            employee_id: incident.employee_id,
+            date: dateStr,
+            clock_in: sStart,
+            clock_out: sEnd,
+            scheduled_start: sStart,
+            scheduled_end: sEnd,
+            status: "Justificado",
+            is_absent: false,
+          });
+        }
       }
-    });
+
+      // Recalcular tardanzas y HE
+      await recalcularAsistenciaService.invoke(
+        incident.employee_id,
+        incident.incident_date,
+        incident.incident_date,
+      );
+
+      queryClient.invalidateQueries(["allIncidents"]);
+      queryClient.invalidateQueries(["todayAttendance"]);
+      toast.success("Justificación aprobada correctamente");
+      setShowIncidentModal(false);
+      setReviewingIncident(null);
+      setReviewComments("");
+    } catch (error) {
+      toast.error("Error al aprobar la justificación: " + (error.message || ""));
+    } finally {
+      setIsApproving(false);
+    }
   };
 
   const handleRejectIncident = (incident) => {
@@ -839,11 +895,6 @@ export default function AttendanceManagement() {
     setRecalcProgress({ done: 0, total: empList.length });
     let done = 0;
     for (const emp of empList) {
-      // await base44.functions.invoke("recalcularAsistencia", {
-        // employee_id: emp.id,
-        // date_from: "2020-01-01",
-        // date_to: format(new Date(), "yyyy-MM-dd"),
-      // });
       await recalcularAsistenciaService.invoke(
         emp.id,
         "2020-01-01",
@@ -855,6 +906,81 @@ export default function AttendanceManagement() {
     setRecalculandoTodo(false);
     queryClient.invalidateQueries(["todayAttendance"]);
     toast.success(`✓ Recálculo completado para ${done} empleados`);
+  };
+
+  const handleExportIncidentsExcel = () => {
+    const statusMap = { pending: "Pendiente", approved: "Aprobada", rejected: "Rechazada" };
+    const statusLabel = statusMap[incidentSubTab];
+    const sourceList = incidentSubTab === "pending" ? pendingIncidents
+      : incidentSubTab === "approved" ? approvedIncidents
+      : rejectedIncidents;
+    const items = applyIncidentFilters(sourceList);
+    if (items.length === 0) {
+      toast.info("No hay justificaciones para exportar");
+      return;
+    }
+    const dataToExport = items.map(incident => {
+      const emp = allEmployees.find(e => e.id === incident.employee_id);
+      const periodStr = incident.full_day_justification
+        ? `Día completo (${incident.justified_time_start || ""} - ${incident.justified_time_end || ""})`
+        : `${incident.justified_time_start || ""} - ${incident.justified_time_end || ""}`;
+      return {
+        "Fecha": incident.incident_date || "",
+        "Tipo Doc": emp?.document_type || "",
+        "DNI": emp?.document_number || "",
+        "Nombres": emp?.first_name || "",
+        "Apellidos": emp?.last_name || "",
+        "Cargo": emp?.position || "",
+        "Departamento": emp?.department_name || "",
+        "Tipo Incidente": incident.incident_type || "",
+        "Justificación": incident.justification || "",
+        "Día Completo": incident.full_day_justification ? "Sí" : "No",
+        "Período Justificado": periodStr,
+        "Horas a Ajustar": hoursDecimalToExcelFraction(incident.hours_to_adjust ?? 0),
+        "Documento Adjunto": incident.supporting_document_url || "",
+        "Estado": incident.status || "",
+        "Revisado por": incident.reviewed_by || "",
+        "Fecha Revisión": incident.review_date || "",
+        "Comentarios Revisión": incident.review_comments || "",
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    // Aplicar formato hora a "Horas a Ajustar"
+    const rangeInc = XLSX.utils.decode_range(ws['!ref']);
+    for (let c = rangeInc.s.c; c <= rangeInc.e.c; c++) {
+      const headerCell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+      if (headerCell && headerCell.v === "Horas a Ajustar") {
+        for (let r = 1; r <= rangeInc.e.r; r++) {
+          const cellRef = XLSX.utils.encode_cell({ r, c });
+          if (ws[cellRef] && typeof ws[cellRef].v === 'number') {
+            ws[cellRef].z = 'hh:mm';
+          }
+        }
+        break;
+      }
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Justificaciones");
+    XLSX.writeFile(wb, `Justificaciones_${statusLabel}_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`);
+    toast.success(`✓ ${items.length} justificación(es) exportada(s)`);
+  };
+
+  // Convierte "HH:mm" (o "HH:mm:ss") a una fracción de día para Excel (0–1)
+  const timeStrToExcelFraction = (t) => {
+    if (!t || typeof t !== "string") return null;
+    const m = t.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return null;
+    const h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    const sec = m[3] ? parseInt(m[3], 10) : 0;
+    if (isNaN(h) || isNaN(min) || isNaN(sec)) return null;
+    return (h + min / 60 + sec / 3600) / 24;
+  };
+
+  // Convierte horas decimales (ej: 8.5) a fracción de día para Excel
+  const hoursDecimalToExcelFraction = (n) => {
+    if (n === null || n === undefined || isNaN(n)) return null;
+    return n / 24;
   };
 
   const handleExportToExcel = async () => {
@@ -934,11 +1060,11 @@ export default function AttendanceManagement() {
       }
 
       // Para vacaciones: mostrar horario programado como marcación
-      let entradaExcel = emp.record?.clock_in || '--:--';
-      let salidaExcel  = emp.record?.clock_out || '--:--';
+      let entradaExcel = timeStrToExcelFraction(emp.record?.clock_in);
+      let salidaExcel  = timeStrToExcelFraction(emp.record?.clock_out);
       if (estadoMarcacion === 'Vacaciones') {
-        entradaExcel = schedStartEx;
-        salidaExcel  = schedEndEx;
+        entradaExcel = timeStrToExcelFraction(schedStartEx);
+        salidaExcel  = timeStrToExcelFraction(schedEndEx);
       }
 
       return {
@@ -953,11 +1079,11 @@ export default function AttendanceManagement() {
         'Sede': emp.site || 'Sin sede',
         'Entrada': entradaExcel,
         'Salida': salidaExcel,
-        'Horas Marcadas': (emp.record?.regular_hours ?? emp.record?.worked_hours ?? 0).toFixed(2),
-        'Horas Efectivas (marcadas+justificadas)': excelHours.toFixed(2),
+        'Horas Marcadas': hoursDecimalToExcelFraction(emp.record?.regular_hours ?? emp.record?.worked_hours ?? 0),
+        'Horas Efectivas (marcadas+justificadas)': hoursDecimalToExcelFraction(excelHours),
         'Tardanza Efectiva (min)': excelLate,
-        'HE 25%': isVacation ? '0.00' : (emp.record?.overtime_hours_25 ?? 0).toFixed(2),
-        'HE 35%': isVacation ? '0.00' : (emp.record?.overtime_hours_35 ?? 0).toFixed(2),
+        'HE 25%': hoursDecimalToExcelFraction(isVacation ? 0 : (emp.record?.overtime_hours_25 ?? 0)),
+        'HE 35%': hoursDecimalToExcelFraction(isVacation ? 0 : (emp.record?.overtime_hours_35 ?? 0)),
         'Estado Marcación': estadoMarcacion,
         'Tiene Justificación': approvedIncsEx.length > 0 ? 'Sí' : 'No',
         'Tipo Incidente': incident ? incident.incident_type : '',
@@ -967,7 +1093,9 @@ export default function AttendanceManagement() {
               ? `Día completo (${incident.justified_time_start || schedStartEx} - ${incident.justified_time_end || schedEndEx})`
               : `${incident.justified_time_start || ''} - ${incident.justified_time_end || ''}`)
           : '',
-        'Horas Justificadas': tiempoPapeleta,
+        'Horas Justificadas': tiempoPapeleta
+          ? hoursDecimalToExcelFraction(parseFloat(tiempoPapeleta))
+          : '',
         'Detalle Justificación': incident ? incident.justification : '',
         'Documento Adjunto': incident?.supporting_document_url || '',
         'Revisado por': incident?.reviewed_by || '',
@@ -976,6 +1104,25 @@ export default function AttendanceManagement() {
       };
     });
     const ws = XLSX.utils.json_to_sheet(dataToExport);
+    // Aplicar formato hora (hh:mm) a las columnas de horas
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const timeCols = ['Entrada', 'Salida', 'Horas Marcadas',
+      'Horas Efectivas (marcadas+justificadas)', 'HE 25%', 'HE 35%', 'Horas Justificadas'];
+    const timeColIndexes = [];
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const headerCell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+      if (headerCell && timeCols.includes(headerCell.v)) {
+        timeColIndexes.push(c);
+      }
+    }
+    timeColIndexes.forEach(c => {
+      for (let r = 1; r <= range.e.r; r++) {
+        const cellRef = XLSX.utils.encode_cell({ r, c });
+        if (ws[cellRef] && typeof ws[cellRef].v === 'number') {
+          ws[cellRef].z = 'hh:mm';
+        }
+      }
+    });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Asistencia');
     const filterText = attendanceFilter === "all" ? "Todos" : attendanceFilter === "sin_entrada" ? "Sin_Entrada" : attendanceFilter === "sin_salida" ? "Sin_Salida" : "Con_Tardanza";
@@ -1795,11 +1942,14 @@ export default function AttendanceManagement() {
                 </Select>
                 <Input type="date" value={incidentDateFilter} onChange={(e) => { setIncidentDateFilter(e.target.value); setIncidentPage(1); }} className="w-40" title="Filtrar por fecha" />
                 {incidentDateFilter && <Button size="sm" variant="outline" onClick={() => { setIncidentDateFilter(""); setIncidentPage(1); }}>✕ Fecha</Button>}
+                <Button size="sm" variant="outline" className="bg-green-600 text-white hover:bg-green-700" onClick={handleExportIncidentsExcel}>
+                  <Download className="w-4 h-4 mr-1" />Excel
+                </Button>
                 <div className="ml-auto">
                   <PaginationBar inline currentPage={incidentPage} totalItems={applyIncidentFilters(allIncidents).length} pageSize={INCIDENT_PAGE_SIZE} onPageChange={setIncidentPage} />
                 </div>
               </div>
-              <Tabs defaultValue="pending">
+              <Tabs value={incidentSubTab} onValueChange={(v) => { setIncidentSubTab(v); setIncidentPage(1); }}>
                 <TabsList className="grid w-full max-w-xl grid-cols-3 mb-6">
                   <TabsTrigger value="pending">Pendientes {pendingIncidents.length > 0 && <Badge className="ml-2 bg-orange-600 text-white">{pendingIncidents.length}</Badge>}</TabsTrigger>
                   <TabsTrigger value="approved">Aprobadas {approvedIncidents.length > 0 && <Badge className="ml-2 bg-green-600 text-white">{approvedIncidents.length}</Badge>}</TabsTrigger>
@@ -1843,14 +1993,18 @@ export default function AttendanceManagement() {
                                     </a>
                                   </div>
                                 )}
-                                {canApproveIncidents && <div className="flex gap-3">
+                                {canApproveIncidents ? (
+                                <div className="flex gap-3">
                                   <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => { setReviewingIncident(incident); setShowIncidentModal(true); }}>
                                     <CheckCircle className="w-4 h-4 mr-2" />Aprobar
                                   </Button>
                                   <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setReviewingIncident(incident); setShowIncidentModal(true); }}>
                                     <XCircle className="w-4 h-4 mr-2" />Rechazar
                                   </Button>
-                                </div>}
+                                </div>
+                                ) : (
+                                  <p className="text-xs text-slate-500 text-center py-2">No tienes permisos para aprobar o rechazar justificaciones.</p>
+                                )}
                               </div>
                             );
                           })}
@@ -2129,10 +2283,10 @@ export default function AttendanceManagement() {
                     <p className="text-xs text-slate-500 mt-2">* Requerido para rechazar una justificación</p>
                   </div>
                   <div className="flex gap-3">
-                    <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => handleApproveIncident(reviewingIncident)} disabled={reviewIncidentMutation.isPending}>
+                    <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => handleApproveIncident(reviewingIncident)} disabled={isApproving || reviewIncidentMutation.isPending}>
                       <CheckCircle className="w-4 h-4 mr-2" />Aprobar
                     </Button>
-                    <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleRejectIncident(reviewingIncident)} disabled={reviewIncidentMutation.isPending}>
+                    <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleRejectIncident(reviewingIncident)} disabled={isApproving || reviewIncidentMutation.isPending}>
                       <XCircle className="w-4 h-4 mr-2" />Rechazar
                     </Button>
                   </div>
