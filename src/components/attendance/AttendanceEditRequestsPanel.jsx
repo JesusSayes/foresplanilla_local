@@ -8,8 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  CheckCircle, XCircle, Clock, Search, ArrowRight, X, AlertCircle, Ban
+  CheckCircle, XCircle, Clock, Search, ArrowRight, X, AlertCircle, Ban, Download
 } from "lucide-react";
+import * as XLSX from 'xlsx';
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -234,6 +235,44 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [editPage, setEditPage] = useState(1);
+  const [activeTab, setActiveTab] = useState("pending");
+
+  const handleExportExcel = () => {
+    const statusMap = { pending: "Pendiente", approved: "Aprobada", rejected: "Rechazada", cancelled: "Cancelada" };
+    const items = filtered(statusMap[activeTab]);
+    if (items.length === 0) {
+      toast.info("No hay solicitudes para exportar");
+      return;
+    }
+    const dataToExport = items.map(req => {
+      const emp = allEmployees.find(e => e.id === req.employee_id);
+      const changes = Object.entries(req.requested_values || {})
+        .map(([k, v]) => `${FIELD_LABELS[k] || k}: ${req.original_values?.[k] || "—"} → ${v || "—"}`)
+        .join("; ");
+      return {
+        "Fecha Asistencia": req.attendance_date || "",
+        "Tipo Doc": emp?.document_type || "",
+        "DNI": emp?.document_number || "",
+        "Nombres": emp?.first_name || "",
+        "Apellidos": emp?.last_name || "",
+        "Cargo": emp?.position || "",
+        "Departamento": emp?.department_name || "",
+        "Solicitado por": req.requested_by_name || "",
+        "Fecha Solicitud": req.requested_at ? format(new Date(req.requested_at), "dd/MM/yyyy HH:mm") : "",
+        "Motivo": req.edit_reason || "",
+        "Cambios Solicitados": changes,
+        "Estado": req.status || "",
+        "Revisado por": req.reviewed_by_name || "",
+        "Fecha Revisión": req.reviewed_at ? format(new Date(req.reviewed_at), "dd/MM/yyyy HH:mm") : "",
+        "Comentario Revisión": req.review_comment || "",
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ediciones");
+    XLSX.writeFile(wb, `Ediciones_${statusMap[activeTab]}_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`);
+    toast.success(`✓ ${items.length} solicitud(es) exportada(s)`);
+  };
   const queryClient = useQueryClient();
 
   const { data: requests = [], refetch } = useQuery({
@@ -273,10 +312,12 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
         </div>
         <Input type="date" value={dateFilter} onChange={(e) => { setDateFilter(e.target.value); setEditPage(1); }} className="w-40" title="Filtrar por fecha de asistencia" />
         {dateFilter && <Button size="sm" variant="outline" onClick={() => { setDateFilter(""); setEditPage(1); }}>✕ Fecha</Button>}
-
+        <Button size="sm" variant="outline" className="bg-green-600 text-white hover:bg-green-700" onClick={handleExportExcel}>
+          <Download className="w-4 h-4 mr-1" />Excel
+        </Button>
       </div>
 
-      <Tabs defaultValue="pending">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid grid-cols-4 max-w-xl mb-4">
           <TabsTrigger value="pending">
             Pendientes {pendingCount > 0 && <Badge className="ml-1.5 bg-yellow-500 text-white text-xs">{pendingCount}</Badge>}

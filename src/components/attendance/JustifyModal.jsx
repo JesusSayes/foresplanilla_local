@@ -171,27 +171,10 @@ export default function JustifyModal({
       const minDate = targetDates[0];
       const maxDate = targetDates[targetDates.length - 1];
 
-      const [allIncidentsInRange, allRecordsInRange] = await Promise.all([
-        base44.entities.AttendanceIncident.filter({ employee_id: justifyingEmployee.id }),
-        base44.entities.AttendanceRecord.filter({ employee_id: justifyingEmployee.id }),
-      ]);
+      const allIncidentsInRange = await base44.entities.AttendanceIncident.filter({ employee_id: justifyingEmployee.id });
 
       const incidentsByDate = {};
       allIncidentsInRange.forEach(i => { incidentsByDate[i.incident_date] = i; });
-
-      // Construir mapa de registros: primero desde la BD (fuente confiable),
-      // con fallback a todayRecords (prop en memoria) para las fechas no encontradas.
-      const recordsByDate = {};
-      allRecordsInRange.forEach(r => { recordsByDate[r.date] = r; });
-      (todayRecords || []).forEach(r => {
-        if (!recordsByDate[r.date] && r.employee_id === justifyingEmployee.id) {
-          recordsByDate[r.date] = r;
-        }
-      });
-
-      // Buscar la afectación del tipo de incidente seleccionado
-      const selectedIncidentType = incidentTypes.find(t => t.name === justificationData.incident_type);
-      const isPermiso = selectedIncidentType?.affectation === "Permiso";
 
       for (const dStr of targetDates) {
         // ── Guardar incidente ──────────────────────────────────────────────
@@ -206,10 +189,7 @@ export default function JustifyModal({
           full_day_justification: justificationData.full_day_justification,
           hours_to_adjust: hoursToAdjust,
           late_minutes_to_adjust: 0,
-          status: "Aprobada",
-          reviewed_by: `${employee.first_name} ${employee.last_name}`,
-          review_date: todayLima(),
-          review_comments: "Justificación registrada por el administrador",
+          status: "Pendiente",
         };
 
         const existingInc = incidentsByDate[dStr];
@@ -219,34 +199,12 @@ export default function JustifyModal({
           await base44.entities.AttendanceIncident.create(incidentPayload);
         }
 
-        // Si el tipo es "Permiso", actualizar clock_in/clock_out según horario programado
-        if (isPermiso) {
-          const record = recordsByDate[dStr];
-          if (record) {
-            await base44.entities.AttendanceRecord.update(record.id, {
-              clock_in: schedStart,
-              clock_out: schedEnd,
-            });
-          } else {
-            // No existe registro de asistencia — crearlo con el horario programado
-            await base44.entities.AttendanceRecord.create({
-              employee_id: justifyingEmployee.id,
-              date: dStr,
-              clock_in: schedStart,
-              clock_out: schedEnd,
-              scheduled_start: schedStart,
-              scheduled_end: schedEnd,
-              status: "Justificado",
-              is_absent: false,
-            });
-          }
-        }
       }
 
       toast.success(
         targetDates.length === 1
-          ? "Justificación guardada y métricas recalculadas"
-          : `${targetDates.length} justificaciones guardadas y métricas recalculadas`
+          ? "Justificación registrada como pendiente de aprobación"
+          : `${targetDates.length} justificaciones registradas como pendientes de aprobación`
       );
       onSuccess();
     } catch (error) {

@@ -155,6 +155,11 @@ export default function AttendanceManagement() {
     queryFn: async () => await base44.entities.AttendanceIncident.list("-created_date", 2000),
   });
 
+  const { data: incidentTypes = [] } = useQuery({
+    queryKey: ["incidentTypes"],
+    queryFn: async () => await base44.entities.IncidentType.list(),
+  });
+
   // Los incidentes se filtrarán después de calcular accessibleEmployeeIds (ver abajo)
   const pendingIncidents = allIncidents.filter(i => i.status === "Pendiente");
   const approvedIncidents = allIncidents.filter(i => i.status === "Aprobada");
@@ -489,18 +494,68 @@ export default function AttendanceManagement() {
   };
 
   const handleApproveIncident = async (incident) => {
-    // No modificar clock_in, clock_out, worked_hours ni regular_hours del AttendanceRecord.
-    // Las horas justificadas viven en attendance_incident.hours_to_adjust.
-    // Solo actualizamos el status del incidente vía reviewIncidentMutation.
-    reviewIncidentMutation.mutate({
-      id: incident.id,
-      data: {
+    setIsApproving(true);
+    try {
+      await base44.entities.AttendanceIncident.update(incident.id, {
         status: "Aprobada",
         reviewed_by: `${effectiveEmployee?.first_name} ${effectiveEmployee?.last_name}`,
         review_date: todayLima(),
         review_comments: reviewComments || "Aprobada",
+      });
+
+      // Si el tipo de incidente es "Permiso", actualizar clock_in/clock_out del registro
+      const incType = incidentTypes.find(t => t.name === incident.incident_type);
+      if (incType?.affectation === "Permiso") {
+        const dateStr = incident.incident_date;
+        const sched = getEmployeeScheduleForDate(incident.employee_id, dateStr);
+        const dow = new Date(dateStr + "T00:00:00").getDay();
+        const dayStarts = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+        const dayEnds = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+        const sStart = sched?.[dayStarts[dow]] || "09:00";
+        const sEnd = sched?.[dayEnds[dow]] || "18:00";
+
+        const existingRecords = await base44.entities.AttendanceRecord.filter({
+          employee_id: incident.employee_id,
+          date: dateStr,
+        });
+        const record = existingRecords?.[0];
+        if (record) {
+          await base44.entities.AttendanceRecord.update(record.id, {
+            clock_in: sStart,
+            clock_out: sEnd,
+          });
+        } else {
+          await base44.entities.AttendanceRecord.create({
+            employee_id: incident.employee_id,
+            date: dateStr,
+            clock_in: sStart,
+            clock_out: sEnd,
+            scheduled_start: sStart,
+            scheduled_end: sEnd,
+            status: "Justificado",
+            is_absent: false,
+          });
+        }
       }
-    });
+
+      // Recalcular tardanzas y HE
+      await base44.functions.invoke("recalcularAsistencia", {
+        employee_id: incident.employee_id,
+        date_from: incident.incident_date,
+        date_to: incident.incident_date,
+      });
+
+      queryClient.invalidateQueries(["allIncidents"]);
+      queryClient.invalidateQueries(["todayAttendance"]);
+      toast.success("Justificación aprobada correctamente");
+      setShowIncidentModal(false);
+      setReviewingIncident(null);
+      setReviewComments("");
+    } catch (error) {
+      toast.error("Error al aprobar la justificación: " + (error.message || ""));
+    } finally {
+      setIsApproving(false);
+    }
   };
 
   const handleRejectIncident = (incident) => {
@@ -526,6 +581,7 @@ export default function AttendanceManagement() {
   const [showIncidentDetail, setShowIncidentDetail] = useState(false);
   const [incidentDetailData, setIncidentDetailData] = useState(null);
   const [incidentDetailEmployee, setIncidentDetailEmployee] = useState(null);
+  const [isApproving, setIsApproving] = useState(false);
 
   const handleJustifyClick = async (emp, record, overrideDate) => {
     setJustifyingEmployee(emp);
@@ -1040,6 +1096,8 @@ export default function AttendanceManagement() {
     hasPermission("attendance.view_all") ||
     hasPermission("attendance.manage") ||
     hasPermission("attendance.view_department");
+
+  const canApproveIncidents = hasPermission("attendance.approve_incidents") || hasPermission("system.admin");
 
   if (!canAccessAttendance) {
     return (
@@ -1764,6 +1822,7 @@ export default function AttendanceManagement() {
                                     </a>
                                   </div>
                                 )}
+                                {canApproveIncidents ? (
                                 <div className="flex gap-3">
                                   <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => { setReviewingIncident(incident); setShowIncidentModal(true); }}>
                                     <CheckCircle className="w-4 h-4 mr-2" />Aprobar
@@ -1772,6 +1831,9 @@ export default function AttendanceManagement() {
                                     <XCircle className="w-4 h-4 mr-2" />Rechazar
                                   </Button>
                                 </div>
+                                ) : (
+                                  <p className="text-xs text-slate-500 text-center py-2">No tienes permisos para aprobar o rechazar justificaciones.</p>
+                                )}
                               </div>
                             );
                           })}
@@ -2050,10 +2112,10 @@ export default function AttendanceManagement() {
                     <p className="text-xs text-slate-500 mt-2">* Requerido para rechazar una justificación</p>
                   </div>
                   <div className="flex gap-3">
-                    <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => handleApproveIncident(reviewingIncident)} disabled={reviewIncidentMutation.isPending}>
+                    <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => handleApproveIncident(reviewingIncident)} disabled={isApproving || reviewIncidentMutation.isPending}>
                       <CheckCircle className="w-4 h-4 mr-2" />Aprobar
                     </Button>
-                    <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleRejectIncident(reviewingIncident)} disabled={reviewIncidentMutation.isPending}>
+                    <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleRejectIncident(reviewingIncident)} disabled={isApproving || reviewIncidentMutation.isPending}>
                       <XCircle className="w-4 h-4 mr-2" />Rechazar
                     </Button>
                   </div>
