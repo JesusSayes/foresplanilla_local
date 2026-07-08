@@ -102,7 +102,7 @@ export default function CompensationModal({
   const filteredAuthorizers = useMemo(() => {
     if (!authorizerSearch.trim()) {
       return allEmployees
-        .filter((e) => e.status === "Activo" && e.id !== employee?.id)
+        .filter((e) => e.status === "Activo")
         .slice(0, 50);
     }
     const term = authorizerSearch.toLowerCase().trim();
@@ -110,7 +110,6 @@ export default function CompensationModal({
       .filter(
         (e) =>
           e.status === "Activo" &&
-          e.id !== employee?.id &&
           (`${e.first_name} ${e.last_name}`.toLowerCase().includes(term) ||
             `${e.last_name} ${e.first_name}`.toLowerCase().includes(term) ||
             (e.document_number || "").toLowerCase().includes(term) ||

@@ -27,6 +27,8 @@ import {
   Plus,
   Pencil,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -49,6 +51,7 @@ export default function CompensationPanel({
   const [dateFrom, setDateFrom] = useState(firstDayOfMonth);
   const [dateTo, setDateTo] = useState(today);
   const [useCustomRange, setUseCustomRange] = useState(false);
+  const [monthOffset, setMonthOffset] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSite, setSelectedSite] = useState("all");
   const [filterType, setFilterType] = useState("all"); // all, late, overtime
@@ -59,13 +62,30 @@ export default function CompensationPanel({
   const [editMode, setEditMode] = useState(false);
   const [pendingCompsForEdit, setPendingCompsForEdit] = useState([]);
 
+  // Calcular mes seleccionado según el offset
+  const selectedMonthDate = useMemo(() => {
+    const d = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+    return d;
+  }, [today, monthOffset]);
+
+  const selectedMonthEnd = useMemo(() => {
+    // Último día del mes seleccionado
+    return new Date(
+      selectedMonthDate.getFullYear(),
+      selectedMonthDate.getMonth() + 1,
+      0
+    );
+  }, [selectedMonthDate]);
+
   // Cargar registros del período
   const periodStart = useCustomRange
     ? dateToStringLima(dateFrom)
-    : format(firstDayOfMonth, "yyyy-MM-dd");
+    : format(selectedMonthDate, "yyyy-MM-dd");
   const periodEnd = useCustomRange
     ? dateToStringLima(dateTo)
-    : format(today, "yyyy-MM-dd");
+    : monthOffset === 0
+      ? format(today, "yyyy-MM-dd")
+      : format(selectedMonthEnd, "yyyy-MM-dd");
 
   const { data: periodRecords = [], isLoading } = useQuery({
     queryKey: ["compensationRecords", periodStart, periodEnd],
@@ -398,13 +418,53 @@ export default function CompensationPanel({
 
           {/* Selector de período */}
           {!useCustomRange ? (
-            <Badge
-              variant="outline"
-              className="bg-indigo-50 text-indigo-700 border-indigo-200 px-3 py-1.5"
-            >
-              <CalendarIcon className="w-3.5 h-3.5 mr-1" />
-              Mes actual: {format(firstDayOfMonth, "MMM yyyy", { locale: es })}
-            </Badge>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => {
+                  setMonthOffset((m) => m - 1);
+                  setCurrentPage(1);
+                }}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Badge
+                variant="outline"
+                className="bg-indigo-50 text-indigo-700 border-indigo-200 px-3 py-1.5 capitalize min-w-[120px] justify-center"
+              >
+                <CalendarIcon className="w-3.5 h-3.5 mr-1" />
+                {format(selectedMonthDate, "MMMM yyyy", { locale: es })}
+                {monthOffset === 0 && (
+                  <span className="ml-1 text-[10px] font-normal">(actual)</span>
+                )}
+              </Badge>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => {
+                  setMonthOffset((m) => m + 1);
+                  setCurrentPage(1);
+                }}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+              {monthOffset !== 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    setMonthOffset(0);
+                    setCurrentPage(1);
+                  }}
+                >
+                  Hoy
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <Popover>
@@ -466,6 +526,7 @@ export default function CompensationPanel({
             size="sm"
             onClick={() => {
               setUseCustomRange(!useCustomRange);
+              setMonthOffset(0);
               setCurrentPage(1);
             }}
             className={
