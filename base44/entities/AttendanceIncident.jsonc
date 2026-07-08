@@ -34,7 +34,8 @@
         "Justificaci\u00f3n de Tardanza",
         "Tardanza",
         "Falta",
-        "Salida Temprana"
+        "Salida Temprana",
+        "Compensaci\u00f3n de Tardanza"
       ],
       "description": "Tipo de incidencia"
     },
