@@ -1003,6 +1003,30 @@ export default function AttendanceManagement() {
         );
       }
 
+      // Descontar compensaciones de tardanza (pendientes + aprobadas) de la tardanza efectiva
+      const compAdjEx = getCompensationAdjustments(emp.id, rowDate);
+      if (estadoMarcacion !== 'Vacaciones') {
+        const totalCompLateEx = compAdjEx.pendingLateMin + compAdjEx.approvedLateMin;
+        excelLate = Math.max(0, excelLate - totalCompLateEx);
+      }
+
+      // Descontar HE pendientes de compensar (primero 25%, luego 35%)
+      let excelHE25 = emp.record?.overtime_hours_25 ?? 0;
+      let excelHE35 = emp.record?.overtime_hours_35 ?? 0;
+      if (estadoMarcacion !== 'Vacaciones' && compAdjEx.pendingOTHours > 0) {
+        let remOTEx = compAdjEx.pendingOTHours;
+        if (remOTEx > 0 && excelHE25 > 0) {
+          const d = Math.min(excelHE25, remOTEx);
+          excelHE25 -= d;
+          remOTEx -= d;
+        }
+        if (remOTEx > 0 && excelHE35 > 0) {
+          const d = Math.min(excelHE35, remOTEx);
+          excelHE35 -= d;
+          remOTEx -= d;
+        }
+      }
+
       // Calcular horas justificadas (solo de incidentes aprobados)
       let tiempoPapeleta = '';
       if (approvedIncsEx.length > 0) {
@@ -1040,8 +1064,8 @@ export default function AttendanceManagement() {
         'Horas Marcadas': hoursDecimalToExcelFraction(emp.record?.regular_hours ?? emp.record?.worked_hours ?? 0),
         'Horas Efectivas (marcadas+justificadas)': hoursDecimalToExcelFraction(excelHours),
         'Tardanza Efectiva (min)': excelLate,
-        'HE 25%': hoursDecimalToExcelFraction(emp.record?.overtime_hours_25 ?? 0),
-        'HE 35%': hoursDecimalToExcelFraction(emp.record?.overtime_hours_35 ?? 0),
+        'HE 25%': hoursDecimalToExcelFraction(excelHE25),
+        'HE 35%': hoursDecimalToExcelFraction(excelHE35),
         'Estado Marcación': estadoMarcacion,
         'Tiene Justificación': approvedIncsEx.length > 0 ? 'Sí' : 'No',
         'Tipo Incidente': incident ? incident.incident_type : '',
@@ -1136,6 +1160,32 @@ export default function AttendanceManagement() {
 
   const applyLateTolerance = (remainingLateMinutes, toleranceMinutes = 10) =>
     remainingLateMinutes > toleranceMinutes ? remainingLateMinutes : 0;
+
+  /**
+   * Obtiene los ajustes de compensación de tardanza para un empleado y fecha.
+   * Devuelve los minutos de tardanza y horas extras pendientes y aprobadas
+   * para descontarlos de la visualización en el control de asistencia.
+   */
+  const getCompensationAdjustments = (empId, rowDate) => {
+    const comps = allIncidents.filter(
+      i => i.employee_id === empId &&
+      i.incident_date === rowDate &&
+      i.incident_type === "Compensación de Tardanza" &&
+      (i.status === "Pendiente" || i.status === "Aprobada")
+    );
+    let pendingLateMin = 0, approvedLateMin = 0, pendingOTHours = 0;
+    let hasPending = false;
+    for (const c of comps) {
+      if (c.status === "Pendiente") {
+        pendingLateMin += c.late_minutes_to_adjust || 0;
+        pendingOTHours += c.hours_to_adjust || 0;
+        hasPending = true;
+      } else if (c.status === "Aprobada") {
+        approvedLateMin += c.late_minutes_to_adjust || 0;
+      }
+    }
+    return { pendingLateMin, approvedLateMin, pendingOTHours, hasPending };
+  };
 
   // Obtener horario programado de entrada/salida para mostrar en vacaciones
   const getScheduledTimes = (empId) => {
@@ -1505,6 +1555,7 @@ export default function AttendanceManagement() {
                           const schedSt = sched ? sched[starts[dow2]] : null;
                           const schedEn = sched ? sched[ends[dow2]] : null;
                           const hasPendingEdit = emp.record && pendingEditRequests.some(r => r.attendance_record_id === emp.record?.id);
+                          const compAdj = getCompensationAdjustments(emp.id, rowDate);
 
                           return (
                             <tr key={rowKey} className={`border-b last:border-b-0 hover:bg-slate-50 transition-colors ${vacation ? "bg-amber-50/40" : "bg-white"}`}>
@@ -1624,7 +1675,7 @@ export default function AttendanceManagement() {
                                   return <span className="text-xs font-bold text-green-700">{jh}h {jm}m</span>;
                                 })()}
                               </td>
-                              {/* Tardanza neta — calculada con union de intervalos */}
+                              {/* Tardanza neta — calculada con union de intervalos, descontando compensaciones */}
                               <td className="px-2 py-2 text-center">
                                 {(() => {
                                   if (vacation) return <span className="text-xs font-bold text-slate-400">0m</span>;
@@ -1633,30 +1684,80 @@ export default function AttendanceManagement() {
                                     metrics.remainingLateMinutes,
                                     metrics.toleranceMinutes
                                   );
-                                  const lh = Math.floor(adjustedLate / 60);
-                                  const lm = adjustedLate % 60;
+                                  // Descontar compensaciones pendientes y aprobadas
+                                  const totalCompLate = compAdj.pendingLateMin + compAdj.approvedLateMin;
+                                  const netLate = Math.max(0, adjustedLate - totalCompLate);
+                                  const lh = Math.floor(netLate / 60);
+                                  const lm = netLate % 60;
                                   const lateStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
-                                  return <span className={`text-xs font-bold ${adjustedLate > 0 ? 'text-orange-600' : 'text-slate-400'}`}>{lateStr}</span>;
+                                  return (
+                                    <span className="flex flex-col items-center">
+                                      <span className={`text-xs font-bold ${netLate > 0 ? 'text-orange-600' : 'text-slate-400'}`}>{lateStr}</span>
+                                      {totalCompLate > 0 && (
+                                        <span className="text-[9px] text-indigo-500 whitespace-nowrap" title={`Compensado: ${totalCompLate} min`}>
+                                          ↓{totalCompLate}m
+                                        </span>
+                                      )}
+                                    </span>
+                                  );
                                 })()}
                               </td>
-                              {/* HE 25% */}
+                              {/* HE 25% — descontando compensaciones pendientes */}
                               <td className="px-2 py-2 text-center">
                                 {(() => {
-                                  const heMin = vacation ? 0 : Math.round((emp.record?.overtime_hours_25 ?? 0) * 60);
+                                  if (vacation) return <span className="text-xs font-bold text-slate-400">0m</span>;
+                                  // Descontar HE pendientes de compensar (primero de 25%, luego 35%)
+                                  let remOT = compAdj.pendingOTHours;
+                                  let net25 = emp.record?.overtime_hours_25 ?? 0;
+                                  let net35 = emp.record?.overtime_hours_35 ?? 0;
+                                  if (remOT > 0 && net25 > 0) {
+                                    const d = Math.min(net25, remOT);
+                                    net25 -= d;
+                                    remOT -= d;
+                                  }
+                                  if (remOT > 0 && net35 > 0) {
+                                    const d = Math.min(net35, remOT);
+                                    net35 -= d;
+                                    remOT -= d;
+                                  }
+                                  const heMin = Math.round(net25 * 60);
                                   const hh = Math.floor(heMin / 60);
                                   const hm = heMin % 60;
                                   const heStr = hh > 0 ? `${hh}h ${hm}m` : `${hm}m`;
-                                  return <span className={`text-xs font-bold ${!vacation && heMin > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{heStr}</span>;
+                                  return (
+                                    <span className="flex flex-col items-center">
+                                      <span className={`text-xs font-bold ${heMin > 0 ? 'text-blue-600' : 'text-slate-300'}`}>{heStr}</span>
+                                      {compAdj.pendingOTHours > 0 && net25 < (emp.record?.overtime_hours_25 ?? 0) && (
+                                        <span className="text-[9px] text-indigo-500 whitespace-nowrap" title={`Compensado: ${(compAdj.pendingOTHours * 60).toFixed(0)} min HE`}>
+                                          ↓{(compAdj.pendingOTHours * 60).toFixed(0)}m
+                                        </span>
+                                      )}
+                                    </span>
+                                  );
                                 })()}
                               </td>
-                              {/* HE 35% */}
+                              {/* HE 35% — descontando compensaciones pendientes */}
                               <td className="px-2 py-2 text-center">
                                 {(() => {
-                                  const heMin = vacation ? 0 : Math.round((emp.record?.overtime_hours_35 ?? 0) * 60);
+                                  if (vacation) return <span className="text-xs font-bold text-slate-400">0m</span>;
+                                  let remOT = compAdj.pendingOTHours;
+                                  let net25 = emp.record?.overtime_hours_25 ?? 0;
+                                  let net35 = emp.record?.overtime_hours_35 ?? 0;
+                                  if (remOT > 0 && net25 > 0) {
+                                    const d = Math.min(net25, remOT);
+                                    net25 -= d;
+                                    remOT -= d;
+                                  }
+                                  if (remOT > 0 && net35 > 0) {
+                                    const d = Math.min(net35, remOT);
+                                    net35 -= d;
+                                    remOT -= d;
+                                  }
+                                  const heMin = Math.round(net35 * 60);
                                   const hh = Math.floor(heMin / 60);
                                   const hm = heMin % 60;
                                   const heStr = hh > 0 ? `${hh}h ${hm}m` : `${hm}m`;
-                                  return <span className={`text-xs font-bold ${!vacation && heMin > 0 ? 'text-purple-600' : 'text-slate-300'}`}>{heStr}</span>;
+                                  return <span className={`text-xs font-bold ${heMin > 0 ? 'text-purple-600' : 'text-slate-300'}`}>{heStr}</span>;
                                 })()}
                               </td>
                               {/* Estado y Acciones */}
@@ -1670,6 +1771,11 @@ export default function AttendanceManagement() {
                                   >
                                     <StatusIcon className="w-3 h-3 mr-1" />{statusConfig.text}
                                   </Badge>
+                                  {compAdj.hasPending && (
+                                    <Badge className="h-7 px-2 text-xs shrink-0 whitespace-nowrap bg-indigo-100 text-indigo-700 border border-indigo-300 flex items-center gap-1" title="Tiene compensación de tardanza pendiente de aprobación">
+                                      <Clock className="w-3 h-3" />Comp. pend.
+                                    </Badge>
+                                  )}
                                   {!vacation && emp.record && (
                                     hasPendingEdit ? (
                                       <Badge className="h-7 px-2 text-xs shrink-0 whitespace-nowrap bg-indigo-100 text-indigo-700 border border-indigo-300 flex items-center gap-1">
