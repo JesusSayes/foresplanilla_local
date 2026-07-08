@@ -237,12 +237,11 @@ export default function Layout({ children, currentPageName }) {
     }
 
     // Asistencia
-    if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.manage", "schedules.view", "schedules.manage", "attendance.compensation"])) {
+    if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.manage", "schedules.view", "schedules.manage"])) {
       const submenu = [];
       if (hasAnyPermission(["attendance.view_all", "attendance.view_department", "attendance.manage"])) submenu.push({ name: "Ver Asistencia", path: "AttendanceManagement" });
       if (hasAnyPermission(["reports.attendance", "attendance.export", "reports.view", "attendance.view_all"])) submenu.push({ name: "Reportes Asistencia", path: "AttendanceReports" });
       if (hasAnyPermission(["schedules.view", "schedules.manage"])) submenu.push({ name: "Gestión Horarios", path: "ScheduleManagement" });
-      if (hasPermission("attendance.compensation")) submenu.push({ name: "Compensación de Tardanzas", path: "TardanzaCompensacion" });
       if (isAdmin || hasPermission("attendance.devices")) {
         submenu.push({ name: "Base de Datos Externa", path: "DatabaseConfig" });
         submenu.push({ name: "Control de Acceso Físico", path: "AccessDeviceConfig" });
