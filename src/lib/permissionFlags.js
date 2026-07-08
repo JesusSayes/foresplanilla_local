@@ -27,6 +27,7 @@ export function computePermissionFlags(permissions) {
     can_manage_attendance: hasAny(["attendance.edit", "attendance.manage"]),
     can_approve_attendance_edits: has("attendance.approve_edits"),
     can_approve_attendance_incidents: has("attendance.approve_incidents"),
+    can_manage_compensation: has("attendance.compensation"),
 
     // Vacations
     can_view_all_vacations: hasAny([

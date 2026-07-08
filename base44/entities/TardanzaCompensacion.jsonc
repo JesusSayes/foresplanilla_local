@@ -1,0 +1,143 @@
+{
+  "name": "TardanzaCompensacion",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "month": {
+      "type": "integer",
+      "description": "Mes (1-12)"
+    },
+    "year": {
+      "type": "integer",
+      "description": "A\u00f1o"
+    },
+    "minutos_tardanza": {
+      "type": "integer",
+      "default": 0,
+      "description": "Minutos de tardanza acumulados en el mes"
+    },
+    "minutos_adicionales_trabajados": {
+      "type": "integer",
+      "default": 0,
+      "description": "Minutos adicionales trabajados fuera del horario"
+    },
+    "minutos_sugeridos": {
+      "type": "integer",
+      "default": 0,
+      "description": "Minutos sugeridos para compensar (menor entre tardanza y adicionales)"
+    },
+    "minutos_autorizados": {
+      "type": "integer",
+      "default": 0,
+      "description": "Minutos autorizados por RRHH"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "Borrador",
+        "Aprobado",
+        "Rechazado",
+        "Cerrado"
+      ],
+      "default": "Borrador",
+      "description": "Estado de la compensaci\u00f3n"
+    },
+    "observacion": {
+      "type": "string",
+      "description": "Observaci\u00f3n de RRHH"
+    },
+    "solicitado_a": {
+      "type": "string",
+      "description": "Personal que debe autorizar la compensaci\u00f3n"
+    },
+    "fecha_solicitud": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de la solicitud"
+    },
+    "aprobado_por": {
+      "type": "string",
+      "description": "Usuario que aprob\u00f3 la compensaci\u00f3n"
+    },
+    "fecha_aprobacion": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de aprobaci\u00f3n"
+    },
+    "cerrado_por": {
+      "type": "string",
+      "description": "Usuario que cerr\u00f3 el registro"
+    },
+    "fecha_cierre": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de cierre"
+    }
+  },
+  "required": [
+    "employee_id",
+    "month",
+    "year"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_compensation": true
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_compensation": true
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_compensation": true
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_compensation": true
+          }
+        }
+      ]
+    }
+  }
+}

@@ -36,6 +36,9 @@ export const PAGE_PERMISSIONS = {
   // ── Employee data ──
   OrgChart: { requiredPermission: "employees.view" },
 
+  // ── Attendance compensation ──
+  TardanzaCompensacion: { requiredPermission: "attendance.compensation" },
+
   // ── Self-service (mínimo permiso) ──
   Payslips: { requiredPermission: "payroll.view_own" },
   Certificates: { requiredAnyPermissions: ["certificates.view_own", "certificates.view_all"] },
