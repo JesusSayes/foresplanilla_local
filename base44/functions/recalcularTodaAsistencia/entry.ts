@@ -46,6 +46,12 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
   const [endH, endM]   = scheduledEnd.split(":").map(Number);
   const schedEndTotal  = endH * 60 + endM;
 
+  // Calcular duración de la jornada programada (manejando cruce de medianoche)
+  let fullJornada = schedEndTotal - schedTotal;
+  if (fullJornada < 0) fullJornada += 1440;
+  // Regla: si la jornada programada es menor a 6 horas (360 min), no se descuenta el break
+  const effectiveBreakMinutes = fullJornada < 360 ? 0 : breakMinutes;
+
   // Tardanza: si supera tolerancia por 1+ min, se cuenta DESDE la hora programada (no desde el fin de tolerancia)
   const rawLate    = inTotal - schedTotal;
   const lateMinutes = rawLate > toleranceMinutes ? rawLate : 0;
@@ -56,10 +62,10 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
   if (clockOut) {
     const [outH, outM] = clockOut.split(":").map(Number);
     const outTotal     = outH * 60 + outM;
-    const totalMinutes = outTotal - inTotal - breakMinutes;
+    const totalMinutes = outTotal - inTotal - effectiveBreakMinutes;
     workedHours = Math.max(0, totalMinutes / 60);
 
-    const regularMinutes = Math.max(0, schedEndTotal - Math.max(inTotal, schedTotal) - breakMinutes);
+    const regularMinutes = Math.max(0, schedEndTotal - Math.max(inTotal, schedTotal) - effectiveBreakMinutes);
     const normalHoursMax = regularMinutes / 60;
 
     if (workedHours <= normalHoursMax) {

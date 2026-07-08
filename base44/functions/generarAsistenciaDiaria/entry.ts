@@ -79,7 +79,11 @@ function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
 function calcWorkedHours(startTime, endTime, breakMinutes) {
   const [sh, sm] = startTime.split(":").map(Number);
   const [eh, em] = endTime.split(":").map(Number);
-  return Math.max(0, ((eh * 60 + em) - (sh * 60 + sm) - (breakMinutes || 60)) / 60);
+  let totalMin = (eh * 60 + em) - (sh * 60 + sm);
+  if (totalMin < 0) totalMin += 1440;
+  // Regla: si la jornada programada es menor a 6 horas (360 min), no se descuenta el break
+  const effectiveBreak = totalMin < 360 ? 0 : (breakMinutes || 60);
+  return Math.max(0, (totalMin - effectiveBreak) / 60);
 }
 
 function dateRange(startStr, endStr) {
