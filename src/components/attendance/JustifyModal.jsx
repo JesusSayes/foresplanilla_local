@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { FileText, AlertCircle, CalendarIcon, CheckCircle, Clock } from "lucide-react";
 import { format, eachDayOfInterval } from "date-fns";
 import { es } from "date-fns/locale";
-import { todayLima, parseDateLima } from "@/lib/dateUtils";
+import { parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { uploadFile } from "@/services/uploadService";
 import { calcEffectiveMetrics, toMin } from "@/lib/attendanceMetrics";
@@ -32,8 +32,6 @@ export default function JustifyModal({
   selectedDate,
   employeeSchedule,
   attendanceRecord,
-  todayRecords,
-  employee,
   existingIncident,
   workSchedules = [],
   onClose,
@@ -44,8 +42,10 @@ export default function JustifyModal({
   const breakMinutes = employeeSchedule?.break_duration_minutes ?? 60;
 
   const getFullDayHours = () => {
-    const totalMin = toMin(schedEnd) - toMin(schedStart) - breakMinutes;
-    return Math.max(0, totalMin / 60);
+    let totalMin = toMin(schedEnd) - toMin(schedStart);
+    if (totalMin < 0) totalMin += 1440;
+    const effectiveBreak = totalMin < 360 ? 0 : breakMinutes;
+    return Math.max(0, (totalMin - effectiveBreak) / 60);
   };
 
   // Justificaciones aprobadas existentes para este día (sin contar la que se está editando)
@@ -175,7 +175,6 @@ export default function JustifyModal({
     if (!file) return;
     setUploadingFile(true);
     try {
-      // const { file_url } = await base44.integrations.Core.UploadFile({ file });
       const { file_url } = await uploadFile(file);
       setJustificationData({ ...justificationData, supporting_document_url: file_url });
       toast.success("Archivo subido correctamente");
@@ -222,12 +221,6 @@ export default function JustifyModal({
 
       const incidentsByDate = {};
       allIncidentsInRange.forEach(i => { incidentsByDate[toDateStr(i.incident_date)] = i; });
-      const recordsByDate = {};
-      todayRecords.forEach(r => { recordsByDate[toDateStr(r.date)] = r; });
-
-      // Buscar la afectación del tipo de incidente seleccionado
-      const selectedIncidentType = incidentTypes.find(t => t.name === justificationData.incident_type);
-      const isPermiso = selectedIncidentType?.affectation === "Permiso";
 
       for (const dStr of targetDates) {
         // ── Guardar incidente ──────────────────────────────────────────────
@@ -242,10 +235,7 @@ export default function JustifyModal({
           full_day_justification: justificationData.full_day_justification,
           hours_to_adjust: hoursToAdjust,
           late_minutes_to_adjust: 0,
-          status: "Aprobada",
-          reviewed_by: `${employee.first_name} ${employee.last_name}`,
-          review_date: todayLima(),
-          review_comments: "Justificación registrada por el administrador",
+          status: "Pendiente",
         };
 
         const existingInc = incidentsByDate[dStr];
@@ -254,35 +244,12 @@ export default function JustifyModal({
         } else {
           await entitiesAPI.AttendanceIncident.create(incidentPayload);
         }
-
-        // Si el tipo es "Permiso", actualizar clock_in/clock_out según horario programado
-        if (isPermiso) {
-          const record = recordsByDate[dStr];
-          if (record) {
-            await entitiesAPI.AttendanceRecord.update(record.id, {
-              clock_in: schedStart,
-              clock_out: schedEnd,
-            });
-          } else {
-            // No existe registro de asistencia — crearlo con el horario programado
-            await entitiesAPI.AttendanceRecord.create({
-              employee_id: justifyingEmployee.id,
-              date: dStr,
-              clock_in: schedStart,
-              clock_out: schedEnd,
-              scheduled_start: schedStart,
-              scheduled_end: schedEnd,
-              status: "Justificado",
-              is_absent: false,
-            });
-          }
-        }
       }
 
       toast.success(
         targetDates.length === 1
-          ? "Justificación guardada"
-          : `${targetDates.length} justificaciones guardadas`
+          ? "Justificación registrada como pendiente de aprobación"
+          : `${targetDates.length} justificaciones registradas como pendientes de aprobación`
       );
       onSuccess();
     } catch (error) {

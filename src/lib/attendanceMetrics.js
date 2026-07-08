@@ -49,6 +49,9 @@ export function calcEffectiveMetrics({
     ? (schedEndMin - schedStartMin + 1440)
     : Math.max(0, schedEndMin - schedStartMin);
 
+  // Regla: si la jornada programada es menor a 6 horas (360 min), no se descuenta el break
+  if (fullJornada < 360) breakMinutes = 0;
+
   // Normalize: for night shifts, maps times to shift-relative [0..1440) space
   const norm = (t) => {
     if (!isNightShift) return t;

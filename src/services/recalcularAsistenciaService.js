@@ -111,6 +111,10 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
     scheduledEnd.split(":").map(Number);
 
   const schedEndTotal = endH * 60 + endM;
+  let fullJornada = schedEndTotal - schedTotal;
+  if (fullJornada < 0) fullJornada += 1440;
+  // Regla: si la jornada programada es menor a 6 horas (360 min), no se descuenta el break
+  const effectiveBreakMinutes = fullJornada < 360 ? 0 : breakMinutes;
 
   // Tardanza
   const rawLate = inTotal - schedTotal;
@@ -133,16 +137,16 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
     const outTotal = outH * 60 + outM;
 
     const totalMinutes =
-      outTotal - inTotal - breakMinutes;
+      outTotal - inTotal - effectiveBreakMinutes;
 
     workedHours = Math.max(0, totalMinutes / 60);
 
     // Horas normales máximas
     const regularMinutes = Math.max(
       0,
-      schedEndTotal -
+        schedEndTotal -
         Math.max(inTotal, schedTotal) -
-        breakMinutes
+        effectiveBreakMinutes
     );
 
     const normalHoursMax = regularMinutes / 60;

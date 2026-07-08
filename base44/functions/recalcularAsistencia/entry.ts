@@ -69,6 +69,9 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
     ? (schedEndTotal - schedTotal + 1440)
     : Math.max(0, schedEndTotal - schedTotal);
 
+  // Regla: si la jornada programada es menor a 6 horas (360 min), no se descuenta el break
+  const effectiveBreakMinutes = fullJornada < 360 ? 0 : breakMinutes;
+
   const norm = (t) => isNightShift ? (t - schedTotal + 1440) % 1440 : t;
 
   const normSchedStart = isNightShift ? 0 : schedTotal;
@@ -91,11 +94,11 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
     const normOut = norm(outTotal);
     const effectiveNormIn = (isNightShift && normIn > fullJornada) ? 0 : normIn;
 
-    const totalMinutes = (normOut >= effectiveNormIn ? normOut - effectiveNormIn : 0) - breakMinutes;
+    const totalMinutes = (normOut >= effectiveNormIn ? normOut - effectiveNormIn : 0) - effectiveBreakMinutes;
     workedHours = Math.max(0, totalMinutes / 60);
 
     const effectiveStart = Math.max(effectiveNormIn, normSchedStart);
-    const regularMinutes = Math.max(0, normSchedEnd - effectiveStart - breakMinutes);
+    const regularMinutes = Math.max(0, normSchedEnd - effectiveStart - effectiveBreakMinutes);
     const normalHoursMax = regularMinutes / 60;
 
     if (workedHours <= normalHoursMax) {
