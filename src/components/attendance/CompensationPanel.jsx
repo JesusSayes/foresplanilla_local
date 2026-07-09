@@ -667,7 +667,7 @@ export default function CompensationPanel({
           <div className="text-center py-12">
             <CheckCircle2 className="w-16 h-16 text-green-300 mx-auto mb-4" />
             <p className="text-slate-600">
-              No hay registros de asistencia en el período seleccionado
+              No hay personal activo con registros en el período seleccionado
             </p>
           </div>
         ) : (
