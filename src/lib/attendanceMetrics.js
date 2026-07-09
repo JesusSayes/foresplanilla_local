@@ -210,3 +210,46 @@ export const computeScheduledHours = (record) => {
   const breakHours = hours > 6 ? 1 : 0;
   return Math.max(0, hours - breakHours);
 };
+
+export const getScheduleForDate = (schedule, date) => {
+  if (!schedule) return null;
+  const dayOfWeek = date.getDay();
+  const dayMap = {
+    0: ["sunday_start", "sunday_end"],
+    1: ["monday_start", "monday_end"],
+    2: ["tuesday_start", "tuesday_end"],
+    3: ["wednesday_start", "wednesday_end"],
+    4: ["thursday_start", "thursday_end"],
+    5: ["friday_start", "friday_end"],
+    6: ["saturday_start", "saturday_end"],
+  };
+  const [startField, endField] = dayMap[dayOfWeek];
+  const start = schedule[startField];
+  const end = schedule[endField];
+  if (!start || !end) return null;
+  return { start, end };
+};
+
+export const computeScheduledHoursFromSchedule = (schedule, date) => {
+  const sched = getScheduleForDate(schedule, date);
+  if (!sched) return 0;
+  const startMin = toMin(sched.start);
+  const endMin = toMin(sched.end);
+  let diff = endMin - startMin;
+  if (diff < 0) diff += 1440;
+  const hours = diff / 60;
+  const breakMin = schedule?.break_duration_minutes ?? 60;
+  const breakHours = hours > 6 ? breakMin / 60 : 0;
+  return Math.max(0, hours - breakHours);
+};
+
+export const computeScheduledHoursForPeriod = (schedule, startDateStr, endDateStr) => {
+  if (!schedule) return 0;
+  const start = new Date(startDateStr + "T00:00:00");
+  const end = new Date(endDateStr + "T00:00:00");
+  let total = 0;
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    total += computeScheduledHoursFromSchedule(schedule, d);
+  }
+  return total;
+};

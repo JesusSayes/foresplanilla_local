@@ -35,7 +35,7 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima, dateToStringLima } from "@/lib/dateUtils";
-import { computeScheduledHours } from "@/lib/attendanceMetrics";
+import { computeScheduledHours, computeScheduledHoursForPeriod } from "@/lib/attendanceMetrics";
 import { toast } from "sonner";
 import CompensationModal from "./CompensationModal";
 
@@ -129,34 +129,63 @@ export default function CompensationPanel({
     },
   });
 
-  // Agrupar por empleado y calcular totales: programadas, trabajadas (dentro), exceso (fuera)
+  const { data: workSchedules = [] } = useQuery({
+    queryKey: ["workSchedulesForComp"],
+    queryFn: async () => {
+      return await base44.entities.WorkSchedule.list("schedule_name");
+    },
+  });
+
+  const scheduleByEmployee = useMemo(() => {
+    const map = new Map();
+    for (const ws of workSchedules) {
+      if (ws.employee_id && ws.is_active !== false) {
+        map.set(ws.employee_id, ws);
+      }
+    }
+    for (const emp of allEmployees) {
+      if (map.has(emp.id)) continue;
+      for (const ws of workSchedules) {
+        if (ws.is_active === false) continue;
+        if (!ws.employee_id) {
+          const matchesDept =
+            ws.department_name === emp.department_name ||
+            (ws.departments && ws.departments.includes(emp.department_name));
+          if (matchesDept) {
+            map.set(emp.id, ws);
+            break;
+          }
+        }
+      }
+    }
+    return map;
+  }, [workSchedules, allEmployees]);
+
+  // Mostrar TODOS los empleados accesibles con sus métricas
   const employeeStats = useMemo(() => {
     const map = new Map();
 
+    for (const emp of allEmployees) {
+      if (!accessibleEmployeeIds.has(emp.id)) continue;
+      const schedule = scheduleByEmployee.get(emp.id);
+      map.set(emp.id, {
+        employee: emp,
+        employee_id: emp.id,
+        schedule,
+        totalScheduledHours: 0,
+        totalRegularHours: 0,
+        totalOvertimeHours: 0,
+        totalLateMinutes: 0,
+        lateDays: 0,
+        overtimeDays: 0,
+        totalDays: 0,
+        records: [],
+      });
+    }
+
     for (const rec of periodRecords) {
       if (!accessibleEmployeeIds.has(rec.employee_id)) continue;
-
-      const overtimeMin = Math.round(
-        ((rec.overtime_hours_25 ?? 0) + (rec.overtime_hours_35 ?? 0)) * 60
-      );
-      const hasLate = (rec.late_minutes ?? 0) > 0;
-      const hasOvertime = overtimeMin > 0;
-
-      if (!map.has(rec.employee_id)) {
-        const emp = allEmployees.find((e) => e.id === rec.employee_id);
-        map.set(rec.employee_id, {
-          employee: emp,
-          employee_id: rec.employee_id,
-          totalScheduledHours: 0,
-          totalRegularHours: 0,
-          totalOvertimeHours: 0,
-          totalLateMinutes: 0,
-          lateDays: 0,
-          overtimeDays: 0,
-          totalDays: 0,
-          records: [],
-        });
-      }
+      if (!map.has(rec.employee_id)) continue;
 
       const stat = map.get(rec.employee_id);
       stat.records.push(rec);
@@ -166,17 +195,30 @@ export default function CompensationPanel({
       stat.totalOvertimeHours +=
         (rec.overtime_hours_25 ?? 0) + (rec.overtime_hours_35 ?? 0);
 
-      if (hasLate) {
+      const overtimeMin = Math.round(
+        ((rec.overtime_hours_25 ?? 0) + (rec.overtime_hours_35 ?? 0)) * 60
+      );
+      if ((rec.late_minutes ?? 0) > 0) {
         stat.totalLateMinutes += rec.late_minutes;
         stat.lateDays++;
       }
-      if (hasOvertime) {
+      if (overtimeMin > 0) {
         stat.overtimeDays++;
       }
     }
 
+    for (const stat of map.values()) {
+      if (stat.totalDays === 0 && stat.schedule) {
+        stat.totalScheduledHours = computeScheduledHoursForPeriod(
+          stat.schedule,
+          periodStart,
+          periodEnd
+        );
+      }
+    }
+
     return Array.from(map.values());
-  }, [periodRecords, allEmployees, accessibleEmployeeIds]);
+  }, [periodRecords, allEmployees, accessibleEmployeeIds, scheduleByEmployee, periodStart, periodEnd]);
 
   const filteredStats = useMemo(() => {
     return employeeStats.filter((stat) => {
@@ -638,6 +680,9 @@ export default function CompensationPanel({
                   <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">
                     Sede
                   </th>
+                  <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">
+                    Horario
+                  </th>
                   <th className="text-center text-xs font-semibold text-slate-600 uppercase tracking-wide px-2 py-2">
                     Hrs. Prog.
                   </th>
@@ -716,6 +761,11 @@ export default function CompensationPanel({
                             {stat.employee.site || "—"}
                           </span>
                         </td>
+                        <td className="px-2 py-2">
+                          <span className="text-xs text-slate-600 truncate block max-w-[120px]">
+                            {stat.schedule?.schedule_name || "—"}
+                          </span>
+                        </td>
                         <td className="px-2 py-2 text-center">
                           <span className="text-sm font-semibold text-slate-700">
                             {fmtHours(stat.totalScheduledHours)}
@@ -790,7 +840,7 @@ export default function CompensationPanel({
                           )}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          {canManage && hasIncidents && (
+                          {canManage && (
                             <div className="flex gap-1 justify-center">
                               {hasEditableComp && (
                                 <Button
@@ -827,6 +877,9 @@ export default function CompensationPanel({
       {showModal && selectedEmployee && (
         <CompensationModal
           employee={selectedEmployee}
+          employeeSchedule={scheduleByEmployee.get(selectedEmployee.id)}
+          periodStart={periodStart}
+          periodEnd={periodEnd}
           periodRecords={periodRecords}
           existingCompensations={existingCompensations}
           allEmployees={allEmployees}
