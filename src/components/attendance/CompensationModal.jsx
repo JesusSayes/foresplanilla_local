@@ -100,6 +100,7 @@ export default function CompensationModal({
           scheduleTimes: schedForDay,
           record,
           hasRecord: !!record,
+          workedHours: record?.worked_hours ?? 0,
           lateMinutes: record?.late_minutes || 0,
           overtimeMinutes: Math.round(
             ((record?.overtime_hours_25 ?? 0) + (record?.overtime_hours_35 ?? 0)) * 60
@@ -118,6 +119,7 @@ export default function CompensationModal({
             scheduleTimes: null,
             record: null,
             hasRecord: false,
+            workedHours: 0,
             lateMinutes: comp.late_minutes_to_adjust || 0,
             overtimeMinutes: Math.round((comp.hours_to_adjust || 0) * 60),
           });
@@ -484,6 +486,9 @@ export default function CompensationModal({
                       <th className="text-left px-2 py-2 text-xs font-semibold text-slate-600">
                         Horario
                       </th>
+                      <th className="text-center px-2 py-2 text-xs font-semibold text-green-600">
+                        Hrs. Trab.
+                      </th>
                       <th className="text-center px-2 py-2 text-xs font-semibold text-orange-600">
                         Tardanza
                       </th>
@@ -547,6 +552,15 @@ export default function CompensationModal({
                                   ? `${day.record.scheduled_start || "—"} - ${day.record.scheduled_end || "—"}`
                                   : "—"}
                             </span>
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            {day.hasRecord ? (
+                              <span className="text-xs font-semibold text-green-700">
+                                {(day.workedHours ?? 0).toFixed(1)}h
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs">—</span>
+                            )}
                           </td>
                           <td className="px-2 py-2 text-center">
                             {day.lateMinutes > 0 ? (

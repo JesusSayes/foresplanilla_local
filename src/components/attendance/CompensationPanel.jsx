@@ -167,6 +167,7 @@ export default function CompensationPanel({
 
     for (const emp of allEmployees) {
       if (!accessibleEmployeeIds.has(emp.id)) continue;
+      if (emp.status && emp.status !== "Activo") continue;
       const schedule = scheduleByEmployee.get(emp.id);
       map.set(emp.id, {
         employee: emp,
@@ -762,9 +763,32 @@ export default function CompensationPanel({
                           </span>
                         </td>
                         <td className="px-2 py-2">
-                          <span className="text-xs text-slate-600 truncate block max-w-[120px]">
-                            {stat.schedule?.schedule_name || "—"}
-                          </span>
+                          {stat.schedule ? (
+                            <div className="text-xs">
+                              <span className="text-slate-700 font-medium truncate block max-w-[120px]">
+                                {stat.schedule.schedule_name}
+                              </span>
+                              <span className="text-slate-400 text-[10px]">
+                                {(() => {
+                                  const days = [
+                                    { d: "monday", s: stat.schedule.monday_start, e: stat.schedule.monday_end },
+                                    { d: "tuesday", s: stat.schedule.tuesday_start, e: stat.schedule.tuesday_end },
+                                    { d: "wednesday", s: stat.schedule.wednesday_start, e: stat.schedule.wednesday_end },
+                                    { d: "thursday", s: stat.schedule.thursday_start, e: stat.schedule.thursday_end },
+                                    { d: "friday", s: stat.schedule.friday_start, e: stat.schedule.friday_end },
+                                    { d: "saturday", s: stat.schedule.saturday_start, e: stat.schedule.saturday_end },
+                                    { d: "sunday", s: stat.schedule.sunday_start, e: stat.schedule.sunday_end },
+                                  ].filter(x => x.s && x.e);
+                                  if (days.length === 0) return "—";
+                                  const allSame = days.every(x => x.s === days[0].s && x.e === days[0].e);
+                                  if (allSame) return `${days[0].s} - ${days[0].e}`;
+                                  return `${days[0].s} - ${days[0].e} (+${days.length - 1} días)`;
+                                })()}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
                         </td>
                         <td className="px-2 py-2 text-center">
                           <span className="text-sm font-semibold text-slate-700">
