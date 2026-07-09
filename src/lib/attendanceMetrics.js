@@ -194,3 +194,19 @@ export function calcEffectiveMetrics({
     intervals:             merged,
   };
 }
+
+/**
+ * Calcula las horas programadas (netas, después de break) para un registro.
+ * Si el turno es mayor a 6h, descuenta 1h de break por defecto.
+ * Soporta turnos nocturnos (cruce de medianoche).
+ */
+export const computeScheduledHours = (record) => {
+  if (!record?.scheduled_start || !record?.scheduled_end) return 0;
+  const start = toMin(record.scheduled_start);
+  const end = toMin(record.scheduled_end);
+  let diff = end - start;
+  if (diff < 0) diff += 1440;
+  const hours = diff / 60;
+  const breakHours = hours > 6 ? 1 : 0;
+  return Math.max(0, hours - breakHours);
+};

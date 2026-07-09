@@ -12,10 +12,12 @@ import {
   Clock,
   TrendingUp,
   X,
+  CalendarDays,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima } from "@/lib/dateUtils";
+import { computeScheduledHours } from "@/lib/attendanceMetrics";
 import { toast } from "sonner";
 
 export default function PendingCompensationsApproval({ allEmployees }) {
@@ -78,6 +80,42 @@ export default function PendingCompensationsApproval({ allEmployees }) {
     },
     enabled: recordIds.length > 0,
   });
+
+  // Cargar todos los registros del período para mostrar métricas de horas
+  const employeeIdsForMetrics = useMemo(
+    () => [...new Set(pendingComps.map((c) => c.employee_id))],
+    [pendingComps]
+  );
+
+  const { data: allPeriodRecords = [] } = useQuery({
+    queryKey: ["allRecordsForCompMetrics", employeeIdsForMetrics.join(",")],
+    queryFn: async () => {
+      if (employeeIdsForMetrics.length === 0) return [];
+      const all = await base44.entities.AttendanceRecord.list("-date", 2000);
+      return all.filter((r) => employeeIdsForMetrics.includes(r.employee_id));
+    },
+    enabled: employeeIdsForMetrics.length > 0,
+  });
+
+  // Métricas por empleado: programadas, trabajadas (dentro), exceso (fuera)
+  const employeeMetrics = useMemo(() => {
+    const map = new Map();
+    for (const rec of allPeriodRecords) {
+      if (!map.has(rec.employee_id)) {
+        map.set(rec.employee_id, {
+          scheduledHours: 0,
+          regularHours: 0,
+          overtimeHours: 0,
+        });
+      }
+      const m = map.get(rec.employee_id);
+      m.scheduledHours += computeScheduledHours(rec);
+      m.regularHours += rec.regular_hours ?? 0;
+      m.overtimeHours +=
+        (rec.overtime_hours_25 ?? 0) + (rec.overtime_hours_35 ?? 0);
+    }
+    return map;
+  }, [allPeriodRecords]);
 
   // Agrupar compensaciones por empleado
   const groupedByEmployee = useMemo(() => {
@@ -317,6 +355,41 @@ export default function PendingCompensationsApproval({ allEmployees }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
+                  {(() => {
+                    const metrics = employeeMetrics.get(group.employee_id);
+                    if (!metrics) return null;
+                    return (
+                      <>
+                        <div className="text-center">
+                          <div className="flex items-center gap-1 text-slate-600">
+                            <CalendarDays className="w-3.5 h-3.5" />
+                            <span className="text-sm font-bold">
+                              {metrics.scheduledHours.toFixed(0)}h
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400">prog.</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="flex items-center gap-1 text-green-600">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span className="text-sm font-bold">
+                              {metrics.regularHours.toFixed(0)}h
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400">trab.</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="flex items-center gap-1 text-blue-600">
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            <span className="text-sm font-bold">
+                              {metrics.overtimeHours.toFixed(1)}h
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400">exceso</p>
+                        </div>
+                      </>
+                    );
+                  })()}
                   <div className="text-center">
                     <div className="flex items-center gap-1 text-orange-600">
                       <Clock className="w-3.5 h-3.5" />
@@ -325,15 +398,6 @@ export default function PendingCompensationsApproval({ allEmployees }) {
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-400">tardanza</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center gap-1 text-blue-600">
-                      <TrendingUp className="w-3.5 h-3.5" />
-                      <span className="text-sm font-bold">
-                        {group.totalOvertimeMinutes} min
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-400">HE</p>
                   </div>
                   <Button
                     size="sm"
