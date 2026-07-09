@@ -840,7 +840,7 @@ export default function CompensationPanel({
                           )}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          {canManage && (
+                          {canManage ? (
                             <div className="flex gap-1 justify-center">
                               {hasEditableComp && (
                                 <Button
@@ -855,14 +855,15 @@ export default function CompensationPanel({
                               )}
                               <Button
                                 size="sm"
-                                variant="outline"
-                                className="h-7 px-2 text-xs shrink-0 whitespace-nowrap text-indigo-700 border-indigo-300 hover:bg-indigo-50"
+                                className="h-7 px-2 text-xs shrink-0 whitespace-nowrap bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600"
                                 onClick={() => handleOpenModal(stat)}
                               >
                                 <Plus className="w-3 h-3 mr-1" />
-                                {hasEditableComp ? "Agregar" : "Solicitar"}
+                                Solicitar
                               </Button>
                             </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-300">Sin permiso</span>
                           )}
                         </td>
                       </tr>
