@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  CheckCircle, XCircle, Clock, Search, ArrowRight, AlertCircle, Ban, Download
+  CheckCircle, XCircle, Clock, Search, ArrowRight, X, AlertCircle, Ban, Download
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { toast } from "sonner";

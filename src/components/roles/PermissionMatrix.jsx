@@ -22,6 +22,7 @@ const PERMISSION_GROUPS = {
     { key: "attendance.edit", label: "Editar registros de asistencia" },
     { key: "attendance.approve_edits", label: "Aprobar/rechazar edición de registros de asistencia" },
     { key: "attendance.approve_incidents", label: "Aprobar/rechazar incidencias" },
+    { key: "attendance.approve_compensations", label: "Aprobar compensaciones de tardanzas y horas extras" },
     { key: "attendance.manage", label: "Gestión completa de asistencia" },
     { key: "attendance.export", label: "Exportar reportes de asistencia" },
   ],

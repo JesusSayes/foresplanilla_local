@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import Layout from "./Layout";
 import Login from "./pages/Login";
+import CompensacionTardanzas from './pages/CompensacionTardanzas';
 import PageGuard from '@/components/PageGuard';
 import { PAGE_PERMISSIONS } from './pagePermissions';
 
@@ -325,6 +326,11 @@ const AuthenticatedApp = () => {
       <Route path="/TipoAnexoManagement" element={
         <ProtectedRoute>
           <Layout currentPageName="TipoAnexoManagement"><TipoAnexoManagement /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/CompensacionTardanzas" element={
+        <ProtectedRoute>
+          <Layout currentPageName="CompensacionTardanzas"><CompensacionTardanzas /></Layout>
         </ProtectedRoute>
       } />
     </Routes>

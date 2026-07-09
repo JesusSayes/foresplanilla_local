@@ -63,18 +63,26 @@ const recalcularAsistencia = async (req, res) => {
       },
       select: {
         incident_date: true,
+        incident_type: true,
         justified_time_start: true,
         justified_time_end: true,
         full_day_justification: true,
+        late_minutes_to_adjust: true,
+        hours_to_adjust: true,
       },
     });
 
     const approvedIncidentsByDate = {};
+    const approvedCompensationsByDate = {};
     incidents.forEach((incident) => {
       if (!incident.incident_date) return;
       const dateKey = incident.incident_date.toISOString().slice(0, 10);
       if (!approvedIncidentsByDate[dateKey]) approvedIncidentsByDate[dateKey] = [];
       approvedIncidentsByDate[dateKey].push(incident);
+      if (incident.incident_type === "Compensación de Tardanza") {
+        if (!approvedCompensationsByDate[dateKey]) approvedCompensationsByDate[dateKey] = [];
+        approvedCompensationsByDate[dateKey].push(incident);
+      }
     });
 
     let updated = 0;
@@ -88,6 +96,7 @@ const recalcularAsistencia = async (req, res) => {
       const approvedIncidents = approvedIncidentsByDate[dateStr] || [];
       const metrics = calcularMetricas(record, schedule, dateStr, overtimeAuth, approvedIncidents);
       const protectedFields = getProtectedFields(record);
+      const approvedCompensations = approvedCompensationsByDate[dateStr] || [];
 
       let status = record.status;
       if (approvedIncidents.length > 0 || record.status === "Justificado") {
@@ -99,6 +108,32 @@ const recalcularAsistencia = async (req, res) => {
       } else if (!record.clock_in) {
         status = record.status === "Justificado" ? "Justificado" : "Ausente";
       }
+      let finalLate = metrics.late_minutes;
+      let finalIsLate = metrics.is_late;
+      let finalOT25 = metrics.overtime_hours_25;
+      let finalOT35 = metrics.overtime_hours_35;
+
+      if (approvedCompensations.length > 0 && status !== "Vacaciones") {
+        const compensatedLateMinutes = approvedCompensations.reduce(
+          (total, incident) => total + (incident.late_minutes_to_adjust || 0),
+          0
+        );
+        let compensatedOvertimeHours = approvedCompensations.reduce(
+          (total, incident) => total + Number(incident.hours_to_adjust || 0),
+          0
+        );
+
+        finalLate = Math.max(0, metrics.late_minutes - compensatedLateMinutes);
+        finalIsLate = finalLate > 0;
+
+        const deductOT25 = Math.min(finalOT25, compensatedOvertimeHours);
+        finalOT25 -= deductOT25;
+        compensatedOvertimeHours -= deductOT25;
+
+        const deductOT35 = Math.min(finalOT35, compensatedOvertimeHours);
+        finalOT35 -= deductOT35;
+        status = "Justificado";
+      }
       if (protectedFields.has("status")) {
         status = record.status;
       }
@@ -108,10 +143,10 @@ const recalcularAsistencia = async (req, res) => {
         data: {
           worked_hours: protectValue(protectedFields, "worked_hours", record.worked_hours, metrics.worked_hours),
           regular_hours: protectValue(protectedFields, "regular_hours", record.regular_hours, metrics.regular_hours),
-          overtime_hours_25: protectValue(protectedFields, "overtime_hours_25", record.overtime_hours_25, metrics.overtime_hours_25),
-          overtime_hours_35: protectValue(protectedFields, "overtime_hours_35", record.overtime_hours_35, metrics.overtime_hours_35),
-          is_late: protectValue(protectedFields, "is_late", record.is_late, metrics.is_late),
-          late_minutes: protectValue(protectedFields, "late_minutes", record.late_minutes, metrics.late_minutes),
+          overtime_hours_25: protectValue(protectedFields, "overtime_hours_25", record.overtime_hours_25, finalOT25),
+          overtime_hours_35: protectValue(protectedFields, "overtime_hours_35", record.overtime_hours_35, finalOT35),
+          is_late: protectValue(protectedFields, "is_late", record.is_late, finalIsLate),
+          late_minutes: protectValue(protectedFields, "late_minutes", record.late_minutes, finalLate),
           is_absent: protectValue(protectedFields, "is_absent", record.is_absent, metrics.is_absent),
           scheduled_start: metrics.scheduled_start || record.scheduled_start,
           scheduled_end: metrics.scheduled_end || record.scheduled_end,

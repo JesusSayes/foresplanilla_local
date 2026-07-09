@@ -34,7 +34,8 @@
         "Justificaci\u00f3n de Tardanza",
         "Tardanza",
         "Falta",
-        "Salida Temprana"
+        "Salida Temprana",
+        "Compensaci\u00f3n de Tardanza"
       ],
       "description": "Tipo de incidencia"
     },
@@ -68,6 +69,14 @@
       "type": "integer",
       "default": 0,
       "description": "Minutos de tardanza a ajustar"
+    },
+    "authorizer_id": {
+      "type": "string",
+      "description": "ID del empleado designado como autorizador de la compensaci\u00f3n"
+    },
+    "authorizer_name": {
+      "type": "string",
+      "description": "Nombre del empleado que debe autorizar la compensaci\u00f3n"
     },
     "status": {
       "type": "string",

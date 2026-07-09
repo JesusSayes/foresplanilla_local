@@ -54,6 +54,7 @@ import AttendanceReports from './pages/AttendanceReports';
 import Certificates from './pages/Certificates';
 import CompanySettings from './pages/CompanySettings';
 import ContractManagement from './pages/ContractManagement';
+import CompensacionTardanzas from './pages/CompensacionTardanzas';
 import ContractRenewalAutomation from './pages/ContractRenewalAutomation';
 import ContractTemplateConfig from './pages/ContractTemplateConfig';
 import CostCenterManagement from './pages/CostCenterManagement';
@@ -106,6 +107,7 @@ export const PAGES = {
     "Certificates": Certificates,
     "CompanySettings": CompanySettings,
     "ContractManagement": ContractManagement,
+    "CompensacionTardanzas": CompensacionTardanzas,
     "ContractRenewalAutomation": ContractRenewalAutomation,
     "ContractTemplateConfig": ContractTemplateConfig,
     "CostCenterManagement": CostCenterManagement,
