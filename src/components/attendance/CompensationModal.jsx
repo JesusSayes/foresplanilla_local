@@ -16,14 +16,22 @@ import {
   CalendarDays,
   ArrowRightLeft,
   Zap,
+  CalendarX,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima } from "@/lib/dateUtils";
-import { computeScheduledHours } from "@/lib/attendanceMetrics";
+import {
+  computeScheduledHours,
+  computeScheduledHoursForPeriod,
+  getScheduleForDate,
+} from "@/lib/attendanceMetrics";
 
 export default function CompensationModal({
   employee,
+  employeeSchedule,
+  periodStart,
+  periodEnd,
   periodRecords,
   existingCompensations = [],
   allEmployees = [],
@@ -36,12 +44,10 @@ export default function CompensationModal({
     if (editMode && pendingCompensations?.length) {
       const initial = {};
       for (const comp of pendingCompensations) {
-        if (
-          comp.attendance_record_id &&
-          (comp.status === "Pendiente" || comp.status === "Rechazada")
-        ) {
-          initial[comp.attendance_record_id] = {
+        if (comp.status === "Pendiente" || comp.status === "Rechazada") {
+          initial[comp.incident_date] = {
             date: comp.incident_date,
+            recordId: comp.attendance_record_id || null,
             lateMinutes: comp.late_minutes_to_adjust || 0,
             overtimeMinutes: Math.round((comp.hours_to_adjust || 0) * 60),
           };
@@ -67,50 +73,68 @@ export default function CompensationModal({
   const [showAuthorizerList, setShowAuthorizerList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Filtrar registros del empleado con tardanza u horas extras
-  const daysWithIncidents = useMemo(() => {
-    if (!employee) return [];
-    const base = periodRecords
-      .filter((r) => r.employee_id === employee.id)
-      .filter(
-        (r) =>
-          r.late_minutes > 0 ||
-          (r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0) > 0
-      );
-
-    if (editMode && pendingCompensations?.length) {
-      const existingIds = new Set(base.map((r) => r.id));
-      for (const comp of pendingCompensations) {
-        if (
-          comp.attendance_record_id &&
-          !existingIds.has(comp.attendance_record_id)
-        ) {
-          const rec = periodRecords.find(
-            (r) => r.id === comp.attendance_record_id
-          );
-          if (rec) {
-            base.push(rec);
-            existingIds.add(rec.id);
-          }
-        }
-      }
-    }
-
-    return base.sort((a, b) => a.date.localeCompare(b.date));
-  }, [employee, periodRecords, editMode, pendingCompensations]);
-
-  // Todos los registros del empleado en el período (para métricas)
   const allEmployeeRecords = useMemo(() => {
     if (!employee) return [];
     return periodRecords.filter((r) => r.employee_id === employee.id);
   }, [employee, periodRecords]);
 
-  // Métricas de resumen
+  // Generar TODOS los días del período (con y sin registro de asistencia)
+  const allScheduledDays = useMemo(() => {
+    if (!employee || !periodStart || !periodEnd) return [];
+
+    const days = [];
+    const start = new Date(periodStart + "T00:00:00");
+    const end = new Date(periodEnd + "T00:00:00");
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = format(d, "yyyy-MM-dd");
+      const record = allEmployeeRecords.find((r) => r.date === dateStr);
+      const schedForDay = employeeSchedule
+        ? getScheduleForDate(employeeSchedule, d)
+        : null;
+
+      // Incluir si tiene horario programado para ese día O tiene un registro
+      if (schedForDay || record) {
+        days.push({
+          date: dateStr,
+          scheduleTimes: schedForDay,
+          record,
+          hasRecord: !!record,
+          workedHours: record?.worked_hours ?? 0,
+          lateMinutes: record?.late_minutes || 0,
+          overtimeMinutes: Math.round(
+            ((record?.overtime_hours_25 ?? 0) + (record?.overtime_hours_35 ?? 0)) * 60
+          ),
+        });
+      }
+    }
+
+    // En modo edición, incluir días de compensaciones pendientes que no estén en la lista
+    if (editMode && pendingCompensations?.length) {
+      const existingDates = new Set(days.map((d) => d.date));
+      for (const comp of pendingCompensations) {
+        if (comp.incident_date && !existingDates.has(comp.incident_date)) {
+          days.push({
+            date: comp.incident_date,
+            scheduleTimes: null,
+            record: null,
+            hasRecord: false,
+            workedHours: 0,
+            lateMinutes: comp.late_minutes_to_adjust || 0,
+            overtimeMinutes: Math.round((comp.hours_to_adjust || 0) * 60),
+          });
+          existingDates.add(comp.incident_date);
+        }
+      }
+    }
+
+    return days.sort((a, b) => a.date.localeCompare(b.date));
+  }, [employee, employeeSchedule, periodStart, periodEnd, allEmployeeRecords, editMode, pendingCompensations]);
+
   const summary = useMemo(() => {
-    const scheduledHours = allEmployeeRecords.reduce(
-      (s, r) => s + computeScheduledHours(r),
-      0
-    );
+    const scheduledHours = employeeSchedule
+      ? computeScheduledHoursForPeriod(employeeSchedule, periodStart, periodEnd)
+      : allEmployeeRecords.reduce((s, r) => s + computeScheduledHours(r), 0);
     const regularHours = allEmployeeRecords.reduce(
       (s, r) => s + (r.regular_hours ?? 0),
       0
@@ -124,7 +148,7 @@ export default function CompensationModal({
       0
     );
     return { scheduledHours, regularHours, overtimeHours, lateMinutes };
-  }, [allEmployeeRecords]);
+  }, [allEmployeeRecords, employeeSchedule, periodStart, periodEnd]);
 
   const compensatedDates = useMemo(() => {
     return new Set(
@@ -150,62 +174,61 @@ export default function CompensationModal({
             (e.position || "").toLowerCase().includes(term))
       )
       .slice(0, 50);
-  }, [allEmployees, authorizerSearch, employee]);
+  }, [allEmployees, authorizerSearch]);
 
-  const toggleDay = (recordId, date) => {
+  const toggleDay = (day) => {
     setSelectedDays((prev) => {
       const next = { ...prev };
-      if (next[recordId]) {
-        delete next[recordId];
+      if (next[day.date]) {
+        delete next[day.date];
       } else {
-        next[recordId] = { date, lateMinutes: 0, overtimeMinutes: 0 };
+        next[day.date] = {
+          date: day.date,
+          recordId: day.record?.id || null,
+          lateMinutes: 0,
+          overtimeMinutes: 0,
+        };
       }
       return next;
     });
   };
 
-  const updateCompensationMinutes = (recordId, field, value) => {
+  const updateCompensationMinutes = (date, field, value) => {
     setSelectedDays((prev) => ({
       ...prev,
-      [recordId]: {
-        ...prev[recordId],
+      [date]: {
+        ...prev[date],
         [field]: Math.max(0, parseInt(value) || 0),
       },
     }));
   };
 
-  // Auto-completar: compensación bidireccional automática (min de tardanza y HE)
-  const autoFillDay = (recordId) => {
-    const rec = daysWithIncidents.find((r) => r.id === recordId);
-    if (!rec) return;
-    const lateMin = rec.late_minutes || 0;
-    const overtimeMin = Math.round(
-      ((rec.overtime_hours_25 ?? 0) + (rec.overtime_hours_35 ?? 0)) * 60
-    );
+  const autoFillDay = (date) => {
+    const day = allScheduledDays.find((d) => d.date === date);
+    if (!day) return;
+    const lateMin = day.lateMinutes;
+    const overtimeMin = day.overtimeMinutes;
     const minVal = Math.min(lateMin, overtimeMin);
     setSelectedDays((prev) => ({
       ...prev,
-      [recordId]: {
-        ...prev[recordId],
+      [date]: {
+        ...prev[date],
         lateMinutes: minVal > 0 ? minVal : lateMin,
         overtimeMinutes: minVal > 0 ? minVal : overtimeMin,
       },
     }));
   };
 
-  // Auto-completar todos los días seleccionados
   const autoFillAll = () => {
     setSelectedDays((prev) => {
       const next = { ...prev };
-      for (const [recordId, data] of Object.entries(next)) {
-        const rec = daysWithIncidents.find((r) => r.id === recordId);
-        if (!rec) continue;
-        const lateMin = rec.late_minutes || 0;
-        const overtimeMin = Math.round(
-          ((rec.overtime_hours_25 ?? 0) + (rec.overtime_hours_35 ?? 0)) * 60
-        );
+      for (const [date, data] of Object.entries(next)) {
+        const day = allScheduledDays.find((d) => d.date === date);
+        if (!day) continue;
+        const lateMin = day.lateMinutes;
+        const overtimeMin = day.overtimeMinutes;
         const minVal = Math.min(lateMin, overtimeMin);
-        next[recordId] = {
+        next[date] = {
           ...data,
           lateMinutes: minVal > 0 ? minVal : lateMin,
           overtimeMinutes: minVal > 0 ? minVal : overtimeMin,
@@ -215,9 +238,9 @@ export default function CompensationModal({
     });
   };
 
-  const selectedList = Object.entries(selectedDays).map(([recordId, data]) => {
-    const rec = daysWithIncidents.find((r) => r.id === recordId);
-    return { recordId, record: rec, ...data };
+  const selectedList = Object.entries(selectedDays).map(([date, data]) => {
+    const day = allScheduledDays.find((d) => d.date === date);
+    return { recordId: data.recordId || null, record: day?.record, ...data };
   });
 
   const totalLateToCompensate = selectedList.reduce(
@@ -256,13 +279,17 @@ export default function CompensationModal({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-xl font-bold">
-                {editMode
-                  ? "Editar Compensación"
-                  : "Solicitar Compensación"}
+                {editMode ? "Editar Compensación" : "Solicitar Compensación"}
               </CardTitle>
               <p className="text-sm text-slate-600 mt-1">
                 {employee.first_name} {employee.last_name} —{" "}
                 {employee.document_type} {employee.document_number}
+                {employeeSchedule && (
+                  <span className="text-slate-400">
+                    {" · "}
+                    {employeeSchedule.schedule_name}
+                  </span>
+                )}
               </p>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose}>
@@ -326,12 +353,14 @@ export default function CompensationModal({
               <div className="text-xs text-indigo-800">
                 <p className="font-semibold mb-1">Compensación bidireccional</p>
                 <p>
-                  Para cada día seleccionado puede compensar en ambas
-                  direcciones: usar horas en exceso para{" "}
+                  Seleccione cualquier fecha del período (incluyendo días sin
+                  registro) para compensar. Use horas en exceso para{" "}
                   <span className="font-medium">reducir tardanzas</span> (↓
-                  naranja) o usar tardanzas para{" "}
-                  <span className="font-medium">reducir horas extras</span> (↓
-                  azul).
+                  naranja) o asigne minutos a compensar en{" "}
+                  <span className="font-medium">
+                    fechas donde no trabajó
+                  </span>{" "}
+                  (↓ azul).
                 </p>
               </div>
             </div>
@@ -418,11 +447,11 @@ export default function CompensationModal({
             )}
           </div>
 
-          {/* Tabla de días con incidencias */}
+          {/* Tabla de todos los días del período */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-semibold text-slate-900">
-                Seleccione los días a compensar:
+                Seleccione las fechas a compensar:
               </p>
               {Object.keys(selectedDays).length > 0 && (
                 <Button
@@ -436,15 +465,15 @@ export default function CompensationModal({
                 </Button>
               )}
             </div>
-            {daysWithIncidents.length === 0 ? (
+            {allScheduledDays.length === 0 ? (
               <div className="text-center py-8 bg-slate-50 rounded-lg">
-                <CheckCircle2 className="w-12 h-12 text-green-300 mx-auto mb-2" />
+                <CalendarX className="w-12 h-12 text-slate-300 mx-auto mb-2" />
                 <p className="text-slate-500 text-sm">
-                  No hay tardanzas ni horas extras en el período seleccionado
+                  No hay días programados ni registros en el período seleccionado
                 </p>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-lg overflow-hidden max-h-[320px] overflow-y-auto">
+              <div className="border border-slate-200 rounded-lg overflow-hidden max-h-[360px] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-100 sticky top-0">
                     <tr>
@@ -453,6 +482,12 @@ export default function CompensationModal({
                       </th>
                       <th className="text-left px-3 py-2 text-xs font-semibold text-slate-600">
                         Fecha
+                      </th>
+                      <th className="text-left px-2 py-2 text-xs font-semibold text-slate-600">
+                        Horario
+                      </th>
+                      <th className="text-center px-2 py-2 text-xs font-semibold text-green-600">
+                        Hrs. Trab.
                       </th>
                       <th className="text-center px-2 py-2 text-xs font-semibold text-orange-600">
                         Tardanza
@@ -466,19 +501,12 @@ export default function CompensationModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {daysWithIncidents.map((rec) => {
-                      const isSelected = !!selectedDays[rec.id];
-                      const isAlreadyCompensated = compensatedDates.has(
-                        rec.date
-                      );
-                      const overtimeMin = Math.round(
-                        ((rec.overtime_hours_25 ?? 0) +
-                          (rec.overtime_hours_35 ?? 0)) *
-                          60
-                      );
+                    {allScheduledDays.map((day) => {
+                      const isSelected = !!selectedDays[day.date];
+                      const isAlreadyCompensated = compensatedDates.has(day.date);
                       return (
                         <tr
-                          key={rec.id}
+                          key={day.date}
                           className={`border-t border-slate-100 ${
                             isSelected ? "bg-indigo-50" : "hover:bg-slate-50"
                           } ${isAlreadyCompensated ? "opacity-50" : ""}`}
@@ -488,36 +516,65 @@ export default function CompensationModal({
                               checked={isSelected}
                               disabled={isAlreadyCompensated}
                               onCheckedChange={() =>
-                                !isAlreadyCompensated &&
-                                toggleDay(rec.id, rec.date)
+                                !isAlreadyCompensated && toggleDay(day)
                               }
                             />
                           </td>
                           <td className="px-3 py-2">
                             <span className="font-medium text-slate-900">
-                              {format(parseDateLima(rec.date), "dd MMM yyyy", {
+                              {format(parseDateLima(day.date), "dd MMM yyyy", {
                                 locale: es,
                               })}
                             </span>
-                            {isAlreadyCompensated && (
-                              <Badge className="ml-2 bg-purple-100 text-purple-700 text-xs">
-                                Ya compensado
-                              </Badge>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              {day.hasRecord ? (
+                                <Badge className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0">
+                                  Trabajado
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-slate-100 text-slate-500 text-[10px] px-1.5 py-0">
+                                  <CalendarX className="w-2.5 h-2.5 mr-0.5" />
+                                  Sin registro
+                                </Badge>
+                              )}
+                              {isAlreadyCompensated && (
+                                <Badge className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0">
+                                  Ya compensado
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-2">
+                            <span className="text-xs text-slate-500">
+                              {day.scheduleTimes
+                                ? `${day.scheduleTimes.start} - ${day.scheduleTimes.end}`
+                                : day.record
+                                  ? `${day.record.scheduled_start || "—"} - ${day.record.scheduled_end || "—"}`
+                                  : "—"}
+                            </span>
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            {day.hasRecord ? (
+                              <span className="text-xs font-semibold text-green-700">
+                                {(day.workedHours ?? 0).toFixed(1)}h
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs">—</span>
                             )}
                           </td>
                           <td className="px-2 py-2 text-center">
-                            {rec.late_minutes > 0 ? (
+                            {day.lateMinutes > 0 ? (
                               <span className="font-bold text-orange-600">
-                                {rec.late_minutes}
+                                {day.lateMinutes}
                               </span>
                             ) : (
                               <span className="text-slate-300">—</span>
                             )}
                           </td>
                           <td className="px-2 py-2 text-center">
-                            {overtimeMin > 0 ? (
+                            {day.overtimeMinutes > 0 ? (
                               <span className="font-bold text-blue-600">
-                                {overtimeMin}
+                                {day.overtimeMinutes}
                               </span>
                             ) : (
                               <span className="text-slate-300">—</span>
@@ -531,12 +588,10 @@ export default function CompensationModal({
                                     type="number"
                                     placeholder="tard"
                                     className="h-7 w-14 text-xs text-center border-orange-300 focus:border-orange-500"
-                                    value={
-                                      selectedDays[rec.id]?.lateMinutes || ""
-                                    }
+                                    value={selectedDays[day.date]?.lateMinutes || ""}
                                     onChange={(e) =>
                                       updateCompensationMinutes(
-                                        rec.id,
+                                        day.date,
                                         "lateMinutes",
                                         e.target.value
                                       )
@@ -546,12 +601,10 @@ export default function CompensationModal({
                                     type="number"
                                     placeholder="HE"
                                     className="h-7 w-14 text-xs text-center border-blue-300 focus:border-blue-500"
-                                    value={
-                                      selectedDays[rec.id]?.overtimeMinutes || ""
-                                    }
+                                    value={selectedDays[day.date]?.overtimeMinutes || ""}
                                     onChange={(e) =>
                                       updateCompensationMinutes(
-                                        rec.id,
+                                        day.date,
                                         "overtimeMinutes",
                                         e.target.value
                                       )
@@ -561,7 +614,7 @@ export default function CompensationModal({
                                     size="sm"
                                     variant="ghost"
                                     className="h-7 px-1.5 text-xs text-indigo-600 hover:bg-indigo-100"
-                                    onClick={() => autoFillDay(rec.id)}
+                                    onClick={() => autoFillDay(day.date)}
                                     title="Auto-completar con el mínimo entre tardanza y HE"
                                   >
                                     <Zap className="w-3 h-3" />
@@ -631,7 +684,7 @@ export default function CompensationModal({
               </div>
               <div className="flex items-center justify-between text-xs">
                 <div className="text-slate-600">
-                  <span className="font-medium">Días seleccionados:</span>{" "}
+                  <span className="font-medium">Fechas seleccionadas:</span>{" "}
                   {selectedList.length}
                 </div>
                 {totalLateToCompensate === totalOvertimeToCompensate &&
