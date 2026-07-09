@@ -22,9 +22,10 @@ export const AVAILABLE_PERMISSIONS = {
   "attendance.edit": "Editar registros de asistencia",
   "attendance.approve_edits": "Aprobar/rechazar edición de registros de asistencia",
   "attendance.approve_incidents": "Aprobar/rechazar incidencias",
+  "attendance.approve_compensations": "Aprobar compensaciones de tardanzas y horas extras",
   "attendance.view_reports": "Ver reportes de asistencia",
+  "attendance.manage": "Gestión completa de asistencia",
   "attendance.export": "Exportar datos de asistencia",
-
   // Vacaciones
   "vacations.view_own": "Ver propias vacaciones",
   "vacations.view_all": "Ver vacaciones de todos",

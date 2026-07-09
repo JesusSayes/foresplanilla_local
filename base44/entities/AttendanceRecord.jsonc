@@ -109,7 +109,8 @@
         "Incompleto",
         "Ausente",
         "Justificado",
-        "Vacaciones"
+        "Vacaciones",
+        "Compensaci\u00f3n"
       ],
       "default": "Completo",
       "description": "Estado del registro"

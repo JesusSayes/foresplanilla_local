@@ -195,6 +195,18 @@ Deno.serve(async (req) => {
       if (i.status === "Aprobada") approvedIncidentsByDate[i.incident_date] = i;
     });
 
+    // Mapa de compensaciones de tardanza aprobadas por fecha
+    // (para re-aplicar los descuentos después del recálculo y que no se pierdan)
+    const approvedCompensationsByDate = {};
+    allIncidents.forEach(i => {
+      if (i.status === "Aprobada" && i.incident_type === "Compensación de Tardanza") {
+        if (!approvedCompensationsByDate[i.incident_date]) {
+          approvedCompensationsByDate[i.incident_date] = [];
+        }
+        approvedCompensationsByDate[i.incident_date].push(i);
+      }
+    });
+
     // Set de record IDs con alerta de HE pendiente (no aprobada → HE no se contabilizan)
     const pendingOvertimeRecordIds = new Set(
       allOvertimeAlerts
@@ -230,17 +242,52 @@ Deno.serve(async (req) => {
         status = "Ausente";
       }
 
+      // Si hay compensaciones aprobadas para esta fecha, re-aplicar los descuentos
+      // (el recálculo anterior resetea los valores, así que hay que re-aplicar)
+      const approvedComps = approvedCompensationsByDate[record.date] || [];
+      let finalLate = metrics.late_minutes;
+      let finalIsLate = metrics.is_late;
+      let finalOT25 = metrics.overtime_hours_25;
+      let finalOT35 = metrics.overtime_hours_35;
+      let finalStatus = status;
+
+      if (approvedComps.length > 0 && status !== "Vacaciones") {
+        let compLateMin = 0;
+        let compOTHours = 0;
+        for (const ac of approvedComps) {
+          compLateMin += ac.late_minutes_to_adjust || 0;
+          compOTHours += ac.hours_to_adjust || 0;
+        }
+        finalLate = Math.max(0, metrics.late_minutes - compLateMin);
+        finalIsLate = finalLate > 0;
+
+        let remOT = compOTHours;
+        finalOT25 = metrics.overtime_hours_25;
+        finalOT35 = metrics.overtime_hours_35;
+        if (remOT > 0 && finalOT25 > 0) {
+          const d = Math.min(finalOT25, remOT);
+          finalOT25 -= d;
+          remOT -= d;
+        }
+        if (remOT > 0 && finalOT35 > 0) {
+          const d = Math.min(finalOT35, remOT);
+          finalOT35 -= d;
+          remOT -= d;
+        }
+        finalStatus = "Justificado";
+      }
+
       await base44.entities.AttendanceRecord.update(record.id, {
         worked_hours: metrics.worked_hours,
         regular_hours: metrics.regular_hours,
-        overtime_hours_25: metrics.overtime_hours_25,
-        overtime_hours_35: metrics.overtime_hours_35,
-        is_late: metrics.is_late,
-        late_minutes: metrics.late_minutes,
+        overtime_hours_25: finalOT25,
+        overtime_hours_35: finalOT35,
+        is_late: finalIsLate,
+        late_minutes: finalLate,
         is_absent: metrics.is_absent,
         scheduled_start: metrics.scheduled_start || record.scheduled_start,
         scheduled_end: metrics.scheduled_end || record.scheduled_end,
-        status,
+        status: finalStatus,
       });
       updated++;
     }
