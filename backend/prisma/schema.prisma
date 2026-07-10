@@ -52,6 +52,8 @@ model attendance_incident {
   created_by_id           String?
   created_by              String?
   is_sample               Boolean?
+  authorizer_id           String?
+  authorizer_name         String?
 }
 
 model attendance_record {

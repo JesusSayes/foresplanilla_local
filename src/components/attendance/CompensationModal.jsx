@@ -5,13 +5,33 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Clock, X, AlertCircle, CheckCircle2, TrendingUp, UserCheck, Search } from "lucide-react";
+import {
+  Clock,
+  X,
+  AlertCircle,
+  CheckCircle2,
+  TrendingUp,
+  UserCheck,
+  Search,
+  CalendarDays,
+  ArrowRightLeft,
+  Zap,
+  CalendarX,
+} from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima } from "@/lib/dateUtils";
+import {
+  computeScheduledHours,
+  computeScheduledHoursForPeriod,
+  getScheduleForDate,
+} from "@/lib/attendanceMetrics";
 
 export default function CompensationModal({
   employee,
+  employeeSchedule,
+  periodStart,
+  periodEnd,
   periodRecords,
   existingCompensations = [],
   allEmployees = [],
@@ -24,12 +44,10 @@ export default function CompensationModal({
     if (editMode && pendingCompensations?.length) {
       const initial = {};
       for (const comp of pendingCompensations) {
-        if (
-          comp.attendance_record_id &&
-          (comp.status === "Pendiente" || comp.status === "Rechazada")
-        ) {
-          initial[comp.attendance_record_id] = {
+        if (comp.status === "Pendiente" || comp.status === "Rechazada") {
+          initial[comp.incident_date] = {
             date: comp.incident_date,
+            recordId: comp.attendance_record_id || null,
             lateMinutes: comp.late_minutes_to_adjust || 0,
             overtimeMinutes: Math.round((comp.hours_to_adjust || 0) * 60),
           };
@@ -54,41 +72,85 @@ export default function CompensationModal({
   const [authorizerSearch, setAuthorizerSearch] = useState("");
   const [showAuthorizerList, setShowAuthorizerList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
-  // Filtrar registros con tardanza u horas extras del empleado seleccionado
-  const daysWithIncidents = useMemo(() => {
+  const allEmployeeRecords = useMemo(() => {
     if (!employee) return [];
-    const base = periodRecords
-      .filter((r) => r.employee_id === employee.id)
-      .filter(
-        (r) =>
-          (r.late_minutes > 0) ||
-          ((r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0) > 0)
-      );
+    return periodRecords.filter((r) => r.employee_id === employee.id);
+  }, [employee, periodRecords]);
 
-    // In edit mode, also include days with existing editable compensations
+  // Generar TODOS los días del período (con y sin registro de asistencia)
+  const allScheduledDays = useMemo(() => {
+    if (!employee || !periodStart || !periodEnd) return [];
+
+    const days = [];
+    const start = new Date(periodStart + "T00:00:00");
+    const end = new Date(periodEnd + "T00:00:00");
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = format(d, "yyyy-MM-dd");
+      const record = allEmployeeRecords.find((r) => r.date === dateStr);
+      const schedForDay = employeeSchedule
+        ? getScheduleForDate(employeeSchedule, d)
+        : null;
+
+      // Incluir si tiene horario programado para ese día O tiene un registro
+      if (schedForDay || record) {
+        days.push({
+          date: dateStr,
+          scheduleTimes: schedForDay,
+          record,
+          hasRecord: !!record,
+          workedHours: record?.worked_hours ?? 0,
+          lateMinutes: record?.late_minutes || 0,
+          overtimeMinutes: Math.round(
+            ((record?.overtime_hours_25 ?? 0) + (record?.overtime_hours_35 ?? 0)) * 60
+          ),
+        });
+      }
+    }
+
+    // En modo edición, incluir días de compensaciones pendientes que no estén en la lista
     if (editMode && pendingCompensations?.length) {
-      const existingIds = new Set(base.map((r) => r.id));
+      const existingDates = new Set(days.map((d) => d.date));
       for (const comp of pendingCompensations) {
-        if (
-          comp.attendance_record_id &&
-          !existingIds.has(comp.attendance_record_id)
-        ) {
-          const rec = periodRecords.find(
-            (r) => r.id === comp.attendance_record_id
-          );
-          if (rec) {
-            base.push(rec);
-            existingIds.add(rec.id);
-          }
+        if (comp.incident_date && !existingDates.has(comp.incident_date)) {
+          days.push({
+            date: comp.incident_date,
+            scheduleTimes: null,
+            record: null,
+            hasRecord: false,
+            workedHours: 0,
+            lateMinutes: comp.late_minutes_to_adjust || 0,
+            overtimeMinutes: Math.round((comp.hours_to_adjust || 0) * 60),
+          });
+          existingDates.add(comp.incident_date);
         }
       }
     }
 
-    return base.sort((a, b) => a.date.localeCompare(b.date));
-  }, [employee, periodRecords, editMode, pendingCompensations]);
+    return days.sort((a, b) => a.date.localeCompare(b.date));
+  }, [employee, employeeSchedule, periodStart, periodEnd, allEmployeeRecords, editMode, pendingCompensations]);
 
-  // Fechas que ya tienen compensación registrada
+  const summary = useMemo(() => {
+    const scheduledHours = employeeSchedule
+      ? computeScheduledHoursForPeriod(employeeSchedule, periodStart, periodEnd)
+      : allEmployeeRecords.reduce((s, r) => s + computeScheduledHours(r), 0);
+    const regularHours = allEmployeeRecords.reduce(
+      (s, r) => s + (r.regular_hours ?? 0),
+      0
+    );
+    const overtimeHours = allEmployeeRecords.reduce(
+      (s, r) => s + (r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0),
+      0
+    );
+    const lateMinutes = allEmployeeRecords.reduce(
+      (s, r) => s + (r.late_minutes ?? 0),
+      0
+    );
+    return { scheduledHours, regularHours, overtimeHours, lateMinutes };
+  }, [allEmployeeRecords, employeeSchedule, periodStart, periodEnd]);
+
   const compensatedDates = useMemo(() => {
     return new Set(
       existingCompensations
@@ -98,12 +160,9 @@ export default function CompensationModal({
     );
   }, [existingCompensations, employee, editMode]);
 
-  // Filtrar empleados para el selector de autorizador
   const filteredAuthorizers = useMemo(() => {
     if (!authorizerSearch.trim()) {
-      return allEmployees
-        .filter((e) => e.status === "Activo")
-        .slice(0, 50);
+      return allEmployees.filter((e) => e.status === "Activo").slice(0, 50);
     }
     const term = authorizerSearch.toLowerCase().trim();
     return allEmployees
@@ -116,33 +175,73 @@ export default function CompensationModal({
             (e.position || "").toLowerCase().includes(term))
       )
       .slice(0, 50);
-  }, [allEmployees, authorizerSearch, employee]);
+  }, [allEmployees, authorizerSearch]);
 
-  const toggleDay = (recordId, date) => {
+  const toggleDay = (day) => {
     setSelectedDays((prev) => {
       const next = { ...prev };
-      if (next[recordId]) {
-        delete next[recordId];
+      if (next[day.date]) {
+        delete next[day.date];
       } else {
-        next[recordId] = { date, lateMinutes: 0, overtimeMinutes: 0 };
+        next[day.date] = {
+          date: day.date,
+          recordId: day.record?.id || null,
+          lateMinutes: 0,
+          overtimeMinutes: 0,
+        };
       }
       return next;
     });
   };
 
-  const updateCompensationMinutes = (recordId, field, value) => {
+  const updateCompensationMinutes = (date, field, value) => {
     setSelectedDays((prev) => ({
       ...prev,
-      [recordId]: {
-        ...prev[recordId],
+      [date]: {
+        ...prev[date],
         [field]: Math.max(0, parseInt(value) || 0),
       },
     }));
   };
 
-  const selectedList = Object.entries(selectedDays).map(([recordId, data]) => {
-    const rec = daysWithIncidents.find((r) => r.id === recordId);
-    return { recordId, record: rec, ...data };
+  const autoFillDay = (date) => {
+    const day = allScheduledDays.find((d) => d.date === date);
+    if (!day) return;
+    const lateMin = day.lateMinutes;
+    const overtimeMin = day.overtimeMinutes;
+    const minVal = Math.min(lateMin, overtimeMin);
+    setSelectedDays((prev) => ({
+      ...prev,
+      [date]: {
+        ...prev[date],
+        lateMinutes: minVal > 0 ? minVal : lateMin,
+        overtimeMinutes: minVal > 0 ? minVal : overtimeMin,
+      },
+    }));
+  };
+
+  const autoFillAll = () => {
+    setSelectedDays((prev) => {
+      const next = { ...prev };
+      for (const [date, data] of Object.entries(next)) {
+        const day = allScheduledDays.find((d) => d.date === date);
+        if (!day) continue;
+        const lateMin = day.lateMinutes;
+        const overtimeMin = day.overtimeMinutes;
+        const minVal = Math.min(lateMin, overtimeMin);
+        next[date] = {
+          ...data,
+          lateMinutes: minVal > 0 ? minVal : lateMin,
+          overtimeMinutes: minVal > 0 ? minVal : overtimeMin,
+        };
+      }
+      return next;
+    });
+  };
+
+  const selectedList = Object.entries(selectedDays).map(([date, data]) => {
+    const day = allScheduledDays.find((d) => d.date === date);
+    return { recordId: data.recordId || null, record: day?.record, ...data };
   });
 
   const totalLateToCompensate = selectedList.reduce(
@@ -159,8 +258,11 @@ export default function CompensationModal({
     if (!compensationReason.trim()) return;
     if (!authorizer) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       await onSubmit(selectedList, compensationReason, authorizer);
+    } catch (error) {
+      setSubmitError(error?.message || "Ocurrió un error al registrar la compensación.");
     } finally {
       setSubmitting(false);
     }
@@ -181,13 +283,17 @@ export default function CompensationModal({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-xl font-bold">
-                {editMode
-                  ? "Editar Compensación de Tardanzas"
-                  : "Solicitar Compensación de Tardanzas"}
+                {editMode ? "Editar Compensación" : "Solicitar Compensación"}
               </CardTitle>
               <p className="text-sm text-slate-600 mt-1">
                 {employee.first_name} {employee.last_name} —{" "}
                 {employee.document_type} {employee.document_number}
+                {employeeSchedule && (
+                  <span className="text-slate-400">
+                    {" · "}
+                    {employeeSchedule.schedule_name}
+                  </span>
+                )}
               </p>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose}>
@@ -196,49 +302,71 @@ export default function CompensationModal({
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-5">
-          {/* Resumen del periodo */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+          {/* Resumen de horas del período — 4 tarjetas */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
               <div className="flex items-center gap-2 mb-1">
-                <Clock className="w-4 h-4 text-orange-600" />
-                <span className="text-xs font-semibold text-orange-700">
-                  Días con tardanza
+                <CalendarDays className="w-4 h-4 text-slate-600" />
+                <span className="text-[11px] font-semibold text-slate-700">
+                  Horas Programadas
                 </span>
               </div>
-              <p className="text-2xl font-bold text-orange-900">
-                {daysWithIncidents.filter((r) => r.late_minutes > 0).length}
+              <p className="text-xl font-bold text-slate-900">
+                {summary.scheduledHours.toFixed(1)}h
               </p>
-              <p className="text-xs text-orange-600">
-                {daysWithIncidents.reduce(
-                  (s, r) => s + (r.late_minutes || 0),
-                  0
-                )}{" "}
-                min totales
+            </div>
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                <span className="text-[11px] font-semibold text-green-700">
+                  Trab. dentro
+                </span>
+              </div>
+              <p className="text-xl font-bold text-green-900">
+                {summary.regularHours.toFixed(1)}h
               </p>
             </div>
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex items-center gap-2 mb-1">
                 <TrendingUp className="w-4 h-4 text-blue-600" />
-                <span className="text-xs font-semibold text-blue-700">
-                  Días con horas extras
+                <span className="text-[11px] font-semibold text-blue-700">
+                  Trab. en exceso
                 </span>
               </div>
-              <p className="text-2xl font-bold text-blue-900">
-                {daysWithIncidents.filter(
-                  (r) =>
-                    (r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0) > 0
-                ).length}
+              <p className="text-xl font-bold text-blue-900">
+                {summary.overtimeHours.toFixed(1)}h
               </p>
-              <p className="text-xs text-blue-600">
-                {(
-                  daysWithIncidents.reduce(
-                    (s, r) =>
-                      s + (r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0),
-                    0
-                  )
-                ).toFixed(2)}{" "}
-                h totales
+            </div>
+            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="w-4 h-4 text-orange-600" />
+                <span className="text-[11px] font-semibold text-orange-700">
+                  Tardanzas
+                </span>
+              </div>
+              <p className="text-xl font-bold text-orange-900">
+                {summary.lateMinutes} min
               </p>
+            </div>
+          </div>
+
+          {/* Información de compensación bidireccional */}
+          <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-indigo-800">
+                <p className="font-semibold mb-1">Compensación bidireccional</p>
+                <p>
+                  Seleccione cualquier fecha del período (incluyendo días sin
+                  registro) para compensar. Use horas en exceso para{" "}
+                  <span className="font-medium">reducir tardanzas</span> (↓
+                  naranja) o asigne minutos a compensar en{" "}
+                  <span className="font-medium">
+                    fechas donde no trabajó
+                  </span>{" "}
+                  (↓ azul).
+                </p>
+              </div>
             </div>
           </div>
 
@@ -323,20 +451,33 @@ export default function CompensationModal({
             )}
           </div>
 
-          {/* Tabla de días con incidencias */}
+          {/* Tabla de todos los días del período */}
           <div>
-            <p className="text-sm font-semibold text-slate-900 mb-2">
-              Seleccione los días a compensar:
-            </p>
-            {daysWithIncidents.length === 0 ? (
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-slate-900">
+                Seleccione las fechas a compensar:
+              </p>
+              {Object.keys(selectedDays).length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                  onClick={autoFillAll}
+                >
+                  <Zap className="w-3 h-3 mr-1" />
+                  Auto-completar todo
+                </Button>
+              )}
+            </div>
+            {allScheduledDays.length === 0 ? (
               <div className="text-center py-8 bg-slate-50 rounded-lg">
-                <CheckCircle2 className="w-12 h-12 text-green-300 mx-auto mb-2" />
+                <CalendarX className="w-12 h-12 text-slate-300 mx-auto mb-2" />
                 <p className="text-slate-500 text-sm">
-                  No hay tardanzas ni horas extras en el período seleccionado
+                  No hay días programados ni registros en el período seleccionado
                 </p>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-lg overflow-hidden max-h-[280px] overflow-y-auto">
+              <div className="border border-slate-200 rounded-lg overflow-hidden max-h-[360px] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-100 sticky top-0">
                     <tr>
@@ -346,31 +487,30 @@ export default function CompensationModal({
                       <th className="text-left px-3 py-2 text-xs font-semibold text-slate-600">
                         Fecha
                       </th>
-                      <th className="text-center px-3 py-2 text-xs font-semibold text-orange-600">
-                        Tardanza (min)
+                      <th className="text-left px-2 py-2 text-xs font-semibold text-slate-600">
+                        Horario
                       </th>
-                      <th className="text-center px-3 py-2 text-xs font-semibold text-blue-600">
+                      <th className="text-center px-2 py-2 text-xs font-semibold text-green-600">
+                        Hrs. Trab.
+                      </th>
+                      <th className="text-center px-2 py-2 text-xs font-semibold text-orange-600">
+                        Tardanza
+                      </th>
+                      <th className="text-center px-2 py-2 text-xs font-semibold text-blue-600">
                         HE (min)
                       </th>
-                      <th className="text-center px-3 py-2 text-xs font-semibold text-slate-600">
+                      <th className="text-center px-2 py-2 text-xs font-semibold text-slate-600">
                         Compensar
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {daysWithIncidents.map((rec) => {
-                      const isSelected = !!selectedDays[rec.id];
-                      const isAlreadyCompensated = compensatedDates.has(
-                        rec.date
-                      );
-                      const overtimeMin = Math.round(
-                        ((rec.overtime_hours_25 ?? 0) +
-                          (rec.overtime_hours_35 ?? 0)) *
-                          60
-                      );
+                    {allScheduledDays.map((day) => {
+                      const isSelected = !!selectedDays[day.date];
+                      const isAlreadyCompensated = compensatedDates.has(day.date);
                       return (
                         <tr
-                          key={rec.id}
+                          key={day.date}
                           className={`border-t border-slate-100 ${
                             isSelected ? "bg-indigo-50" : "hover:bg-slate-50"
                           } ${isAlreadyCompensated ? "opacity-50" : ""}`}
@@ -380,74 +520,114 @@ export default function CompensationModal({
                               checked={isSelected}
                               disabled={isAlreadyCompensated}
                               onCheckedChange={() =>
-                                !isAlreadyCompensated &&
-                                toggleDay(rec.id, rec.date)
+                                !isAlreadyCompensated && toggleDay(day)
                               }
                             />
                           </td>
                           <td className="px-3 py-2">
                             <span className="font-medium text-slate-900">
-                              {format(parseDateLima(rec.date), "dd MMM yyyy", {
+                              {format(parseDateLima(day.date), "dd MMM yyyy", {
                                 locale: es,
                               })}
                             </span>
-                            {isAlreadyCompensated && (
-                              <Badge className="ml-2 bg-purple-100 text-purple-700 text-xs">
-                                Ya compensado
-                              </Badge>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              {day.hasRecord ? (
+                                <Badge className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0">
+                                  Trabajado
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-slate-100 text-slate-500 text-[10px] px-1.5 py-0">
+                                  <CalendarX className="w-2.5 h-2.5 mr-0.5" />
+                                  Sin registro
+                                </Badge>
+                              )}
+                              {isAlreadyCompensated && (
+                                <Badge className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0">
+                                  Ya compensado
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-2">
+                            <span className="text-xs text-slate-500">
+                              {day.scheduleTimes
+                                ? `${day.scheduleTimes.start} - ${day.scheduleTimes.end}`
+                                : day.record
+                                  ? `${day.record.scheduled_start || "—"} - ${day.record.scheduled_end || "—"}`
+                                  : "—"}
+                            </span>
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            {day.hasRecord ? (
+                              <span className="text-xs font-semibold text-green-700">
+                                {(day.workedHours ?? 0).toFixed(1)}h
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs">—</span>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            {rec.late_minutes > 0 ? (
+                          <td className="px-2 py-2 text-center">
+                            {day.lateMinutes > 0 ? (
                               <span className="font-bold text-orange-600">
-                                {rec.late_minutes}
+                                {day.lateMinutes}
                               </span>
                             ) : (
                               <span className="text-slate-300">—</span>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            {overtimeMin > 0 ? (
+                          <td className="px-2 py-2 text-center">
+                            {day.overtimeMinutes > 0 ? (
                               <span className="font-bold text-blue-600">
-                                {overtimeMin}
+                                {day.overtimeMinutes}
                               </span>
                             ) : (
                               <span className="text-slate-300">—</span>
                             )}
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-2 py-2">
                             {isSelected && (
-                              <div className="flex gap-1 justify-center">
-                                <Input
-                                  type="number"
-                                  placeholder="min tard"
-                                  className="h-7 w-16 text-xs text-center"
-                                  value={
-                                    selectedDays[rec.id]?.lateMinutes || ""
-                                  }
-                                  onChange={(e) =>
-                                    updateCompensationMinutes(
-                                      rec.id,
-                                      "lateMinutes",
-                                      e.target.value
-                                    )
-                                  }
-                                />
-                                <Input
-                                  type="number"
-                                  placeholder="min HE"
-                                  className="h-7 w-16 text-xs text-center"
-                                  value={
-                                    selectedDays[rec.id]?.overtimeMinutes || ""
-                                  }
-                                  onChange={(e) =>
-                                    updateCompensationMinutes(
-                                      rec.id,
-                                      "overtimeMinutes",
-                                      e.target.value
-                                    )
-                                  }
-                                />
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1 justify-center">
+                                  <Input
+                                    type="number"
+                                    placeholder="tard"
+                                    className="h-7 w-14 text-xs text-center border-orange-300 focus:border-orange-500"
+                                    value={selectedDays[day.date]?.lateMinutes || ""}
+                                    onChange={(e) =>
+                                      updateCompensationMinutes(
+                                        day.date,
+                                        "lateMinutes",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                  <Input
+                                    type="number"
+                                    placeholder="HE"
+                                    className="h-7 w-14 text-xs text-center border-blue-300 focus:border-blue-500"
+                                    value={selectedDays[day.date]?.overtimeMinutes || ""}
+                                    onChange={(e) =>
+                                      updateCompensationMinutes(
+                                        day.date,
+                                        "overtimeMinutes",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-1.5 text-xs text-indigo-600 hover:bg-indigo-100"
+                                    onClick={() => autoFillDay(day.date)}
+                                    title="Auto-completar con el mínimo entre tardanza y HE"
+                                  >
+                                    <Zap className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                                <div className="flex justify-center gap-3 text-[9px] text-slate-400">
+                                  <span className="text-orange-500">↓ tardanza</span>
+                                  <span className="text-blue-500">↓ HE</span>
+                                </div>
                               </div>
                             )}
                           </td>
@@ -473,41 +653,66 @@ export default function CompensationModal({
             />
           </div>
 
-          {/* Resumen de compensación */}
+          {/* Resumen de compensación bidireccional */}
           {selectedList.length > 0 && (
-            <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
                 <AlertCircle className="w-4 h-4 text-indigo-600" />
                 <p className="text-sm font-semibold text-indigo-900">
-                  Resumen de compensación solicitada
+                  Resumen de compensación
                 </p>
               </div>
-              <div className="grid grid-cols-3 gap-3 text-sm">
-                <div>
-                  <span className="text-slate-600">Días seleccionados:</span>
-                  <span className="font-bold ml-1">
-                    {selectedList.length}
-                  </span>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="bg-white rounded-lg p-2.5 border border-orange-200">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Clock className="w-3.5 h-3.5 text-orange-600" />
+                    <span className="text-xs font-medium text-orange-700">
+                      Tardanza a compensar
+                    </span>
+                  </div>
+                  <p className="text-lg font-bold text-orange-900">
+                    {totalLateToCompensate} min
+                  </p>
                 </div>
-                <div>
-                  <span className="text-slate-600">Min. tardanza:</span>
-                  <span className="font-bold ml-1 text-orange-600">
-                    {totalLateToCompensate}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-600">Min. HE:</span>
-                  <span className="font-bold ml-1 text-blue-600">
-                    {totalOvertimeToCompensate}
-                  </span>
+                <div className="bg-white rounded-lg p-2.5 border border-blue-200">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="text-xs font-medium text-blue-700">
+                      HE a compensar
+                    </span>
+                  </div>
+                  <p className="text-lg font-bold text-blue-900">
+                    {totalOvertimeToCompensate} min
+                  </p>
                 </div>
               </div>
+              <div className="flex items-center justify-between text-xs">
+                <div className="text-slate-600">
+                  <span className="font-medium">Fechas seleccionadas:</span>{" "}
+                  {selectedList.length}
+                </div>
+                {totalLateToCompensate === totalOvertimeToCompensate &&
+                  totalLateToCompensate > 0 && (
+                    <Badge className="bg-green-100 text-green-700 text-xs">
+                      <ArrowRightLeft className="w-3 h-3 mr-1" />
+                      Compensación equilibrada
+                    </Badge>
+                  )}
+              </div>
               {authorizer && (
-                <p className="text-xs text-indigo-700 mt-2">
+                <p className="text-xs text-indigo-700 mt-2 pt-2 border-t border-indigo-100">
                   <UserCheck className="w-3 h-3 inline mr-1" />
                   Autorizador: {authorizer.first_name} {authorizer.last_name}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Error de envío */}
+          {submitError && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700">{submitError}</p>
             </div>
           )}
 

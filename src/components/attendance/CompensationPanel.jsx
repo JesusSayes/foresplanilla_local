@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { entitiesAPI } from "@/api/entitiesClient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,14 +29,28 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  CalendarDays,
+  Scale,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima, dateToStringLima } from "@/lib/dateUtils";
+import { computeScheduledHours, computeScheduledHoursForPeriod } from "@/lib/attendanceMetrics";
 import { toast } from "sonner";
 import CompensationModal from "./CompensationModal";
 
 const PAGE_SIZE = 25;
+
+const fmtHours = (h) => {
+  const val = h ?? 0;
+  return `${val.toFixed(1)}h`;
+};
+
+const fmtBalance = (minutes) => {
+  if (minutes === 0) return "0 min";
+  const sign = minutes > 0 ? "+" : "";
+  return `${sign}${minutes} min`;
+};
 
 export default function CompensationPanel({
   allEmployees,
@@ -54,7 +68,7 @@ export default function CompensationPanel({
   const [monthOffset, setMonthOffset] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSite, setSelectedSite] = useState("all");
-  const [filterType, setFilterType] = useState("all"); // all, late, overtime
+  const [filterType, setFilterType] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -62,14 +76,11 @@ export default function CompensationPanel({
   const [editMode, setEditMode] = useState(false);
   const [pendingCompsForEdit, setPendingCompsForEdit] = useState([]);
 
-  // Calcular mes seleccionado según el offset
   const selectedMonthDate = useMemo(() => {
-    const d = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
-    return d;
+    return new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
   }, [today, monthOffset]);
 
   const selectedMonthEnd = useMemo(() => {
-    // Último día del mes seleccionado
     return new Date(
       selectedMonthDate.getFullYear(),
       selectedMonthDate.getMonth() + 1,
@@ -77,7 +88,6 @@ export default function CompensationPanel({
     );
   }, [selectedMonthDate]);
 
-  // Cargar registros del período
   const periodStart = useCustomRange
     ? dateToStringLima(dateFrom)
     : format(selectedMonthDate, "yyyy-MM-dd");
@@ -90,7 +100,7 @@ export default function CompensationPanel({
   const { data: periodRecords = [], isLoading } = useQuery({
     queryKey: ["compensationRecords", periodStart, periodEnd],
     queryFn: async () => {
-      const all = await entitiesAPI.AttendanceRecord.list("-date");
+      const all = await entitiesAPI.AttendanceRecord.list("-date", 2000);
       return all.filter((r) => r.date >= periodStart && r.date <= periodEnd);
     },
   });
@@ -103,11 +113,13 @@ export default function CompensationPanel({
     },
   });
 
-  // Cargar compensaciones existentes (incidentes de tipo "Compensación de Tardanza")
   const { data: existingCompensations = [] } = useQuery({
     queryKey: ["compensationIncidents", periodStart, periodEnd],
     queryFn: async () => {
-      const all = await entitiesAPI.AttendanceIncident.list("-incident_date");
+      const all = await entitiesAPI.AttendanceIncident.list(
+        "-incident_date",
+        2000
+      );
       return all.filter(
         (i) =>
           i.incident_type === "Compensación de Tardanza" &&
@@ -117,54 +129,102 @@ export default function CompensationPanel({
     },
   });
 
-  // Agrupar por empleado y calcular totales
+  const { data: workSchedules = [] } = useQuery({
+    queryKey: ["workSchedulesForComp"],
+    queryFn: async () => {
+      return await entitiesAPI.WorkSchedule.list("schedule_name");
+    },
+  });
+
+  const scheduleByEmployee = useMemo(() => {
+    const map = new Map();
+    for (const ws of workSchedules) {
+      if (ws.employee_id && ws.is_active !== false) {
+        map.set(ws.employee_id, ws);
+      }
+    }
+    for (const emp of allEmployees) {
+      if (map.has(emp.id)) continue;
+      for (const ws of workSchedules) {
+        if (ws.is_active === false) continue;
+        if (!ws.employee_id) {
+          const matchesDept =
+            ws.department_name === emp.department_name ||
+            (ws.departments && ws.departments.includes(emp.department_name));
+          if (matchesDept) {
+            map.set(emp.id, ws);
+            break;
+          }
+        }
+      }
+    }
+    return map;
+  }, [workSchedules, allEmployees]);
+
+  // Mostrar TODOS los empleados accesibles con sus métricas
   const employeeStats = useMemo(() => {
     const map = new Map();
 
+    for (const emp of allEmployees) {
+      if (!accessibleEmployeeIds.has(emp.id)) continue;
+      if (emp.status && emp.status !== "Activo") continue;
+      const schedule = scheduleByEmployee.get(emp.id);
+      map.set(emp.id, {
+        employee: emp,
+        employee_id: emp.id,
+        schedule,
+        totalScheduledHours: 0,
+        totalRegularHours: 0,
+        totalOvertimeHours: 0,
+        totalLateMinutes: 0,
+        lateDays: 0,
+        overtimeDays: 0,
+        totalDays: 0,
+        records: [],
+      });
+    }
+
     for (const rec of periodRecords) {
       if (!accessibleEmployeeIds.has(rec.employee_id)) continue;
+      if (!map.has(rec.employee_id)) continue;
+
+      const stat = map.get(rec.employee_id);
+      stat.records.push(rec);
+      stat.totalDays++;
+      stat.totalScheduledHours += computeScheduledHours(rec);
+      stat.totalRegularHours += rec.regular_hours ?? 0;
+      stat.totalOvertimeHours +=
+        (rec.overtime_hours_25 ?? 0) + (rec.overtime_hours_35 ?? 0);
 
       const overtimeMin = Math.round(
         ((rec.overtime_hours_25 ?? 0) + (rec.overtime_hours_35 ?? 0)) * 60
       );
-      const hasLate = (rec.late_minutes ?? 0) > 0;
-      const hasOvertime = overtimeMin > 0;
-      if (!hasLate && !hasOvertime) continue;
-
-      if (!map.has(rec.employee_id)) {
-        const emp = allEmployees.find((e) => e.id === rec.employee_id);
-        map.set(rec.employee_id, {
-          employee: emp,
-          employee_id: rec.employee_id,
-          totalLateMinutes: 0,
-          totalOvertimeMinutes: 0,
-          lateDays: 0,
-          overtimeDays: 0,
-          records: [],
-        });
-      }
-
-      const stat = map.get(rec.employee_id);
-      stat.records.push(rec);
-      if (hasLate) {
+      if ((rec.late_minutes ?? 0) > 0) {
         stat.totalLateMinutes += rec.late_minutes;
         stat.lateDays++;
       }
-      if (hasOvertime) {
-        stat.totalOvertimeMinutes += overtimeMin;
+      if (overtimeMin > 0) {
         stat.overtimeDays++;
       }
     }
 
-    return Array.from(map.values());
-  }, [periodRecords, allEmployees, accessibleEmployeeIds]);
+    for (const stat of map.values()) {
+      if (stat.totalDays === 0 && stat.schedule) {
+        stat.totalScheduledHours = computeScheduledHoursForPeriod(
+          stat.schedule,
+          periodStart,
+          periodEnd
+        );
+      }
+    }
 
-  // Filtrar
+    return Array.from(map.values());
+  }, [periodRecords, allEmployees, accessibleEmployeeIds, scheduleByEmployee, periodStart, periodEnd]);
+
   const filteredStats = useMemo(() => {
     return employeeStats.filter((stat) => {
       if (!stat.employee) return false;
 
-      // Search
       if (searchTerm) {
         const term = searchTerm.toLowerCase().trim();
         const fullName =
@@ -180,7 +240,6 @@ export default function CompensationPanel({
         }
       }
 
-      // Site
       if (
         selectedSite !== "all" &&
         stat.employee.site !== selectedSite &&
@@ -189,21 +248,18 @@ export default function CompensationPanel({
         return false;
       }
 
-      // Type filter
       if (filterType === "late" && stat.totalLateMinutes === 0) return false;
-      if (filterType === "overtime" && stat.totalOvertimeMinutes === 0)
+      if (filterType === "overtime" && stat.totalOvertimeHours === 0)
         return false;
 
       return true;
     });
   }, [employeeStats, searchTerm, selectedSite, filterType]);
 
-  // Marcar empleados que ya tienen compensación registrada
   const employeesWithCompensation = useMemo(() => {
     return new Set(existingCompensations.map((c) => c.employee_id));
   }, [existingCompensations]);
 
-  // Compensaciones editables (Pendiente o Rechazada) por empleado
   const editableCompsByEmployee = useMemo(() => {
     const map = new Map();
     for (const c of existingCompensations) {
@@ -233,7 +289,6 @@ export default function CompensationPanel({
   const handleSubmitCompensation = async (selectedList, reason, authorizer) => {
     setSubmitting(true);
     try {
-      // Crear un AttendanceIncident por cada día seleccionado
       const incidentsToCreate = selectedList.map((item) => ({
         employee_id: selectedEmployee.id,
         attendance_record_id: item.recordId,
@@ -251,12 +306,13 @@ export default function CompensationPanel({
       }));
 
       if (incidentsToCreate.length > 0) {
-        await Promise.all(incidentsToCreate.map((incident) =>
-          entitiesAPI.AttendanceIncident.create(incident)
-        ));
+        await Promise.all(
+          incidentsToCreate.map((incident) =>
+            entitiesAPI.AttendanceIncident.create(incident)
+          )
+        );
       }
 
-      // Actualizar los registros de asistencia con estado "Compensación"
       for (const item of selectedList) {
         if (item.recordId) {
           await entitiesAPI.AttendanceRecord.update(item.recordId, {
@@ -290,13 +346,11 @@ export default function CompensationPanel({
   const handleEditCompensation = async (selectedList, reason, authorizer) => {
     setSubmitting(true);
     try {
-      // Eliminar compensaciones editables existentes para este empleado
       const toDelete = editableCompsByEmployee.get(selectedEmployee.id) || [];
       for (const comp of toDelete) {
         await entitiesAPI.AttendanceIncident.delete(comp.id);
       }
 
-      // Crear las compensaciones actualizadas
       const incidentsToCreate = selectedList.map((item) => ({
         employee_id: selectedEmployee.id,
         attendance_record_id: item.recordId,
@@ -314,12 +368,13 @@ export default function CompensationPanel({
       }));
 
       if (incidentsToCreate.length > 0) {
-        await Promise.all(incidentsToCreate.map((incident) =>
-          entitiesAPI.AttendanceIncident.create(incident)
-        ));
+        await Promise.all(
+          incidentsToCreate.map((incident) =>
+            entitiesAPI.AttendanceIncident.create(incident)
+          )
+        );
       }
 
-      // Asegurar que los registros seleccionados tengan estado "Compensación"
       for (const item of selectedList) {
         if (item.recordId && item.record?.status !== "Compensación") {
           await entitiesAPI.AttendanceRecord.update(item.recordId, {
@@ -352,6 +407,19 @@ export default function CompensationPanel({
     hasPermission("attendance.approve_compensations") ||
     hasPermission("system.admin");
 
+  // Totales generales del período
+  const periodTotals = useMemo(() => {
+    return filteredStats.reduce(
+      (acc, s) => ({
+        scheduled: acc.scheduled + s.totalScheduledHours,
+        regular: acc.regular + s.totalRegularHours,
+        overtime: acc.overtime + s.totalOvertimeHours,
+        late: acc.late + s.totalLateMinutes,
+      }),
+      { scheduled: 0, regular: 0, overtime: 0, late: 0 }
+    );
+  }, [filteredStats]);
+
   return (
     <Card className="border-0 shadow-lg">
       <CardHeader className="border-b bg-indigo-50/50">
@@ -360,10 +428,58 @@ export default function CompensationPanel({
           Compensación de Tardanzas y Horas en Exceso
         </CardTitle>
         <p className="text-sm text-slate-600 mt-1">
-          Empleados con tardanzas u horas extras en el período seleccionado
+          Horas programadas vs. trabajadas por empleado en el período
         </p>
       </CardHeader>
       <CardContent className="p-6">
+        {/* Resumen general del período */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <CalendarDays className="w-4 h-4 text-slate-600" />
+              <span className="text-xs font-semibold text-slate-700">
+                Horas Programadas
+              </span>
+            </div>
+            <p className="text-xl font-bold text-slate-900">
+              {fmtHours(periodTotals.scheduled)}
+            </p>
+          </div>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <span className="text-xs font-semibold text-green-700">
+                Trab. dentro horario
+              </span>
+            </div>
+            <p className="text-xl font-bold text-green-900">
+              {fmtHours(periodTotals.regular)}
+            </p>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="w-4 h-4 text-blue-600" />
+              <span className="text-xs font-semibold text-blue-700">
+                Trab. fuera horario
+              </span>
+            </div>
+            <p className="text-xl font-bold text-blue-900">
+              {fmtHours(periodTotals.overtime)}
+            </p>
+          </div>
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="w-4 h-4 text-orange-600" />
+              <span className="text-xs font-semibold text-orange-700">
+                Tardanzas totales
+              </span>
+            </div>
+            <p className="text-xl font-bold text-orange-900">
+              {periodTotals.late} min
+            </p>
+          </div>
+        </div>
+
         {/* Filtros */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
           <div className="relative flex-1 min-w-[180px]">
@@ -417,7 +533,6 @@ export default function CompensationPanel({
             </SelectContent>
           </Select>
 
-          {/* Selector de período */}
           {!useCustomRange ? (
             <div className="flex items-center gap-1">
               <Button
@@ -560,8 +675,7 @@ export default function CompensationPanel({
           <div className="text-center py-12">
             <CheckCircle2 className="w-16 h-16 text-green-300 mx-auto mb-4" />
             <p className="text-slate-600">
-              No hay empleados con tardanzas u horas extras en el período
-              seleccionado
+              No hay personal activo con registros en el período seleccionado
             </p>
           </div>
         ) : (
@@ -575,17 +689,32 @@ export default function CompensationPanel({
                   <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">
                     Sede
                   </th>
-                  <th className="text-center text-xs font-semibold text-orange-600 uppercase tracking-wide px-2 py-2">
-                    Días tardanza
+                  <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">
+                    Horario
                   </th>
-                  <th className="text-center text-xs font-semibold text-orange-600 uppercase tracking-wide px-2 py-2">
-                    Min. tardanza
+                  <th className="text-center text-xs font-semibold text-slate-600 uppercase tracking-wide px-2 py-2">
+                    Hrs. Prog.
+                  </th>
+                  <th className="text-center text-xs font-semibold text-green-600 uppercase tracking-wide px-2 py-2">
+                    Hrs. Trab.
+                    <span className="block text-[9px] font-normal text-slate-400">
+                      dentro
+                    </span>
                   </th>
                   <th className="text-center text-xs font-semibold text-blue-600 uppercase tracking-wide px-2 py-2">
-                    Días HE
+                    Hrs. Exceso
+                    <span className="block text-[9px] font-normal text-slate-400">
+                      fuera
+                    </span>
                   </th>
-                  <th className="text-center text-xs font-semibold text-blue-600 uppercase tracking-wide px-2 py-2">
-                    Min. extras
+                  <th className="text-center text-xs font-semibold text-orange-600 uppercase tracking-wide px-2 py-2">
+                    Tardanzas
+                    <span className="block text-[9px] font-normal text-slate-400">
+                      min
+                    </span>
+                  </th>
+                  <th className="text-center text-xs font-semibold text-indigo-600 uppercase tracking-wide px-2 py-2">
+                    Balance
                   </th>
                   <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">
                     Estado
@@ -598,13 +727,17 @@ export default function CompensationPanel({
               <tbody>
                 {filteredStats
                   .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-                  .map((stat, idx) => {
+                  .map((stat) => {
                     const hasComp = employeesWithCompensation.has(
                       stat.employee_id
                     );
                     const hasEditableComp = editableCompsByEmployee.has(
                       stat.employee_id
                     );
+                    const overtimeMin = Math.round(stat.totalOvertimeHours * 60);
+                    const balanceMin = overtimeMin - stat.totalLateMinutes;
+                    const hasIncidents =
+                      stat.totalLateMinutes > 0 || stat.totalOvertimeHours > 0;
                     return (
                       <tr
                         key={stat.employee_id}
@@ -637,39 +770,109 @@ export default function CompensationPanel({
                             {stat.employee.site || "—"}
                           </span>
                         </td>
+                        <td className="px-2 py-2">
+                          {stat.schedule ? (
+                            <div className="text-xs">
+                              <span className="text-slate-700 font-medium truncate block max-w-[120px]">
+                                {stat.schedule.schedule_name}
+                              </span>
+                              <span className="text-slate-400 text-[10px]">
+                                {(() => {
+                                  const days = [
+                                    { d: "monday", s: stat.schedule.monday_start, e: stat.schedule.monday_end },
+                                    { d: "tuesday", s: stat.schedule.tuesday_start, e: stat.schedule.tuesday_end },
+                                    { d: "wednesday", s: stat.schedule.wednesday_start, e: stat.schedule.wednesday_end },
+                                    { d: "thursday", s: stat.schedule.thursday_start, e: stat.schedule.thursday_end },
+                                    { d: "friday", s: stat.schedule.friday_start, e: stat.schedule.friday_end },
+                                    { d: "saturday", s: stat.schedule.saturday_start, e: stat.schedule.saturday_end },
+                                    { d: "sunday", s: stat.schedule.sunday_start, e: stat.schedule.sunday_end },
+                                  ].filter(x => x.s && x.e);
+                                  if (days.length === 0) return "—";
+                                  const allSame = days.every(x => x.s === days[0].s && x.e === days[0].e);
+                                  if (allSame) return `${days[0].s} - ${days[0].e}`;
+                                  return `${days[0].s} - ${days[0].e} (+${days.length - 1} días)`;
+                                })()}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </td>
                         <td className="px-2 py-2 text-center">
-                          <span className="text-sm font-bold text-orange-600">
-                            {stat.lateDays}
+                          <span className="text-sm font-semibold text-slate-700">
+                            {fmtHours(stat.totalScheduledHours)}
                           </span>
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <span className="text-sm font-bold text-orange-900">
+                          <span className="text-sm font-semibold text-green-700">
+                            {fmtHours(stat.totalRegularHours)}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <span
+                            className={`text-sm font-bold ${
+                              stat.totalOvertimeHours > 0
+                                ? "text-blue-600"
+                                : "text-slate-300"
+                            }`}
+                          >
+                            {fmtHours(stat.totalOvertimeHours)}
+                          </span>
+                          {stat.overtimeDays > 0 && (
+                            <span className="block text-[9px] text-blue-400">
+                              {stat.overtimeDays} día(s)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <span
+                            className={`text-sm font-bold ${
+                              stat.totalLateMinutes > 0
+                                ? "text-orange-600"
+                                : "text-slate-300"
+                            }`}
+                          >
                             {stat.totalLateMinutes} min
                           </span>
+                          {stat.lateDays > 0 && (
+                            <span className="block text-[9px] text-orange-400">
+                              {stat.lateDays} día(s)
+                            </span>
+                          )}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <span className="text-sm font-bold text-blue-600">
-                            {stat.overtimeDays}
-                          </span>
-                        </td>
-                        <td className="px-2 py-2 text-center">
-                          <span className="text-sm font-bold text-blue-900">
-                            {stat.totalOvertimeMinutes} min
-                          </span>
+                          <div className="flex items-center justify-center gap-1">
+                            <Scale className="w-3 h-3 text-slate-400" />
+                            <span
+                              className={`text-xs font-bold ${
+                                balanceMin > 0
+                                  ? "text-blue-600"
+                                  : balanceMin < 0
+                                    ? "text-orange-600"
+                                    : "text-slate-400"
+                              }`}
+                            >
+                              {fmtBalance(balanceMin)}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-2 py-2 text-center">
                           {hasComp ? (
                             <Badge className="bg-purple-100 text-purple-700 border-purple-300 text-xs">
                               Comp. solicitada
                             </Badge>
+                          ) : hasIncidents ? (
+                            <Badge className="bg-amber-100 text-amber-700 border-amber-300 text-xs">
+                              Por compensar
+                            </Badge>
                           ) : (
-                            <Badge className="bg-slate-100 text-slate-500 border-slate-200 text-xs">
-                              Pendiente
+                            <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
+                              Sin novedad
                             </Badge>
                           )}
                         </td>
                         <td className="px-2 py-2 text-center">
-                          {canManage && (
+                          {canManage ? (
                             <div className="flex gap-1 justify-center">
                               {hasEditableComp && (
                                 <Button
@@ -684,14 +887,15 @@ export default function CompensationPanel({
                               )}
                               <Button
                                 size="sm"
-                                variant="outline"
-                                className="h-7 px-2 text-xs shrink-0 whitespace-nowrap text-indigo-700 border-indigo-300 hover:bg-indigo-50"
+                                className="h-7 px-2 text-xs shrink-0 whitespace-nowrap bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600"
                                 onClick={() => handleOpenModal(stat)}
                               >
                                 <Plus className="w-3 h-3 mr-1" />
-                                {hasEditableComp ? "Agregar" : "Solicitar"}
+                                Solicitar
                               </Button>
                             </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-300">Sin permiso</span>
                           )}
                         </td>
                       </tr>
@@ -703,10 +907,12 @@ export default function CompensationPanel({
         )}
       </CardContent>
 
-      {/* Modal de compensación */}
       {showModal && selectedEmployee && (
         <CompensationModal
           employee={selectedEmployee}
+          employeeSchedule={scheduleByEmployee.get(selectedEmployee.id)}
+          periodStart={periodStart}
+          periodEnd={periodEnd}
           periodRecords={periodRecords}
           existingCompensations={existingCompensations}
           allEmployees={allEmployees}

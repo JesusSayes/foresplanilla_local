@@ -14,6 +14,7 @@ export const AVAILABLE_PERMISSIONS = {
   "employees.export": "Exportar datos de empleados",
   "employees.change_status": "Cambiar estado de empleados",
   "employees.view_financials": "Ver información financiera de empleados",
+  "employees.orgchart": "Ver organigrama de la empresa",
 
   // Asistencia
   "attendance.view_own": "Ver propia asistencia",
@@ -26,6 +27,7 @@ export const AVAILABLE_PERMISSIONS = {
   "attendance.view_reports": "Ver reportes de asistencia",
   "attendance.manage": "Gestión completa de asistencia",
   "attendance.export": "Exportar datos de asistencia",
+  "attendance.devices": "Gestionar dispositivos y base de datos externa de asistencia",
   // Vacaciones
   "vacations.view_own": "Ver propias vacaciones",
   "vacations.view_all": "Ver vacaciones de todos",
@@ -34,6 +36,8 @@ export const AVAILABLE_PERMISSIONS = {
   "vacations.approve": "Aprobar/rechazar solicitudes",
   "vacations.manage_balances": "Gestionar saldos de vacaciones",
   "vacations.view_calendar": "Ver calendario de vacaciones",
+  "vacations.manage": "Gestión completa de vacaciones",
+  "vacations.calendar": "Ver calendario de vacaciones",
 
   // Planilla
   "payroll.view_own": "Ver propia planilla",
@@ -41,9 +45,13 @@ export const AVAILABLE_PERMISSIONS = {
   "payroll.view_department": "Ver planilla del departamento",
   "payroll.process": "Procesar planilla",
   "payroll.edit": "Editar conceptos de planilla",
+  "payroll.create": "Crear boletas",
+  "payroll.delete": "Eliminar boletas",
+  "payroll.calculate": "Calcular nómina",
   "payroll.approve": "Aprobar planilla",
   "payroll.export": "Exportar datos de planilla",
   "payroll.manage_concepts": "Gestionar conceptos de planilla",
+  "payroll.concepts": "Gestionar conceptos de planilla",
   "payroll.view_amounts": "Ver montos en planillas",
 
   // Contabilidad
@@ -64,12 +72,57 @@ export const AVAILABLE_PERMISSIONS = {
   "contracts.sign": "Firmar contratos digitalmente",
   "contracts.manage_templates": "Gestionar plantillas de contratos",
   "contracts.manage_renewals": "Gestionar renovaciones automáticas",
+  "contracts.templates": "Gestionar plantillas de contratos",
+  "contracts.renewal": "Configurar automatización de renovación de contratos",
 
   // Certificados
   "certificates.view_own": "Ver propios certificados",
   "certificates.view_all": "Ver certificados de todos",
   "certificates.generate": "Generar certificados",
   "certificates.approve": "Aprobar certificados",
+  "certificates.create": "Crear certificados",
+  "certificates.request": "Solicitar certificados",
+
+  // Horarios
+  "schedules.view": "Ver horarios",
+  "schedules.edit": "Editar horarios",
+  "schedules.create": "Crear horarios",
+  "schedules.delete": "Eliminar horarios",
+  "schedules.assign": "Asignar horarios",
+
+  // Feriados
+  "holidays.view": "Ver feriados",
+  "holidays.manage": "Gestionar feriados",
+  "holidays.create": "Crear feriados",
+  "holidays.edit": "Editar feriados",
+  "holidays.delete": "Eliminar feriados",
+
+  // Sedes
+  "sites.view": "Ver sedes",
+  "sites.create": "Crear sedes",
+  "sites.edit": "Editar sedes",
+  "sites.delete": "Eliminar sedes",
+  "sites.manage": "Gestión completa de sedes",
+
+  // Departamentos
+  "departments.view": "Ver departamentos",
+  "departments.create": "Crear departamentos",
+  "departments.edit": "Editar departamentos",
+  "departments.delete": "Eliminar departamentos",
+  "departments.manage": "Gestión completa de departamentos",
+
+  // Cargos/Posiciones
+  "positions.view": "Ver cargos",
+  "positions.create": "Crear cargos",
+  "positions.edit": "Editar cargos",
+  "positions.delete": "Eliminar cargos",
+  "positions.manage": "Gestión completa de cargos",
+
+  // Bancos
+  "banks.view": "Ver bancos",
+  "banks.create": "Crear bancos",
+  "banks.edit": "Editar bancos",
+  "banks.delete": "Eliminar bancos",
 
   // Reportes
   "reports.view": "Ver reportes",
@@ -364,21 +417,23 @@ export const getBasicPermissionsByRole = (role) => {
     super_admin: Object.keys(AVAILABLE_PERMISSIONS),
     admin: [
       "system.admin", "system.settings",
-      "employees.view", "employees.edit", "employees.create", "employees.delete", "employees.import", "employees.export", "employees.change_status",
-      "attendance.view_all", "attendance.edit", "attendance.approve_edits", "attendance.approve_incidents", "attendance.manage", "attendance.export",
+      "employees.view", "employees.view_financials", "employees.edit", "employees.create", "employees.delete", "employees.import", "employees.export", "employees.change_status", "employees.orgchart",
+      "attendance.view_all", "attendance.edit", "attendance.approve_edits", "attendance.approve_incidents", "attendance.approve_compensations", "attendance.manage", "attendance.export", "attendance.devices",
       "vacations.view_all", "vacations.approve", "vacations.manage", "vacations.calendar",
-      "payroll.view_all", "payroll.view_amounts", "payroll.edit", "payroll.create", "payroll.delete", "payroll.calculate", "payroll.approve", "payroll.view_department",
+      "payroll.view_all", "payroll.view_amounts", "payroll.edit", "payroll.create", "payroll.delete", "payroll.calculate", "payroll.approve", "payroll.view_department", "payroll.concepts",
       "certificates.view_all", "certificates.approve", "certificates.create", "certificates.request",
       "schedules.view", "schedules.edit", "schedules.create", "schedules.delete", "schedules.assign",
       "holidays.view", "holidays.manage", "holidays.create", "holidays.edit", "holidays.delete",
       "reports.view", "reports.export", "reports.attendance", "reports.payroll", "reports.vacations", "reports.employees",
       "roles.view", "roles.manage", "roles.assign",
       "cost_centers.view", "cost_centers.create", "cost_centers.edit", "cost_centers.assign", "cost_centers.view_amounts", "cost_centers.delete",
-      "contracts.view", "contracts.view_amounts", "contracts.create", "contracts.edit", "contracts.delete", "contracts.sign",
+      "contracts.view", "contracts.view_amounts", "contracts.create", "contracts.edit", "contracts.delete", "contracts.sign", "contracts.templates", "contracts.renewal",
       "sites.view", "sites.create", "sites.edit", "sites.delete", "sites.manage",
       "departments.view", "departments.create", "departments.edit", "departments.delete", "departments.manage",
       "positions.view", "positions.create", "positions.edit", "positions.delete", "positions.manage",
       "banks.view", "banks.create", "banks.edit", "banks.delete",
+      "accounting.view", "accounting.manage",
+      "loans.view", "loans.manage",
     ],
     hr_readonly: [
       "employees.view",

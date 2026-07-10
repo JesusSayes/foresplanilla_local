@@ -14,6 +14,7 @@ const PERMISSION_GROUPS = {
     { key: "employees.import", label: "Importar empleados masivamente" },
     { key: "employees.export", label: "Exportar datos de empleados" },
     { key: "employees.change_status", label: "Cambiar estado de empleados" },
+    { key: "employees.orgchart", label: "Ver organigrama de la empresa" },
   ],
   "Asistencia": [
     { key: "attendance.view_own", label: "Ver propia asistencia" },
@@ -25,6 +26,7 @@ const PERMISSION_GROUPS = {
     { key: "attendance.approve_compensations", label: "Aprobar compensaciones de tardanzas y horas extras" },
     { key: "attendance.manage", label: "Gestión completa de asistencia" },
     { key: "attendance.export", label: "Exportar reportes de asistencia" },
+    { key: "attendance.devices", label: "Gestionar dispositivos y base de datos externa" },
   ],
   "Vacaciones": [
     { key: "vacations.view_own", label: "Ver propias vacaciones" },
@@ -44,6 +46,7 @@ const PERMISSION_GROUPS = {
     { key: "payroll.delete", label: "Eliminar boletas" },
     { key: "payroll.calculate", label: "Calcular nómina" },
     { key: "payroll.approve", label: "Aprobar nómina" },
+    { key: "payroll.concepts", label: "Gestionar conceptos de planilla" },
   ],
   "Contabilidad": [
     { key: "accounting.view", label: "Ver asientos contables" },
@@ -60,6 +63,8 @@ const PERMISSION_GROUPS = {
     { key: "contracts.edit", label: "Editar contratos" },
     { key: "contracts.delete", label: "Eliminar contratos" },
     { key: "contracts.sign", label: "Firmar contratos digitalmente" },
+    { key: "contracts.templates", label: "Gestionar plantillas de contratos" },
+    { key: "contracts.renewal", label: "Configurar automatización de renovación" },
   ],
   "Certificados": [
     { key: "certificates.view_own", label: "Ver propios certificados" },
@@ -123,6 +128,12 @@ const PERMISSION_GROUPS = {
     { key: "roles.assign", label: "Asignar roles a usuarios" },
     { key: "system.settings", label: "Configurar ajustes del sistema" },
     { key: "system.admin", label: "Acceso administrativo completo" },
+  ],
+  "Contabilidad y Préstamos": [
+    { key: "accounting.view", label: "Ver asientos y cuentas contables" },
+    { key: "accounting.manage", label: "Gestionar asientos contables" },
+    { key: "loans.view", label: "Ver préstamos" },
+    { key: "loans.manage", label: "Gestionar préstamos" },
   ],
 };
 
