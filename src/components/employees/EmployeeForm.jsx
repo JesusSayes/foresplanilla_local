@@ -650,8 +650,14 @@ export default function EmployeeForm({
               {formData.pension_system === "AFP" && (
                 <div className="grid grid-cols-3 gap-4 mt-2">
                     <div>
-                      <Label>Fecha Afiliación AFP</Label>
-                      <Input type="date" value={formData.afp_affiliation_date} onChange={(e) => setFormData({ ...formData, afp_affiliation_date: e.target.value })} />
+                      <Label>Fecha Afiliación AFP <span className="text-red-600">*</span></Label>
+                      <Input
+                        type="date"
+                        value={formData.afp_affiliation_date || ""}
+                        onChange={(e) => setFormData({ ...formData, afp_affiliation_date: e.target.value })}
+                        className={!formData.afp_affiliation_date ? "border-red-300" : ""}
+                      />
+                      {!formData.afp_affiliation_date && <p className="text-xs text-red-600 mt-1">⚠ Obligatorio cuando el sistema de pensiones es AFP</p>}
                     </div>
                     <div className="col-span-2">
                       <Label>CUSPP <span className="text-red-600">*</span></Label>
