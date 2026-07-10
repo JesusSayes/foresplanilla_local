@@ -100,6 +100,7 @@ export default function JustifyModal({
   const [dateRangeEnd, setDateRangeEnd]     = useState(null);
   const [extraDates, setExtraDates]         = useState([]);
   const [incidentTypes, setIncidentTypes]   = useState([]);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
 
   useEffect(() => {
     base44.entities.IncidentType.list().then(types =>
@@ -138,8 +139,13 @@ export default function JustifyModal({
   // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     setValidationError("");
+    setShowFieldErrors(true);
 
-    if (!justificationData.incident_type) { setValidationError("El campo 'Tipo de Incidente' es obligatorio."); return; }
+    if (!justificationData.incident_type) {
+      setValidationError("⚠ Falta seleccionar el Tipo de Incidente. Es un campo obligatorio.");
+      toast.error("Debe seleccionar un Tipo de Incidente antes de guardar.");
+      return;
+    }
     if (!justificationData.justification.trim()) { setValidationError("El campo 'Justificación' es obligatorio."); return; }
 
     const targetDates = getTargetDates();
@@ -483,9 +489,11 @@ export default function JustifyModal({
               </label>
               <Select
                 value={justificationData.incident_type}
-                onValueChange={(v) => { setJustificationData({ ...justificationData, incident_type: v }); setValidationError(""); setIncidentSearch(""); }}
+                onValueChange={(v) => { setJustificationData({ ...justificationData, incident_type: v }); setValidationError(""); setShowFieldErrors(false); setIncidentSearch(""); }}
               >
-                <SelectTrigger><SelectValue placeholder="Seleccionar tipo..." /></SelectTrigger>
+                <SelectTrigger className={showFieldErrors && !justificationData.incident_type ? "border-red-500 ring-2 ring-red-200" : ""}>
+                  <SelectValue placeholder="Seleccionar tipo..." />
+                </SelectTrigger>
                 <SelectContent>
                   <div className="p-2 border-b sticky top-0 bg-white z-10">
                     <Input placeholder="Buscar tipo..." value={incidentSearch}
@@ -503,10 +511,16 @@ export default function JustifyModal({
                      ))
                    : <div className="px-3 py-2 text-sm text-slate-400">Sin resultados</div>}
                 </SelectContent>
-              </Select>
-            </div>
+                </Select>
+                {showFieldErrors && !justificationData.incident_type && (
+                <p className="text-xs text-red-600 font-medium mt-1.5 flex items-center gap-1">
+                 <AlertCircle className="w-3 h-3" />
+                 Debe seleccionar un tipo de incidente para continuar.
+                </p>
+                )}
+                </div>
 
-            {/* ── Período a justificar ──────────────────────────────────── */}
+                {/* ── Período a justificar ──────────────────────────────────── */}
             <div>
               <label className="block text-sm font-semibold text-slate-900 mb-2">
                 Período a Justificar <span className="text-red-500">*</span>
@@ -600,7 +614,7 @@ export default function JustifyModal({
             {/* ── Acciones ──────────────────────────────────────────────── */}
             <div className="flex gap-3 pt-1">
               <Button variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>
-              <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleSubmit} disabled={submitting}>
+              <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleSubmit} disabled={submitting || !justificationData.incident_type}>
                 {submitting
                   ? "Guardando..."
                   : multiDateMode && targetDates.length > 1
