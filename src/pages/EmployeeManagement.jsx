@@ -691,6 +691,18 @@ export default function EmployeeManagement() {
       return;
     }
 
+    // Validar campos obligatorios de AFP (aplica tanto para crear como editar)
+    const afpErrors = [];
+    if (formData.pension_system === 'AFP') {
+      if (!formData.afp_id) afpErrors.push("La AFP Afiliada es obligatoria cuando el sistema de pensiones es AFP");
+      if (!formData.afp_affiliation_date) afpErrors.push("La Fecha de Afiliación AFP es obligatoria cuando el sistema de pensiones es AFP");
+      if (!formData.cuspp) afpErrors.push("El CUSPP es obligatorio cuando el sistema de pensiones es AFP");
+    }
+    if (afpErrors.length > 0) {
+      setFormErrors(afpErrors);
+      return;
+    }
+
     // Si está editando, permitir actualización parcial
     if (editingEmployee) {
       setFormErrors([]);
@@ -711,10 +723,6 @@ export default function EmployeeManagement() {
 
     if (formData.document_type === 'DNI' && formData.document_number && formData.document_number.length !== 8) {
       errors.push("El DNI debe tener exactamente 8 dígitos");
-    }
-
-    if (formData.pension_system === 'AFP' && !formData.cuspp) {
-      errors.push("El CUSPP es obligatorio cuando el sistema de pensiones es AFP");
     }
 
     // Validar documento duplicado
