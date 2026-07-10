@@ -27,6 +27,23 @@ import {
   getScheduleForDate,
 } from "@/lib/attendanceMetrics";
 
+const fmtHours = (h) => {
+  const val = h ?? 0;
+  const totalMinutes = Math.round(val * 60);
+  const hh = Math.floor(totalMinutes / 60);
+  const mm = totalMinutes % 60;
+  return `${hh}:${String(mm).padStart(2, "0")}`;
+};
+
+const fmtMinutes = (minutes) => {
+  const val = minutes ?? 0;
+  const sign = val < 0 ? "-" : val > 0 ? "+" : "";
+  const abs = Math.abs(val);
+  const hh = Math.floor(abs / 60);
+  const mm = abs % 60;
+  return `${sign}${hh}:${String(mm).padStart(2, "0")}`;
+};
+
 export default function CompensationModal({
   employee,
   employeeSchedule,
@@ -220,6 +237,25 @@ export default function CompensationModal({
     }));
   };
 
+  const selectAllCompensable = () => {
+    setSelectedDays((prev) => {
+      const next = { ...prev };
+      for (const day of allScheduledDays) {
+        if (compensatedDates.has(day.date)) continue;
+        if (day.lateMinutes > 0 || day.overtimeMinutes > 0) {
+          const minVal = Math.min(day.lateMinutes, day.overtimeMinutes);
+          next[day.date] = {
+            date: day.date,
+            recordId: day.record?.id || null,
+            lateMinutes: minVal > 0 ? minVal : day.lateMinutes,
+            overtimeMinutes: minVal > 0 ? minVal : day.overtimeMinutes,
+          };
+        }
+      }
+      return next;
+    });
+  };
+
   const autoFillAll = () => {
     setSelectedDays((prev) => {
       const next = { ...prev };
@@ -312,7 +348,7 @@ export default function CompensationModal({
                 </span>
               </div>
               <p className="text-xl font-bold text-slate-900">
-                {summary.scheduledHours.toFixed(1)}h
+                {fmtHours(summary.scheduledHours)}
               </p>
             </div>
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -323,7 +359,7 @@ export default function CompensationModal({
                 </span>
               </div>
               <p className="text-xl font-bold text-green-900">
-                {summary.regularHours.toFixed(1)}h
+                {fmtHours(summary.regularHours)}
               </p>
             </div>
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -334,7 +370,7 @@ export default function CompensationModal({
                 </span>
               </div>
               <p className="text-xl font-bold text-blue-900">
-                {summary.overtimeHours.toFixed(1)}h
+                {fmtHours(summary.overtimeHours)}
               </p>
             </div>
             <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
@@ -345,7 +381,7 @@ export default function CompensationModal({
                 </span>
               </div>
               <p className="text-xl font-bold text-orange-900">
-                {summary.lateMinutes} min
+                {fmtMinutes(summary.lateMinutes)}
               </p>
             </div>
           </div>
@@ -453,21 +489,32 @@ export default function CompensationModal({
 
           {/* Tabla de todos los días del período */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
               <p className="text-sm font-semibold text-slate-900">
                 Seleccione las fechas a compensar:
               </p>
-              {Object.keys(selectedDays).length > 0 && (
+              <div className="flex gap-2">
                 <Button
                   size="sm"
                   variant="outline"
                   className="h-7 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                  onClick={autoFillAll}
+                  onClick={selectAllCompensable}
                 >
                   <Zap className="w-3 h-3 mr-1" />
-                  Auto-completar todo
+                  Seleccionar días con compensación
                 </Button>
-              )}
+                {Object.keys(selectedDays).length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                    onClick={autoFillAll}
+                  >
+                    <Zap className="w-3 h-3 mr-1" />
+                    Auto-completar todo
+                  </Button>
+                )}
+              </div>
             </div>
             {allScheduledDays.length === 0 ? (
               <div className="text-center py-8 bg-slate-50 rounded-lg">
@@ -560,7 +607,7 @@ export default function CompensationModal({
                           <td className="px-2 py-2 text-center">
                             {day.hasRecord ? (
                               <span className="text-xs font-semibold text-green-700">
-                                {(day.workedHours ?? 0).toFixed(1)}h
+                                {fmtHours(day.workedHours ?? 0)}
                               </span>
                             ) : (
                               <span className="text-slate-300 text-xs">—</span>
@@ -591,7 +638,7 @@ export default function CompensationModal({
                                   <Input
                                     type="number"
                                     placeholder="tard"
-                                    className="h-7 w-14 text-xs text-center border-orange-300 focus:border-orange-500"
+                                    className="h-8 w-20 text-xs text-center border-orange-300 focus:border-orange-500"
                                     value={selectedDays[day.date]?.lateMinutes || ""}
                                     onChange={(e) =>
                                       updateCompensationMinutes(
@@ -604,7 +651,7 @@ export default function CompensationModal({
                                   <Input
                                     type="number"
                                     placeholder="HE"
-                                    className="h-7 w-14 text-xs text-center border-blue-300 focus:border-blue-500"
+                                    className="h-8 w-20 text-xs text-center border-blue-300 focus:border-blue-500"
                                     value={selectedDays[day.date]?.overtimeMinutes || ""}
                                     onChange={(e) =>
                                       updateCompensationMinutes(

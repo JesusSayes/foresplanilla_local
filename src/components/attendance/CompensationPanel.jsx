@@ -43,13 +43,19 @@ const PAGE_SIZE = 25;
 
 const fmtHours = (h) => {
   const val = h ?? 0;
-  return `${val.toFixed(1)}h`;
+  const totalMinutes = Math.round(val * 60);
+  const hh = Math.floor(totalMinutes / 60);
+  const mm = totalMinutes % 60;
+  return `${hh}:${String(mm).padStart(2, "0")}`;
 };
 
-const fmtBalance = (minutes) => {
-  if (minutes === 0) return "0 min";
-  const sign = minutes > 0 ? "+" : "";
-  return `${sign}${minutes} min`;
+const fmtMinutes = (minutes) => {
+  const val = minutes ?? 0;
+  const sign = val < 0 ? "-" : val > 0 ? "+" : "";
+  const abs = Math.abs(val);
+  const hh = Math.floor(abs / 60);
+  const mm = abs % 60;
+  return `${sign}${hh}:${String(mm).padStart(2, "0")}`;
 };
 
 export default function CompensationPanel({
@@ -475,7 +481,7 @@ export default function CompensationPanel({
               </span>
             </div>
             <p className="text-xl font-bold text-orange-900">
-              {periodTotals.late} min
+              {fmtMinutes(periodTotals.late)}
             </p>
           </div>
         </div>
@@ -710,11 +716,14 @@ export default function CompensationPanel({
                   <th className="text-center text-xs font-semibold text-orange-600 uppercase tracking-wide px-2 py-2">
                     Tardanzas
                     <span className="block text-[9px] font-normal text-slate-400">
-                      min
+                      hh:mm
                     </span>
                   </th>
                   <th className="text-center text-xs font-semibold text-indigo-600 uppercase tracking-wide px-2 py-2">
                     Balance
+                    <span className="block text-[9px] font-normal text-slate-400">
+                      hh:mm
+                    </span>
                   </th>
                   <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wide px-2 py-2">
                     Estado
@@ -832,7 +841,7 @@ export default function CompensationPanel({
                                 : "text-slate-300"
                             }`}
                           >
-                            {stat.totalLateMinutes} min
+                            {fmtMinutes(stat.totalLateMinutes)}
                           </span>
                           {stat.lateDays > 0 && (
                             <span className="block text-[9px] text-orange-400">
@@ -852,7 +861,7 @@ export default function CompensationPanel({
                                     : "text-slate-400"
                               }`}
                             >
-                              {fmtBalance(balanceMin)}
+                              {fmtMinutes(balanceMin)}
                             </span>
                           </div>
                         </td>

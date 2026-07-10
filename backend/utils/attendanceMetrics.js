@@ -15,6 +15,30 @@ export const calcDuration = (startMin, endMin) => {
   return d;
 };
 
+export const getSegmentClockTimes = (record) => {
+  if (!record) return { firstClockIn: null, lastClockOut: null };
+  const segFields = [
+    ["clock_in", "clock_out"],
+    ["clock_in_2", "clock_out_2"],
+    ["clock_in_3", "clock_out_3"],
+    ["clock_in_4", "clock_out_4"],
+  ];
+  const clockIns = [];
+  const clockOuts = [];
+  for (const [inField, outField] of segFields) {
+    const ci = record[inField] ? String(record[inField]).slice(0, 5) : null;
+    const co = record[outField] ? String(record[outField]).slice(0, 5) : null;
+    if (ci) clockIns.push(ci);
+    if (co) clockOuts.push(co);
+  }
+  clockIns.sort((a, b) => toMin(a) - toMin(b));
+  clockOuts.sort((a, b) => toMin(a) - toMin(b));
+  return {
+    firstClockIn: clockIns[0] || null,
+    lastClockOut: clockOuts[clockOuts.length - 1] || null,
+  };
+};
+
 export function calcEffectiveMetrics({
   record,
   approvedIncidents = [],
@@ -58,19 +82,26 @@ export function calcEffectiveMetrics({
   }
   const fullDayMins = Math.max(0, fullJornada - effectiveBreakMin);
 
+  const segFields = [
+    ["clock_in", "clock_out"],
+    ["clock_in_2", "clock_out_2"],
+    ["clock_in_3", "clock_out_3"],
+    ["clock_in_4", "clock_out_4"],
+  ];
   const rawIntervals = [];
-  const clockIn = record?.clock_in ? String(record.clock_in).slice(0, 5) : null;
-  const clockOut = record?.clock_out ? String(record.clock_out).slice(0, 5) : null;
-
-  if (clockIn && clockOut) {
-    let nIn = norm(toMin(clockIn));
-    let nOut = norm(toMin(clockOut));
-    if (isNightShift && nIn > fullJornada) nIn = 0;
-    if (nOut >= nIn) rawIntervals.push([nIn, nOut]);
-  } else if (clockIn) {
-    let nIn = norm(toMin(clockIn));
-    if (isNightShift && nIn > fullJornada) nIn = 0;
-    rawIntervals.push([nIn, normSchedEnd]);
+  for (const [inField, outField] of segFields) {
+    const ci = record?.[inField] ? String(record[inField]).slice(0, 5) : null;
+    const co = record?.[outField] ? String(record[outField]).slice(0, 5) : null;
+    if (ci && co) {
+      let nIn = norm(toMin(ci));
+      let nOut = norm(toMin(co));
+      if (isNightShift && nIn > fullJornada) nIn = 0;
+      if (nOut >= nIn) rawIntervals.push([nIn, nOut]);
+    } else if (ci) {
+      let nIn = norm(toMin(ci));
+      if (isNightShift && nIn > fullJornada) nIn = 0;
+      rawIntervals.push([nIn, normSchedEnd]);
+    }
   }
 
   for (const inc of approvedIncidents) {
@@ -117,27 +148,39 @@ export function calcEffectiveMetrics({
   const totalWorkedHours = totalWorkedMins / 60;
 
   let rawWorkedMin = 0;
-  if (clockIn && clockOut) {
-    let nIn = norm(toMin(clockIn));
-    let nOut = norm(toMin(clockOut));
-    if (isNightShift && nIn > fullJornada) nIn = 0;
-    const rawTotal = nOut >= nIn ? nOut - nIn : 0;
-    rawWorkedMin = Math.max(0, rawTotal - effectiveBreakMin);
-    rawWorkedMin = Math.min(rawWorkedMin, fullDayMins);
+  for (const [inField, outField] of segFields) {
+    const ci = record?.[inField] ? String(record[inField]).slice(0, 5) : null;
+    const co = record?.[outField] ? String(record[outField]).slice(0, 5) : null;
+    if (ci && co) {
+      let nIn = norm(toMin(ci));
+      let nOut = norm(toMin(co));
+      if (isNightShift && nIn > fullJornada) nIn = 0;
+      rawWorkedMin += Math.max(0, nOut >= nIn ? nOut - nIn : 0);
+    }
   }
+  rawWorkedMin = Math.max(0, rawWorkedMin - effectiveBreakMin);
+  rawWorkedMin = Math.min(rawWorkedMin, fullDayMins);
 
   const justifiedHours = Math.max(0, totalWorkedHours - rawWorkedMin / 60);
 
+  let earliestClockInNorm = null;
+  for (const [inField] of segFields) {
+    const ci = record?.[inField] ? String(record[inField]).slice(0, 5) : null;
+    if (!ci) continue;
+    let nIn = norm(toMin(ci));
+    if (isNightShift && nIn > fullJornada) nIn = 0;
+    if (earliestClockInNorm === null || nIn < earliestClockInNorm) {
+      earliestClockInNorm = nIn;
+    }
+  }
   let baseLateMin = 0;
-  if (clockIn) {
-    const nIn = norm(toMin(clockIn));
-    baseLateMin = nIn <= fullJornada ? Math.max(0, nIn - normSchedStart) : 0;
+  if (earliestClockInNorm !== null) {
+    baseLateMin = earliestClockInNorm <= fullJornada
+      ? Math.max(0, earliestClockInNorm - normSchedStart)
+      : 0;
   }
 
-  let effectiveStartMin = clockIn ? norm(toMin(clockIn)) : null;
-  if (effectiveStartMin !== null && isNightShift && effectiveStartMin > fullJornada) {
-    effectiveStartMin = 0;
-  }
+  let effectiveStartMin = earliestClockInNorm;
   for (const inc of approvedIncidents) {
     if (inc.full_day_justification) {
       effectiveStartMin = normSchedStart;
@@ -211,8 +254,8 @@ export function getScheduleForDate(employeeId, departmentName, schedules, dateSt
 }
 
 export function calcularMetricas(record, schedule, dateStr, overtimeAuthorized, approvedIncidents = []) {
-  const clockIn = record.clock_in;
-  const clockOut = record.clock_out;
+  const { firstClockIn } = getSegmentClockTimes(record);
+  const hasClockIn = Boolean(firstClockIn);
 
   const dow = new Date(dateStr + "T00:00:00").getDay();
 
@@ -260,7 +303,7 @@ export function calcularMetricas(record, schedule, dateStr, overtimeAuthorized, 
   let overtimeHours25 = 0;
   let overtimeHours35 = 0;
 
-  if (clockIn && clockOut) {
+  if (effective.rawWorkedHours > 0) {
     const scheduledStartMin = toMin(scheduledStart);
     const scheduledEndMin = toMin(scheduledEnd);
     const isNightShift = scheduledEndMin < scheduledStartMin;
@@ -272,15 +315,13 @@ export function calcularMetricas(record, schedule, dateStr, overtimeAuthorized, 
       : minutes;
     const normSchedStart = isNightShift ? 0 : scheduledStartMin;
     const normSchedEnd = isNightShift ? fullJornada : scheduledEndMin;
-    const normIn = norm(toMin(clockIn));
-    const normOut = norm(toMin(clockOut));
+    const normIn = norm(toMin(firstClockIn));
     const effectiveNormIn = (isNightShift && normIn > fullJornada) ? 0 : normIn;
     const effectiveBreakMinutes = fullJornada < 360 ? 0 : breakMinutes;
 
-    const rawWorkedMinutes = Math.max(0, (normOut >= effectiveNormIn ? normOut - effectiveNormIn : 0) - effectiveBreakMinutes);
     const effectiveStart = Math.max(effectiveNormIn, normSchedStart);
     const regularMinutesMax = Math.max(0, normSchedEnd - effectiveStart - effectiveBreakMinutes);
-    const extraHours = Math.max(0, rawWorkedMinutes / 60 - regularMinutesMax / 60);
+    const extraHours = Math.max(0, effective.rawWorkedHours - regularMinutesMax / 60);
     if (overtimeAuthorized) {
       overtimeHours25 = Math.min(extraHours, 2);
       overtimeHours35 = Math.max(0, extraHours - 2);
@@ -296,7 +337,7 @@ export function calcularMetricas(record, schedule, dateStr, overtimeAuthorized, 
     overtime_hours_35: overtimeHours35,
     is_late: isLate,
     late_minutes: lateMinutes,
-    is_absent: !clockIn && effective.totalWorkedHours === 0 && record.status === "Ausente",
+    is_absent: !hasClockIn && effective.totalWorkedHours === 0 && record.status === "Ausente",
     scheduled_start: scheduledStart,
     scheduled_end: scheduledEnd,
   };

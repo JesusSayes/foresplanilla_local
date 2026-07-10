@@ -194,6 +194,9 @@ Deno.serve(async (req) => {
           if (existingDates.has(dateStr)) continue;
           if (holidayDates.has(dateStr)) continue;
 
+          // No generar registros después de la fecha de cese del empleado
+          if (emp.termination_date && dateStr > emp.termination_date.slice(0, 10)) continue;
+
           const schedule = getScheduleForDate(emp.id, emp.department_name, activeScheds, dateStr);
           if (!schedule) continue;
 
