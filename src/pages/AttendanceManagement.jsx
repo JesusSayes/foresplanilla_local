@@ -22,7 +22,7 @@ import { createPageUrl } from "@/utils";
 import { todayLima, todayDateLima, parseDateLima, dateToStringLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
-import { calcEffectiveMetrics, toMin as attToMin } from "@/lib/attendanceMetrics";
+import { calcEffectiveMetrics, toMin as attToMin, getSegmentClockTimes } from "@/lib/attendanceMetrics";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
 import JustifyModal from "../components/attendance/JustifyModal";
@@ -797,7 +797,7 @@ export default function AttendanceManagement() {
       if (attendanceFilter === "all") return true;
       if (attendanceFilter === "sin_entrada") return !emp.record?.clock_in;
       if (attendanceFilter === "sin_salida") return emp.record?.clock_in && !emp.record?.clock_out;
-      if (attendanceFilter === "con_tardanza") return emp.record?.is_late;
+      if (attendanceFilter === "con_tardanza") return (emp.record?.late_minutes ?? 0) > 0;
       return true;
     });
   } else {
@@ -821,7 +821,7 @@ export default function AttendanceManagement() {
       if (attendanceFilter === "all") return true;
       if (attendanceFilter === "sin_entrada") return !emp.record.clock_in;
       if (attendanceFilter === "sin_salida") return emp.record.clock_in && !emp.record.clock_out;
-      if (attendanceFilter === "con_tardanza") return emp.record.is_late;
+      if (attendanceFilter === "con_tardanza") return (emp.record?.late_minutes ?? 0) > 0;
       return true;
     });
     } // end else (fecha no futura)
@@ -1048,8 +1048,9 @@ export default function AttendanceManagement() {
       }
 
       // Para vacaciones: mostrar horario programado como marcación (salvo día libre)
-      let entradaExcel = timeStrToExcelFraction(emp.record?.clock_in);
-      let salidaExcel  = timeStrToExcelFraction(emp.record?.clock_out);
+      const { firstClockIn: rowFirstIn, lastClockOut: rowLastOut } = getSegmentClockTimes(emp.record);
+      let entradaExcel = timeStrToExcelFraction(rowFirstIn);
+      let salidaExcel  = timeStrToExcelFraction(rowLastOut);
       if (estadoMarcacion === 'Vacaciones' && !isDayOffEx) {
         entradaExcel = timeStrToExcelFraction(schedStartEx);
         salidaExcel  = timeStrToExcelFraction(schedEndEx);
@@ -1129,7 +1130,7 @@ export default function AttendanceManagement() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) { toast.error('Por favor, permite las ventanas emergentes para imprimir'); return; }
     const filterText = attendanceFilter === "all" ? "Todos los empleados" : attendanceFilter === "sin_entrada" ? "Sin marcar entrada" : attendanceFilter === "sin_salida" ? "Sin marcar salida" : "Con tardanza";
-    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>DNI</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; return `<tr><td>${emp.document_number}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${emp.record?.clock_in || '--:--'}</td><td>${emp.record?.clock_out || '--:--'}</td><td>${wh.toFixed(2)}h</td><td class="${emp.record?.is_late ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h</td><td>${(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
+    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>DNI</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; const ct = getSegmentClockTimes(emp.record); return `<tr><td>${emp.document_number}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${ct.firstClockIn || '--:--'}</td><td>${ct.lastClockOut || '--:--'}</td><td>${wh.toFixed(2)}h</td><td class="${(emp.record?.late_minutes ?? 0) > 0 ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h</td><td>${(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
     printWindow.document.write(printContent);
     printWindow.document.close();
   };
@@ -1316,7 +1317,7 @@ export default function AttendanceManagement() {
             {[
               { label: "Total empleados", value: siteAllowedEmployees.length, icon: Users, color: "blue" },
               { label: "Han marcado", value: todayRecords.filter(r => r.clock_in).length, icon: CheckCircle, color: "green" },
-              { label: "Tardanzas", value: todayRecords.filter(r => r.is_late).length, icon: Clock, color: "yellow" },
+              { label: "Tardanzas", value: todayRecords.filter(r => (r.late_minutes ?? 0) > 0).length, icon: Clock, color: "yellow" },
               { label: "Justificaciones", value: pendingIncidents.length, icon: AlertCircle, color: "orange" },
               { label: "De vacaciones", value: approvedVacations.filter(v => accessibleEmployeeIds.has(v.employee_id)).length, icon: Palmtree, color: "amber" },
             ].map(({ label, value, icon: Icon, color }) => (
@@ -1591,18 +1592,24 @@ export default function AttendanceManagement() {
                                  {format(parseDateLima(rowDate), "dd MMM", { locale: es })}
                                 </span>
                               </td>
-                              {/* Entrada */}
+                              {/* Entrada — primera entrada real del día (todos los segmentos) */}
                               <td className="px-2 py-2 text-center">
                                 {vacation
                                   ? <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{scheduledTimes?.start}</span>
-                                  : <span className={`text-sm font-bold ${emp.record?.clock_in ? 'text-slate-900' : 'text-slate-300'}`}>{emp.record?.clock_in ? emp.record.clock_in.slice(0, 5) : "--:--"}</span>
+                                  : (() => {
+                                      const { firstClockIn } = getSegmentClockTimes(emp.record);
+                                      return <span className={`text-sm font-bold ${firstClockIn ? 'text-slate-900' : 'text-slate-300'}`}>{firstClockIn || "--:--"}</span>;
+                                    })()
                                 }
                               </td>
-                              {/* Salida */}
+                              {/* Salida — última salida real del día (todos los segmentos) */}
                               <td className="px-2 py-2 text-center">
                                 {vacation
                                   ? <span className="text-xs font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{scheduledTimes?.end}</span>
-                                  : <span className={`text-sm font-bold ${emp.record?.clock_out ? 'text-slate-900' : 'text-slate-300'}`}>{emp.record?.clock_out ? emp.record.clock_out.slice(0, 5) : "--:--"}</span>
+                                  : (() => {
+                                      const { lastClockOut } = getSegmentClockTimes(emp.record);
+                                      return <span className={`text-sm font-bold ${lastClockOut ? 'text-slate-900' : 'text-slate-300'}`}>{lastClockOut || "--:--"}</span>;
+                                    })()
                                 }
                               </td>
                               {/* Horas — cobertura real: asistencia + justificadas aprobadas (sin duplicar) */}

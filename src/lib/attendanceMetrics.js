@@ -33,6 +33,30 @@ export const calcDuration = (startMin, endMin) => {
  * normaliza todos los tiempos relativos al inicio del turno para trabajar
  * en un espacio lineal [0, fullJornada].
  */
+/**
+ * Obtiene la primera entrada y la última salida registradas del día,
+ * considerando todos los segmentos de marcación disponibles (1-4).
+ * Devuelve { firstClockIn, lastClockOut } en formato "HH:mm" o null.
+ */
+export const getSegmentClockTimes = (record) => {
+  if (!record) return { firstClockIn: null, lastClockOut: null };
+  const segFields = [
+    ["clock_in", "clock_out"],
+    ["clock_in_2", "clock_out_2"],
+    ["clock_in_3", "clock_out_3"],
+    ["clock_in_4", "clock_out_4"],
+  ];
+  let firstClockIn = null;
+  let lastClockOut = null;
+  for (const [inField, outField] of segFields) {
+    const ci = record[inField] ? String(record[inField]).slice(0, 5) : null;
+    const co = record[outField] ? String(record[outField]).slice(0, 5) : null;
+    if (ci && firstClockIn === null) firstClockIn = ci;
+    if (co) lastClockOut = co;
+  }
+  return { firstClockIn, lastClockOut };
+};
+
 export function calcEffectiveMetrics({
   record,
   approvedIncidents = [],
@@ -78,21 +102,28 @@ export function calcEffectiveMetrics({
   }
   const fullDayMins = Math.max(0, fullJornada - effectiveBreakMin);
 
-  // ── Build intervals in normalized space ──────────────────────────────────
+  // ── Build intervals in normalized space (all segments) ───────────────────
+  const segFields = [
+    ["clock_in", "clock_out"],
+    ["clock_in_2", "clock_out_2"],
+    ["clock_in_3", "clock_out_3"],
+    ["clock_in_4", "clock_out_4"],
+  ];
   const rawIntervals = [];
-  const clockIn  = record?.clock_in  ? String(record.clock_in).slice(0, 5)  : null;
-  const clockOut = record?.clock_out ? String(record.clock_out).slice(0, 5) : null;
-
-  if (clockIn && clockOut) {
-    let nIn  = norm(toMin(clockIn));
-    let nOut = norm(toMin(clockOut));
-    // Pre-shift clock-in: treat as arriving at shift start
-    if (isNightShift && nIn > fullJornada) nIn = 0;
-    if (nOut >= nIn) rawIntervals.push([nIn, nOut]);
-  } else if (clockIn) {
-    let nIn = norm(toMin(clockIn));
-    if (isNightShift && nIn > fullJornada) nIn = 0;
-    rawIntervals.push([nIn, normSchedEnd]);
+  for (const [inField, outField] of segFields) {
+    const ci = record?.[inField]  ? String(record[inField]).slice(0, 5)  : null;
+    const co = record?.[outField] ? String(record[outField]).slice(0, 5) : null;
+    if (ci && co) {
+      let nIn  = norm(toMin(ci));
+      let nOut = norm(toMin(co));
+      // Pre-shift clock-in: treat as arriving at shift start
+      if (isNightShift && nIn > fullJornada) nIn = 0;
+      if (nOut >= nIn) rawIntervals.push([nIn, nOut]);
+    } else if (ci) {
+      let nIn = norm(toMin(ci));
+      if (isNightShift && nIn > fullJornada) nIn = 0;
+      rawIntervals.push([nIn, normSchedEnd]);
+    }
   }
 
   for (const inc of approvedIncidents) {
@@ -140,31 +171,43 @@ export function calcEffectiveMetrics({
   const totalWorkedMins  = Math.min(coverageMins, fullDayMins);
   const totalWorkedHours = totalWorkedMins / 60;
 
-  // ── Raw worked hours (clock-based only) ─────────────────────────────────
+  // ── Raw worked hours (clock-based only, sum of all segment pairs) ────────
   let rawWorkedMin = 0;
-  if (clockIn && clockOut) {
-    let nIn  = norm(toMin(clockIn));
-    let nOut = norm(toMin(clockOut));
-    if (isNightShift && nIn > fullJornada) nIn = 0;
-    const rawTotal = nOut >= nIn ? nOut - nIn : 0;
-    rawWorkedMin = Math.max(0, rawTotal - effectiveBreakMin);
-    rawWorkedMin = Math.min(rawWorkedMin, fullDayMins);
+  for (const [inField, outField] of segFields) {
+    const ci = record?.[inField]  ? String(record[inField]).slice(0, 5)  : null;
+    const co = record?.[outField] ? String(record[outField]).slice(0, 5) : null;
+    if (ci && co) {
+      let nIn  = norm(toMin(ci));
+      let nOut = norm(toMin(co));
+      if (isNightShift && nIn > fullJornada) nIn = 0;
+      rawWorkedMin += Math.max(0, nOut >= nIn ? nOut - nIn : 0);
+    }
   }
+  // Discount break once for the whole day
+  rawWorkedMin = Math.max(0, rawWorkedMin - effectiveBreakMin);
+  rawWorkedMin = Math.min(rawWorkedMin, fullDayMins);
 
   const justifiedHours = Math.max(0, totalWorkedHours - rawWorkedMin / 60);
 
-  // ── Lateness ────────────────────────────────────────────────────────────
+  // ── Lateness (from earliest clock_in across all segments) ────────────────
+  let earliestClockInNorm = null;
+  for (const [inField] of segFields) {
+    const ci = record?.[inField] ? String(record[inField]).slice(0, 5) : null;
+    if (!ci) continue;
+    let nIn = norm(toMin(ci));
+    if (isNightShift && nIn > fullJornada) nIn = 0; // pre-shift arrival
+    if (earliestClockInNorm === null || nIn < earliestClockInNorm) {
+      earliestClockInNorm = nIn;
+    }
+  }
   let baseLateMin = 0;
-  if (clockIn) {
-    const nIn = norm(toMin(clockIn));
-    // Only late if within the shift window (pre-shift arrivals = not late)
-    baseLateMin = (nIn <= fullJornada) ? Math.max(0, nIn - normSchedStart) : 0;
+  if (earliestClockInNorm !== null) {
+    baseLateMin = (earliestClockInNorm <= fullJornada)
+      ? Math.max(0, earliestClockInNorm - normSchedStart)
+      : 0;
   }
 
-  let effectiveStartMin = clockIn ? norm(toMin(clockIn)) : null;
-  if (effectiveStartMin !== null && isNightShift && effectiveStartMin > fullJornada) {
-    effectiveStartMin = 0;
-  }
+  let effectiveStartMin = earliestClockInNorm;
   for (const inc of approvedIncidents) {
     if (inc.full_day_justification) {
       effectiveStartMin = normSchedStart;
