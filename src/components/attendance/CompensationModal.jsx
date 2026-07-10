@@ -72,6 +72,7 @@ export default function CompensationModal({
   const [authorizerSearch, setAuthorizerSearch] = useState("");
   const [showAuthorizerList, setShowAuthorizerList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   const allEmployeeRecords = useMemo(() => {
     if (!employee) return [];
@@ -257,8 +258,11 @@ export default function CompensationModal({
     if (!compensationReason.trim()) return;
     if (!authorizer) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       await onSubmit(selectedList, compensationReason, authorizer);
+    } catch (error) {
+      setSubmitError(error?.message || "Ocurrió un error al registrar la compensación.");
     } finally {
       setSubmitting(false);
     }
@@ -701,6 +705,14 @@ export default function CompensationModal({
                   Autorizador: {authorizer.first_name} {authorizer.last_name}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Error de envío */}
+          {submitError && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700">{submitError}</p>
             </div>
           )}
 
