@@ -28,6 +28,7 @@ export const generateAutoClockings = async (targetDate = new Date()) => {
     let recordsCreated = 0;
 
     for (const employee of employees) {
+      // No generar registros fuera del período laboral, incluyendo fecha de cese.
       if (!isEmploymentDateValid(employee, dateStr)) continue;
 
       // Verificar si ya tiene marcación
@@ -56,8 +57,10 @@ export const generateAutoClockings = async (targetDate = new Date()) => {
       // Calcular horas trabajadas
       const [startHour, startMin] = startTime.split(":").map(Number);
       const [endHour, endMin] = endTime.split(":").map(Number);
-      const totalMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin) - (schedule.break_duration_minutes || 60);
-      const workedHours = Math.max(0, totalMinutes / 60);
+      let scheduledMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
+      if (scheduledMinutes < 0) scheduledMinutes += 1440;
+      const effectiveBreakMinutes = scheduledMinutes < 360 ? 0 : (schedule.break_duration_minutes || 60);
+      const workedHours = Math.max(0, (scheduledMinutes - effectiveBreakMinutes) / 60);
 
       // Crear registro automático
       await entitiesAPI.AttendanceRecord.create({
