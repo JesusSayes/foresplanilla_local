@@ -114,16 +114,8 @@ export default function AttendanceEditRequestModal({ record, employee, requester
         setErrorMsg(`Formato de hora inválido en ${seg.label}. Usa el formato HH:mm.`);
         return;
       }
-      // If one side filled, require the other
-      if (inVal && !outVal) {
-        setErrorMsg(`${seg.label}: si ingresas entrada debes ingresar también la salida.`);
-        return;
-      }
-      if (!inVal && outVal) {
-        setErrorMsg(`${seg.label}: si ingresas salida debes ingresar también la entrada.`);
-        return;
-      }
-      // Segment 1 diurno: out > in
+      // Permite edición parcial: solo entrada, solo salida, o ambos.
+      // Segment 1 diurno: out > in (solo si ambos están presentes)
       if (i === 0 && inVal && outVal) {
         if (!isNightShift && inVal >= outVal) {
           setErrorMsg("Segmento 1: la hora de salida debe ser posterior a la de entrada.");
@@ -259,7 +251,7 @@ export default function AttendanceEditRequestModal({ record, employee, requester
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Salida {formValues[seg.inKey] && !formValues[seg.outKey] && <span className="text-red-500">*</span>}
+                      Salida
                     </label>
                     <div className="flex items-center gap-1">
                       <Input

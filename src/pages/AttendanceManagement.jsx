@@ -941,9 +941,14 @@ export default function AttendanceManagement() {
       const dowForRow = new Date(rowDate + "T00:00:00").getDay();
       const stMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
       const enMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-      const horarioProg = schedForRow
-        ? `${schedForRow[stMap[dowForRow]] || '--'}–${schedForRow[enMap[dowForRow]] || '--'}`
-        : 'Sin horario';
+      const schedStRaw = schedForRow?.[stMap[dowForRow]] || null;
+      const schedEnRaw = schedForRow?.[enMap[dowForRow]] || null;
+      const isDayOff = schedForRow && (!schedStRaw || !schedEnRaw);
+      const horarioProg = !schedForRow
+        ? 'Sin horario'
+        : isDayOff
+          ? 'Día libre'
+          : `${schedStRaw}–${schedEnRaw}`;
 
       // Buscar TODOS los incidentes para este empleado y fecha
       const incidentsForRow = freshIncidents.filter(
@@ -973,6 +978,7 @@ export default function AttendanceManagement() {
       const enMap2 = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
       const schedStartEx = schedForRowEx?.[stMap2[dowForRow2]] || "09:00";
       const schedEndEx   = schedForRowEx?.[enMap2[dowForRow2]] || "18:00";
+      const isDayOffEx = schedForRowEx && (!schedForRowEx[stMap2[dowForRow2]] || !schedForRowEx[enMap2[dowForRow2]]);
       const breakMinEx   = schedForRowEx?.break_duration_minutes ?? 60;
       const breakStEx    = schedForRowEx?.break_start || null;
 
@@ -982,10 +988,10 @@ export default function AttendanceManagement() {
 
       let excelHours, excelLate;
       if (estadoMarcacion === 'Vacaciones') {
-        excelHours = schedForRowEx ? Math.max(0, (
+        excelHours = (schedForRowEx && !isDayOffEx) ? Math.max(0, (
           (parseInt(schedEndEx.split(':')[0]) * 60 + parseInt(schedEndEx.split(':')[1])) -
           (parseInt(schedStartEx.split(':')[0]) * 60 + parseInt(schedStartEx.split(':')[1])) - breakMinEx
-        ) / 60) : 8;
+        ) / 60) : 0;
         excelLate = 0;
       } else {
         const excelMetrics = calcEffectiveMetrics({
@@ -1041,10 +1047,10 @@ export default function AttendanceManagement() {
         tiempoPapeleta = `${justMetrics.totalWorkedHours.toFixed(2)} h`;
       }
 
-      // Para vacaciones: mostrar horario programado como marcación
+      // Para vacaciones: mostrar horario programado como marcación (salvo día libre)
       let entradaExcel = timeStrToExcelFraction(emp.record?.clock_in);
       let salidaExcel  = timeStrToExcelFraction(emp.record?.clock_out);
-      if (estadoMarcacion === 'Vacaciones') {
+      if (estadoMarcacion === 'Vacaciones' && !isDayOffEx) {
         entradaExcel = timeStrToExcelFraction(schedStartEx);
         salidaExcel  = timeStrToExcelFraction(schedEndEx);
       }
