@@ -1055,9 +1055,13 @@ export default function AttendanceManagement() {
         salidaExcel  = timeStrToExcelFraction(schedEndEx);
       }
 
+      const diaSemana = format(parseDateLima(rowDate), "EEEE", { locale: es });
+      const diaSemanaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+
       return {
         'Horario Programado': horarioProg,
         'Fecha': rowDate,
+        'Día': diaSemanaCap,
         'Tipo Doc': emp.document_type,
         'DNI': emp.document_number,
         'Nombres': emp.first_name,

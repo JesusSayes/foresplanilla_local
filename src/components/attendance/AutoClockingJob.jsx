@@ -27,6 +27,13 @@ export const generateAutoClockings = async (targetDate = new Date()) => {
     let recordsCreated = 0;
     
     for (const employee of employees) {
+      // No generar registros después de la fecha de cese del empleado
+      if (employee.termination_date) {
+        const termination = new Date(employee.termination_date + "T00:00:00");
+        const target = new Date(dateStr + "T00:00:00");
+        if (target > termination) continue;
+      }
+
       // Verificar si ya tiene marcación
       const hasRecord = existingRecords.some(r => r.employee_id === employee.id);
       if (hasRecord) continue;
