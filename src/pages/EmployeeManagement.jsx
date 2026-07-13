@@ -21,6 +21,7 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import EmployeeHistory from "../components/employees/EmployeeHistory";
+import AFPChangeHistoryPanel from "../components/employees/AFPChangeHistoryPanel";
 import EmployeeForm from "../components/employees/EmployeeForm";
 import ImportDerechohabientesModal from "../components/employees/ImportDerechohabientesModal";
 
@@ -324,12 +325,52 @@ export default function EmployeeManagement() {
           });
         }
       }
-      
+
+      // Auto-registrar cambio de AFP si cambiaron campos relacionados
+      const afpFields = ["pension_system", "afp_id", "afp_commission_type", "cuspp"];
+      const afpChanged = afpFields.some(f =>
+        cleanData[f] !== undefined && String(cleanData[f] || "") !== String(oldData[f] || "")
+      );
+      if (afpChanged) {
+        const oldAFPName = afps.find(a => a.id === oldData.afp_id)?.name || "";
+        const newAFPId = cleanData.afp_id !== undefined ? cleanData.afp_id : oldData.afp_id;
+        const newAFPName = afps.find(a => a.id === newAFPId)?.name || "";
+        const changeType = cleanData.pension_system !== undefined && cleanData.pension_system !== oldData.pension_system
+          ? "Cambio de Sistema de Pensiones"
+          : cleanData.afp_id !== undefined && cleanData.afp_id !== oldData.afp_id
+            ? "Cambio de AFP"
+            : cleanData.afp_commission_type !== undefined && cleanData.afp_commission_type !== oldData.afp_commission_type
+              ? "Cambio de Comisión"
+              : "Cambio de CUSPP";
+        try {
+          await base44.entities.AFPChangeHistory.create({
+            employee_id: id,
+            change_date: new Date().toISOString().slice(0, 10),
+            previous_pension_system: oldData.pension_system || "",
+            new_pension_system: cleanData.pension_system !== undefined ? cleanData.pension_system : (oldData.pension_system || ""),
+            previous_afp_id: oldData.afp_id || "",
+            previous_afp_name: oldAFPName,
+            new_afp_id: newAFPId || "",
+            new_afp_name: newAFPName,
+            previous_commission_type: oldData.afp_commission_type || "",
+            new_commission_type: cleanData.afp_commission_type !== undefined ? cleanData.afp_commission_type : (oldData.afp_commission_type || ""),
+            previous_cuspp: oldData.cuspp || "",
+            new_cuspp: cleanData.cuspp !== undefined ? cleanData.cuspp : (oldData.cuspp || ""),
+            change_type: changeType,
+            change_reason: "Cambio registrado desde edición de empleado",
+            changed_by: currentUser?.email || "Sistema",
+          });
+        } catch (e) {
+          console.error("Error registrando cambio de AFP:", e);
+        }
+      }
+
       return updatedEmployee;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["allEmployees"]);
       queryClient.invalidateQueries(["employeeChanges"]);
+      queryClient.invalidateQueries(["afpChangeHistory"]);
       toast.success("✅ Empleado actualizado exitosamente");
       resetForm();
     },
@@ -1262,6 +1303,15 @@ export default function EmployeeManagement() {
                     <p>{selectedEmployee.department}</p>
                   </div>
                 </div>
+              </div>
+
+              {/* Historial de Cambios de AFP */}
+              <div className="mt-2">
+                <AFPChangeHistoryPanel
+                  employee={selectedEmployee}
+                  afps={afps}
+                  canEdit={hasPermission("employees.edit")}
+                />
               </div>
             </CardContent>
           </Card>

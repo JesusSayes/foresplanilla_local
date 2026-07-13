@@ -1,0 +1,146 @@
+{
+  "name": "AFPChangeHistory",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "change_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha efectiva del cambio de AFP o comisi\u00f3n"
+    },
+    "previous_pension_system": {
+      "type": "string",
+      "description": "Sistema de pensiones anterior"
+    },
+    "new_pension_system": {
+      "type": "string",
+      "description": "Sistema de pensiones nuevo"
+    },
+    "previous_afp_id": {
+      "type": "string",
+      "description": "ID de la AFP anterior"
+    },
+    "previous_afp_name": {
+      "type": "string",
+      "description": "Nombre de la AFP anterior"
+    },
+    "new_afp_id": {
+      "type": "string",
+      "description": "ID de la nueva AFP"
+    },
+    "new_afp_name": {
+      "type": "string",
+      "description": "Nombre de la nueva AFP"
+    },
+    "previous_commission_type": {
+      "type": "string",
+      "description": "Tipo de comisi\u00f3n AFP anterior (Flujo o Mixta)"
+    },
+    "new_commission_type": {
+      "type": "string",
+      "description": "Tipo de comisi\u00f3n AFP nuevo (Flujo o Mixta)"
+    },
+    "previous_cuspp": {
+      "type": "string",
+      "description": "CUSPP anterior"
+    },
+    "new_cuspp": {
+      "type": "string",
+      "description": "CUSPP nuevo"
+    },
+    "change_type": {
+      "type": "string",
+      "enum": [
+        "Cambio de AFP",
+        "Cambio de Comisi\u00f3n",
+        "Cambio de CUSPP",
+        "Cambio de Sistema de Pensiones",
+        "Registro Inicial",
+        "Otro"
+      ],
+      "default": "Otro",
+      "description": "Tipo de cambio registrado"
+    },
+    "change_reason": {
+      "type": "string",
+      "description": "Motivo del cambio"
+    },
+    "changed_by": {
+      "type": "string",
+      "description": "Email de quien registr\u00f3 el cambio"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "employee_id",
+    "change_date",
+    "change_type"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_edit_employees": true
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_view_all_employees": true
+          }
+        },
+        {
+          "data.employee_id": "{{user.data.employee_id}}"
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_edit_employees": true
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_delete_employees": true
+          }
+        }
+      ]
+    }
+  }
+}

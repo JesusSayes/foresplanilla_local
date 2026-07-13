@@ -651,9 +651,22 @@ export default function EmployeeForm({
                         onChange={(e) => setFormData({ ...formData, afp_affiliation_date: e.target.value })}
                         className={!formData.afp_affiliation_date ? "border-red-300" : ""}
                       />
-                      {!formData.afp_affiliation_date && <p className="text-xs text-red-600 mt-1">⚠ Obligatorio cuando el sistema de pensiones es AFP</p>}
+                      {!formData.afp_affiliation_date && <p className="text-xs text-red-600 mt-1">⚠ Obligatorio</p>}
                     </div>
-                    <div className="col-span-2">
+                    <div>
+                      <Label>Tipo de Comisión AFP</Label>
+                      <Select
+                        value={formData.afp_commission_type || ""}
+                        onValueChange={(v) => setFormData({ ...formData, afp_commission_type: v })}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Flujo">Flujo</SelectItem>
+                          <SelectItem value="Mixta">Mixta</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3">
                       <Label>CUSPP <span className="text-red-600">*</span></Label>
                       <Input
                         value={formData.cuspp || ""}
