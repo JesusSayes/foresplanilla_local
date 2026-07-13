@@ -422,34 +422,55 @@ export default function PayrollManagement() {
     // Excluir empleados que el usuario haya quitado
     filteredEmployees = filteredEmployees.filter(emp => !excludedEmployees.includes(emp.id));
 
-    // Batch fetch: TODOS los contratos (no solo Vigente) para soportar planillas retroactivas
-    // y cambios anticipados. Se busca el contrato válido para el período de planilla.
+    // Batch fetch: TODOS los contratos (historial completo) para consultar sueldo vigente exacto.
+    // Se usa filter con límite alto para evitar pérdida por paginación.
     const allContracts = filteredEmployees.length > 0
-      ? await withRetry(() => base44.entities.Contract.list())
+      ? await withRetry(() => base44.entities.Contract.filter({}, '-start_date', 500))
       : [];
 
-    // Helper: encuentra el contrato válido para el período (mes/año) usando periodStart/periodEnd ya declarados
+    // Helper: encuentra el contrato con sueldo vigente exacto para el período de planilla.
+    // Estrategia de prioridad:
+    //   1. Contrato que solapa el período (start_date ≤ fin mes, end_date ≥ inicio mes o nulo)
+    //   2. Si ninguno solapa (cese/liquidación post-período): el más reciente cuyo inicio ≤ fin del período
+    //   3. Último recurso: el contrato más reciente disponible
     const getContractForPeriod = (employeeId) => {
-      const empContracts = allContracts.filter(c => c.employee_id === employeeId);
-      const sorted = empContracts.sort((a, b) => {
-        const da = new Date((a.start_date || "1900-01-01").split("T")[0]);
-        const db = new Date((b.start_date || "1900-01-01").split("T")[0]);
-        return db - da;
-      });
-      return sorted.find(c => {
+      const empContracts = allContracts
+        .filter(c => c.employee_id === employeeId)
+        .sort((a, b) => {
+          const da = new Date((a.start_date || "1900-01-01").split("T")[0]);
+          const db = new Date((b.start_date || "1900-01-01").split("T")[0]);
+          return db - da; // más reciente primero
+        });
+
+      if (empContracts.length === 0) return null;
+
+      // 1. Contrato que solapa el período exactamente
+      const overlapping = empContracts.find(c => {
         if (!c.start_date) return false;
         const startDate = new Date(c.start_date.split("T")[0]);
         const endDate = c.end_date ? new Date(c.end_date.split("T")[0]) : null;
         return startDate <= periodEnd && (!endDate || endDate >= periodStart);
       });
+      if (overlapping) return overlapping;
+
+      // 2. Más reciente cuyo inicio fue antes o durante el período (regularización post-cese)
+      const closestBefore = empContracts.find(c => {
+        if (!c.start_date) return false;
+        return new Date(c.start_date.split("T")[0]) <= periodEnd;
+      });
+      if (closestBefore) return closestBefore;
+
+      // 3. Último recurso: el más reciente sin restricción de fecha
+      return empContracts[0];
     };
 
-    // Enriquecer empleados con el monto del contrato válido para el período
-    // (soporta planillas retroactivas y cambios anticipados de contrato)
+    // Enriquecer SIEMPRE con el sueldo del contrato vigente del período.
+    // El base_salary del empleado solo se usa como último recurso si no existe
+    // ningún contrato con salario registrado.
     const enrichedEmployees = await mapWithConcurrency(filteredEmployees, async (emp) => {
       const periodContract = getContractForPeriod(emp.id);
 
-      if (periodContract && periodContract.salary && parseFloat(periodContract.salary) > 0) {
+      if (periodContract && periodContract.salary != null && parseFloat(periodContract.salary) > 0) {
         const contractSalary = parseFloat(periodContract.salary);
         const currentSalary = parseFloat(emp.base_salary) || 0;
         return {
@@ -464,14 +485,7 @@ export default function PayrollManagement() {
         };
       }
 
-      // Sin contrato para el período: usar salario actual del empleado
-      if (!emp.base_salary || parseFloat(emp.base_salary) <= 0) {
-        const empContracts = allContracts.filter(c => c.employee_id === emp.id && c.status === "Vigente");
-        const activeContract = empContracts.find(c => c.salary && parseFloat(c.salary) > 0);
-        if (activeContract) {
-          return { ...emp, base_salary: parseFloat(activeContract.salary) };
-        }
-      }
+      // Sin contrato con salario válido: último recurso es el base_salary del empleado
       return emp;
     });
 
