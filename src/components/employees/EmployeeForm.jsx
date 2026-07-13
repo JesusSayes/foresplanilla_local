@@ -666,7 +666,7 @@ export default function EmployeeForm({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-3">
+                    <div>
                       <Label>CUSPP <span className="text-red-600">*</span></Label>
                       <Input
                         value={formData.cuspp || ""}
