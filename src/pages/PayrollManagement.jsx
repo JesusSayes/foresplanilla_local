@@ -422,22 +422,54 @@ export default function PayrollManagement() {
     // Excluir empleados que el usuario haya quitado
     filteredEmployees = filteredEmployees.filter(emp => !excludedEmployees.includes(emp.id));
 
-    // Batch fetch: una sola llamada para contratos vigentes (en lugar de N por empleado)
-    const employeesNeedingSalary = filteredEmployees.filter(emp => !emp.base_salary || parseFloat(emp.base_salary) <= 0);
-    let allActiveContracts = [];
-    if (employeesNeedingSalary.length > 0) {
-      allActiveContracts = await withRetry(() => base44.entities.Contract.filter({ status: "Vigente" }));
-    }
+    // Batch fetch: TODOS los contratos (no solo Vigente) para soportar planillas retroactivas
+    // y cambios anticipados. Se busca el contrato válido para el período de planilla.
+    const allContracts = filteredEmployees.length > 0
+      ? await withRetry(() => base44.entities.Contract.list())
+      : [];
 
-    // Enriquecer empleados sin salario usando los contratos ya cargados (client-side filter)
+    // Helper: encuentra el contrato válido para el período (mes/año) usando periodStart/periodEnd ya declarados
+    const getContractForPeriod = (employeeId) => {
+      const empContracts = allContracts.filter(c => c.employee_id === employeeId);
+      const sorted = empContracts.sort((a, b) => {
+        const da = new Date((a.start_date || "1900-01-01").split("T")[0]);
+        const db = new Date((b.start_date || "1900-01-01").split("T")[0]);
+        return db - da;
+      });
+      return sorted.find(c => {
+        if (!c.start_date) return false;
+        const startDate = new Date(c.start_date.split("T")[0]);
+        const endDate = c.end_date ? new Date(c.end_date.split("T")[0]) : null;
+        return startDate <= periodEnd && (!endDate || endDate >= periodStart);
+      });
+    };
+
+    // Enriquecer empleados con el monto del contrato válido para el período
+    // (soporta planillas retroactivas y cambios anticipados de contrato)
     const enrichedEmployees = await mapWithConcurrency(filteredEmployees, async (emp) => {
+      const periodContract = getContractForPeriod(emp.id);
+
+      if (periodContract && periodContract.salary && parseFloat(periodContract.salary) > 0) {
+        const contractSalary = parseFloat(periodContract.salary);
+        const currentSalary = parseFloat(emp.base_salary) || 0;
+        return {
+          ...emp,
+          base_salary: contractSalary,
+          activity_cost: periodContract.activity_cost ?? emp.activity_cost ?? 0,
+          food_cost: periodContract.food_cost ?? emp.food_cost ?? 0,
+          transport_cost: periodContract.transport_cost ?? emp.transport_cost ?? 0,
+          _salary_from_contract: true,
+          _salary_changed: contractSalary !== currentSalary,
+          _contract_number: periodContract.contract_number || "",
+        };
+      }
+
+      // Sin contrato para el período: usar salario actual del empleado
       if (!emp.base_salary || parseFloat(emp.base_salary) <= 0) {
-        const empContracts = allActiveContracts.filter(c => c.employee_id === emp.id);
+        const empContracts = allContracts.filter(c => c.employee_id === emp.id && c.status === "Vigente");
         const activeContract = empContracts.find(c => c.salary && parseFloat(c.salary) > 0);
         if (activeContract) {
-          const salaryFromContract = parseFloat(activeContract.salary);
-          await withRetry(() => base44.entities.Employee.update(emp.id, { base_salary: salaryFromContract }));
-          return { ...emp, base_salary: salaryFromContract };
+          return { ...emp, base_salary: parseFloat(activeContract.salary) };
         }
       }
       return emp;
@@ -1305,6 +1337,25 @@ export default function PayrollManagement() {
                               </p>
                             </div>
                           )}
+
+                          {(() => {
+                            const currentEmp = allEmployees.find(e => e.id === payslip.employee_id);
+                            const currentSalary = currentEmp ? parseFloat(currentEmp.base_salary) || 0 : 0;
+                            const usedSalary = parseFloat(payslip.base_salary) || 0;
+                            if (canViewAmounts && currentSalary > 0 && usedSalary > 0 && Math.abs(currentSalary - usedSalary) > 0.01) {
+                              return (
+                                <div className="mt-3 p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800 flex items-center gap-2">
+                                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                  <span>
+                                    <strong>Salario del contrato del período:</strong> S/ {usedSalary.toFixed(2)}
+                                    {' '}(vigente en {format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}).
+                                    {' '}Salario actual: S/ {currentSalary.toFixed(2)}
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
 
                           {payslip.advance_deduction > 0 && (
                             <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
