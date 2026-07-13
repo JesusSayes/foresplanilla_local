@@ -124,12 +124,13 @@ Deno.serve(async (req) => {
 
     const today = todayInLima();
 
-    // 1. Cargar contratos vigentes, empleados, usuarios y preferencias
-    const [contractsRaw, employeesRaw, usersRaw, prefsRaw] = await Promise.all([
+    // 1. Cargar contratos vigentes, empleados, usuarios, preferencias y destinatarios adicionales
+    const [contractsRaw, employeesRaw, usersRaw, prefsRaw, extraRecipientsRaw] = await Promise.all([
       listAll(db.entities.Contract, { status: "Vigente" }, "-end_date"),
       listAll(db.entities.Employee, null, "-created_date"),
       listAll(db.entities.User, null, "-created_date"),
       listAll(db.entities.NotificationPreference, null, "-created_date"),
+      listAll(db.entities.NotificationRecipient, { notification_type: "contract_expiring", is_active: true }, "-created_date"),
     ]);
 
     const employeeMap = {};
@@ -149,16 +150,36 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, message: "No hay contratos por vencer en los próximos 30 días", notified: 0 });
     }
 
-    // 3. Filtrar usuarios que deben recibir notificaciones de contrato
+    // 3. Filtrar usuarios del sistema que deben recibir notificaciones de contrato
     const notifyUsers = usersRaw.filter(u => {
       if (!u.email) return false;
       const pref = prefMap[u.email];
-      // Sin preferencia → default true
       return !pref || pref.contract_expiring !== false;
     });
 
-    if (notifyUsers.length === 0) {
-      return Response.json({ success: true, message: "No hay usuarios configurados para recibir notificaciones", notified: 0 });
+    // 3b. Destinatarios adicionales (correos externos configurados por el admin)
+    const extraRecipients = extraRecipientsRaw
+      .filter(r => r.email && r.is_active !== false)
+      .map(r => ({ email: r.email, name: r.recipient_name || r.email, is_external: true }));
+
+    // Combinar destinatarios del sistema + adicionales (evitando duplicados por email)
+    const allRecipients = [];
+    const seenEmails = new Set();
+    for (const u of notifyUsers) {
+      if (!seenEmails.has(u.email)) {
+        seenEmails.add(u.email);
+        allRecipients.push({ email: u.email, name: u.full_name || u.email, is_external: false });
+      }
+    }
+    for (const r of extraRecipients) {
+      if (!seenEmails.has(r.email)) {
+        seenEmails.add(r.email);
+        allRecipients.push(r);
+      }
+    }
+
+    if (allRecipients.length === 0) {
+      return Response.json({ success: true, message: "No hay destinatarios configurados para recibir notificaciones", notified: 0 });
     }
 
     // 4. Evitar duplicados del día (mismo contrato + mismo usuario)
@@ -186,45 +207,49 @@ Deno.serve(async (req) => {
       };
     }).sort((a, b) => a.days_left - b.days_left);
 
-    // 6. Enviar notificaciones
+    // 6. Enviar notificaciones a todos los destinatarios (sistema + adicionales)
     let emailsSent = 0;
     let notifsCreated = 0;
 
-    for (const user of notifyUsers) {
-      const pref = prefMap[user.email];
-      const sendEmail = !pref || (pref.email_notifications !== false && pref.contract_expiring !== false);
+    for (const recipient of allRecipients) {
+      const pref = prefMap[recipient.email];
+      // Destinatarios externos siempre reciben email; usuarios del sistema respetan su preferencia
+      const sendEmail = recipient.is_external || !pref || (pref.email_notifications !== false && pref.contract_expiring !== false);
 
-      // Crear notificaciones in-app para cada contrato no notificado hoy
-      const userNewContracts = [];
+      // Crear notificaciones in-app (solo para usuarios del sistema)
+      const recipientNewContracts = [];
       for (const cs of contractSummaries) {
-        const notifKey = `${cs.contract_id}:${user.email}`;
+        const notifKey = `${cs.contract_id}:${recipient.email}`;
         if (todayNotifiedKeys.has(notifKey)) continue;
-        userNewContracts.push(cs);
+        recipientNewContracts.push(cs);
 
-        try {
-          await db.entities.Notification.create({
-            user_email: user.email,
-            type: "contract_expiring",
-            title: `Contrato por vencer: ${cs.employee_name}`,
-            message: `El contrato de ${cs.employee_name} (${cs.employee_code}) — ${cs.position} vence el ${cs.end_date} (faltan ${cs.days_left} días).`,
-            link_page: "ContractManagement",
-            priority: cs.days_left <= 7 ? "high" : "normal",
-            related_entity_id: cs.contract_id,
-            related_entity_type: "Contract",
-          });
-          notifsCreated++;
-        } catch (e) { /* continue */ }
+        // Notificación in-app solo para usuarios con cuenta en el sistema
+        if (!recipient.is_external) {
+          try {
+            await db.entities.Notification.create({
+              user_email: recipient.email,
+              type: "contract_expiring",
+              title: `Contrato por vencer: ${cs.employee_name}`,
+              message: `El contrato de ${cs.employee_name} (${cs.employee_code}) — ${cs.position} vence el ${cs.end_date} (faltan ${cs.days_left} días).`,
+              link_page: "ContractManagement",
+              priority: cs.days_left <= 7 ? "high" : "normal",
+              related_entity_id: cs.contract_id,
+              related_entity_type: "Contract",
+            });
+            notifsCreated++;
+          } catch (e) { /* continue */ }
+        }
 
         todayNotifiedKeys.add(notifKey);
       }
 
-      // Enviar email con todos los contratos nuevos del usuario
-      if (sendEmail && userNewContracts.length > 0) {
+      // Enviar email con todos los contratos nuevos del destinatario
+      if (sendEmail && recipientNewContracts.length > 0) {
         try {
           await db.integrations.Core.SendEmail({
-            to: user.email,
-            subject: `⚠️ Alerta: ${userNewContracts.length} contrato(s) por vencer en menos de 30 días`,
-            body: buildEmailBody(today, userNewContracts),
+            to: recipient.email,
+            subject: `⚠️ Alerta: ${recipientNewContracts.length} contrato(s) por vencer en menos de 30 días`,
+            body: buildEmailBody(today, recipientNewContracts),
           });
           emailsSent++;
         } catch (e) { /* continue */ }
@@ -235,7 +260,9 @@ Deno.serve(async (req) => {
       success: true,
       date: today,
       contracts_expiring: contractSummaries.length,
-      users_notified: notifyUsers.length,
+      recipients_total: allRecipients.length,
+      recipients_system: notifyUsers.length,
+      recipients_external: extraRecipients.length,
       emails_sent: emailsSent,
       notifications_created: notifsCreated,
       contracts: contractSummaries,

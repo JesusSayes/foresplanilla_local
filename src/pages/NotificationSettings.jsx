@@ -9,6 +9,7 @@ import {
   XCircle, Mail 
 } from "lucide-react";
 import { toast } from "sonner";
+import ContractNotificationConfig from "@/components/notifications/ContractNotificationConfig";
 
 export default function NotificationSettings() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -273,6 +274,11 @@ export default function NotificationSettings() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Sección admin: configuración de correos para vencimiento de contratos */}
+        {(employee?.role === "admin" || employee?.role === "super_admin") && (
+          <ContractNotificationConfig currentUser={currentUser} />
+        )}
 
         <div className="flex gap-3">
           <Button
