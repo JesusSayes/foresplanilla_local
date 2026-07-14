@@ -598,7 +598,14 @@ export default function PayrollManagement() {
         ];
       } else {
         // Para planillas no quincenales: usar todos los conceptos normales
-        conceptsForCalc = [...allEmpConcepts];
+        // Excluir conceptos que PayrollManagement calcula por separado (tardanzas, inasistencias, adelanto)
+        // para evitar doble descuento en el neto a pagar.
+        const separatelyHandled = ['tardiness_discount', 'absence_discount', 'salary_advance'];
+        conceptsForCalc = allEmpConcepts.filter(c => {
+          const formulaKey = c.calculation_formula ? String(c.calculation_formula).trim().toLowerCase() : '';
+          const logicType = c.system_logic_type || formulaKey;
+          return !separatelyHandled.includes(logicType);
+        });
         // Si NO existe un concepto de "Asignación Familiar" configurado (ya sea por fórmula o lógica del sistema),
         // agregar la asignación familiar automática basada en derechohabientes como fallback.
         const hasFamilyAllowanceConcept = allEmpConcepts.some(c => 
