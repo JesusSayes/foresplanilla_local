@@ -121,6 +121,12 @@ const PERMISSION_GROUPS = {
     { key: "system.settings", label: "Configurar ajustes del sistema" },
     { key: "system.admin", label: "Acceso administrativo completo" },
   ],
+  "Notificaciones": [
+    { key: "notifications.view_own", label: "Ver y configurar propias notificaciones" },
+    { key: "notifications.view_center", label: "Acceder al centro de notificaciones" },
+    { key: "notifications.view_all", label: "Ver notificaciones de todos los empleados" },
+    { key: "notifications.manage_config", label: "Configurar notificaciones del sistema (destinatarios y tipos)" },
+  ],
   "Contabilidad y Préstamos": [
     { key: "accounting.view", label: "Ver asientos y cuentas contables" },
     { key: "accounting.manage", label: "Gestionar asientos contables" },

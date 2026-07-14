@@ -49,4 +49,13 @@ export const PAGE_PERMISSIONS = {
   // ── Self-service (mínimo permiso) ──
   Payslips: { requiredPermission: "payroll.view_own" },
   Certificates: { requiredAnyPermissions: ["certificates.view_own", "certificates.view_all"] },
+
+  // ── Notificaciones ──
+  NotificationSettings: {
+    requiredAnyPermissions: [
+      "notifications.view_own",
+      "notifications.manage_config",
+      "system.admin",
+    ],
+  },
 };
