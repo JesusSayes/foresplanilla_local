@@ -12,7 +12,6 @@ import {
   XCircle,
   Clock,
   TrendingUp,
-  X,
   CalendarDays,
 } from "lucide-react";
 import { format } from "date-fns";

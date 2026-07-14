@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import EmployeeHistory from "../components/employees/EmployeeHistory";
+import AFPChangeHistoryPanel from "../components/employees/AFPChangeHistoryPanel";
 import EmployeeForm from "../components/employees/EmployeeForm";
 import ImportDerechohabientesModal from "../components/employees/ImportDerechohabientesModal";
 
@@ -314,6 +315,7 @@ export default function EmployeeManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allEmployees"] });
       queryClient.invalidateQueries({ queryKey: ["employeeChanges"] });
+      queryClient.invalidateQueries({ queryKey: ["afpChangeHistory"] });
       toast.success("✅ Empleado actualizado exitosamente");
       resetForm();
     },
@@ -634,6 +636,7 @@ export default function EmployeeManagement() {
       pension_system: emp?.pension_system || "Ninguno",
       afp_id: emp?.afp_id || "",
       afp_affiliation_date: toDateInputValue(emp?.afp_affiliation_date),
+      afp_commission_type: emp?.afp_commission_type || "",
       cuspp: emp?.cuspp || "",
       bank_name: emp?.bank_name || "",
       bank_account: emp?.bank_account || "",
@@ -693,6 +696,7 @@ export default function EmployeeManagement() {
     if (formData.pension_system === 'AFP') {
       if (!formData.afp_id) afpErrors.push("La AFP Afiliada es obligatoria cuando el sistema de pensiones es AFP");
       if (!formData.afp_affiliation_date) afpErrors.push("La Fecha de Afiliación AFP es obligatoria cuando el sistema de pensiones es AFP");
+      if (!formData.afp_commission_type) afpErrors.push("El Tipo de Comisión AFP es obligatorio cuando el sistema de pensiones es AFP");
       if (!formData.cuspp) afpErrors.push("El CUSPP es obligatorio cuando el sistema de pensiones es AFP");
     }
     if (afpErrors.length > 0) {
@@ -1283,6 +1287,13 @@ export default function EmployeeManagement() {
                     <p>{selectedEmployee.department}</p>
                   </div>
                 </div>
+              </div>
+              <div className="mt-6">
+                <AFPChangeHistoryPanel
+                  employee={selectedEmployee}
+                  afps={afps}
+                  canEdit={hasPermission("employees.edit")}
+                />
               </div>
             </CardContent>
           </Card>

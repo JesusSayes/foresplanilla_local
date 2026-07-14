@@ -427,23 +427,45 @@ export default function PayrollManagement() {
     // Excluir empleados que el usuario haya quitado
     filteredEmployees = filteredEmployees.filter(emp => !excludedEmployees.includes(emp.id));
 
-    // Batch fetch: una sola llamada para contratos vigentes (en lugar de N por empleado)
-    const employeesNeedingSalary = filteredEmployees.filter(emp => !emp.base_salary || parseFloat(emp.base_salary) <= 0);
-    let allActiveContracts = [];
-    if (employeesNeedingSalary.length > 0) {
-      allActiveContracts = await withRetry(() => entitiesAPI.Contract.filter({ status: "Vigente" }));
-    }
+    // Cargar contratos para recuperar el salario histórico correspondiente al período.
+    const allContracts = filteredEmployees.length > 0
+      ? await withRetry(() => entitiesAPI.Contract.list("-start_date"))
+      : [];
 
-    // Enriquecer empleados sin salario usando los contratos ya cargados (client-side filter)
+    const getContractForPeriod = (employeeId) => {
+      const overlapping = allContracts
+        .filter(contract => contract.employee_id === employeeId && contract.start_date)
+        .filter(contract => {
+          const startDate = new Date(contract.start_date.split("T")[0] + "T00:00:00");
+          const endDate = contract.end_date ? new Date(contract.end_date.split("T")[0] + "T00:00:00") : null;
+          return startDate <= periodEnd && (!endDate || endDate >= periodStart);
+        })
+        .sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+
+      const fullPeriodContract = overlapping.find(contract => {
+        const startDate = new Date(contract.start_date.split("T")[0] + "T00:00:00");
+        const endDate = contract.end_date ? new Date(contract.end_date.split("T")[0] + "T00:00:00") : null;
+        return startDate <= periodStart && (!endDate || endDate >= periodEnd);
+      });
+
+      // Un solo contrato solapado también es válido para ingresos o ceses dentro del mes.
+      return fullPeriodContract || (overlapping.length === 1 ? overlapping[0] : null);
+    };
+
     const enrichedEmployees = await mapWithConcurrency(filteredEmployees, async (emp) => {
-      if (!emp.base_salary || parseFloat(emp.base_salary) <= 0) {
-        const empContracts = allActiveContracts.filter(c => c.employee_id === emp.id);
-        const activeContract = empContracts.find(c => c.salary && parseFloat(c.salary) > 0);
-        if (activeContract) {
-          const salaryFromContract = parseFloat(activeContract.salary);
-          await withRetry(() => entitiesAPI.Employee.update(emp.id, { base_salary: salaryFromContract }));
-          return { ...emp, base_salary: salaryFromContract };
-        }
+      const periodContract = getContractForPeriod(emp.id);
+      if (periodContract?.salary && parseFloat(periodContract.salary) > 0) {
+        const contractSalary = parseFloat(periodContract.salary);
+        return {
+          ...emp,
+          base_salary: contractSalary,
+          activity_cost: periodContract.activity_cost ?? emp.activity_cost ?? 0,
+          food_cost: periodContract.food_cost ?? emp.food_cost ?? 0,
+          transport_cost: periodContract.transport_cost ?? emp.transport_cost ?? 0,
+          _salary_from_contract: true,
+          _salary_changed: Math.abs(contractSalary - (parseFloat(emp.base_salary) || 0)) > 0.01,
+          _contract_number: periodContract.contract_number || "",
+        };
       }
       return emp;
     });
@@ -1320,6 +1342,23 @@ export default function PayrollManagement() {
                               Adelanto descontado: S/ {Number(payslip.advance_deduction || 0).toFixed(2)}
                             </div>
                           )}
+
+                          {(() => {
+                            const currentEmp = allEmployees.find(e => e.id === payslip.employee_id);
+                            const currentSalary = currentEmp ? parseFloat(currentEmp.base_salary) || 0 : 0;
+                            const usedSalary = parseFloat(payslip.base_salary) || 0;
+                            if (canViewAmounts && currentSalary > 0 && usedSalary > 0 && Math.abs(currentSalary - usedSalary) > 0.01) {
+                              return (
+                                <div className="mt-3 p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800 flex items-center gap-2">
+                                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                  <span>
+                                    <strong>Salario del contrato del período:</strong> S/ {usedSalary.toFixed(2)}. Salario actual: S/ {currentSalary.toFixed(2)}
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
 
                           {hasAdditionalConcepts && (
                             <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">

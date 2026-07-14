@@ -29,13 +29,14 @@ const getTransporter = () => {
   return _transporter;
 };
 
-export const sendEmail = async ({ to, subject, body }) => {
+export const sendEmail = async ({ to, subject, body, html }) => {
   const transporter = getTransporter();
   const info = await transporter.sendMail({
     from: isDev ? 'noreply@localhost' : (process.env.SMTP_FROM || process.env.SMTP_USER),
     to,
     subject,
     text: body,
+    ...(html ? { html } : {}),
   });
   if (isDev) {
     console.log(`[Mailer DEV] Email enviado a ${to} — ver en http://localhost:8025`);

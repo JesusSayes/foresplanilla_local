@@ -105,6 +105,8 @@ export const entitiesAPI = {
   Certificate: createEntityAPI('/api/certificates'),
   Notification: createEntityAPI('/api/notifications'),
   NotificationPreference: createEntityAPI('/api/notification-preferences'),
+  NotificationRecipient: createEntityAPI('/api/notification-recipients'),
+  AFPChangeHistory: createEntityAPI('/api/afp-change-history'),
   CompanyInfo: createEntityAPI('/api/company/info'),
   CostCenter: createEntityAPI('/api/cost-centers'),
   CostCenterCategory: createEntityAPI('/api/cost-center-categories'),

@@ -626,7 +626,16 @@ export default function EmployeeForm({
                 </div>
                 <div>
                   <Label>Sistema de Pensiones</Label>
-                  <Select value={formData.pension_system || "Ninguno"} onValueChange={(v) => setFormData({ ...formData,               pension_system: v, afp_id: v === "AFP" ? formData.afp_id : "", cuspp: v === "AFP" ? formData.cuspp : "" })}>
+                  <Select
+                    value={formData.pension_system || "Ninguno"}
+                    onValueChange={(v) => setFormData({
+                      ...formData,
+                      pension_system: v,
+                      afp_id: v === "AFP" ? formData.afp_id : null,
+                      afp_commission_type: v === "AFP" ? formData.afp_commission_type : null,
+                      cuspp: v === "AFP" ? formData.cuspp : null,
+                    })}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Ninguno">Ninguno</SelectItem>
@@ -659,7 +668,22 @@ export default function EmployeeForm({
                       />
                       {!formData.afp_affiliation_date && <p className="text-xs text-red-600 mt-1">⚠ Obligatorio cuando el sistema de pensiones es AFP</p>}
                     </div>
-                    <div className="col-span-2">
+                    <div>
+                      <Label>Tipo de Comisión AFP <span className="text-red-600">*</span></Label>
+                      <Select
+                        value={formData.afp_commission_type || ""}
+                        onValueChange={(v) => setFormData({ ...formData, afp_commission_type: v })}
+                      >
+                        <SelectTrigger className={!formData.afp_commission_type ? "border-red-300" : ""}>
+                          <SelectValue placeholder="Seleccionar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Flujo">Flujo</SelectItem>
+                          <SelectItem value="Mixta">Mixta</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
                       <Label>CUSPP <span className="text-red-600">*</span></Label>
                       <Input
                         value={formData.cuspp || ""}
