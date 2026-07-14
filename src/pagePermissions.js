@@ -21,11 +21,45 @@ export const PAGE_PERMISSIONS = {
 
   // ── Payroll / Financial ──
   ConsultaPlanillas: { requiredPermission: "payroll.view_all" },
-  SunatExport: { requiredPermission: "payroll.view_all" },
-  AsientosContables: { requiredPermission: "payroll.view_all" },
-  CuentasContables: { requiredPermission: "payroll.view_all" },
-  BeneficiosSociales: { requiredPermission: "payroll.view_all" },
-  HistorialRemunerativo: { requiredPermission: "payroll.view_all" },
+  SunatExport: {
+    requiredAnyPermissions: [
+      "accounting.view",
+      "accounting.manage",
+      "payroll.view_all",
+      "payroll.create",
+      "payroll.calculate",
+    ],
+  },
+  AsientosContables: {
+    requiredAnyPermissions: [
+      "accounting.view",
+      "accounting.manage",
+      "payroll.view_all",
+      "payroll.create",
+      "payroll.calculate",
+    ],
+  },
+  CuentasContables: {
+    requiredAnyPermissions: [
+      "accounting.view",
+      "accounting.manage",
+      "payroll.view_all",
+    ],
+  },
+  BeneficiosSociales: {
+    requiredAnyPermissions: [
+      "payroll.view_all",
+      "payroll.create",
+      "payroll.calculate",
+    ],
+  },
+  HistorialRemunerativo: {
+    requiredAnyPermissions: [
+      "payroll.view_all",
+      "payroll.create",
+      "payroll.calculate",
+    ],
+  },
   PayrollConcepts: { requiredPermission: "payroll.view_all" },
   CostCenterValuation: { requiredPermission: "cost_centers.view" },
 
