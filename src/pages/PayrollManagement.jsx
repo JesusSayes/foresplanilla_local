@@ -432,29 +432,39 @@ export default function PayrollManagement() {
       ? await withRetry(() => entitiesAPI.Contract.list("-start_date"))
       : [];
 
+    // Prioridad: contrato solapado, contrato más reciente antes del periodo,
+    // y como ultimo recurso el contrato mas reciente disponible.
     const getContractForPeriod = (employeeId) => {
-      const overlapping = allContracts
-        .filter(contract => contract.employee_id === employeeId && contract.start_date)
-        .filter(contract => {
-          const startDate = new Date(contract.start_date.split("T")[0] + "T00:00:00");
-          const endDate = contract.end_date ? new Date(contract.end_date.split("T")[0] + "T00:00:00") : null;
-          return startDate <= periodEnd && (!endDate || endDate >= periodStart);
-        })
-        .sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+      const empContracts = allContracts
+        .filter(contract => contract.employee_id === employeeId)
+        .sort((a, b) => {
+          const da = new Date((a.start_date || "1900-01-01").split("T")[0] + "T00:00:00");
+          const db = new Date((b.start_date || "1900-01-01").split("T")[0] + "T00:00:00");
+          return db - da;
+        });
 
-      const fullPeriodContract = overlapping.find(contract => {
+      if (empContracts.length === 0) return null;
+
+      const overlapping = empContracts.find(contract => {
+        if (!contract.start_date) return false;
         const startDate = new Date(contract.start_date.split("T")[0] + "T00:00:00");
         const endDate = contract.end_date ? new Date(contract.end_date.split("T")[0] + "T00:00:00") : null;
-        return startDate <= periodStart && (!endDate || endDate >= periodEnd);
+        return startDate <= periodEnd && (!endDate || endDate >= periodStart);
       });
+      if (overlapping) return overlapping;
 
-      // Un solo contrato solapado también es válido para ingresos o ceses dentro del mes.
-      return fullPeriodContract || (overlapping.length === 1 ? overlapping[0] : null);
+      const closestBefore = empContracts.find(contract => {
+        if (!contract.start_date) return false;
+        return new Date(contract.start_date.split("T")[0] + "T00:00:00") <= periodEnd;
+      });
+      if (closestBefore) return closestBefore;
+
+      return empContracts[0];
     };
 
     const enrichedEmployees = await mapWithConcurrency(filteredEmployees, async (emp) => {
       const periodContract = getContractForPeriod(emp.id);
-      if (periodContract?.salary && parseFloat(periodContract.salary) > 0) {
+      if (periodContract && periodContract.salary != null && parseFloat(periodContract.salary) > 0) {
         const contractSalary = parseFloat(periodContract.salary);
         return {
           ...emp,
