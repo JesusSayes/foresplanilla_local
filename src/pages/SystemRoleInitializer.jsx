@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, CheckCircle, Loader2, RefreshCw } from "lucide-react";
+import { Shield, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AVAILABLE_PERMISSIONS } from "../components/hooks/usePermissions";
 
@@ -48,26 +48,19 @@ export default function SystemRoleInitializer() {
     },
     {
       name: "Administrador",
-      description: "Administrador general con acceso completo a gestión de empleados, nómina, contabilidad y configuraciones",
+      description: "Administrador general con acceso completo a gestión de empleados, nómina y configuraciones",
       permissions: [
-        "system.admin", "system.settings",
-        "employees.view", "employees.view_financials", "employees.edit", "employees.create", "employees.delete", "employees.import", "employees.export", "employees.change_status", "employees.orgchart",
-        "attendance.view_all", "attendance.edit", "attendance.approve_edits", "attendance.approve_incidents", "attendance.approve_compensations", "attendance.manage", "attendance.export", "attendance.devices",
+        "system.admin",
+        "employees.view", "employees.edit", "employees.create", "employees.delete", "employees.import", "employees.export",
+        "attendance.view_all", "attendance.edit", "attendance.approve_incidents", "attendance.manage", "attendance.export",
         "vacations.view_all", "vacations.approve", "vacations.manage", "vacations.calendar",
-        "payroll.view_all", "payroll.view_amounts", "payroll.edit", "payroll.create", "payroll.delete", "payroll.calculate", "payroll.approve", "payroll.view_department", "payroll.concepts",
-        "certificates.view_all", "certificates.approve", "certificates.create", "certificates.request",
+        "payroll.view_all", "payroll.edit", "payroll.create", "payroll.delete", "payroll.calculate", "payroll.approve",
+        "certificates.view_all", "certificates.approve", "certificates.create",
         "schedules.view", "schedules.edit", "schedules.create", "schedules.delete", "schedules.assign",
         "holidays.view", "holidays.manage", "holidays.create", "holidays.edit", "holidays.delete",
-        "sites.view", "sites.create", "sites.edit", "sites.delete", "sites.manage",
-        "departments.view", "departments.create", "departments.edit", "departments.delete", "departments.manage",
-        "positions.view", "positions.create", "positions.edit", "positions.delete", "positions.manage",
-        "banks.view", "banks.create", "banks.edit", "banks.delete",
-        "reports.view", "reports.export", "reports.attendance", "reports.payroll", "reports.vacations", "reports.employees",
+        "sites.manage", "departments.manage", "positions.manage",
+        "reports.view", "reports.export", "reports.attendance", "reports.payroll", "reports.vacations",
         "roles.view", "roles.manage", "roles.assign",
-        "cost_centers.view", "cost_centers.view_amounts", "cost_centers.create", "cost_centers.edit", "cost_centers.assign", "cost_centers.delete",
-        "contracts.view", "contracts.view_amounts", "contracts.create", "contracts.edit", "contracts.delete", "contracts.sign", "contracts.templates", "contracts.renewal",
-        "accounting.view", "accounting.manage",
-        "loans.view", "loans.manage",
       ],
       is_system_role: true,
       department_restricted: false,
@@ -76,20 +69,16 @@ export default function SystemRoleInitializer() {
     },
     {
       name: "RRHH Solo Lectura",
-      description: "Acceso de solo lectura a todos los datos de RRHH (incluye información financiera) sin capacidad de edición",
+      description: "Acceso de solo lectura a todos los datos de RRHH sin capacidad de edición",
       permissions: [
-        "employees.view", "employees.view_financials", "employees.export",
+        "employees.view", "employees.export",
         "attendance.view_all", "attendance.export",
         "vacations.view_all", "vacations.calendar",
-        "payroll.view_all", "payroll.view_amounts",
+        "payroll.view_all",
         "certificates.view_all",
-        "contracts.view", "contracts.view_amounts",
         "schedules.view",
         "holidays.view",
         "sites.view", "departments.view", "positions.view", "banks.view",
-        "cost_centers.view", "cost_centers.view_amounts",
-        "accounting.view",
-        "loans.view",
         "reports.view", "reports.export", "reports.attendance", "reports.payroll", "reports.vacations", "reports.employees",
       ],
       is_system_role: true,
@@ -99,10 +88,10 @@ export default function SystemRoleInitializer() {
     },
     {
       name: "Manager Departamental",
-      description: "Gestión de equipo limitado a su departamento, con aprobación de incidencias y compensaciones",
+      description: "Gestión de equipo limitado a su departamento",
       permissions: [
         "employees.view",
-        "attendance.view_department", "attendance.approve_incidents", "attendance.approve_compensations",
+        "attendance.view_department", "attendance.approve_incidents",
         "vacations.view_department", "vacations.approve", "vacations.calendar",
         "payroll.view_own",
         "certificates.view_own", "certificates.request",
@@ -117,10 +106,10 @@ export default function SystemRoleInitializer() {
     },
     {
       name: "Manager de Equipo",
-      description: "Gestión de un equipo específico de empleados asignados, con aprobación de incidencias y compensaciones",
+      description: "Gestión de un equipo específico de empleados asignados",
       permissions: [
         "employees.view",
-        "attendance.view_department", "attendance.approve_incidents", "attendance.approve_compensations",
+        "attendance.view_department", "attendance.approve_incidents",
         "vacations.view_department", "vacations.approve", "vacations.calendar",
         "payroll.view_own",
         "certificates.view_own", "certificates.request",
@@ -174,49 +163,6 @@ export default function SystemRoleInitializer() {
     },
     onError: () => {
       toast.error("Error al inicializar roles del sistema");
-    },
-  });
-
-  // Actualiza roles del sistema ya existentes agregando permisos faltantes (aditivo).
-  // No elimina permisos personalizados que el usuario haya agregado manualmente.
-  const syncRolesMutation = useMutation({
-    mutationFn: async () => {
-      const updatedRoles = [];
-      for (const roleData of SYSTEM_ROLES) {
-        const exists = existingRoles.find(r => r.name === roleData.name);
-        if (!exists) continue;
-        const currentPerms = new Set(exists.permissions || []);
-        let changed = false;
-        (roleData.permissions || []).forEach(p => {
-          if (!currentPerms.has(p)) {
-            currentPerms.add(p);
-            changed = true;
-          }
-        });
-        if (changed) {
-          const updated = await base44.entities.Role.update(exists.id, {
-            permissions: [...currentPerms],
-            description: roleData.description,
-          });
-          updatedRoles.push(updated);
-        }
-      }
-      return updatedRoles;
-    },
-    onSuccess: (updatedRoles) => {
-      queryClient.invalidateQueries(["roles"]);
-      setExistingRoles(prev => prev.map(r => {
-        const upd = updatedRoles.find(u => u.id === r.id);
-        return upd || r;
-      }));
-      if (updatedRoles.length > 0) {
-        toast.success(`${updatedRoles.length} rol(es) actualizado(s) con los nuevos permisos`);
-      } else {
-        toast.info("Los roles del sistema ya cuentan con todos los permisos actualizados");
-      }
-    },
-    onError: () => {
-      toast.error("Error al sincronizar permisos de los roles");
     },
   });
 
@@ -303,73 +249,31 @@ export default function SystemRoleInitializer() {
                 <p className="text-slate-600 mb-4">
                   Los roles del sistema han sido creados correctamente
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button
-                    onClick={() => window.location.href = "/RoleManagement"}
-                    className="bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    Ir a Gestión de Roles
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => syncRolesMutation.mutate()}
-                    disabled={syncRolesMutation.isPending}
-                    className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                  >
-                    {syncRolesMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Sincronizando...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Sincronizar permisos nuevos
-                      </>
-                    )}
-                  </Button>
-                </div>
+                <Button
+                  onClick={() => window.location.href = "/RoleManagement"}
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
+                  Ir a Gestión de Roles
+                </Button>
               </div>
             ) : (
-              <div className="space-y-3">
-                <Button
-                  onClick={() => initializeRolesMutation.mutate()}
-                  disabled={initializeRolesMutation.isPending}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 h-12 text-base"
-                >
-                  {initializeRolesMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Inicializando...
-                    </>
-                  ) : (
-                    <>
-                      <Shield className="w-5 h-5 mr-2" />
-                      Inicializar Roles del Sistema
-                    </>
-                  )}
-                </Button>
-                {existingRoles.some(r => SYSTEM_ROLES.some(sr => sr.name === r.name)) && (
-                  <Button
-                    variant="outline"
-                    onClick={() => syncRolesMutation.mutate()}
-                    disabled={syncRolesMutation.isPending}
-                    className="w-full border-indigo-300 text-indigo-700 hover:bg-indigo-50 h-11"
-                  >
-                    {syncRolesMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Sincronizando permisos nuevos...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Sincronizar permisos nuevos en roles existentes
-                      </>
-                    )}
-                  </Button>
+              <Button
+                onClick={() => initializeRolesMutation.mutate()}
+                disabled={initializeRolesMutation.isPending}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 h-12 text-base"
+              >
+                {initializeRolesMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Inicializando...
+                  </>
+                ) : (
+                  <>
+                    <Shield className="w-5 h-5 mr-2" />
+                    Inicializar Roles del Sistema
+                  </>
                 )}
-              </div>
+              </Button>
             )}
           </CardContent>
         </Card>
