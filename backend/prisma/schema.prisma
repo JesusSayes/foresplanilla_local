@@ -447,6 +447,7 @@ model employee {
   activity_cost                  Decimal?                  @default(0) @db.Decimal(18, 2)
   food_cost                      Decimal?                  @default(0) @db.Decimal(18, 2)
   transport_cost                 Decimal?                  @default(0) @db.Decimal(18, 2)
+  afp_commission_type            String?                   @db.VarChar(20)
   attendance_edit_request        attendance_edit_request[]
   attendance_logs                attendance_logs[]
   historial_remunerativo         historial_remunerativo[]
@@ -1244,4 +1245,46 @@ model historial_remunerativo {
   @@unique([employee_id, year, month])
   @@index([employee_id], map: "idx_historial_remunerativo_employee")
   @@index([year, month], map: "idx_historial_remunerativo_period")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model afp_change_history {
+  id                       String    @id @db.VarChar(255)
+  employee_id              String    @db.VarChar(255)
+  change_date              DateTime  @db.Date
+  previous_pension_system  String?
+  new_pension_system       String?
+  previous_afp_id          String?   @db.VarChar(255)
+  previous_afp_name        String?
+  new_afp_id               String?   @db.VarChar(255)
+  new_afp_name             String?
+  previous_commission_type String?   @db.VarChar(20)
+  new_commission_type      String?   @db.VarChar(20)
+  previous_cuspp           String?
+  new_cuspp                String?
+  change_type              String    @default("Otro") @db.VarChar(50)
+  change_reason            String?
+  changed_by               String?   @db.VarChar(255)
+  notes                    String?
+  created_date             DateTime? @default(now()) @db.Timestamp(6)
+  updated_date             DateTime? @default(now()) @db.Timestamp(6)
+  created_by               String?   @db.VarChar(255)
+
+  @@index([employee_id, change_date(sort: Desc)], map: "idx_afp_change_history_employee_date")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model notification_recipient {
+  id                String    @id @db.VarChar(255)
+  email             String    @db.VarChar(320)
+  recipient_name    String?
+  notification_type String    @default("contract_expiring") @db.VarChar(50)
+  is_active         Boolean   @default(true)
+  added_by          String?   @db.VarChar(255)
+  notes             String?
+  created_date      DateTime? @default(now()) @db.Timestamp(6)
+  updated_date      DateTime? @default(now()) @db.Timestamp(6)
+  created_by        String?   @db.VarChar(255)
+
+  @@index([notification_type, is_active], map: "idx_notification_recipient_type_active")
 }

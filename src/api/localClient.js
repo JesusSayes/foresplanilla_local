@@ -84,4 +84,15 @@ export const mailerAPI = {
   },
 };
 
+export const contractNotificationsAPI = {
+  recipients: async () => {
+    const response = await localClient.get('/api/contract-notifications/recipients');
+    return response.data;
+  },
+  run: async () => {
+    const response = await localClient.post('/api/contract-notifications/run');
+    return response.data;
+  },
+};
+
 export default localClient;

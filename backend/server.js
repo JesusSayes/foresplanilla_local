@@ -47,6 +47,9 @@ import payrollConfigRoutes from "./routes/payroll/config.js";
 import certificatesRoutes from './routes/certificates.js';
 import notificationsRoutes from './routes/notifications.js';
 import notificationPreferencesRoutes from './routes/notificationPreferences.js';
+import notificationRecipientsRoutes from './routes/notificationRecipients.js';
+import contractNotificationsRoutes from './routes/contractNotifications.js';
+import afpChangeHistoryRoutes from './routes/afpChangeHistory.js';
 import infoRoutes from './routes/company/info.js';
 import costcentersRoutes from './routes/cost-centers.js';
 import costCenterCategoriesRoutes from './routes/costCenterCategories.js';
@@ -70,6 +73,7 @@ import incidentTypesRoutes from './routes/incidentTypes.js';
 import subdiariosRoutes from './routes/subdiarios.js';
 import tipoAnexosRoutes from './routes/tipoAnexos.js';
 import historialRemunerativoRoutes from './routes/historialRemunerativo.js';
+import { notifyExpiringContracts } from './services/contractNotificationService.js';
 
 dotenv.config();
 
@@ -153,6 +157,9 @@ app.use('/api/payroll/config', payrollConfigRoutes);
 app.use('/api/certificates', certificatesRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/notification-preferences', notificationPreferencesRoutes);
+app.use('/api/notification-recipients', notificationRecipientsRoutes);
+app.use('/api/contract-notifications', contractNotificationsRoutes);
+app.use('/api/afp-change-history', afpChangeHistoryRoutes);
 app.use('/api/company/info', infoRoutes);
 app.use('/api/cost-centers', costcentersRoutes);
 app.use('/api/cost-center-categories', costCenterCategoriesRoutes);
@@ -216,6 +223,12 @@ cron.schedule('0 0 * * *', () => {
 
 // Cron: sincronización de asistencias externas cada hora en minuto 15
 if (process.env.NODE_ENV === 'production') {
+  cron.schedule('0 9 * * *', () => {
+    console.log('[Cron] Ejecutando notificación de contratos por vencer...');
+    notifyExpiringContracts({ triggeredBy: 'scheduler' })
+      .catch(err => console.error('[Cron] Error notificando contratos:', err.message));
+  }, { timezone: CRON_TIMEZONE });
+
   cron.schedule('15 * * * *', () => {
     console.log('[Cron] Ejecutando sincronización de asistencias externas...');
     syncExternalAttendance().catch(err => console.error('[Cron] Error en sync asistencias externas:', err.message));

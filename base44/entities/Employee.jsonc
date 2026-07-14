@@ -206,6 +206,11 @@
       "type": "string",
       "description": "C\u00f3digo CUSPP"
     },
+    "afp_commission_type": {
+      "type": "string",
+      "enum": ["Flujo", "Mixta"],
+      "description": "Tipo de comisi\u00f3n AFP (Flujo o Mixta)"
+    },
     "worker_type": {
       "type": "string",
       "enum": [

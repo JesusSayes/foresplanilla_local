@@ -75,6 +75,9 @@ export const AVAILABLE_PERMISSIONS = {
   "contracts.templates": "Gestionar plantillas de contratos",
   "contracts.renewal": "Configurar automatización de renovación de contratos",
 
+  // Notificaciones
+  "notifications.manage_contract_alerts": "Gestionar alertas de vencimiento de contratos",
+
   // Certificados
   "certificates.view_own": "Ver propios certificados",
   "certificates.view_all": "Ver certificados de todos",

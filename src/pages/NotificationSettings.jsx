@@ -10,11 +10,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
+import ContractNotificationConfig from "@/components/notifications/ContractNotificationConfig";
+import { usePermissions } from "@/components/hooks/usePermissions";
 
 export default function NotificationSettings() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
   const [preferences, setPreferences] = useState(null);
+  const { hasPermission } = usePermissions();
 
   const queryClient = useQueryClient();
 
@@ -75,7 +78,7 @@ export default function NotificationSettings() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["notificationPreferences"]);
+      queryClient.invalidateQueries({ queryKey: ["notificationPreferences"] });
       toast.success("Preferencias guardadas correctamente");
     },
     onError: () => {
@@ -263,6 +266,10 @@ export default function NotificationSettings() {
             </div>
           </CardContent>
         </Card>
+
+        {hasPermission("notifications.manage_contract_alerts") && (
+          <ContractNotificationConfig currentUser={currentUser} />
+        )}
 
         <div className="flex gap-3">
           <Button

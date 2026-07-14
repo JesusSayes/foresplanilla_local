@@ -1,0 +1,102 @@
+{
+  "name": "NotificationRecipient",
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string",
+      "description": "Correo electr\u00f3nico del destinatario adicional"
+    },
+    "recipient_name": {
+      "type": "string",
+      "description": "Nombre del destinatario"
+    },
+    "notification_type": {
+      "type": "string",
+      "enum": [
+        "contract_expiring",
+        "incident_pending",
+        "vacation_pending",
+        "payslip_ready",
+        "attendance_alert",
+        "system"
+      ],
+      "default": "contract_expiring",
+      "description": "Tipo de notificaci\u00f3n para la que recibe correos"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Destinatario activo"
+    },
+    "added_by": {
+      "type": "string",
+      "description": "Email de quien agreg\u00f3 al destinatario"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "email",
+    "notification_type"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    }
+  }
+}

@@ -8,7 +8,7 @@ import { entitiesAPI } from "@/api/entitiesClient";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, FileText, Calendar, Clock,
-  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown, KeyRound, Eye, EyeOff, AlertCircle
+  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown, KeyRound, Eye, EyeOff, AlertCircle, Bell
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -508,6 +508,14 @@ export default function Layout({ children, currentPageName }) {
                         <KeyRound className="w-4 h-4" />
                         Cambiar Contraseña
                       </button>
+                      <Link
+                        to={createPageUrl("NotificationSettings")}
+                        onClick={() => setOpenDropdown(null)}
+                        className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <Bell className="w-4 h-4" />
+                        Configurar Notificaciones
+                      </Link>
                       {hasPermission("system.settings") && (
                         <>
                           <Link
@@ -671,7 +679,15 @@ export default function Layout({ children, currentPageName }) {
                 );
               })}
             </ul>
-            <div className="mt-4 pt-4 border-t border-slate-200">
+            <div className="mt-4 pt-4 border-t border-slate-200 space-y-1">
+              <button
+                type="button"
+                onClick={() => navigate(createPageUrl("NotificationSettings"))}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors text-base"
+              >
+                <Bell className="w-5 h-5" />
+                Configurar Notificaciones
+              </button>
               <Button
                 variant="outline"
                 className="w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700"

@@ -133,6 +133,9 @@ export const BASE44_PERMISSIONS = Object.freeze({
   'contracts.manage_templates': 'Gestionar plantillas de contratos',
   'contracts.manage_renewals': 'Gestionar renovaciones automáticas',
 
+  // Notificaciones
+  'notifications.manage_contract_alerts': 'Gestionar alertas de vencimiento de contratos',
+
   // Administración
   'roles.view': 'Ver roles',
   'roles.create': 'Crear roles',
