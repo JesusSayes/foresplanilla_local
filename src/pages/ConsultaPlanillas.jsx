@@ -124,6 +124,8 @@ export default function ConsultaPlanillas() {
           payroll_type: p.payroll_type,
           payroll_number: p.payroll_number || `${p.payroll_type}-${p.year}-${String(p.month).padStart(2,"0")}`,
           period: p.period || format(new Date(p.year, p.month - 1), "MMMM yyyy", { locale: es }),
+          attendance_period_start: p.attendance_period_start || null,
+          attendance_period_end: p.attendance_period_end || null,
           payslips: [],
         };
       }
@@ -470,6 +472,12 @@ export default function ConsultaPlanillas() {
                   </Badge>
                   <span className="text-sm text-slate-500">N° {selectedGroup.payroll_number}</span>
                 </div>
+                {selectedGroup.attendance_period_start && selectedGroup.attendance_period_end && (
+                  <div className="flex items-center gap-1.5 mt-1 text-xs text-indigo-600 font-medium">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Cómputo de asistencias: {format(new Date(selectedGroup.attendance_period_start), "dd/MM/yyyy", { locale: es })} → {format(new Date(selectedGroup.attendance_period_end), "dd/MM/yyyy", { locale: es })}</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
@@ -881,6 +889,11 @@ export default function ConsultaPlanillas() {
                               <Badge className={`text-[10px] px-1.5 py-0 ${STATUS_COLORS[g.status] || "bg-slate-100"}`}>{g.status}</Badge>
                             </div>
                             <p className="text-[10px] text-slate-400 mt-0.5 truncate">N° {g.payroll_number}</p>
+                            {g.attendance_period_start && g.attendance_period_end && (
+                              <p className="text-[10px] text-indigo-500 mt-0.5 truncate font-medium">
+                                📅 {format(new Date(g.attendance_period_start), "dd/MM", { locale: es })} → {format(new Date(g.attendance_period_end), "dd/MM/yyyy", { locale: es })}
+                              </p>
+                            )}
                           </div>
                         </div>
 

@@ -227,6 +227,10 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
       </table>`
     : "";
 
+  const attStartFmt = payslip.attendance_period_start ? safeDateFmt(payslip.attendance_period_start, "dd/MM/yyyy") : "";
+  const attEndFmt = payslip.attendance_period_end ? safeDateFmt(payslip.attendance_period_end, "dd/MM/yyyy") : "";
+  const attPeriodLine = attStartFmt && attEndFmt ? `<div class="bp-att">Cómputo asistencias: ${attStartFmt} → ${attEndFmt}</div>` : "";
+
   const oneBoleta = `
   <div class="boleta">
     <!-- Cabecera empresa -->
@@ -240,6 +244,7 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
       <td class="hdr-bp">
         <div class="bp-title">BOLETA DE PAGO</div>
         <div class="bp-period">Periodo: ${payslip.period || ""}</div>
+        ${attPeriodLine}
         <div class="bp-type">${payslip.payroll_type || ""}</div>
       </td>
     </tr></table>
@@ -335,6 +340,7 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
   .bp-title { font-size:11pt; font-weight:700; }
   .bp-period { font-size:7.5pt; color:#475569; }
   .bp-type { display:inline-block; background:#4f46e5; color:white; padding:1px 7px; border-radius:8px; font-size:7pt; font-weight:700; margin-top:2px; }
+  .bp-att { font-size:7pt; color:#4338ca; font-weight:600; margin-top:1px; }
   /* Tables */
   .tbl { width:100%; border-collapse:collapse; margin-bottom:5px; font-size:7.5pt; }
   .tbl th, .tbl td { border:1px solid #94a3b8; padding:2px 4px; }
@@ -481,6 +487,11 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
         <div className="text-right">
           <div className="text-xl font-bold text-slate-900">BOLETA DE PAGO</div>
           <div className="text-sm text-slate-500">Periodo: {payslip.period}</div>
+          {payslip.attendance_period_start && payslip.attendance_period_end && (
+            <div className="text-xs text-indigo-600 font-medium mt-0.5">
+              Cómputo asistencias: {safeDateFmt(payslip.attendance_period_start, "dd/MM/yyyy")} → {safeDateFmt(payslip.attendance_period_end, "dd/MM/yyyy")}
+            </div>
+          )}
           <span className="inline-block mt-1 bg-indigo-600 text-white text-xs font-bold px-3 py-0.5 rounded-full">{payslip.payroll_type}</span>
         </div>
       </div>

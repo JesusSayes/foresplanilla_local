@@ -193,7 +193,8 @@ const ENTITY_SCHEMAS = {
   },
   Payslip: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
-    employee_id: "TEXT", period: "TEXT", month: "INTEGER", year: "INTEGER", payroll_type: "TEXT",
+    employee_id: "TEXT", period: "TEXT", attendance_period_start: "DATE", attendance_period_end: "DATE",
+    month: "INTEGER", year: "INTEGER", payroll_type: "TEXT",
     payroll_number: "TEXT", advance_payment_id: "TEXT",
     worked_days: "INTEGER", non_worked_days: "INTEGER", subsidized_days: "INTEGER",
     regular_hours: "DECIMAL(18,2)", overtime_hours: "DECIMAL(18,2)",
