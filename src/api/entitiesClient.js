@@ -96,7 +96,7 @@ export const entitiesAPI = {
 
     bulkCreate: async (data) => {
       const response = await localClient.post('/api/payroll/payslips/bulk', data);
-      return response.data;
+      return response.data?.data ?? response.data;
     }
   },
   PayslipTemplate: createEntityAPI('/api/payroll/templates'),

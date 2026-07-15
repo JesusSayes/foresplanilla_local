@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from '@/api/entitiesClient';
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   FileText, Users, DollarSign, Eye, Printer, ChevronRight,
-  CheckCircle, Search, Calendar, ArrowLeft, Settings, PenTool,
-  Loader2, Download, BookOpen, RefreshCw
+  CheckCircle, Search, Calendar, ArrowLeft, Settings,
+  Loader2, BookOpen
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -20,6 +19,7 @@ import PayslipPreview from "../components/payroll/PayslipPreview";
 import PlanillaCompletaView from "../components/payroll/PlanillaCompletaView";
 import ConfigFirmantesModal from "../components/payroll/ConfigFirmantesModal";
 import { safePayrollNumber, formatMoney } from "@/lib/payrollUtils";
+import { parseDateLima } from "@/lib/dateUtils";
 
 const TIPO_COLORS = {
   Quincenal:    "bg-blue-100 text-blue-700 border-blue-200",
@@ -129,6 +129,8 @@ export default function ConsultaPlanillas() {
           payroll_type: p.payroll_type,
           payroll_number: p.payroll_number || `${p.payroll_type}-${p.year}-${String(p.month).padStart(2,"0")}`,
           period: p.period || format(new Date(p.year, p.month - 1), "MMMM yyyy", { locale: es }),
+          attendance_period_start: p.attendance_period_start || null,
+          attendance_period_end: p.attendance_period_end || null,
           payslips: [],
         };
       }
@@ -475,6 +477,12 @@ export default function ConsultaPlanillas() {
                   </Badge>
                   <span className="text-sm text-slate-500">N° {selectedGroup.payroll_number}</span>
                 </div>
+                {selectedGroup.attendance_period_start && selectedGroup.attendance_period_end && (
+                  <div className="flex items-center gap-1.5 mt-1 text-xs text-indigo-600 font-medium">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Cómputo de asistencias: {format(parseDateLima(selectedGroup.attendance_period_start), "dd/MM/yyyy", { locale: es })} → {format(parseDateLima(selectedGroup.attendance_period_end), "dd/MM/yyyy", { locale: es })}</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
@@ -885,6 +893,11 @@ export default function ConsultaPlanillas() {
                               <Badge className={`text-[10px] px-1.5 py-0 ${STATUS_COLORS[g.status] || "bg-slate-100"}`}>{g.status}</Badge>
                             </div>
                             <p className="text-[10px] text-slate-400 mt-0.5 truncate">N° {g.payroll_number}</p>
+                            {g.attendance_period_start && g.attendance_period_end && (
+                              <p className="text-[10px] text-indigo-500 mt-0.5 truncate font-medium">
+                                📅 {format(parseDateLima(g.attendance_period_start), "dd/MM", { locale: es })} → {format(parseDateLima(g.attendance_period_end), "dd/MM/yyyy", { locale: es })}
+                              </p>
+                            )}
                           </div>
                         </div>
 

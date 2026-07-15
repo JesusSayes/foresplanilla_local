@@ -29,6 +29,7 @@ import PayslipPreview from "../components/payroll/PayslipPreview";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 import { safePayrollNumber, roundMoney, sanitizePayslip } from "@/lib/payrollUtils";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
+import { parseDateLima } from "@/lib/dateUtils";
 
 // Rate limiter global + retry con backoff exponencial para errores de rate-limit
 // Garantiza un gap mínimo entre TODAS las llamadas API y reintenta en caso de 429
@@ -93,8 +94,8 @@ const DEDICATED_PAYSLIP_DEDUCTION_TYPES = new Set([
 ]);
 
 const isDedicatedPayslipDeduction = (concept) => {
-  const systemLogicType = String(concept?.system_logic_type || "").trim();
-  const formula = String(concept?.calculation_formula || "").trim();
+  const systemLogicType = String(concept?.system_logic_type || "").trim().toLowerCase();
+  const formula = String(concept?.calculation_formula || "").trim().toLowerCase();
   return DEDICATED_PAYSLIP_DEDUCTION_TYPES.has(systemLogicType)
     || DEDICATED_PAYSLIP_DEDUCTION_TYPES.has(formula);
 };
@@ -168,9 +169,10 @@ export default function PayrollManagement() {
   const { data: attendanceRecords = [] } = useQuery({
     queryKey: ["attendanceRecords", selectedMonth, selectedYear],
     queryFn: async () => {
-      const startDate = new Date(selectedYear, selectedMonth - 1, 1);
+      // Ampliar el rango 15 días antes del inicio del mes para cubrir el ajuste
+      // del período de cómputo de asistencias (ej: 26 del mes anterior al 24 del mes actual)
+      const startDate = new Date(selectedYear, selectedMonth - 1, -14);
       const endDate = new Date(selectedYear, selectedMonth, 0);
-
       const records = await withRetry(() => entitiesAPI.AttendanceRecord.list("-date"));
       return records.filter(r => {
         const recordDate = new Date(r.date);
@@ -690,6 +692,8 @@ export default function PayrollManagement() {
         employee_code: emp.employee_code,
         department: emp.department_name,
         period: `${format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}`,
+        attendance_period_start: periodFrom,
+        attendance_period_end: periodTo,
         month: selectedMonth,
         year: selectedYear,
         payroll_type: payrollType,
@@ -1210,6 +1214,9 @@ export default function PayrollManagement() {
                       <CardTitle className="text-xl font-bold">Vista Previa de Planilla</CardTitle>
                       <p className="text-sm text-slate-600 mt-1">
                         {payrollType} - {format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}
+                      </p>
+                      <p className="text-xs text-indigo-600 mt-0.5 font-medium">
+                        📅 Período de cómputo: {previewData[0]?.attendance_period_start ? format(parseDateLima(previewData[0].attendance_period_start), "dd/MM/yyyy", { locale: es }) : "—"} → {previewData[0]?.attendance_period_end ? format(parseDateLima(previewData[0].attendance_period_end), "dd/MM/yyyy", { locale: es }) : "—"}
                       </p>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => setShowPreview(false)}>

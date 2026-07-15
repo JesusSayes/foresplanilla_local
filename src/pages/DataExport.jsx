@@ -35,7 +35,7 @@ const ENTITY_SCHEMAS = {
     base_salary: "DECIMAL(18,2)", quincenal_amount: "DECIMAL(18,2)", activity_cost: "DECIMAL(18,2)", food_cost: "DECIMAL(18,2)", transport_cost: "DECIMAL(18,2)",
     bank_name: "TEXT", bank_account: "TEXT",
     cci_account: "TEXT", cts_bank: "TEXT", cts_account_number: "TEXT", cts_currency: "TEXT",
-    pension_system: "TEXT", afp_id: "TEXT", afp_affiliation_date: "DATE", cuspp: "TEXT",
+    pension_system: "TEXT", afp_id: "TEXT", afp_affiliation_date: "DATE", cuspp: "TEXT", afp_commission_type: "TEXT",
     worker_type: "TEXT", tax_residence: "TEXT", photo_url: "TEXT", status: "TEXT", role: "TEXT",
     managed_team_ids: "JSON", supervisor_id: "TEXT", supervisor_name: "TEXT",
     emergency_contact_name: "TEXT", emergency_contact_phone: "TEXT", emergency_contact_relationship: "TEXT",
@@ -49,8 +49,14 @@ const ENTITY_SCHEMAS = {
   Derechohabiente: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     employee_id: "TEXT", document_type: "TEXT", document_number: "TEXT",
-    first_name: "TEXT", last_name: "TEXT", gender: "TEXT", birth_date: "DATE",
-    relationship: "TEXT", registration_date: "DATE", deregistration_date: "DATE", is_active: "BOOLEAN"
+    first_name: "TEXT", last_name: "TEXT", last_name_paterno: "TEXT", last_name_materno: "TEXT",
+    gender: "TEXT", birth_date: "DATE", relationship: "TEXT",
+    country_code: "TEXT", document_type_sustento: "TEXT", document_number_sustento: "TEXT",
+    conception_month: "TEXT", address: "TEXT", address_reference: "TEXT", ubigeo: "TEXT",
+    address2: "TEXT", address_reference2: "TEXT", ubigeo2: "TEXT",
+    health_center_indicator: "TEXT", city_code: "TEXT", phone: "TEXT", email: "TEXT",
+    registration_date: "DATE", deregistration_date: "DATE", is_active: "BOOLEAN",
+    is_studying: "BOOLEAN", study_proof_url: "TEXT"
   },
   Contract: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
@@ -123,8 +129,8 @@ const ENTITY_SCHEMAS = {
     incident_type: "TEXT", justification: "TEXT", supporting_document_url: "TEXT",
     justified_time_start: "TEXT", justified_time_end: "TEXT",
     full_day_justification: "BOOLEAN", hours_to_adjust: "DECIMAL(18,2)",
-    late_minutes_to_adjust: "INTEGER", status: "TEXT",
-    reviewed_by: "TEXT", review_date: "DATE", review_comments: "TEXT"
+    late_minutes_to_adjust: "INTEGER", authorizer_id: "TEXT", authorizer_name: "TEXT",
+    status: "TEXT", reviewed_by: "TEXT", review_date: "DATE", review_comments: "TEXT"
   },
   OvertimeAlert: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
@@ -189,7 +195,8 @@ const ENTITY_SCHEMAS = {
   },
   Payslip: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
-    employee_id: "TEXT", period: "TEXT", month: "INTEGER", year: "INTEGER", payroll_type: "TEXT",
+    employee_id: "TEXT", period: "TEXT", attendance_period_start: "DATE", attendance_period_end: "DATE",
+    month: "INTEGER", year: "INTEGER", payroll_type: "TEXT",
     payroll_number: "TEXT", advance_payment_id: "TEXT",
     worked_days: "INTEGER", non_worked_days: "INTEGER", subsidized_days: "INTEGER",
     regular_hours: "DECIMAL(18,2)", overtime_hours: "DECIMAL(18,2)",
@@ -390,6 +397,21 @@ const ENTITY_SCHEMAS = {
     contract_expiring: "BOOLEAN", payslip_ready: "BOOLEAN",
     attendance_alert: "BOOLEAN", system: "BOOLEAN", email_notifications: "BOOLEAN"
   },
+  NotificationRecipient: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    email: "TEXT", recipient_name: "TEXT", notification_type: "TEXT",
+    is_active: "BOOLEAN", added_by: "TEXT", notes: "TEXT"
+  },
+  AFPChangeHistory: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    employee_id: "TEXT", change_date: "DATE",
+    previous_pension_system: "TEXT", new_pension_system: "TEXT",
+    previous_afp_id: "TEXT", previous_afp_name: "TEXT",
+    new_afp_id: "TEXT", new_afp_name: "TEXT",
+    previous_commission_type: "TEXT", new_commission_type: "TEXT",
+    previous_cuspp: "TEXT", new_cuspp: "TEXT",
+    change_type: "TEXT", change_reason: "TEXT", changed_by: "TEXT", notes: "TEXT"
+  },
   IncidentType: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     name: "TEXT", affectation: "TEXT", is_active: "BOOLEAN"
@@ -397,7 +419,7 @@ const ENTITY_SCHEMAS = {
 };
 
 const ENTITY_GROUPS = [
-  { label: "Usuarios y Empleados", entities: ["User", "UserInvitation", "UserRole", "Employee", "EmployeeChangeLog", "Derechohabiente"] },
+  { label: "Usuarios y Empleados", entities: ["User", "UserInvitation", "UserRole", "Employee", "EmployeeChangeLog", "Derechohabiente", "AFPChangeHistory"] },
   { label: "Contratos", entities: ["Contract", "ContractTemplate", "ContractClause", "ContractRenewalRule"] },
   { label: "Asistencia", entities: ["AttendanceRecord", "AttendanceEditRequest", "AttendanceIncident", "OvertimeAlert", "WorkSchedule", "AccessDevice", "EmployeeAccessMapping", "DeviceEvent", "DatabaseConnection", "SyncLog"] },
   { label: "Vacaciones", entities: ["VacationRequest", "VacationBalance"] },
@@ -408,7 +430,7 @@ const ENTITY_GROUPS = [
   { label: "Roles y Permisos", entities: ["Role"] },
   { label: "Certificados", entities: ["Certificate"] },
   { label: "Configuración de Empresa", entities: ["CompanyInfo", "PayslipTemplate", "ReportConfiguration"] },
-  { label: "Notificaciones", entities: ["Notification", "NotificationPreference"] },
+  { label: "Notificaciones", entities: ["Notification", "NotificationPreference", "NotificationRecipient"] },
 ];
 
 const ALL_ENTITIES = ENTITY_GROUPS.flatMap(g => g.entities);

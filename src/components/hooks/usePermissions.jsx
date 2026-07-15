@@ -155,6 +155,12 @@ export const AVAILABLE_PERMISSIONS = {
   // Administración
   "system.admin": "Acceso administrativo completo",
   "system.settings": "Configurar ajustes del sistema",
+
+  // Notificaciones
+  "notifications.view_own": "Ver y configurar propias notificaciones",
+  "notifications.view_center": "Acceder al centro de notificaciones",
+  "notifications.view_all": "Ver notificaciones de todos los empleados",
+  "notifications.manage_config": "Configurar notificaciones del sistema (destinatarios y tipos)",
 };
 
 export const usePermissions = () => {
@@ -437,6 +443,7 @@ export const getBasicPermissionsByRole = (role) => {
       "banks.view", "banks.create", "banks.edit", "banks.delete",
       "accounting.view", "accounting.manage",
       "loans.view", "loans.manage",
+      "notifications.view_own", "notifications.view_all", "notifications.view_center", "notifications.manage_config",
     ],
     hr_readonly: [
       "employees.view",
@@ -447,6 +454,7 @@ export const getBasicPermissionsByRole = (role) => {
       "schedules.view",
       "holidays.view",
       "reports.view", "reports.export",
+      "notifications.view_own", "notifications.view_all", "notifications.view_center",
     ],
     manager: [
       "employees.view",
@@ -457,6 +465,7 @@ export const getBasicPermissionsByRole = (role) => {
       "schedules.view",
       "holidays.view",
       "reports.view", "reports.export",
+      "notifications.view_own", "notifications.view_center",
     ],
     empleado: [
       "attendance.view_own",
@@ -465,6 +474,7 @@ export const getBasicPermissionsByRole = (role) => {
       "certificates.view_own",
       "schedules.view",
       "holidays.view",
+      "notifications.view_own", "notifications.view_center",
     ],
   };
 

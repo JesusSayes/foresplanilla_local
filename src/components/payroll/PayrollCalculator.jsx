@@ -74,10 +74,10 @@ export class PayrollCalculator {
         activity_cost: context.activity_cost || 0,
       };
 
-      // Reemplazar variables en la fórmula
+      // Reemplazar variables en la fórmula (con límites de palabra para evitar sustituciones parciales)
       let evaluatedFormula = formula;
       Object.keys(variables).forEach(key => {
-        const regex = new RegExp(key, 'g');
+        const regex = new RegExp('\\b' + key + '\\b', 'g');
         evaluatedFormula = evaluatedFormula.replace(regex, variables[key]);
       });
 
@@ -345,9 +345,17 @@ export class PayrollCalculator {
       calculatedAmount = this.applySystemLogic(concept, context);
       method = 'system_logic';
     } else if (concept.is_dynamic && concept.calculation_formula) {
-      // Cálculo dinámico usando fórmula
-      calculatedAmount = this.evaluateFormula(concept.calculation_formula, context);
-      method = 'dynamic';
+      // Verificar si la fórmula es en realidad una referencia a una lógica del sistema
+      // (ej: calculation_formula = "tardiness_discount" sin system_logic_type configurado)
+      const formulaTrimmed = String(concept.calculation_formula).trim().toLowerCase();
+      if (SYSTEM_LOGIC_TYPES[formulaTrimmed]) {
+        calculatedAmount = this.applySystemLogic({ ...concept, system_logic_type: formulaTrimmed }, context);
+        method = 'system_logic';
+      } else {
+        // Cálculo dinámico usando fórmula matemática
+        calculatedAmount = this.evaluateFormula(concept.calculation_formula, context);
+        method = 'dynamic';
+      }
     } else {
       // Monto fijo
       calculatedAmount = parseFloat(concept.amount) || 0;
