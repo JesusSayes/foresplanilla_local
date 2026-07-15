@@ -101,5 +101,9 @@ export function computePermissionFlags(permissions) {
 
     // Reports
     can_view_reports: has("reports.view"),
+
+    // Notifications
+    can_view_all_notifications: hasAny(["notifications.view_all", "system.admin"]),
+    can_manage_notifications: hasAny(["notifications.manage_config", "system.admin"]),
   };
 }

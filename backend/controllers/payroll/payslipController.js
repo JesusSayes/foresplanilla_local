@@ -87,10 +87,22 @@ export const bulkCreate = async (req, res) => {
     const formattedPayslips = payslips.map(p => {
 
       let paymentDate = null;
+      let attendancePeriodStart = null;
+      let attendancePeriodEnd = null;
 
       if (p.payment_date) {
         const d = new Date(p.payment_date);
         if (!isNaN(d.getTime())) paymentDate = d;
+      }
+
+      if (p.attendance_period_start) {
+        const d = new Date(p.attendance_period_start);
+        if (!isNaN(d.getTime())) attendancePeriodStart = d;
+      }
+
+      if (p.attendance_period_end) {
+        const d = new Date(p.attendance_period_end);
+        if (!isNaN(d.getTime())) attendancePeriodEnd = d;
       }
 
       return {
@@ -100,6 +112,8 @@ export const bulkCreate = async (req, res) => {
         created_by: p.created_by || "system",
         employee_id: p.employee_id || null,
         period: p.period || null,
+        attendance_period_start: attendancePeriodStart,
+        attendance_period_end: attendancePeriodEnd,
         month: p.month ? Number(p.month) : null,
         year: p.year ? Number(p.year) : null,
         payroll_type: p.payroll_type || null,

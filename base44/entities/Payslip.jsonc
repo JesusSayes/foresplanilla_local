@@ -10,6 +10,16 @@
       "type": "string",
       "description": "Periodo (Mes YYYY)"
     },
+    "attendance_period_start": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de inicio del per\u00edodo de c\u00f3mputo de asistencias (tardanzas, faltas, horas extras)"
+    },
+    "attendance_period_end": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de fin del per\u00edodo de c\u00f3mputo de asistencias (tardanzas, faltas, horas extras)"
+    },
     "month": {
       "type": "integer",
       "description": "Mes (1-12)"
