@@ -533,9 +533,17 @@ export default function PayrollManagement() {
           maxDaysInPeriod = termDate.getDate(); // solo hasta el día de cese
         }
       }
+      // Días trabajados: incluyen días con asistencia real (Completo/Incompleto) Y días
+      // con justificación aprobada (Justificado), vacaciones y compensaciones.
+      // Los días "Ausente" (sin justificar) NO cuentan como trabajados.
+      const countableStatuses = ["Completo", "Incompleto", "Justificado", "Vacaciones", "Compensación"];
       const workedDays = payrollType === "Quincenal"
         ? Math.min(15, maxDaysInPeriod)
-        : (empAttendance.filter(r => r.status === "Completo" || r.status === "Incompleto").length || maxDaysInPeriod);
+        : (empAttendance.filter(r => countableStatuses.includes(r.status)).length || maxDaysInPeriod);
+      // Días subsidiados: justificaciones aprobadas que cubren el día completo (descanso médico, etc.)
+      const subsidizedDays = payrollType === "Quincenal"
+        ? 0
+        : empAttendance.filter(r => r.status === "Justificado").length;
       
       const attendanceData = {
         worked_days: workedDays,
@@ -716,6 +724,8 @@ export default function PayrollManagement() {
         payroll_number: payrollNumber,
         advance_payment_id: advancePaymentId,
         worked_days: workedDays,
+        subsidized_days: subsidizedDays,
+        non_worked_days: payrollType === "Quincenal" ? 0 : empAttendance.filter(r => r.status === "Ausente").length,
         regular_hours: attendanceData.regular_hours,
         overtime_hours: empAttendance.reduce((sum, r) => sum + (r.overtime_hours_25 || 0) + (r.overtime_hours_35 || 0), 0),
         base_salary: safePayrollNumber(emp.base_salary),
