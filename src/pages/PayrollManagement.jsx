@@ -30,6 +30,7 @@ import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUp
 import { safePayrollNumber, roundMoney, sanitizePayslip } from "@/lib/payrollUtils";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 import { parseDateLima } from "@/lib/dateUtils";
+import { isEmploymentDateValid } from "@/lib/employmentDate";
 
 // Rate limiter global + retry con backoff exponencial para errores de rate-limit
 // Garantiza un gap mínimo entre TODAS las llamadas API y reintenta en caso de 429
@@ -514,6 +515,8 @@ export default function PayrollManagement() {
         if (r.employee_id !== emp.id) return false;
         if (periodFrom && r.date < periodFrom) return false;
         if (periodTo && r.date > periodTo) return false;
+        // No considerar asistencias anteriores al ingreso ni posteriores al cese.
+        if (!isEmploymentDateValid(emp, r.date)) return false;
         return true;
       });
       // Calcular días proporcionales si el empleado cesó dentro del periodo

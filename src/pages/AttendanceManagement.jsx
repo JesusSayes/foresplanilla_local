@@ -25,6 +25,7 @@ import { todayLima, todayDateLima, parseDateLima, dateToStringLima } from "@/lib
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { calcEffectiveMetrics, getSegmentClockTimes } from "@/lib/attendanceMetrics";
+import { isEmploymentDateValid } from "@/lib/employmentDate";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
@@ -827,19 +828,9 @@ export default function AttendanceManagement() {
     // Para cada empleado filtrado × cada fecha → una fila (solo si existe registro en BD)
     const rows = [];
     for (const emp of filteredEmployees) {
-      // Excluir empleados cesados antes del rango
-      if (emp.termination_date) {
-        const termination = new Date(emp.termination_date + "T00:00:00");
-        const rangeStart = new Date(dateFrom); rangeStart.setHours(0, 0, 0, 0);
-        if (rangeStart > termination) continue;
-      }
       for (const dateStr of dateList) {
-        // Si el empleado estaba cesado en esta fecha específica, omitir
-        if (emp.termination_date) {
-          const termination = new Date(emp.termination_date + "T00:00:00");
-          const rowDay = new Date(dateStr + "T00:00:00");
-          if (rowDay > termination) continue;
-        }
+        // Omitir fechas anteriores al ingreso o posteriores al cese.
+        if (!isEmploymentDateValid(emp, dateStr)) continue;
         const record = todayRecords.find(r => r.employee_id === emp.id && r.date === dateStr);
         if (!record) continue; // solo mostrar si existe registro en la BD
         rows.push({ ...emp, record, displayDate: dateStr });
@@ -865,11 +856,7 @@ export default function AttendanceManagement() {
       employeesWithRecords = [];
     } else {
     employeesWithRecords = filteredEmployees.filter(emp => {
-      if (emp.termination_date) {
-        const termination = new Date(emp.termination_date + "T00:00:00");
-        const selected = new Date(selectedDate); selected.setHours(0, 0, 0, 0);
-        if (selected > termination) return false;
-      }
+      if (!isEmploymentDateValid(emp, selectedDateStr)) return false;
       const record = todayRecords.find(r => r.employee_id === emp.id && r.date === selectedDateStr);
       return !!record; // solo si existe registro en la BD
     }).map(emp => {
