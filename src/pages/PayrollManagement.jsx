@@ -599,21 +599,47 @@ export default function PayrollManagement() {
         if (periodTo && r.date > periodTo) return false;
         return true;
       });
-      // Calcular días proporcionales si el empleado cesó dentro del periodo
-      let maxDaysInPeriod = periodEnd.getDate(); // días totales del mes
-      if (emp.status === "Cesado" && emp.termination_date) {
-        const termDate = new Date(emp.termination_date.split("T")[0]);
-        if (termDate >= periodStart && termDate <= periodEnd) {
-          maxDaysInPeriod = termDate.getDate(); // solo hasta el día de cese
-        }
+      // ── DÍAS LABORADOS (convención Perú: el mes se computa como 30 días) ──
+      // El periodo de asistencia seleccionado (periodFrom/periodTo) SOLO se usa para
+      // descontar faltas y tardanzas, NO para el cómputo de días laborados.
+      // - Mes completo (activo del 1 al último día calendario): 30 días (siempre,
+      //   sin importar si el mes tiene 28, 30 o 31 días calendario).
+      // - Ingreso en el mes el día D (>1): del D al 30 → (30 - D + 1).
+      // - Cese en el mes el día D (< último día calendario): del 1 al D → min(D, 30).
+      // - Ingreso y cese en el mismo mes: del día de ingreso al día de cese.
+      const lastCalendarDay = periodEnd.getDate(); // último día calendario del mes
+      let hireInMonth = null;
+      if (emp.hire_date) {
+        const [hY, hM, hD] = emp.hire_date.split("T")[0].split("-").map(Number);
+        if (hY === selectedYear && hM === selectedMonth && hD > 1) hireInMonth = hD;
       }
-      // Días trabajados: incluyen días con asistencia real (Completo/Incompleto) Y días
-      // con justificación aprobada (Justificado), vacaciones y compensaciones.
-      // Los días "Ausente" (sin justificar) NO cuentan como trabajados.
-      const countableStatuses = ["Completo", "Incompleto", "Justificado", "Vacaciones", "Compensación"];
-      const workedDays = payrollType === "Quincenal"
-        ? Math.min(15, maxDaysInPeriod)
-        : (empAttendance.filter(r => countableStatuses.includes(r.status)).length || maxDaysInPeriod);
+      let termInMonth = null;
+      if (emp.status === "Cesado" && emp.termination_date) {
+        const [tY, tM, tD] = emp.termination_date.split("T")[0].split("-").map(Number);
+        if (tY === selectedYear && tM === selectedMonth && tD < lastCalendarDay) termInMonth = tD;
+      }
+
+      let workedDays;
+      if (payrollType === "Quincenal") {
+        // Adelanto quincenal: tope 15, prorrateado por cese (comportamiento existente).
+        let quincenalMax = lastCalendarDay;
+        if (emp.status === "Cesado" && emp.termination_date) {
+          const termDate = new Date(emp.termination_date.split("T")[0]);
+          if (termDate >= periodStart && termDate <= periodEnd) {
+            quincenalMax = termDate.getDate();
+          }
+        }
+        workedDays = Math.min(15, quincenalMax);
+      } else if (hireInMonth !== null && termInMonth !== null) {
+        workedDays = Math.min(30, termInMonth) - hireInMonth + 1;
+      } else if (hireInMonth !== null) {
+        workedDays = 30 - hireInMonth + 1;
+      } else if (termInMonth !== null) {
+        workedDays = Math.min(termInMonth, 30);
+      } else {
+        workedDays = 30; // mes completo → siempre 30
+      }
+      if (workedDays < 0) workedDays = 0;
       // Días subsidiados: justificaciones aprobadas que cubren el día completo (descanso médico, etc.)
       const subsidizedDays = payrollType === "Quincenal"
         ? 0
