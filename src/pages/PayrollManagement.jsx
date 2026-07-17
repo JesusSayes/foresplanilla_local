@@ -110,6 +110,7 @@ export default function PayrollManagement() {
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null); // 'preview' | 'generate'
   const [showPayrollConfig, setShowPayrollConfig] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -134,15 +135,16 @@ export default function PayrollManagement() {
     loadUserData();
   }, []);
 
-  const { data: allEmployees = [] } = useQuery({
+  const employeesQuery = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
       // Incluir Activos y Cesados (los Cesados pueden tener días parciales en el periodo)
       return await withRetry(() => base44.entities.Employee.filter({}));
     },
   });
+  const { data: allEmployees = [] } = employeesQuery;
 
-  const { data: existingPayslips = [] } = useQuery({
+  const payslipsQuery = useQuery({
     queryKey: ["payslips", selectedMonth, selectedYear],
     queryFn: async () => {
       return await withRetry(() => base44.entities.Payslip.filter({
@@ -153,6 +155,7 @@ export default function PayrollManagement() {
     staleTime: 0,
     refetchOnMount: true,
   });
+  const { data: existingPayslips = [] } = payslipsQuery;
 
   const { data: allPayslips = [] } = useQuery({
     queryKey: ["allPayslips"],
@@ -161,7 +164,7 @@ export default function PayrollManagement() {
     },
   });
 
-  const { data: attendanceRecords = [] } = useQuery({
+  const attendanceQuery = useQuery({
     queryKey: ["attendanceRecords", selectedMonth, selectedYear],
     queryFn: async () => {
       // Ampliar el rango 15 días antes del inicio del mes para cubrir el ajuste
@@ -176,8 +179,9 @@ export default function PayrollManagement() {
       });
     },
   });
+  const { data: attendanceRecords = [] } = attendanceQuery;
 
-  const { data: payrollConcepts = [] } = useQuery({
+  const payrollConceptsQuery = useQuery({
     queryKey: ["payrollConcepts", selectedMonth, selectedYear],
     queryFn: async () => {
       const allConcepts = await withRetry(() => base44.entities.PayrollConcept.list());
@@ -203,22 +207,25 @@ export default function PayrollManagement() {
       });
     },
   });
+  const { data: payrollConcepts = [] } = payrollConceptsQuery;
 
-  const { data: rmvData } = useQuery({
+  const rmvQuery = useQuery({
     queryKey: ["rmv"],
     queryFn: async () => {
       const rmvs = await withRetry(() => base44.entities.RMV.filter({ is_active: true }, "-effective_date"));
       return rmvs.length > 0 ? rmvs[0] : { amount: 1130 };
     },
   });
+  const { data: rmvData } = rmvQuery;
 
-  const { data: allAfps = [] } = useQuery({
+  const afpsQuery = useQuery({
     queryKey: ["allAfps"],
     queryFn: async () => {
       return await withRetry(() => base44.entities.AFP.filter({ is_active: true }));
     },
     staleTime: 300000,
   });
+  const { data: allAfps = [] } = afpsQuery;
 
   const { data: companyInfo } = useQuery({
     queryKey: ["companyInfo"],
@@ -228,7 +235,7 @@ export default function PayrollManagement() {
     },
   });
 
-  const { data: payrollConfig } = useQuery({
+  const payrollConfigQuery = useQuery({
     queryKey: ["payrollConfig"],
     queryFn: async () => {
       const configs = await withRetry(() => base44.entities.PayrollConfig.filter({ config_type: "Quincenal", is_active: true }));
@@ -236,6 +243,27 @@ export default function PayrollManagement() {
     },
     staleTime: 0, // Siempre refetch al invalidar para reflejar cambios de configuración inmediatamente
   });
+  const { data: payrollConfig } = payrollConfigQuery;
+
+  // Bandera combinada de carga/errores de los datos críticos para el cálculo de planilla.
+  // Diferencia una consulta pendiente (payrollDataLoading=true) de un resultado válido vacío.
+  const payrollDataLoading =
+    employeesQuery.isPending ||
+    payslipsQuery.isPending ||
+    attendanceQuery.isPending ||
+    payrollConceptsQuery.isPending ||
+    rmvQuery.isPending ||
+    afpsQuery.isPending ||
+    payrollConfigQuery.isPending;
+
+  const payrollDataError =
+    employeesQuery.isError ||
+    payslipsQuery.isError ||
+    attendanceQuery.isError ||
+    payrollConceptsQuery.isError ||
+    rmvQuery.isError ||
+    afpsQuery.isError ||
+    payrollConfigQuery.isError;
 
   const createPayslipsMutation = useMutation({
     mutationFn: async (payslips) => {
@@ -257,6 +285,7 @@ export default function PayrollManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries(["payslips"]);
       queryClient.invalidateQueries(["payrollConcepts"]);
+      queryClient.invalidateQueries({ queryKey: ["allEmployees"] });
       toast.success("Planilla generada exitosamente");
       setShowPreview(false);
       setPreviewData([]);
@@ -368,13 +397,50 @@ export default function PayrollManagement() {
   };
 
   const calculatePayroll = async (periodFrom, periodTo, autoGenerate = false) => {
-    const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
+    // Evitar reentrada: si ya hay un cálculo en curso, ignorar
+    if (isCalculating) return;
+
+    setIsCalculating(true);
+    try {
+      // ── Forzar datos frescos con React Query para evitar valores capturados por renders anteriores ──
+      // Garantiza que la primera vista previa produzca los mismos montos que las siguientes,
+      // incluso tras recargar o limpiar la caché.
+      const criticalKeys = [
+        ["allEmployees"],
+        ["attendanceRecords", selectedMonth, selectedYear],
+        ["payrollConcepts", selectedMonth, selectedYear],
+        ["rmv"],
+        ["allAfps"],
+        ["payrollConfig"],
+        ["payslips", selectedMonth, selectedYear],
+      ];
+      await Promise.all(criticalKeys.map(key => queryClient.refetchQueries({ queryKey: key, exact: true })));
+
+      // Si alguna consulta crítica falló, cancelar el proceso sin crear boletas
+      const failedKey = criticalKeys.find(key => queryClient.getQueryState(key)?.status === "error");
+      if (failedKey) {
+        toast.error("Error al cargar datos de planilla. Reintente en unos segundos.");
+        return;
+      }
+
+      // Leer datos frescos desde la caché y sombrear las variables del closure
+      const allEmployees = queryClient.getQueryData(["allEmployees"]) ?? [];
+      const attendanceRecords = queryClient.getQueryData(["attendanceRecords", selectedMonth, selectedYear]) ?? [];
+      const payrollConcepts = queryClient.getQueryData(["payrollConcepts", selectedMonth, selectedYear]) ?? [];
+      const rmvData = queryClient.getQueryData(["rmv"]) ?? { amount: 1130 };
+      const allAfps = queryClient.getQueryData(["allAfps"]) ?? [];
+      const payrollConfig = queryClient.getQueryData(["payrollConfig"]) ?? { quincenal_percentage: 40, quincenal_cutoff_day: 7 };
+      const existingPayslips = queryClient.getQueryData(["payslips", selectedMonth, selectedYear]) ?? [];
+
+      const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
     
     const periodStart = new Date(selectedYear, selectedMonth - 1, 1);
     const periodEnd = new Date(selectedYear, selectedMonth, 0); // último día del mes
 
-    // Filtrar empleados según búsqueda y departamento
-    let filteredEmployees = getFilteredEmployees();
+      // Filtrar empleados según búsqueda y departamento (usando datos frescos locales)
+      let filteredEmployees = canViewAllDepartments
+        ? allEmployees
+        : allEmployees.filter(emp => canAccessDepartment(emp.department_name));
     
     // Filtrar solo empleados activos o cesados que aún tenían días en el periodo
     filteredEmployees = filteredEmployees.filter(emp => {
@@ -782,14 +848,17 @@ export default function PayrollManagement() {
       return { ...sanitized, employee_name: rawPayslip.employee_name, employee_code: rawPayslip.employee_code, department: rawPayslip.department };
     });
 
-    setPreviewData(payslipsData);
-    setShowPreview(true);
-    if (autoGenerate) {
-      const payslipsToCreate = payslipsData.map(p => {
-        const { employee_name, employee_code, department, ...rest } = p;
-        return rest;
-      });
-      createPayslipsMutation.mutate(payslipsToCreate);
+      setPreviewData(payslipsData);
+      setShowPreview(true);
+      if (autoGenerate) {
+        const payslipsToCreate = payslipsData.map(p => {
+          const { employee_name, employee_code, department, ...rest } = p;
+          return rest;
+        });
+        createPayslipsMutation.mutate(payslipsToCreate);
+      }
+    } finally {
+      setIsCalculating(false);
     }
   };
 
@@ -1206,14 +1275,32 @@ export default function PayrollManagement() {
               {/* Vista Previa */}
               {canCreate && (
                 <div className="flex items-end">
-                  <Button onClick={() => handleOpenPeriodModal('preview')} className="bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap">
-                    <Eye className="w-4 h-4 mr-2" />Vista Previa
+                  <Button onClick={() => handleOpenPeriodModal('preview')} className="bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap" disabled={payrollDataLoading || isCalculating}>
+                    <Eye className="w-4 h-4 mr-2" />{isCalculating ? "Calculando..." : "Vista Previa"}
                   </Button>
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
+
+        {/* ── Indicador de carga / error de datos de planilla ── */}
+        {(payrollDataLoading || isCalculating) && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-blue-700 font-medium">
+              {isCalculating ? "Calculando planilla..." : "Cargando datos de planilla..."}
+            </p>
+          </div>
+        )}
+        {payrollDataError && !payrollDataLoading && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+            <p className="text-sm text-red-700 font-medium">
+              Error al cargar datos de planilla. Algunos datos no están disponibles. Reintente en unos segundos.
+            </p>
+          </div>
+        )}
 
         {/* ── Stats Cards ── */}
         <div className="flex flex-wrap gap-4 mb-6">
@@ -1288,10 +1375,10 @@ export default function PayrollManagement() {
                     <Button
                       onClick={() => handleOpenPeriodModal('generate')}
                       className="flex-1 bg-green-600 hover:bg-green-700"
-                      disabled={createPayslipsMutation.isPending}
+                      disabled={createPayslipsMutation.isPending || isCalculating}
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
-                      {createPayslipsMutation.isPending ? "Generando..." : "Confirmar y Generar"}
+                      {isCalculating ? "Calculando..." : createPayslipsMutation.isPending ? "Generando..." : "Confirmar y Generar"}
                     </Button>
                   </div>
 
