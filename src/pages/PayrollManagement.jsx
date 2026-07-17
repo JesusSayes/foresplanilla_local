@@ -595,21 +595,55 @@ export default function PayrollManagement() {
         if (!isEmploymentDateValid(emp, r.date)) return false;
         return true;
       });
-      // Calcular días proporcionales usando el período ingresado y la fecha de cese.
-      let maxDaysInPeriod = Math.min(30, Math.floor((periodEnd - periodStart) / 86400000) + 1);
-      if (emp.status === "Cesado" && emp.termination_date) {
-        const termDate = new Date(`${emp.termination_date.split("T")[0]}T00:00:00`);
-        if (termDate >= periodStart && termDate <= periodEnd) {
-          maxDaysInPeriod = Math.min(30, Math.floor((termDate - periodStart) / 86400000) + 1);
-        }
+      // Para un mes calendario se aplica la convención laboral de 30 días.
+      // En períodos personalizados se respeta el cruce real con ingreso y cese.
+      const lastCalendarDay = new Date(selectedYear, selectedMonth, 0).getDate();
+      const isCalendarMonthPeriod =
+        periodStart.getFullYear() === selectedYear &&
+        periodStart.getMonth() + 1 === selectedMonth &&
+        periodStart.getDate() === 1 &&
+        periodEnd.getFullYear() === selectedYear &&
+        periodEnd.getMonth() + 1 === selectedMonth &&
+        periodEnd.getDate() === lastCalendarDay;
+
+      const hireDate = emp.hire_date
+        ? new Date(`${emp.hire_date.split("T")[0]}T00:00:00`)
+        : null;
+      const terminationDate = emp.termination_date
+        ? new Date(`${emp.termination_date.split("T")[0]}T00:00:00`)
+        : null;
+      const employmentPeriodStart = hireDate && hireDate > periodStart ? hireDate : periodStart;
+      const employmentPeriodEnd = terminationDate && terminationDate < periodEnd ? terminationDate : periodEnd;
+      const effectivePeriodDays = employmentPeriodEnd >= employmentPeriodStart
+        ? Math.floor((employmentPeriodEnd - employmentPeriodStart) / 86400000) + 1
+        : 0;
+
+      let hireInMonth = null;
+      if (emp.hire_date) {
+        const [hY, hM, hD] = emp.hire_date.split("T")[0].split("-").map(Number);
+        if (hY === selectedYear && hM === selectedMonth && hD > 1) hireInMonth = hD;
       }
-      // Días trabajados: incluyen días con asistencia real (Completo/Incompleto) Y días
-      // con justificación aprobada (Justificado), vacaciones y compensaciones.
-      // Los días "Ausente" (sin justificar) NO cuentan como trabajados.
-      const countableStatuses = ["Completo", "Incompleto", "Justificado", "Vacaciones", "Compensación"];
-      const workedDays = payrollType === "Quincenal"
-        ? Math.min(15, maxDaysInPeriod)
-        : (empAttendance.filter(r => countableStatuses.includes(r.status)).length || maxDaysInPeriod);
+      let termInMonth = null;
+      if (emp.status === "Cesado" && emp.termination_date) {
+        const [tY, tM, tD] = emp.termination_date.split("T")[0].split("-").map(Number);
+        if (tY === selectedYear && tM === selectedMonth && tD < lastCalendarDay) termInMonth = tD;
+      }
+
+      let workedDays;
+      if (payrollType === "Quincenal") {
+        workedDays = Math.min(15, effectivePeriodDays);
+      } else if (!isCalendarMonthPeriod) {
+        workedDays = Math.min(30, effectivePeriodDays);
+      } else if (hireInMonth !== null && termInMonth !== null) {
+        workedDays = Math.min(30, termInMonth) - hireInMonth + 1;
+      } else if (hireInMonth !== null) {
+        workedDays = 30 - hireInMonth + 1;
+      } else if (termInMonth !== null) {
+        workedDays = Math.min(termInMonth, 30);
+      } else {
+        workedDays = 30; // mes completo → siempre 30
+      }
+      if (workedDays < 0) workedDays = 0;
       // Días subsidiados: justificaciones aprobadas que cubren el día completo (descanso médico, etc.)
       const subsidizedDays = payrollType === "Quincenal"
         ? 0
