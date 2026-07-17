@@ -246,10 +246,16 @@ export class PayrollCalculator {
       return { amount: 0, name: "", code: "", detail: "Sin sistema de pensiones configurado" };
     }
 
+    // Devuelve { items: [{name, code, amount, detail}], totalAmount, name, code, detail }
+    // Cada item se agrega como un descuento independiente en la boleta (según ley peruana:
+    // aporte obligatorio, comisión y prima de seguro se muestran por separado).
+
     if (pensionSystem === "ONP") {
       const amount = totalIncome * 0.13;
+      const rounded = Math.round(amount * 100) / 100;
       return {
-        amount: Math.round(amount * 100) / 100,
+        items: [{ name: "ONP", code: "0602", amount: rounded, detail: `ONP 13% de S/${totalIncome.toFixed(2)}` }],
+        totalAmount: rounded,
         name: "ONP",
         code: "0602",
         detail: `ONP 13% de S/${totalIncome.toFixed(2)}`,
@@ -260,26 +266,54 @@ export class PayrollCalculator {
       const afp = context.afp;
       if (!afp) {
         this.errors.push({ concept: "AFP", error: `Empleado ${employee.employee_code} tiene sistema AFP pero no tiene AFP asignada` });
-        return { amount: 0, name: "AFP", code: "", detail: "AFP no configurada para el empleado" };
+        return { items: [], totalAmount: 0, name: "AFP", code: "", detail: "AFP no configurada para el empleado" };
       }
       const commission = afp.commission_percentage || 0;
       const obligatory = afp.obligatory_contribution_percentage || 10;
       const insurance = afp.insurance_percentage || 0;
       // Comisión Mixta: la comisión se cobra sobre el fondo acumulado, no sobre el flujo mensual
       const isMixta = employee.afp_commission_type === "Mixta";
-      const totalRate = isMixta
-        ? (obligatory + insurance) / 100
-        : (commission + obligatory + insurance) / 100;
-      const amount = totalIncome * totalRate;
+      const round2 = (v) => Math.round(v * 100) / 100;
+
+      const items = [];
+      // 1) Aporte obligatorio (10% de la remuneración asegurable)
+      const aporteAmount = round2(totalIncome * (obligatory / 100));
+      items.push({
+        name: `Aporte Obligatorio AFP ${afp.name}`,
+        code: "0601",
+        amount: aporteAmount,
+        detail: `Aporte obligatorio ${obligatory}% de S/${totalIncome.toFixed(2)}`,
+      });
+      // 2) Prima de seguro (seguro)
+      const seguroAmount = round2(totalIncome * (insurance / 100));
+      items.push({
+        name: `Prima de Seguro AFP ${afp.name}`,
+        code: "0601",
+        amount: seguroAmount,
+        detail: `Prima de seguro ${insurance}% de S/${totalIncome.toFixed(2)}`,
+      });
+      // 3) Comisión (solo en régimen de Flujo; en Mixta se cobra sobre el saldo, no sobre el flujo)
+      if (!isMixta && commission > 0) {
+        const comisionAmount = round2(totalIncome * (commission / 100));
+        items.push({
+          name: `Comisión AFP ${afp.name}`,
+          code: "0601",
+          amount: comisionAmount,
+          detail: `Comisión flujo ${commission}% de S/${totalIncome.toFixed(2)}`,
+        });
+      }
+
+      const totalAmount = round2(items.reduce((s, i) => s + i.amount, 0));
       return {
-        amount: Math.round(amount * 100) / 100,
+        items,
+        totalAmount,
         name: `AFP ${afp.name}`,
         code: "0601",
         detail: `AFP ${afp.name} (${isMixta ? "Mixta" : "Flujo"}): ${isMixta ? `${obligatory}%+${insurance}%` : `${commission}%+${obligatory}%+${insurance}%`} de S/${totalIncome.toFixed(2)}`,
       };
     }
 
-    return { amount: 0, name: "", code: "", detail: `Sistema de pensiones no reconocido: "${pensionSystem}"` };
+    return { items: [], totalAmount: 0, name: "", code: "", detail: `Sistema de pensiones no reconocido: "${pensionSystem}"` };
   }
 
   /**
@@ -332,26 +366,30 @@ export class PayrollCalculator {
     );
     if (!hasPensionConcept && this.payrollType !== "Quincenal" && totalIncome > 0) {
       const pensionCalc = this.calculatePensionContribution(totalIncome, context);
-      if (pensionCalc.amount > 0) {
-        deductions.push({
-          concept_type: "Descuento",
-          concept_category: "AFP/ONP",
-          concept_name: pensionCalc.name,
-          concept_code: pensionCalc.code,
-          is_dynamic: true,
-          system_logic_type: "pension_contribution",
-          calculated_amount: pensionCalc.amount,
-          calculation_method: "system_logic",
-          applied_date: new Date().toISOString(),
-        });
-        this.logCalculation({
-          concept: pensionCalc.name,
-          system_logic_type: "pension_contribution",
-          result: pensionCalc.amount,
-          detail: pensionCalc.detail,
-          status: "success",
-        });
-      }
+      // Agregar cada componente (aporte obligatorio, prima de seguro, comisión) como
+      // un descuento independiente, según la ley peruana.
+      (pensionCalc.items || []).forEach((item) => {
+        if (item.amount > 0) {
+          deductions.push({
+            concept_type: "Descuento",
+            concept_category: "AFP/ONP",
+            concept_name: item.name,
+            concept_code: item.code,
+            is_dynamic: true,
+            system_logic_type: "pension_contribution",
+            calculated_amount: item.amount,
+            calculation_method: "system_logic",
+            applied_date: new Date().toISOString(),
+          });
+          this.logCalculation({
+            concept: item.name,
+            system_logic_type: "pension_contribution",
+            result: item.amount,
+            detail: item.detail,
+            status: "success",
+          });
+        }
+      });
     }
 
     const totalDeductions = safe(deductions.reduce((sum, c) => sum + c.calculated_amount, 0));

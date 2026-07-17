@@ -669,11 +669,16 @@ export default function PayrollManagement() {
       // Obtener conceptos del empleado (generales + específicos + fijos del empleado)
       const generalConcepts = payrollConcepts.filter(c => c.employee_id === "general");
       const specificConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
-      // Para Mensual/Adicional/SNP: los bonos (actividad, alimento, movilidad) ya vienen como
-      // conceptos dinámicos generales con fórmulas que prorratean por días trabajados.
-      // No se agregan employeeFixedConcepts aquí para evitar doble conteo.
-      // (Los conceptos fijos se usan solo en el bloque Quincenal más abajo.)
-      const allEmpConcepts = [...generalConcepts, ...specificConcepts];
+      // Para Mensual/Adicional/SNP: incluir los conceptos fijos del empleado desde la pestaña
+      // financiera (costo de actividad, alimento, movilidad) como ingresos. Se evita el doble
+      // conteo si ya existe un concepto (general o específico) con el mismo nombre.
+      const existingConceptNames = new Set(
+        [...generalConcepts, ...specificConcepts].map(c => (c.concept_name || "").toLowerCase().trim())
+      );
+      const fixedConceptsForMonth = employeeFixedConcepts.filter(
+        c => !existingConceptNames.has((c.concept_name || "").toLowerCase().trim())
+      );
+      const allEmpConcepts = [...generalConcepts, ...specificConcepts, ...fixedConceptsForMonth];
 
       // Porcentaje quincenal desde la configuración (decimal, ej: 0.40)
       const quincenalPct = (payrollConfig?.quincenal_percentage ?? 40) / 100;
@@ -815,8 +820,13 @@ export default function PayrollManagement() {
       );
       const adjustedNetPay = roundMoney(safePayrollNumber(result.totals.totalIncome) - adjustedDeductions);
 
-      // Extraer montos específicos del calculador para los campos dedicados de la boleta
-      const pensionDeductionAmount = safePayrollNumber(result.deductions.find(d => d.concept_name.includes("AFP") || d.concept_name === "ONP")?.calculated_amount);
+      // Extraer montos específicos del calculador para los campos dedicados de la boleta.
+      // AFP ahora se itemiza (aporte obligatorio, prima de seguro, comisión): se suman todos.
+      const pensionDeductionAmount = roundMoney(
+        result.deductions
+          .filter(d => d.concept_category === "AFP/ONP" || d.concept_name.includes("AFP") || d.concept_name === "ONP")
+          .reduce((sum, d) => sum + safePayrollNumber(d.calculated_amount), 0)
+      );
       const incomeTaxAmount = safePayrollNumber(result.deductions.find(d => d.concept_name.includes("Renta"))?.calculated_amount);
       // other_deductions: descuentos del calculador que NO están en campos dedicados (AFP/ONP, Renta)
       const otherDeductionsFromCalc = roundMoney(
