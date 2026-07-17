@@ -220,7 +220,8 @@ export default function PayrollManagement() {
   const { data: allAfps = [] } = useQuery({
     queryKey: ["allAfps"],
     queryFn: async () => {
-      return await withRetry(() => base44.entities.AFP.filter({ is_active: true }));
+      const afps = await withRetry(() => entitiesAPI.AFP.list("name"));
+      return afps.filter(afp => afp.is_active !== false);
     },
     staleTime: 300000,
   });
@@ -571,11 +572,22 @@ export default function PayrollManagement() {
       // Obtener conceptos del empleado (generales + específicos + fijos del empleado)
       const generalConcepts = payrollConcepts.filter(c => c.employee_id === "general");
       const specificConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
-      // Para Mensual/Adicional/SNP: los bonos (actividad, alimento, movilidad) ya vienen como
-      // conceptos dinámicos generales con fórmulas que prorratean por días trabajados.
-      // No se agregan employeeFixedConcepts aquí para evitar doble conteo.
-      // (Los conceptos fijos se usan solo en el bloque Quincenal más abajo.)
-      const allEmpConcepts = [...generalConcepts, ...specificConcepts];
+      const configuredConcepts = [...generalConcepts, ...specificConcepts];
+      const fixedConceptVariables = {
+        "Costo Actividad": "activity_cost",
+        "Costo Alimento": "food_cost",
+        "Costo Movilidad": "transport_cost",
+      };
+      // Si el costo ya tiene un concepto configurado (por nombre o variable de fórmula),
+      // se conserva ese cálculo. En caso contrario se mantiene el monto del contrato.
+      const missingEmployeeFixedConcepts = employeeFixedConcepts.filter(fixedConcept => {
+        const variable = fixedConceptVariables[fixedConcept.concept_name];
+        return !configuredConcepts.some(concept =>
+          concept.concept_name === fixedConcept.concept_name ||
+          (variable && new RegExp(`\\b${variable}\\b`).test(String(concept.calculation_formula || "")))
+        );
+      });
+      const allEmpConcepts = [...configuredConcepts, ...missingEmployeeFixedConcepts];
 
       // Porcentaje quincenal desde la configuración (decimal, ej: 0.40)
       const quincenalPct = (payrollConfig?.quincenal_percentage ?? 40) / 100;
@@ -711,8 +723,12 @@ export default function PayrollManagement() {
       const adjustedNetPay = roundMoney(safePayrollNumber(result.totals.totalIncome) - adjustedDeductions);
 
       // Extraer montos específicos del calculador para los campos dedicados de la boleta
-      const pensionDeductionAmount = safePayrollNumber(result.deductions.find(d => d.concept_name.includes("AFP") || d.concept_name === "ONP")?.calculated_amount);
-      const incomeTaxAmount = safePayrollNumber(result.deductions.find(d => d.concept_name.includes("Renta"))?.calculated_amount);
+      const pensionDeductionAmount = roundMoney(result.deductions
+        .filter(d => d.concept_category === "AFP/ONP" || d.concept_name.includes("AFP") || d.concept_name === "ONP")
+        .reduce((sum, d) => sum + safePayrollNumber(d.calculated_amount), 0));
+      const incomeTaxAmount = roundMoney(result.deductions
+        .filter(d => d.concept_name.includes("Renta"))
+        .reduce((sum, d) => sum + safePayrollNumber(d.calculated_amount), 0));
       // other_deductions: descuentos del calculador que NO están en campos dedicados (AFP/ONP, Renta)
       const otherDeductionsFromCalc = roundMoney(
         safePayrollNumber(result.totals.totalDeductions) - pensionDeductionAmount - incomeTaxAmount

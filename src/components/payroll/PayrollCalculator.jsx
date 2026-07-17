@@ -262,9 +262,9 @@ export class PayrollCalculator {
         this.errors.push({ concept: "AFP", error: `Empleado ${employee.employee_code} tiene sistema AFP pero no tiene AFP asignada` });
         return { amount: 0, name: "AFP", code: "", detail: "AFP no configurada para el empleado" };
       }
-      const commission = afp.commission_percentage || 0;
-      const obligatory = afp.obligatory_contribution_percentage || 10;
-      const insurance = afp.insurance_percentage || 0;
+      const commission = Number(afp.commission_percentage) || 0;
+      const obligatory = Number(afp.obligatory_contribution_percentage) || 10;
+      const insurance = Number(afp.insurance_percentage) || 0;
       // Comisión Mixta: la comisión se cobra sobre el fondo acumulado, no sobre el flujo mensual
       const isMixta = employee.afp_commission_type === "Mixta";
       const totalRate = isMixta
@@ -307,6 +307,12 @@ export class PayrollCalculator {
         continue;
       }
 
+      // Este concepto depende del total de ingresos y se calcula después del bucle.
+      const formula = String(concept.calculation_formula || "").trim().toLowerCase();
+      if (concept.system_logic_type === "pension_contribution" || formula === "pension_contribution") {
+        continue;
+      }
+
       const calculatedConcept = this.calculateConcept(concept, context);
       
       if (calculatedConcept.concept_type === "Ingreso") {
@@ -325,15 +331,23 @@ export class PayrollCalculator {
     // Auto-calcular descuento de AFP/ONP según el sistema de pensiones del empleado.
     // Se calcula DESPUÉS de procesar todos los ingresos para usar el total real.
     // Se omite si ya existe un concepto manual con categoría AFP/ONP configurado.
-    const hasPensionConcept = concepts.some(c =>
-      c.concept_category === "AFP/ONP" ||
-      c.system_logic_type === "pension_contribution" ||
-      (c.calculation_formula && String(c.calculation_formula).trim().toLowerCase() === "pension_contribution")
+    const pensionSystemConcept = concepts.find(c => {
+      const formula = String(c.calculation_formula || "").trim().toLowerCase();
+      return this.shouldApplyConcept(c) &&
+        (c.system_logic_type === "pension_contribution" || formula === "pension_contribution");
+    });
+    const hasManualPensionConcept = concepts.some(c =>
+      this.shouldApplyConcept(c) &&
+      c !== pensionSystemConcept &&
+      (c.concept_category === "AFP/ONP" ||
+        String(c.concept_name || "").includes("AFP") ||
+        String(c.concept_name || "") === "ONP")
     );
-    if (!hasPensionConcept && this.payrollType !== "Quincenal" && totalIncome > 0) {
+    if ((pensionSystemConcept || !hasManualPensionConcept) && this.payrollType !== "Quincenal" && totalIncome > 0) {
       const pensionCalc = this.calculatePensionContribution(totalIncome, context);
       if (pensionCalc.amount > 0) {
         deductions.push({
+          ...(pensionSystemConcept || {}),
           concept_type: "Descuento",
           concept_category: "AFP/ONP",
           concept_name: pensionCalc.name,
