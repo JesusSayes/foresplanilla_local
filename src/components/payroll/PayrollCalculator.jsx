@@ -37,6 +37,12 @@ export const SYSTEM_LOGIC_TYPES = {
     concept_type: "Descuento",
     concept_category: "Préstamos",
   },
+  pension_contribution: {
+    label: "Aporte AFP/ONP",
+    description: "Calcula automáticamente el descuento al sistema de pensiones (AFP u ONP) según la configuración del empleado",
+    concept_type: "Descuento",
+    concept_category: "AFP/ONP",
+  },
 };
 
 export class PayrollCalculator {
@@ -227,6 +233,56 @@ export class PayrollCalculator {
   }
 
   /**
+   * Calcula el descuento automático al sistema de pensiones (AFP u ONP)
+   * según la configuración del empleado y su AFP asignada.
+   * @param {number} totalIncome - Total de ingresos computables
+   * @param {Object} context - Contexto de cálculo (incluye afp)
+   */
+  calculatePensionContribution(totalIncome, context) {
+    const employee = this.employee;
+    const pensionSystem = employee.pension_system;
+
+    if (!pensionSystem || pensionSystem === "Ninguno") {
+      return { amount: 0, name: "", code: "", detail: "Sin sistema de pensiones configurado" };
+    }
+
+    if (pensionSystem === "ONP") {
+      const amount = totalIncome * 0.13;
+      return {
+        amount: Math.round(amount * 100) / 100,
+        name: "ONP",
+        code: "0602",
+        detail: `ONP 13% de S/${totalIncome.toFixed(2)}`,
+      };
+    }
+
+    if (pensionSystem === "AFP") {
+      const afp = context.afp;
+      if (!afp) {
+        this.errors.push({ concept: "AFP", error: `Empleado ${employee.employee_code} tiene sistema AFP pero no tiene AFP asignada` });
+        return { amount: 0, name: "AFP", code: "", detail: "AFP no configurada para el empleado" };
+      }
+      const commission = afp.commission_percentage || 0;
+      const obligatory = afp.obligatory_contribution_percentage || 10;
+      const insurance = afp.insurance_percentage || 0;
+      // Comisión Mixta: la comisión se cobra sobre el fondo acumulado, no sobre el flujo mensual
+      const isMixta = employee.afp_commission_type === "Mixta";
+      const totalRate = isMixta
+        ? (obligatory + insurance) / 100
+        : (commission + obligatory + insurance) / 100;
+      const amount = totalIncome * totalRate;
+      return {
+        amount: Math.round(amount * 100) / 100,
+        name: `AFP ${afp.name}`,
+        code: "0601",
+        detail: `AFP ${afp.name} (${isMixta ? "Mixta" : "Flujo"}): ${isMixta ? `${obligatory}%+${insurance}%` : `${commission}%+${obligatory}%+${insurance}%`} de S/${totalIncome.toFixed(2)}`,
+      };
+    }
+
+    return { amount: 0, name: "", code: "", detail: `Sistema de pensiones no reconocido: "${pensionSystem}"` };
+  }
+
+  /**
    * Calcula todos los conceptos de planilla para el empleado
    * @param {Array} concepts - Lista de conceptos
    * @param {Object} attendanceData - Datos de asistencia
@@ -265,6 +321,39 @@ export class PayrollCalculator {
     // Calcular totales — sanitizar cada acumulador para evitar Infinity/NaN propagado
     const safe = (v) => (Number.isFinite(v) && Math.abs(v) <= 500_000 ? v : 0);
     const totalIncome = safe(incomes.reduce((sum, c) => sum + c.calculated_amount, 0));
+
+    // Auto-calcular descuento de AFP/ONP según el sistema de pensiones del empleado.
+    // Se calcula DESPUÉS de procesar todos los ingresos para usar el total real.
+    // Se omite si ya existe un concepto manual con categoría AFP/ONP configurado.
+    const hasPensionConcept = concepts.some(c =>
+      c.concept_category === "AFP/ONP" ||
+      c.system_logic_type === "pension_contribution" ||
+      (c.calculation_formula && String(c.calculation_formula).trim().toLowerCase() === "pension_contribution")
+    );
+    if (!hasPensionConcept && this.payrollType !== "Quincenal" && totalIncome > 0) {
+      const pensionCalc = this.calculatePensionContribution(totalIncome, context);
+      if (pensionCalc.amount > 0) {
+        deductions.push({
+          concept_type: "Descuento",
+          concept_category: "AFP/ONP",
+          concept_name: pensionCalc.name,
+          concept_code: pensionCalc.code,
+          is_dynamic: true,
+          system_logic_type: "pension_contribution",
+          calculated_amount: pensionCalc.amount,
+          calculation_method: "system_logic",
+          applied_date: new Date().toISOString(),
+        });
+        this.logCalculation({
+          concept: pensionCalc.name,
+          system_logic_type: "pension_contribution",
+          result: pensionCalc.amount,
+          detail: pensionCalc.detail,
+          status: "success",
+        });
+      }
+    }
+
     const totalDeductions = safe(deductions.reduce((sum, c) => sum + c.calculated_amount, 0));
     const totalContributions = safe(contributions.reduce((sum, c) => sum + c.calculated_amount, 0));
     const netPay = safe(totalIncome - totalDeductions);
@@ -330,6 +419,7 @@ export class PayrollCalculator {
       late_records: extraContext.late_records || [],
       absent_records: extraContext.absent_records || [],
       loan_installments: extraContext.loan_installments || [],
+      afp: extraContext.afp || null,
     };
   }
 

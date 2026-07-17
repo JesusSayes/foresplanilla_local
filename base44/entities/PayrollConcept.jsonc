@@ -66,7 +66,8 @@
         "tardiness_discount",
         "absence_discount",
         "salary_advance",
-        "loan_installment"
+        "loan_installment",
+        "pension_contribution"
       ],
       "default": "",
       "description": "Tipo de l\u00f3gica del sistema. Cuando est\u00e1 definido, el sistema calcula el monto autom\u00e1ticamente seg\u00fan la l\u00f3gica implementada (no usa f\u00f3rmula ni monto fijo)."
