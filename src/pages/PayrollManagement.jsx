@@ -376,8 +376,9 @@ export default function PayrollManagement() {
 
   const calculatePayroll = async (periodFrom, periodTo, autoGenerate = false) => {
     const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
-    const periodStart = new Date(selectedYear, selectedMonth - 1, 1);
-    const periodEnd = new Date(selectedYear, selectedMonth, 0); // último día del mes
+    // El período efectivo es el rango confirmado por el usuario, no el mes calendario.
+    const periodStart = new Date(`${periodFrom}T00:00:00`);
+    const periodEnd = new Date(`${periodTo}T00:00:00`);
 
     // Filtrar empleados según búsqueda y departamento
     // let filteredEmployees = allEmployees;
@@ -390,7 +391,7 @@ export default function PayrollManagement() {
       // Si cesado, verificar que la fecha de cese sea dentro o después del inicio del periodo
       if (emp.status === "Cesado") {
         if (!emp.termination_date) return false;
-        const termDate = new Date(emp.termination_date.split("T")[0]);
+        const termDate = new Date(`${emp.termination_date.split("T")[0]}T00:00:00`);
         return termDate >= periodStart; // Cesó durante o antes del fin del periodo
       }
       return true; // Activo: incluir
@@ -528,12 +529,12 @@ export default function PayrollManagement() {
         if (!isEmploymentDateValid(emp, r.date)) return false;
         return true;
       });
-      // Calcular días proporcionales si el empleado cesó dentro del periodo
-      let maxDaysInPeriod = periodEnd.getDate(); // días totales del mes
+      // Calcular días proporcionales usando el período ingresado y la fecha de cese.
+      let maxDaysInPeriod = Math.min(30, Math.floor((periodEnd - periodStart) / 86400000) + 1);
       if (emp.status === "Cesado" && emp.termination_date) {
-        const termDate = new Date(emp.termination_date.split("T")[0]);
+        const termDate = new Date(`${emp.termination_date.split("T")[0]}T00:00:00`);
         if (termDate >= periodStart && termDate <= periodEnd) {
-          maxDaysInPeriod = termDate.getDate(); // solo hasta el día de cese
+          maxDaysInPeriod = Math.min(30, Math.floor((termDate - periodStart) / 86400000) + 1);
         }
       }
       // Días trabajados: incluyen días con asistencia real (Completo/Incompleto) Y días
