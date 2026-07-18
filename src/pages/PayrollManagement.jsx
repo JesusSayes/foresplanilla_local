@@ -674,6 +674,9 @@ export default function PayrollManagement() {
       const generalConcepts = payrollConcepts.filter(c => c.employee_id === "general");
       const specificConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
       const configuredConcepts = [...generalConcepts, ...specificConcepts];
+      const existingConceptNames = new Set(
+        configuredConcepts.map(c => (c.concept_name || "").toLowerCase().trim())
+      );
       const fixedConceptVariables = {
         "Costo Actividad": "activity_cost",
         "Costo Alimento": "food_cost",
@@ -684,9 +687,8 @@ export default function PayrollManagement() {
       const missingEmployeeFixedConcepts = employeeFixedConcepts.filter(fixedConcept => {
         const variable = fixedConceptVariables[fixedConcept.concept_name];
         return !configuredConcepts.some(concept =>
-          concept.concept_name === fixedConcept.concept_name ||
           (variable && new RegExp(`\\b${variable}\\b`).test(String(concept.calculation_formula || "")))
-        );
+        ) && !existingConceptNames.has((fixedConcept.concept_name || "").toLowerCase().trim());
       });
       const allEmpConcepts = [...configuredConcepts, ...missingEmployeeFixedConcepts];
 
@@ -823,7 +825,7 @@ export default function PayrollManagement() {
       );
       const adjustedNetPay = roundMoney(safePayrollNumber(result.totals.totalIncome) - adjustedDeductions);
 
-      // Extraer montos específicos del calculador para los campos dedicados de la boleta
+      // AFP se itemiza (aporte obligatorio, prima de seguro, comisión): se suman todos.
       const pensionDeductionAmount = roundMoney(result.deductions
         .filter(d => d.concept_category === "AFP/ONP" || d.concept_name.includes("AFP") || d.concept_name === "ONP")
         .reduce((sum, d) => sum + safePayrollNumber(d.calculated_amount), 0));
