@@ -267,6 +267,20 @@ export default function PayrollManagement() {
 
   const createPayslipsMutation = useMutation({
     mutationFn: async (payslips) => {
+      // Reemplazar boletas existentes del mismo período/tipo para estos empleados.
+      // Así la regeneración sobrescribe valores obsoletos (p.ej. días laborados
+      // calculados con una versión anterior de la lógica) en lugar de crear
+      // duplicados que dejarían la boleta antigua visible.
+      if (payslips.length > 0) {
+        const { month, year, payroll_type: payrollType } = payslips[0];
+        const employeeIds = [...new Set(payslips.map(p => p.employee_id))];
+        const existing = await base44.entities.Payslip.filter({ month, year, payroll_type: payrollType });
+        const stale = existing.filter(p => employeeIds.includes(p.employee_id));
+        if (stale.length > 0) {
+          await mapWithConcurrency(stale, p => base44.entities.Payslip.delete(p.id));
+        }
+      }
+
       const createdPayslips = await base44.entities.Payslip.bulkCreate(payslips);
       
       // Marcar conceptos como aplicados
@@ -893,6 +907,21 @@ export default function PayrollManagement() {
         });
         createPayslipsMutation.mutate(payslipsToCreate);
       }
+      // ── Validación de sanity post-cálculo: registrar días laborados para depuración ──
+      // Si un empleado ingresa a mitad de mes, los días laborados deben ser
+      // (30 - día_ingreso + 1), NO el conteo de registros de asistencia.
+      payslipsData.forEach(p => {
+        const empDebug = enrichedEmployees.find(e => e.id === p.employee_id);
+        if (empDebug?.hire_date && p.worked_days != null) {
+          const [hY, hM, hD] = empDebug.hire_date.split("T")[0].split("-").map(Number);
+          if (hY === selectedYear && hM === selectedMonth && hD > 1) {
+            const expected = 30 - hD + 1;
+            if (p.worked_days !== expected) {
+              console.warn(`[Días Laborados] ${p.employee_name}: calculado=${p.worked_days}, esperado=${expected} (ingreso ${empDebug.hire_date})`);
+            }
+          }
+        }
+      });
     } finally {
       setIsCalculating(false);
     }
