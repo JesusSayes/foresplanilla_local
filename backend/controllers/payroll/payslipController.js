@@ -154,26 +154,50 @@ export const bulkCreate = async (req, res) => {
     console.log("registros a insertar:", formattedPayslips.length);
 
     const chunkSize = 50;
+    const replaceExisting = req.query.replace === 'true';
+    const persistPayslips = async (db) => {
+      if (replaceExisting) {
+        const replacementGroups = Object.values(formattedPayslips.reduce((groups, payslip) => {
+          const key = `${payslip.month}-${payslip.year}-${payslip.payroll_type}`;
+          groups[key] ??= {
+            month: payslip.month,
+            year: payslip.year,
+            payroll_type: payslip.payroll_type,
+            employeeIds: []
+          };
+          groups[key].employeeIds.push(payslip.employee_id);
+          return groups;
+        }, {}));
 
-    for (let i = 0; i < formattedPayslips.length; i += chunkSize) {
+        await db.payslip.deleteMany({
+          where: {
+            OR: replacementGroups.map(group => ({
+              month: group.month,
+              year: group.year,
+              payroll_type: group.payroll_type,
+              employee_id: { in: group.employeeIds }
+            }))
+          }
+        });
+      }
 
-      const chunk = formattedPayslips.slice(i, i + chunkSize);
+      for (let i = 0; i < formattedPayslips.length; i += chunkSize) {
+        const chunk = formattedPayslips.slice(i, i + chunkSize);
+        console.log(`insertando chunk ${i} - ${i + chunk.length}`);
+        await db.payslip.createMany({ data: chunk, skipDuplicates: true });
+      }
+    };
 
-      console.log(`insertando chunk ${i} - ${i + chunk.length}`);
-
-      await prisma.payslip.createMany({
-        data: chunk,
-        skipDuplicates: true
-      });
-
+    if (replaceExisting) {
+      await prisma.$transaction(persistPayslips);
+    } else {
+      await persistPayslips(prisma);
     }
 
     console.log("bulkCreate terminado");
 
     const result = await prisma.payslip.findMany({
-      where: {
-        payroll_number: formattedPayslips[0].payroll_number
-      }
+      where: { id: { in: formattedPayslips.map(payslip => payslip.id) } }
     });
 
     res.json({

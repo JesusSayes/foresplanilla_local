@@ -273,7 +273,11 @@ export default function PayrollManagement() {
 
   const createPayslipsMutation = useMutation({
     mutationFn: async (payslips) => {
-      const createdPayslips = await entitiesAPI.Payslip.bulkCreate(payslips);
+      // Reemplazar boletas existentes del mismo período/tipo para estos empleados.
+      // Así la regeneración sobrescribe valores obsoletos (p.ej. días laborados
+      // calculados con una versión anterior de la lógica) en lugar de crear
+      // duplicados que dejarían la boleta antigua visible.
+      const createdPayslips = await entitiesAPI.Payslip.bulkCreate(payslips, { replace: true });
 
       // Marcar conceptos como aplicados
       const conceptsToUpdate = additionalConcepts.map(c => ({
@@ -585,6 +589,15 @@ export default function PayrollManagement() {
       }));
     }
 
+    const lastCalendarDay = new Date(selectedYear, selectedMonth, 0).getDate();
+    const isCalendarMonthPeriod =
+      periodStart.getFullYear() === selectedYear &&
+      periodStart.getMonth() + 1 === selectedMonth &&
+      periodStart.getDate() === 1 &&
+      periodEnd.getFullYear() === selectedYear &&
+      periodEnd.getMonth() + 1 === selectedMonth &&
+      periodEnd.getDate() === lastCalendarDay;
+
     const payslipsData = await mapWithConcurrency(enrichedEmployees, async (emp) => {
       // Preparar datos de asistencia
       const empAttendance = attendanceRecords.filter(r => {
@@ -597,15 +610,6 @@ export default function PayrollManagement() {
       });
       // Para un mes calendario se aplica la convención laboral de 30 días.
       // En períodos personalizados se respeta el cruce real con ingreso y cese.
-      const lastCalendarDay = new Date(selectedYear, selectedMonth, 0).getDate();
-      const isCalendarMonthPeriod =
-        periodStart.getFullYear() === selectedYear &&
-        periodStart.getMonth() + 1 === selectedMonth &&
-        periodStart.getDate() === 1 &&
-        periodEnd.getFullYear() === selectedYear &&
-        periodEnd.getMonth() + 1 === selectedMonth &&
-        periodEnd.getDate() === lastCalendarDay;
-
       const hireDate = emp.hire_date
         ? new Date(`${emp.hire_date.split("T")[0]}T00:00:00`)
         : null;
@@ -897,6 +901,22 @@ export default function PayrollManagement() {
         });
         createPayslipsMutation.mutate(payslipsToCreate);
       }
+      // ── Validación de sanity post-cálculo: registrar días laborados para depuración ──
+      // Si un empleado ingresa a mitad de mes, los días laborados deben ser
+      // (30 - día_ingreso + 1), NO el conteo de registros de asistencia.
+      payslipsData.forEach(p => {
+        const empDebug = enrichedEmployees.find(e => e.id === p.employee_id);
+        if (empDebug?.hire_date && !empDebug.termination_date &&
+            payrollType !== "Quincenal" && isCalendarMonthPeriod && p.worked_days != null) {
+          const [hY, hM, hD] = empDebug.hire_date.split("T")[0].split("-").map(Number);
+          if (hY === selectedYear && hM === selectedMonth && hD > 1) {
+            const expected = 30 - hD + 1;
+            if (p.worked_days !== expected) {
+              console.warn(`[Días Laborados] ${p.employee_name}: calculado=${p.worked_days}, esperado=${expected} (ingreso ${empDebug.hire_date})`);
+            }
+          }
+        }
+      });
     } finally {
       setIsCalculating(false);
     }
