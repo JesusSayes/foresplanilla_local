@@ -94,8 +94,10 @@ export const entitiesAPI = {
   Payslip: {
     ...createEntityAPI('/api/payroll/payslips'),
 
-    bulkCreate: async (data) => {
-      const response = await localClient.post('/api/payroll/payslips/bulk', data);
+    bulkCreate: async (data, options = {}) => {
+      const response = await localClient.post('/api/payroll/payslips/bulk', data, {
+        params: options.replace ? { replace: true } : undefined
+      });
       return response.data?.data ?? response.data;
     }
   },
