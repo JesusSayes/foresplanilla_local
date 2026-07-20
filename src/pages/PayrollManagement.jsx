@@ -1411,7 +1411,7 @@ export default function PayrollManagement() {
                         {payrollType} - {format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}
                       </p>
                       <p className="text-xs text-indigo-600 mt-0.5 font-medium">
-                        📅 Período de cómputo: {previewData[0]?.attendance_period_start ? format(new Date(previewData[0].attendance_period_start), "dd/MM/yyyy", { locale: es }) : "—"} → {previewData[0]?.attendance_period_end ? format(new Date(previewData[0].attendance_period_end), "dd/MM/yyyy", { locale: es }) : "—"}
+                        📅 Período de cómputo: {previewData[0]?.attendance_period_start ? format(parseDateLima(previewData[0].attendance_period_start), "dd/MM/yyyy", { locale: es }) : "—"} → {previewData[0]?.attendance_period_end ? format(parseDateLima(previewData[0].attendance_period_end), "dd/MM/yyyy", { locale: es }) : "—"}
                       </p>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => setShowPreview(false)}>

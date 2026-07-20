@@ -13,7 +13,17 @@ const fmt = (val) => safePayrollNumber(val).toFixed(2);
 
 function safeDateFmt(dateStr, fmt_str) {
   if (!dateStr) return "—";
-  try { return format(new Date(dateStr), fmt_str, { locale: es }); } catch { return "—"; }
+  try {
+    const s = String(dateStr);
+    // Las fechas sin hora (YYYY-MM-DD) las interpreta JS como UTC, desplazándose
+    // un día atrás en zonas horarias negativas (Lima UTC-5). Parsear como local.
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) {
+      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      return format(d, fmt_str, { locale: es });
+    }
+    return format(new Date(s), fmt_str, { locale: es });
+  } catch { return "—"; }
 }
 
 function toHorasMinutos(decimalHours) {
