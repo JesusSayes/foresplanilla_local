@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from "@/lib/AuthContext";
 import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import {
 import { usePermissions } from "../components/hooks/usePermissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
@@ -29,7 +30,6 @@ import PayslipPreview from "../components/payroll/PayslipPreview";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 import { safePayrollNumber, roundMoney, sanitizePayslip } from "@/lib/payrollUtils";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
-import { parseDateLima } from "@/lib/dateUtils";
 import { isEmploymentDateValid } from "@/lib/employmentDate";
 
 // Rate limiter global + retry con backoff exponencial para errores de rate-limit
@@ -87,19 +87,6 @@ const createLimiter = (maxConcurrent = 1) => {
   });
 };
 const apiLimiter = createLimiter(2);
-
-const DEDICATED_PAYSLIP_DEDUCTION_TYPES = new Set([
-  "salary_advance",
-  "tardiness_discount",
-  "absence_discount",
-]);
-
-const isDedicatedPayslipDeduction = (concept) => {
-  const systemLogicType = String(concept?.system_logic_type || "").trim().toLowerCase();
-  const formula = String(concept?.calculation_formula || "").trim().toLowerCase();
-  return DEDICATED_PAYSLIP_DEDUCTION_TYPES.has(systemLogicType)
-    || DEDICATED_PAYSLIP_DEDUCTION_TYPES.has(formula);
-};
 
 export default function PayrollManagement() {
   const { user: currentUser } = useAuth();
@@ -445,9 +432,8 @@ export default function PayrollManagement() {
 
       const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
 
-      // El período efectivo es el rango confirmado por el usuario, no el mes calendario.
-      const periodStart = new Date(`${periodFrom}T00:00:00`);
-      const periodEnd = new Date(`${periodTo}T00:00:00`);
+      const periodStart = new Date(selectedYear, selectedMonth - 1, 1);
+      const periodEnd = new Date(selectedYear, selectedMonth, 0); // último día del mes
 
       // Filtrar empleados según búsqueda y departamento (usando datos frescos locales)
       let filteredEmployees = canViewAllDepartments
@@ -589,15 +575,6 @@ export default function PayrollManagement() {
       }));
     }
 
-    const lastCalendarDay = new Date(selectedYear, selectedMonth, 0).getDate();
-    const isCalendarMonthPeriod =
-      periodStart.getFullYear() === selectedYear &&
-      periodStart.getMonth() + 1 === selectedMonth &&
-      periodStart.getDate() === 1 &&
-      periodEnd.getFullYear() === selectedYear &&
-      periodEnd.getMonth() + 1 === selectedMonth &&
-      periodEnd.getDate() === lastCalendarDay;
-
     const payslipsData = await mapWithConcurrency(enrichedEmployees, async (emp) => {
       // Preparar datos de asistencia
       const empAttendance = attendanceRecords.filter(r => {
@@ -608,20 +585,15 @@ export default function PayrollManagement() {
         if (!isEmploymentDateValid(emp, r.date)) return false;
         return true;
       });
-      // Para un mes calendario se aplica la convención laboral de 30 días.
-      // En períodos personalizados se respeta el cruce real con ingreso y cese.
-      const hireDate = emp.hire_date
-        ? new Date(`${emp.hire_date.split("T")[0]}T00:00:00`)
-        : null;
-      const terminationDate = emp.termination_date
-        ? new Date(`${emp.termination_date.split("T")[0]}T00:00:00`)
-        : null;
-      const employmentPeriodStart = hireDate && hireDate > periodStart ? hireDate : periodStart;
-      const employmentPeriodEnd = terminationDate && terminationDate < periodEnd ? terminationDate : periodEnd;
-      const effectivePeriodDays = employmentPeriodEnd >= employmentPeriodStart
-        ? Math.floor((employmentPeriodEnd - employmentPeriodStart) / 86400000) + 1
-        : 0;
-
+      // ── DÍAS LABORADOS (convención Perú: el mes se computa como 30 días) ──
+      // El periodo de asistencia seleccionado (periodFrom/periodTo) SOLO se usa para
+      // descontar faltas y tardanzas, NO para el cómputo de días laborados.
+      // - Mes completo (activo del 1 al último día calendario): 30 días (siempre,
+      //   sin importar si el mes tiene 28, 30 o 31 días calendario).
+      // - Ingreso en el mes el día D (>1): del D al 30 → (30 - D + 1).
+      // - Cese en el mes el día D (< último día calendario): del 1 al D → min(D, 30).
+      // - Ingreso y cese en el mismo mes: del día de ingreso al día de cese.
+      const lastCalendarDay = periodEnd.getDate(); // último día calendario del mes
       let hireInMonth = null;
       if (emp.hire_date) {
         const [hY, hM, hD] = emp.hire_date.split("T")[0].split("-").map(Number);
@@ -635,9 +607,15 @@ export default function PayrollManagement() {
 
       let workedDays;
       if (payrollType === "Quincenal") {
-        workedDays = Math.min(15, effectivePeriodDays);
-      } else if (!isCalendarMonthPeriod) {
-        workedDays = Math.min(30, effectivePeriodDays);
+        // Adelanto quincenal: tope 15, prorrateado por cese (comportamiento existente).
+        let quincenalMax = lastCalendarDay;
+        if (emp.status === "Cesado" && emp.termination_date) {
+          const termDate = new Date(emp.termination_date.split("T")[0]);
+          if (termDate >= periodStart && termDate <= periodEnd) {
+            quincenalMax = termDate.getDate();
+          }
+        }
+        workedDays = Math.min(15, quincenalMax);
       } else if (hireInMonth !== null && termInMonth !== null) {
         workedDays = Math.min(30, termInMonth) - hireInMonth + 1;
       } else if (hireInMonth !== null) {
@@ -731,7 +709,14 @@ export default function PayrollManagement() {
         ];
       } else {
         // Para planillas no quincenales: usar todos los conceptos normales
-        conceptsForCalc = allEmpConcepts.filter(c => !isDedicatedPayslipDeduction(c));
+        // Excluir conceptos que PayrollManagement calcula por separado (tardanzas, inasistencias, adelanto)
+        // para evitar doble descuento en el neto a pagar.
+        const separatelyHandled = ['tardiness_discount', 'absence_discount', 'salary_advance'];
+        conceptsForCalc = allEmpConcepts.filter(c => {
+          const formulaKey = c.calculation_formula ? String(c.calculation_formula).trim().toLowerCase() : '';
+          const logicType = c.system_logic_type || formulaKey;
+          return !separatelyHandled.includes(logicType);
+        });
         // Si NO existe un concepto de "Asignación Familiar" configurado (ya sea por fórmula o lógica del sistema),
         // agregar la asignación familiar automática basada en derechohabientes como fallback.
         const hasFamilyAllowanceConcept = allEmpConcepts.some(c =>
@@ -907,7 +892,7 @@ export default function PayrollManagement() {
       payslipsData.forEach(p => {
         const empDebug = enrichedEmployees.find(e => e.id === p.employee_id);
         if (empDebug?.hire_date && !empDebug.termination_date &&
-            payrollType !== "Quincenal" && isCalendarMonthPeriod && p.worked_days != null) {
+            payrollType !== "Quincenal" && p.worked_days != null) {
           const [hY, hM, hD] = empDebug.hire_date.split("T")[0].split("-").map(Number);
           if (hY === selectedYear && hM === selectedMonth && hD > 1) {
             const expected = 30 - hD + 1;
@@ -1548,12 +1533,6 @@ export default function PayrollManagement() {
                             </div>
                           )}
 
-                          {Number(payslip.advance_deduction || 0) > 0 && (
-                            <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
-                              Adelanto descontado: S/ {Number(payslip.advance_deduction || 0).toFixed(2)}
-                            </div>
-                          )}
-
                           {(() => {
                             const currentEmp = allEmployees.find(e => e.id === payslip.employee_id);
                             const currentSalary = currentEmp ? parseFloat(currentEmp.base_salary) || 0 : 0;
@@ -1563,13 +1542,21 @@ export default function PayrollManagement() {
                                 <div className="mt-3 p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800 flex items-center gap-2">
                                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                                   <span>
-                                    <strong>Salario del contrato del período:</strong> S/ {usedSalary.toFixed(2)}. Salario actual: S/ {currentSalary.toFixed(2)}
+                                    <strong>Salario del contrato del período:</strong> S/ {usedSalary.toFixed(2)}
+                                    {' '}(vigente en {format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}).
+                                    {' '}Salario actual: S/ {currentSalary.toFixed(2)}
                                   </span>
                                 </div>
                               );
                             }
                             return null;
                           })()}
+
+                          {Number(payslip.advance_deduction || 0) > 0 && (
+                            <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+                              Adelanto descontado: S/ {Number(payslip.advance_deduction || 0).toFixed(2)}
+                            </div>
+                          )}
 
                           {hasAdditionalConcepts && (
                             <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
