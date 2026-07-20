@@ -126,17 +126,25 @@ function buildConceptRows(payslip, conceptsMap = []) {
   }
 
   // ── Fallback a campos fijos si el motor no proporcionó datos ─────────
+  // El fallback prorratea la remuneración básica por días trabajados, igual que
+  // la fórmula del concepto (base_salary / 30 * worked_days), para que la boleta
+  // siempre refleje el prorrateo aunque el calculation_summary no traiga ingresos.
   if (ingresos.length === 0) {
+    const wd = safePayrollNumber(payslip.worked_days);
+    const proratedDays = (wd > 0 && wd < 30) ? wd : 30;
     const fixed = [
-      { field: "base_salary",     label: "REMUNERACIÓN O JORNAL BÁSICO", lookupName: "Remuneración Básica" },
-      { field: "family_allowance", label: "ASIGNACIÓN FAMILIAR",          lookupName: "Asignación Familiar" },
-      { field: "overtime_pay",    label: "HORAS EXTRAS",                  lookupName: "Horas Extras al 25%" },
-      { field: "bonuses",         label: "BONIFICACIONES",                lookupName: "Bonificación por Movilidad" },
-      { field: "commissions",     label: "COMISIONES",                    lookupName: "Comisiones" },
-      { field: "other_income",    label: "OTROS INGRESOS",               lookupName: "otros ingresos" },
+      { field: "base_salary",     label: "REMUNERACIÓN O JORNAL BÁSICO", lookupName: "Remuneración Básica", prorate: true },
+      { field: "family_allowance", label: "ASIGNACIÓN FAMILIAR",          lookupName: "Asignación Familiar",   prorate: false },
+      { field: "overtime_pay",    label: "HORAS EXTRAS",                  lookupName: "Horas Extras al 25%",  prorate: false },
+      { field: "bonuses",         label: "BONIFICACIONES",                lookupName: "Bonificación por Movilidad", prorate: false },
+      { field: "commissions",     label: "COMISIONES",                    lookupName: "Comisiones",           prorate: false },
+      { field: "other_income",    label: "OTROS INGRESOS",               lookupName: "otros ingresos",       prorate: false },
     ];
-    fixed.forEach(({ field, label, lookupName }) => {
-      const amt = safePayrollNumber(payslip[field]);
+    fixed.forEach(({ field, label, lookupName, prorate }) => {
+      let amt = safePayrollNumber(payslip[field]);
+      if (prorate) {
+        amt = Math.round((amt / 30 * proratedDays) * 100) / 100;
+      }
       if (field === "base_salary" || amt > 0) {
         const { code, conceptId } = lookupCode(lookupName, conceptsMap);
         ingresos.push({ code, label, amount: amt, conceptId, missingCode: !code });
