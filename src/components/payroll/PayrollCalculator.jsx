@@ -468,6 +468,35 @@ export class PayrollCalculator {
     let calculatedAmount = 0;
     let method = 'fixed';
 
+    // Prorrata legal de la remuneración básica: siempre se calcula como
+    // base_salary / 30 * worked_days (independiente de la fórmula configurada
+    // en el concepto). En Perú, la remuneración mensual se prorratea por los
+    // días efectivamente laborados cuando el trabajador ingresa o cesa a
+    // mitad de mes. Esto aplica para Ingresos de categoría "Remuneración Base".
+    if (concept.concept_category === "Remuneración Base" && concept.concept_type === "Ingreso") {
+      const baseSalary = context.base_salary || 0;
+      const workedDays = context.worked_days || 30;
+      calculatedAmount = (baseSalary / 30) * workedDays;
+      method = 'system_prorated';
+
+      this.logCalculation({
+        concept: concept.concept_name,
+        system_logic_type: 'base_salary_proration',
+        result: calculatedAmount,
+        detail: `Remuneración básica prorrateada: S/${baseSalary.toFixed(2)} / 30 × ${workedDays} días = S/${calculatedAmount.toFixed(2)}`,
+        status: 'success'
+      });
+
+      const safeAmount = (typeof calculatedAmount === 'number' && Number.isFinite(calculatedAmount) && Math.abs(calculatedAmount) <= 500_000)
+        ? calculatedAmount : 0;
+      return {
+        ...concept,
+        calculated_amount: Math.round(safeAmount * 100) / 100,
+        calculation_method: method,
+        applied_date: new Date().toISOString()
+      };
+    }
+
     if (concept.system_logic_type) {
       // Lógica del sistema: el sistema calcula según la lógica implementada
       calculatedAmount = this.applySystemLogic(concept, context);
