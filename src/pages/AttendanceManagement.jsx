@@ -827,6 +827,30 @@ export default function AttendanceManagement() {
     } // end else (fecha no futura)
   }
 
+  // Ocultar filas de días libres (según horario vigente) sin marcaciones ni incidencias.
+  // Solo visualización: no modifica registros. Se aplica antes de la paginación para
+  // que el total de filas, la exportación Excel y la impresión usen el mismo conjunto.
+  const stDowMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+  const enDowMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+  const isHiddenFreeDayRow = (empRow) => {
+    const rowDate = empRow.displayDate || format(selectedDate, "yyyy-MM-dd");
+    const sched = getEmployeeScheduleForDate(empRow.id, rowDate);
+    if (!sched) return false; // sin horario → siempre visible
+    const dow = new Date(rowDate + "T00:00:00").getDay();
+    const schedStRaw = sched?.[stDowMap[dow]] || null;
+    const schedEnRaw = sched?.[enDowMap[dow]] || null;
+    const isDayOff = !schedStRaw || !schedEnRaw;
+    if (!isDayOff) return false; // día laborable → visible
+    // Sin marcaciones reales (entrada/salida ni segmentos)
+    const seg = getSegmentClockTimes(empRow.record);
+    if (seg.firstClockIn || seg.lastClockOut) return false;
+    // Sin incidencia para el empleado y la fecha (cualquier estado)
+    const hasIncident = allIncidents.some(i => i.employee_id === empRow.id && i.incident_date === rowDate);
+    if (hasIncident) return false;
+    return true; // día libre sin marcaciones ni incidencias → ocultar
+  };
+  employeesWithRecords = employeesWithRecords.filter(emp => !isHiddenFreeDayRow(emp));
+
   const [recalculandoTodo, setRecalculandoTodo] = useState(false);
   const [recalcProgress, setRecalcProgress] = useState({ done: 0, total: 0 });
 
