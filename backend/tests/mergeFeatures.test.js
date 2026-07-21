@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getAFPChangeType } from '../controllers/employeeController.js';
+import { SCHEDULE_PERMISSION_GROUPS } from '../config/permissions.js';
 import {
   escapeHtml,
   mergeContractRecipients,
@@ -23,6 +24,23 @@ test('clasifica correctamente los cambios AFP', () => {
     ),
     'Cambio de Comisión'
   );
+});
+
+test('permite consultar horarios a los perfiles que revisan asistencia', () => {
+  const attendanceReadPermissions = [
+    'attendance.view_all',
+    'attendance.view_department',
+    'attendance.manage',
+    'attendance.approve_edits',
+    'attendance.approve_incidents',
+  ];
+
+  for (const permission of attendanceReadPermissions) {
+    assert.ok(SCHEDULE_PERMISSION_GROUPS.view.includes(permission));
+    assert.ok(!SCHEDULE_PERMISSION_GROUPS.create.includes(permission));
+    assert.ok(!SCHEDULE_PERMISSION_GROUPS.update.includes(permission));
+    assert.ok(!SCHEDULE_PERMISSION_GROUPS.delete.includes(permission));
+  }
 });
 
 test('filtra preferencias y evita destinatarios duplicados', () => {

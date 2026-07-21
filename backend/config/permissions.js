@@ -209,6 +209,11 @@ export const SCHEDULE_PERMISSION_GROUPS = Object.freeze({
     'schedules.edit',
     'schedules.assign',
     'schedules.delete',
+    'attendance.view_all',
+    'attendance.view_department',
+    'attendance.manage',
+    'attendance.approve_edits',
+    'attendance.approve_incidents',
   ],
   create: [
     'schedules.create',
