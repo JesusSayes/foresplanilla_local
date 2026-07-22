@@ -73,12 +73,27 @@
     },
     "base_salary": {
       "type": "number",
-      "description": "Remuneraci\u00f3n b\u00e1sica"
+      "description": "Remuneraci\u00f3n b\u00e1sica calculada (importe ejecutado por el concepto de Remuneraci\u00f3n Base, no el valor nominal del contrato)"
     },
     "family_allowance": {
       "type": "number",
       "default": 0,
-      "description": "Asignaci\u00f3n familiar"
+      "description": "Asignaci\u00f3n familiar calculada (importe ejecutado por el concepto)"
+    },
+    "activity_cost_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Costo de actividad calculado (importe ejecutado por el concepto, no el valor nominal del contrato)"
+    },
+    "food_cost_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Costo de alimentaci\u00f3n calculado (importe ejecutado por el concepto, no el valor nominal del contrato)"
+    },
+    "transport_cost_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Costo de movilidad calculado (importe ejecutado por el concepto, no el valor nominal del contrato)"
     },
     "overtime_pay": {
       "type": "number",
@@ -88,7 +103,7 @@
     "bonuses": {
       "type": "number",
       "default": 0,
-      "description": "Bonificaciones"
+      "description": "Bonificaciones (suma de conceptos de ingreso calculados con categor\u00eda Bonificaciones)"
     },
     "commissions": {
       "type": "number",
