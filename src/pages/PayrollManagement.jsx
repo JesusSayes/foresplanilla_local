@@ -1181,6 +1181,8 @@ export default function PayrollManagement() {
       const periodContract = (p.month && p.year)
         ? getContractForPayslipPeriod(p.employee_id, p.month, p.year, allContracts)
         : null;
+      const familyAllowance = safeNum(p.family_allowance);
+      const bonusesWithoutFamilyAllowance = Math.max(0, safeNum(p.bonuses) - familyAllowance);
       // Periodo legible: usar los campos month/year de la boleta (no del estado global)
       const periodoLabel = p.period && p.period.trim()
         ? p.period
@@ -1201,7 +1203,8 @@ export default function PayrollManagement() {
         "Costo Actividad": safeNum(periodContract?.activity_cost ?? emp?.activity_cost ?? 0),
         "Costo Alimento": safeNum(periodContract?.food_cost ?? emp?.food_cost ?? 0),
         "Costo Movilidad": safeNum(periodContract?.transport_cost ?? emp?.transport_cost ?? 0),
-        "Bonificaciones": safeNum(p.bonuses),
+        "Bonificaciones": bonusesWithoutFamilyAllowance,
+        "Asignación familiar": familyAllowance,
         "Total Ingresos": safeNum(p.total_income),
         "AFP/ONP": safeNum(p.pension_deduction),
         "Impuesto Renta": safeNum(p.income_tax),
