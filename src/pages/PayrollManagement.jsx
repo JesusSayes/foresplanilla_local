@@ -1128,11 +1128,59 @@ export default function PayrollManagement() {
   };
 
   // Exportar planilla a Excel (formato lineal)
-  const exportToExcel = (payslipsData, filename, filterType) => {
+  // Helper: encuentra el contrato correspondiente al mes/año de una boleta.
+  // Misma prioridad que el cálculo de planilla:
+  //   1. Contrato que solapa el período (start_date ≤ fin mes, end_date ≥ inicio mes o nulo)
+  //   2. Más reciente cuyo inicio ≤ fin del período
+  //   3. Último recurso: el contrato más reciente disponible
+  const getContractForPayslipPeriod = (employeeId, month, year, contractsList) => {
+    const empContracts = contractsList
+      .filter(c => c.employee_id === employeeId)
+      .sort((a, b) => {
+        const da = new Date(`${(a.start_date || "1900-01-01").split("T")[0]}T00:00:00`);
+        const db = new Date(`${(b.start_date || "1900-01-01").split("T")[0]}T00:00:00`);
+        return db - da;
+      });
+    if (empContracts.length === 0) return null;
+    const periodStart = new Date(year, month - 1, 1);
+    const periodEnd = new Date(year, month, 0);
+    const overlapping = empContracts.find(c => {
+      if (!c.start_date) return false;
+      const startDate = new Date(`${c.start_date.split("T")[0]}T00:00:00`);
+      const endDate = c.end_date ? new Date(`${c.end_date.split("T")[0]}T00:00:00`) : null;
+      return startDate <= periodEnd && (!endDate || endDate >= periodStart);
+    });
+    if (overlapping) return overlapping;
+    const closestBefore = empContracts.find(c => {
+      if (!c.start_date) return false;
+      return new Date(`${c.start_date.split("T")[0]}T00:00:00`) <= periodEnd;
+    });
+    if (closestBefore) return closestBefore;
+    return empContracts[0];
+  };
+
+  const exportToExcel = async (payslipsData, filename, filterType) => {
     // Si se pasa filterType, filtrar solo las boletas de ese tipo
     const data = filterType ? payslipsData.filter(p => p.payroll_type === filterType) : payslipsData;
+    if (data.length === 0) { toast.error("No hay datos para exportar"); return; }
+
+    // Cargar contratos para resolver el costo correspondiente al período de cada boleta.
+    // Si la carga falla, cancelar la exportación para evitar costos incorrectos.
+    let allContracts = [];
+    try {
+      allContracts = await withRetry(() => entitiesAPI.Contract.list('-start_date'));
+    } catch (err) {
+      console.error("Error cargando contratos para exportación:", err);
+      toast.error("No se pudieron cargar los contratos. Exportación cancelada para evitar costos incorrectos.");
+      return;
+    }
+
     const rows = data.map((p, idx) => {
       const emp = allEmployees.find(e => e.id === p.employee_id);
+      // Contrato del período de la boleta (p.month / p.year), no la ficha actual
+      const periodContract = (p.month && p.year)
+        ? getContractForPayslipPeriod(p.employee_id, p.month, p.year, allContracts)
+        : null;
       // Periodo legible: usar los campos month/year de la boleta (no del estado global)
       const periodoLabel = p.period && p.period.trim()
         ? p.period
@@ -1150,9 +1198,9 @@ export default function PayrollManagement() {
         "Tipo Planilla": p.payroll_type || "",
         "Días Trabajados": safeNum(p.worked_days),
         "Salario Base": safeNum(p.base_salary),
-        "Costo Actividad": safeNum(emp?.activity_cost),
-        "Costo Alimento": safeNum(emp?.food_cost),
-        "Costo Movilidad": safeNum(emp?.transport_cost),
+        "Costo Actividad": safeNum(periodContract?.activity_cost ?? emp?.activity_cost ?? 0),
+        "Costo Alimento": safeNum(periodContract?.food_cost ?? emp?.food_cost ?? 0),
+        "Costo Movilidad": safeNum(periodContract?.transport_cost ?? emp?.transport_cost ?? 0),
         "Bonificaciones": safeNum(p.bonuses),
         "Total Ingresos": safeNum(p.total_income),
         "AFP/ONP": safeNum(p.pension_deduction),
@@ -1173,7 +1221,6 @@ export default function PayrollManagement() {
       wch: Math.max(key.length, ...rows.map(r => String(r[key] ?? "").length)) + 2
     }));
     ws["!cols"] = colWidths;
-    if (rows.length === 0) { toast.error("No hay datos para exportar"); return; }
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Planilla");

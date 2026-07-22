@@ -113,6 +113,7 @@ export default function ContractManagement() {
     },
     onSuccess: (newContract) => {
       queryClient.invalidateQueries(["contracts"]);
+      queryClient.invalidateQueries(["allEmployees"]);
       toast.success(`Contrato ${newContract.contract_number} creado correctamente`);
       resetForm();
     },
@@ -125,6 +126,7 @@ export default function ContractManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contracts"]);
+      queryClient.invalidateQueries(["allEmployees"]);
       toast.success("Contrato actualizado correctamente");
       resetForm();
     },
@@ -137,6 +139,7 @@ export default function ContractManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["contracts"]);
+      queryClient.invalidateQueries(["allEmployees"]);
       toast.success("Estado actualizado");
     },
   });
@@ -186,9 +189,9 @@ export default function ContractManagement() {
       department: contract?.department || emp?.department_name || "",
       work_location: contract?.work_location || emp?.site || "",
       salary: contract?.salary || emp?.base_salary || "",
-      activity_cost: contract?.activity_cost || "",
-      food_cost: contract?.food_cost || "",
-      transport_cost: contract?.transport_cost || "",
+      activity_cost: contract ? (contract.activity_cost ?? "") : (emp?.activity_cost ?? ""),
+      food_cost: contract ? (contract.food_cost ?? "") : (emp?.food_cost ?? ""),
+      transport_cost: contract ? (contract.transport_cost ?? "") : (emp?.transport_cost ?? ""),
       work_schedule: contract?.work_schedule || "Lunes a Viernes de 9:00 AM a 6:00 PM",
       weekly_hours: contract?.weekly_hours || 48,
       functions: contract?.functions || "",
@@ -903,6 +906,34 @@ export default function ContractManagement() {
                     <div><Label>Horas Semanales</Label><Input type="number" value={formData.weekly_hours} onChange={(e) => setFormData({ ...formData, weekly_hours: parseInt(e.target.value) })} /></div>
                     <div><Label>Período de Prueba (días)</Label><Input type="number" value={formData.trial_period_days} onChange={(e) => setFormData({ ...formData, trial_period_days: parseInt(e.target.value) })} /></div>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div><Label>Costo Actividad (S/)</Label><Input type="number" step="0.01" min="0" placeholder="0.00" value={formData.activity_cost} onChange={(e) => setFormData({ ...formData, activity_cost: e.target.value })} /></div>
+                    <div><Label>Costo Alimento (S/)</Label><Input type="number" step="0.01" min="0" placeholder="0.00" value={formData.food_cost} onChange={(e) => setFormData({ ...formData, food_cost: e.target.value })} /></div>
+                    <div><Label>Costo Movilidad (S/)</Label><Input type="number" step="0.01" min="0" placeholder="0.00" value={formData.transport_cost} onChange={(e) => setFormData({ ...formData, transport_cost: e.target.value })} /></div>
+                  </div>
+                  {editingContract && (() => {
+                    const contractCostsZero =
+                      (!editingContract.activity_cost || Number(editingContract.activity_cost) === 0) &&
+                      (!editingContract.food_cost || Number(editingContract.food_cost) === 0) &&
+                      (!editingContract.transport_cost || Number(editingContract.transport_cost) === 0);
+                    const linkedEmp = allEmployees.find(e => e.id === editingContract.employee_id);
+                    const empHasCost = linkedEmp &&
+                      (Number(linkedEmp.activity_cost) > 0 ||
+                       Number(linkedEmp.food_cost) > 0 ||
+                       Number(linkedEmp.transport_cost) > 0);
+                    if (contractCostsZero && empHasCost) {
+                      return (
+                        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                          <p className="text-sm text-amber-800">
+                            Este contrato no tiene costos adicionales registrados, pero la ficha actual del empleado sí contiene valores. Verifica los importes antes de guardar.
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
 
                   <div><Label>Horario de Trabajo</Label><Input value={formData.work_schedule} onChange={(e) => setFormData({ ...formData, work_schedule: e.target.value })} placeholder="Ej: Lunes a Viernes de 9:00 AM a 6:00 PM" /></div>
                   {formData.contract_type !== "Indeterminado" && (

@@ -1,19 +1,19 @@
 import React, { useState } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from '@/api/entitiesClient';
+import { mailerAPI } from '@/api/localClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   Calendar, Plus, Edit, Trash2, Bell, FileText,
-  CheckCircle, AlertTriangle, Settings
+  AlertTriangle, Settings
 } from "lucide-react";
-import { format, addDays, differenceInDays, addMonths } from "date-fns";
+import { format, differenceInDays, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 
@@ -212,22 +212,14 @@ export default function ContractRenewalAutomation() {
           if (rule.notification_emails?.length > 0) {
             for (const email of rule.notification_emails) {
               try {
-                await base44.integrations.Core.SendEmail({
+                await mailerAPI.sendContractRenewalAlert({
                   to: email,
-                  subject: `Alerta: Contrato próximo a vencer - ${emp.first_name} ${emp.last_name}`,
-                  body: `
-                    El contrato del empleado ${emp.first_name} ${emp.last_name} está próximo a vencer.
-                    
-                    Detalles:
-                    - Cargo: ${contract.position}
-                    - Tipo: ${contract.contract_type}
-                    - Fecha de vencimiento: ${format(new Date(contract.end_date), "dd 'de' MMMM 'de' yyyy", { locale: es })}
-                    - Días restantes: ${differenceInDays(new Date(contract.end_date), today)}
-                    
-                    ${rule.auto_create_draft ? "Se ha creado un borrador de renovación automáticamente en el sistema." : "Por favor, revisa y gestiona la renovación del contrato."}
-                    
-                    Accede al sistema para más detalles.
-                  `
+                  employeeName: `${emp.first_name} ${emp.last_name}`,
+                  position: contract.position,
+                  contractType: contract.contract_type,
+                  endDate: format(new Date(contract.end_date), "dd 'de' MMMM 'de' yyyy", { locale: es }),
+                  daysRemaining: differenceInDays(new Date(contract.end_date), today),
+                  draftCreated: rule.auto_create_draft,
                 });
               } catch (error) {
                 console.error("Error enviando email:", error);
@@ -255,6 +247,9 @@ export default function ContractRenewalAutomation() {
             department: contract.department,
             work_location: contract.work_location,
             salary: contract.salary,
+            activity_cost: contract.activity_cost ?? 0,
+            food_cost: contract.food_cost ?? 0,
+            transport_cost: contract.transport_cost ?? 0,
             work_schedule: contract.work_schedule,
             weekly_hours: contract.weekly_hours,
             functions: contract.functions,
