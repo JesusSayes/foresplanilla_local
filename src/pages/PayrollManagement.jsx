@@ -88,6 +88,54 @@ const createLimiter = (maxConcurrent = 1) => {
 };
 const apiLimiter = createLimiter(2);
 
+// ── Identificación de conceptos calculados dentro de result.incomes ──────────
+// Permite extraer los importes efectivamente calculados por el motor para los
+// campos dedicados de la boleta (remuneración base, costos, asignación familiar).
+const _normStr = (s) => String(s || "").toLowerCase().trim();
+
+// Suma los calculated_amount de los ingresos cuya categoría coincide (normalizada).
+const sumIncomesByCategory = (incomes, category) => {
+  if (!Array.isArray(incomes)) return 0;
+  const cat = _normStr(category);
+  return incomes
+    .filter(c => _normStr(c.concept_category) === cat)
+    .reduce((sum, c) => sum + safePayrollNumber(c.calculated_amount), 0);
+};
+
+// Remuneración base calculada: suma de ingresos con categoría "Remuneración Base".
+// Si no existe el concepto, conserva el salario nominal del contrato (fallback).
+const getCalculatedBaseSalary = (incomes, fallback) => {
+  if (!Array.isArray(incomes)) return safePayrollNumber(fallback);
+  const baseConcepts = incomes.filter(c => _normStr(c.concept_category) === "remuneración base");
+  if (baseConcepts.length === 0) return safePayrollNumber(fallback);
+  return roundMoney(baseConcepts.reduce((s, c) => s + safePayrollNumber(c.calculated_amount), 0));
+};
+
+// Encuentra el monto calculado de un concepto de costo.
+// Primario: la fórmula contiene la variable (activity_cost, food_cost, transport_cost).
+// Respaldo: el nombre del concepto coincide con palabras clave.
+const findCalculatedCost = (incomes, varName, nameKeywords) => {
+  if (!Array.isArray(incomes)) return 0;
+  let match = incomes.find(c => {
+    const f = _normStr(c.calculation_formula);
+    return f && f.includes(varName);
+  });
+  if (match) return safePayrollNumber(match.calculated_amount);
+  match = incomes.find(c => {
+    const n = _normStr(c.concept_name);
+    return nameKeywords.some(kw => n.includes(kw));
+  });
+  return match ? safePayrollNumber(match.calculated_amount) : 0;
+};
+
+// Encuentra la asignación familiar calculada (lógica del sistema o nombre).
+const findCalculatedFamilyAllowance = (incomes) => {
+  if (!Array.isArray(incomes)) return 0;
+  let match = incomes.find(c => c.system_logic_type === "family_allowance");
+  if (!match) match = incomes.find(c => _normStr(c.concept_name).includes("asignación familiar"));
+  return match ? safePayrollNumber(match.calculated_amount) : 0;
+};
+
 export default function PayrollManagement() {
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
@@ -844,10 +892,20 @@ export default function PayrollManagement() {
         non_worked_days: payrollType === "Quincenal" ? 0 : empAttendance.filter(r => r.status === "Ausente").length,
         regular_hours: attendanceData.regular_hours,
         overtime_hours: empAttendance.reduce((sum, r) => sum + (r.overtime_hours_25 || 0) + (r.overtime_hours_35 || 0), 0),
-        base_salary: safePayrollNumber(emp.base_salary),
-        family_allowance: familyAllowanceInfo.qualifies ? familyAllowanceInfo.amount : 0,
+        // Remuneración base calculada: suma de ingresos con categoría "Remuneración Base".
+        // Si no existe el concepto, conserva el salario nominal del contrato.
+        base_salary: getCalculatedBaseSalary(result.incomes, emp.base_salary),
+        // Asignación familiar calculada desde el concepto del motor (respaldo: elegibilidad).
+        family_allowance: roundMoney(findCalculatedFamilyAllowance(result.incomes) || (familyAllowanceInfo.qualifies ? familyAllowanceInfo.amount : 0)),
+        // Costos calculados desde los conceptos del motor (por variable de fórmula, respaldo por nombre).
+        // Contienen el calculated_amount, no el valor nominal del contrato.
+        activity_cost_amount: roundMoney(findCalculatedCost(result.incomes, "activity_cost", ["actividad", "costo actividad"])),
+        food_cost_amount: roundMoney(findCalculatedCost(result.incomes, "food_cost", ["alimentación", "costo alimentación", "costo alimento"])),
+        transport_cost_amount: roundMoney(findCalculatedCost(result.incomes, "transport_cost", ["movilidad", "costo movilidad"])),
         overtime_pay: 0,
-        bonuses: roundMoney(Math.max(0, safePayrollNumber(result.totals.totalIncome) - safePayrollNumber(emp.base_salary))),
+        // Bonificaciones: suma de conceptos de ingreso calculados con categoría "Bonificaciones".
+        // La asignación familiar queda excluida (tiene categoría "Asignaciones" y su propia columna).
+        bonuses: roundMoney(sumIncomesByCategory(result.incomes, "Bonificaciones")),
         commissions: 0,
         other_income: 0,
         total_income: safePayrollNumber(result.totals.totalIncome),
@@ -1128,61 +1186,32 @@ export default function PayrollManagement() {
   };
 
   // Exportar planilla a Excel (formato lineal)
-  // Helper: encuentra el contrato correspondiente al mes/año de una boleta.
-  // Misma prioridad que el cálculo de planilla:
-  //   1. Contrato que solapa el período (start_date ≤ fin mes, end_date ≥ inicio mes o nulo)
-  //   2. Más reciente cuyo inicio ≤ fin del período
-  //   3. Último recurso: el contrato más reciente disponible
-  const getContractForPayslipPeriod = (employeeId, month, year, contractsList) => {
-    const empContracts = contractsList
-      .filter(c => c.employee_id === employeeId)
-      .sort((a, b) => {
-        const da = new Date(`${(a.start_date || "1900-01-01").split("T")[0]}T00:00:00`);
-        const db = new Date(`${(b.start_date || "1900-01-01").split("T")[0]}T00:00:00`);
-        return db - da;
-      });
-    if (empContracts.length === 0) return null;
-    const periodStart = new Date(year, month - 1, 1);
-    const periodEnd = new Date(year, month, 0);
-    const overlapping = empContracts.find(c => {
-      if (!c.start_date) return false;
-      const startDate = new Date(`${c.start_date.split("T")[0]}T00:00:00`);
-      const endDate = c.end_date ? new Date(`${c.end_date.split("T")[0]}T00:00:00`) : null;
-      return startDate <= periodEnd && (!endDate || endDate >= periodStart);
+  // Los costos desglosados provienen de los importes calculados guardados en la boleta
+  // (activity_cost_amount, food_cost_amount, transport_cost_amount), no de los valores
+  // nominales del contrato. Para boletas antiguas sin estos campos, se intenta el
+  // desglose desde calculation_summary.breakdown.incomes.items; si no existe, va 0.
+  const getCostFromSummary = (payslip, varName, nameKeywords) => {
+    const items = payslip?.calculation_summary?.breakdown?.incomes?.items;
+    if (!Array.isArray(items)) return null;
+    let match = items.find(it => {
+      const f = _normStr(it.formula);
+      return f && f.includes(varName);
     });
-    if (overlapping) return overlapping;
-    const closestBefore = empContracts.find(c => {
-      if (!c.start_date) return false;
-      return new Date(`${c.start_date.split("T")[0]}T00:00:00`) <= periodEnd;
+    if (match) return safeNum(match.amount);
+    match = items.find(it => {
+      const n = _normStr(it.name);
+      return nameKeywords.some(kw => n.includes(kw));
     });
-    if (closestBefore) return closestBefore;
-    return empContracts[0];
+    return match ? safeNum(match.amount) : null;
   };
 
-  const exportToExcel = async (payslipsData, filename, filterType) => {
+  const exportToExcel = (payslipsData, filename, filterType) => {
     // Si se pasa filterType, filtrar solo las boletas de ese tipo
     const data = filterType ? payslipsData.filter(p => p.payroll_type === filterType) : payslipsData;
     if (data.length === 0) { toast.error("No hay datos para exportar"); return; }
 
-    // Cargar contratos para resolver el costo correspondiente al período de cada boleta.
-    // Si la carga falla, cancelar la exportación para evitar costos incorrectos.
-    let allContracts = [];
-    try {
-      allContracts = await withRetry(() => entitiesAPI.Contract.list('-start_date'));
-    } catch (err) {
-      console.error("Error cargando contratos para exportación:", err);
-      toast.error("No se pudieron cargar los contratos. Exportación cancelada para evitar costos incorrectos.");
-      return;
-    }
-
     const rows = data.map((p, idx) => {
       const emp = allEmployees.find(e => e.id === p.employee_id);
-      // Contrato del período de la boleta (p.month / p.year), no la ficha actual
-      const periodContract = (p.month && p.year)
-        ? getContractForPayslipPeriod(p.employee_id, p.month, p.year, allContracts)
-        : null;
-      const familyAllowance = safeNum(p.family_allowance);
-      const bonusesWithoutFamilyAllowance = Math.max(0, safeNum(p.bonuses) - familyAllowance);
       // Periodo legible: usar los campos month/year de la boleta (no del estado global)
       const periodoLabel = p.period && p.period.trim()
         ? p.period
@@ -1200,11 +1229,11 @@ export default function PayrollManagement() {
         "Tipo Planilla": p.payroll_type || "",
         "Días Trabajados": safeNum(p.worked_days),
         "Salario Base": safeNum(p.base_salary),
-        "Costo Actividad": safeNum(periodContract?.activity_cost ?? emp?.activity_cost ?? 0),
-        "Costo Alimento": safeNum(periodContract?.food_cost ?? emp?.food_cost ?? 0),
-        "Costo Movilidad": safeNum(periodContract?.transport_cost ?? emp?.transport_cost ?? 0),
-        "Bonificaciones": bonusesWithoutFamilyAllowance,
-        "Asignación familiar": familyAllowance,
+        "Costo Actividad": safeNum(p.activity_cost_amount ?? getCostFromSummary(p, "activity_cost", ["actividad", "costo actividad"])),
+        "Costo Alimento": safeNum(p.food_cost_amount ?? getCostFromSummary(p, "food_cost", ["alimentación", "costo alimentación", "costo alimento"])),
+        "Costo Movilidad": safeNum(p.transport_cost_amount ?? getCostFromSummary(p, "transport_cost", ["movilidad", "costo movilidad"])),
+        "Bonificaciones": safeNum(p.bonuses),
+        "Asignación familiar": safeNum(p.family_allowance),
         "Total Ingresos": safeNum(p.total_income),
         "AFP/ONP": safeNum(p.pension_deduction),
         "Impuesto Renta": safeNum(p.income_tax),
