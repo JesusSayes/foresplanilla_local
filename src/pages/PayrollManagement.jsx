@@ -883,10 +883,11 @@ export default function PayrollManagement() {
       const adjustedNetPay = roundMoney(safePayrollNumber(result.totals.totalIncome) - adjustedDeductions);
 
       // Extraer montos específicos del calculador para los campos dedicados de la boleta.
-      // AFP ahora se itemiza (aporte obligatorio, prima de seguro, comisión): se suman todos.
+      // AFP/ONP se itemiza (aporte obligatorio, prima de seguro, comisión, u ONP) y todos
+      // los ítems llevan concept_category === "AFP/ONP" (cálculo centralizado o sobrescritura manual).
       const pensionDeductionAmount = roundMoney(
         result.deductions
-          .filter(d => d.concept_category === "AFP/ONP" || d.concept_name.includes("AFP") || d.concept_name === "ONP")
+          .filter(d => d.concept_category === "AFP/ONP")
           .reduce((sum, d) => sum + safePayrollNumber(d.calculated_amount), 0)
       );
       const incomeTaxAmount = safePayrollNumber(result.deductions.find(d => d.concept_name.includes("Renta"))?.calculated_amount);
@@ -1176,7 +1177,21 @@ export default function PayrollManagement() {
     doc.text("DESCUENTOS", 14, yPos);
     doc.setFont(undefined, 'normal');
     yPos += 7;
-    if (payslip.pension_deduction > 0) {
+    // AFP/ONP detallado desde el breakdown cuando está disponible; fallback a la línea
+    // agregada pension_deduction para boletas históricas sin breakdown.
+    const breakdownDeductions = payslip?.calculation_summary?.breakdown?.deductions?.items;
+    const pensionItems = Array.isArray(breakdownDeductions)
+      ? breakdownDeductions.filter(d => d.concept_category === "AFP/ONP" || /AFP|ONP/i.test(d.name || ""))
+      : [];
+    if (pensionItems.length > 0) {
+      pensionItems.forEach(item => {
+        if (item.amount > 0) {
+          doc.text(`${item.name}:`, 14, yPos);
+          doc.text(`S/ ${Number(item.amount).toFixed(2)}`, 160, yPos, { align: "right" });
+          yPos += 7;
+        }
+      });
+    } else if (payslip.pension_deduction > 0) {
       doc.text(`Pensiones:`, 14, yPos);
       doc.text(`S/ ${payslip.pension_deduction.toFixed(2)}`, 160, yPos, { align: "right" });
       yPos += 7;
