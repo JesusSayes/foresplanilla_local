@@ -82,6 +82,10 @@ export const mailerAPI = {
     const response = await localClient.post('/api/mailer/invite-user', { email, name });
     return response.data;
   },
+  sendContractRenewalAlert: async (data) => {
+    const response = await localClient.post('/api/mailer/contract-renewal-alert', data);
+    return response.data;
+  },
 };
 
 export const contractNotificationsAPI = {

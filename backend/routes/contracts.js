@@ -18,6 +18,26 @@ const CREATE_PERMISSIONS = ['system.admin', 'contracts.create'];
 const UPDATE_PERMISSIONS = ['system.admin', 'contracts.edit'];
 const DELETE_PERMISSIONS = ['system.admin', 'contracts.delete'];
 
+const syncEmployeeCosts = async (client, contract) => {
+  if (!contract?.employee_id || contract.status !== 'Vigente') return;
+
+  await client.query(
+    `UPDATE employee
+        SET activity_cost = $1,
+            food_cost = $2,
+            transport_cost = $3,
+            updated_date = $4
+      WHERE id = $5`,
+    [
+      contract.activity_cost ?? 0,
+      contract.food_cost ?? 0,
+      contract.transport_cost ?? 0,
+      new Date(),
+      contract.employee_id,
+    ]
+  );
+};
+
 router.get('/', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), async (req, res) => {
   try {
     const { sort = '-created_date' } = req.query;
@@ -93,9 +113,13 @@ router.get('/:id', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScop
 });
 
 router.post('/', requireAnyPermission(...CREATE_PERMISSIONS), attachEmployeeScope(...CREATE_PERMISSIONS), async (req, res) => {
+  let client;
   try {
+    client = await pool.connect();
+    await client.query('BEGIN');
     const data = req.body;
     if (data.employee_id && !canAccessEmployee(req, data.employee_id)) {
+      await client.query('ROLLBACK');
       return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
     const contractToInsert = {
@@ -122,28 +146,41 @@ router.post('/', requireAnyPermission(...CREATE_PERMISSIONS), attachEmployeeScop
     const values = Object.values(contractToInsert);
     const placeholders = fields.map((_, index) => `$${index + 1}`).join(', ');
 
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO contract (${fields.join(', ')}) VALUES (${placeholders}) RETURNING *`,
       values
     );
 
+    await syncEmployeeCosts(client, result.rows[0]);
+    await client.query('COMMIT');
     res.status(201).json(result.rows[0]);
   } catch (error) {
+    if (client) await client.query('ROLLBACK');
     console.error('Error creating contract:', error);
     res.status(500).json({ error: error.message });
+  } finally {
+    client?.release();
   }
 });
 
 router.put('/:id', requireAnyPermission(...UPDATE_PERMISSIONS), attachEmployeeScope(...UPDATE_PERMISSIONS), async (req, res) => {
+  let client;
   try {
+    client = await pool.connect();
+    await client.query('BEGIN');
     const { id } = req.params;
     const updates = req.body;
-    const current = await pool.query('SELECT employee_id FROM contract WHERE id = $1', [id]);
-    if (current.rows.length === 0) return res.status(404).json({ error: 'Contract not found' });
+    const current = await client.query('SELECT employee_id FROM contract WHERE id = $1', [id]);
+    if (current.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Contract not found' });
+    }
     if (!canAccessEmployee(req, current.rows[0].employee_id)) {
+      await client.query('ROLLBACK');
       return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
     if (updates.employee_id && !canAccessEmployee(req, updates.employee_id)) {
+      await client.query('ROLLBACK');
       return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
 
@@ -157,24 +194,31 @@ router.put('/:id', requireAnyPermission(...UPDATE_PERMISSIONS), attachEmployeeSc
     const values = Object.values(updates);
 
     if (fields.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ error: 'No fields to update' });
     }
 
     const setClause = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
 
-    const result = await pool.query(
+    const result = await client.query(
       `UPDATE contract SET ${setClause} WHERE id = $${fields.length + 1} RETURNING *`,
       [...values, id]
     );
 
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Contract not found' });
     }
 
+    await syncEmployeeCosts(client, result.rows[0]);
+    await client.query('COMMIT');
     res.json(result.rows[0]);
   } catch (error) {
+    if (client) await client.query('ROLLBACK');
     console.error('Error updating contract:', error);
     res.status(500).json({ error: error.message });
+  } finally {
+    client?.release();
   }
 });
 
