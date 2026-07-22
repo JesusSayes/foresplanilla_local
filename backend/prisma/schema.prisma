@@ -605,6 +605,9 @@ model payslip {
   is_sample               Boolean?
   attendance_period_start DateTime? @db.Date
   attendance_period_end   DateTime? @db.Date
+  activity_cost_amount    Decimal?  @db.Decimal(18, 2)
+  food_cost_amount        Decimal?  @db.Decimal(18, 2)
+  transport_cost_amount   Decimal?  @db.Decimal(18, 2)
 }
 
 model payslip_template {
