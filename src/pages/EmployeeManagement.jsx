@@ -180,18 +180,9 @@ export default function EmployeeManagement() {
   const handleCreateEmployee = async (data) => {
     const newEmployee = await entitiesAPI.Employee.create(data);
 
-    // Si seleccionó ONP, agregar concepto automáticamente
-    if (data.pension_system === "ONP") {
-      await addONPConcept(newEmployee.id);
-    }
-
-    // Si seleccionó AFP, agregar conceptos automáticamente
-    if (data.pension_system === "AFP" && data.afp_id) {
-      const selectedAFP = afps.find(a => a.id === data.afp_id);
-      if (selectedAFP) {
-        await syncAFPConcepts(newEmployee.id, selectedAFP);
-      }
-    }
+    // El cálculo de AFP/ONP está centralizado en PayrollCalculator.calculatePensionContribution:
+    // no se crean ni sincronizan conceptos dinámicos al crear/editar empleados. Los cambios de
+    // AFP, tipo de comisión o porcentajes se reflejan automáticamente en el siguiente cálculo.
 
     // Registrar creación en el historial
     await createChangeLogMutation.mutateAsync({
@@ -246,42 +237,11 @@ export default function EmployeeManagement() {
           cleanData.status = "Cesado";
         }
       }
-      console.log("OK: Datos limpios a enviar:", cleanData);
-
       const updatedEmployee = await entitiesAPI.Employee.update(id, cleanData);
-      console.log("OK: Empleado actualizado:", updatedEmployee);
 
-      // Si cambió la AFP, actualizar conceptos de planilla
-      if (cleanData.afp_id && cleanData.afp_id !== oldData.afp_id && cleanData.pension_system === "AFP") {
-        const selectedAFP = afps.find(a => a.id === cleanData.afp_id);
-        if (selectedAFP) {
-          await syncAFPConcepts(id, selectedAFP);
-        }
-      }
-
-      // Si cambió el sistema de pensiones a AFP, agregar conceptos
-      if (cleanData.pension_system === "AFP" && oldData.pension_system !== "AFP" && cleanData.afp_id) {
-        const selectedAFP = afps.find(a => a.id === cleanData.afp_id);
-        if (selectedAFP) {
-          await syncAFPConcepts(id, selectedAFP);
-        }
-      }
-
-      // Si cambió a ONP o Ninguno, eliminar conceptos AFP
-      if ((cleanData.pension_system === "ONP" || cleanData.pension_system === "Ninguno") && oldData.pension_system === "AFP") {
-        await removeAFPConcepts(id);
-      }
-
-      // Si cambió a ONP, agregar concepto ONP y eliminar AFP
-      if (cleanData.pension_system === "ONP" && oldData.pension_system !== "ONP") {
-        await removeAFPConcepts(id);
-        await addONPConcept(id);
-      }
-
-      // Si cambió de ONP a otro sistema, eliminar concepto ONP
-      if (cleanData.pension_system !== "ONP" && oldData.pension_system === "ONP") {
-        await removeONPConcept(id);
-      }
+      // El cálculo de AFP/ONP está centralizado en PayrollCalculator.calculatePensionContribution.
+      // No se sincronizan ni eliminan conceptos al cambiar AFP o sistema de pensiones: el
+      // siguiente cálculo de planilla refleja automáticamente la nueva configuración.
 
       // Registrar cambios en el historial solo de campos modificados
       const changedFields = [];
@@ -325,124 +285,6 @@ export default function EmployeeManagement() {
       console.error("Error detallado:", error);
     },
   });
-
-  const syncAFPConcepts = async (employeeId, afp) => {
-    try {
-      // Eliminar conceptos AFP anteriores
-      await removeAFPConcepts(employeeId);
-
-      // Agregar nuevos conceptos AFP
-      const currentDate = new Date();
-      const month = currentDate.getMonth() + 1;
-      const year = currentDate.getFullYear();
-
-      const afpConcepts = [
-        {
-          employee_id: employeeId,
-          concept_type: "Descuento",
-          concept_name: "AFP - Comisión",
-          amount: 0,
-          is_dynamic: true,
-          calculation_formula: `base_salary * ${(afp.commission_percentage / 100).toFixed(4)}`,
-          month,
-          year,
-          is_recurring: true,
-          is_applied: false,
-          notes: `${afp.name} - Comisión ${afp.commission_percentage}%`
-        },
-        {
-          employee_id: employeeId,
-          concept_type: "Descuento",
-          concept_name: "AFP - Aporte Obligatorio",
-          amount: 0,
-          is_dynamic: true,
-          calculation_formula: `base_salary * ${(afp.obligatory_contribution_percentage / 100).toFixed(4)}`,
-          month,
-          year,
-          is_recurring: true,
-          is_applied: false,
-          notes: `${afp.name} - Aporte Obligatorio ${afp.obligatory_contribution_percentage}%`
-        },
-        {
-          employee_id: employeeId,
-          concept_type: "Descuento",
-          concept_name: "AFP - Seguro",
-          amount: 0,
-          is_dynamic: true,
-          calculation_formula: `base_salary * ${(afp.insurance_percentage / 100).toFixed(4)}`,
-          month,
-          year,
-          is_recurring: true,
-          is_applied: false,
-          notes: `${afp.name} - Seguro ${afp.insurance_percentage}%`
-        }
-      ];
-
-      for (const concept of afpConcepts) {
-        await entitiesAPI.PayrollConcept.create(concept);
-      }
-
-      toast.success(`Conceptos AFP de ${afp.name} agregados automáticamente`);
-    } catch (error) {
-      console.error("Error al sincronizar conceptos AFP:", error);
-    }
-  };
-
-  const removeAFPConcepts = async (employeeId) => {
-    try {
-      const allConcepts = await entitiesAPI.PayrollConcept.filter({ employee_id: employeeId });
-      const afpConcepts = allConcepts.filter(c =>
-        c.concept_name.includes("AFP - Comisión") ||
-        c.concept_name.includes("AFP - Aporte Obligatorio") ||
-        c.concept_name.includes("AFP - Seguro")
-      );
-
-      for (const concept of afpConcepts) {
-        await entitiesAPI.PayrollConcept.delete(concept.id);
-      }
-    } catch (error) {
-      console.error("Error al eliminar conceptos AFP:", error);
-    }
-  };
-
-  const addONPConcept = async (employeeId) => {
-    try {
-      const currentDate = new Date();
-      const month = currentDate.getMonth() + 1;
-      const year = currentDate.getFullYear();
-
-      await entitiesAPI.PayrollConcept.create({
-        employee_id: employeeId,
-        concept_type: "Descuento",
-        concept_name: "ONP",
-        amount: 0,
-        is_dynamic: true,
-        calculation_formula: "base_salary * 0.13",
-        month,
-        year,
-        is_recurring: true,
-        is_applied: false,
-        notes: "ONP - 13% sobre remuneración bruta"
-      });
-
-      toast.success("Concepto ONP agregado automáticamente");
-    } catch (error) {
-      console.error("Error al agregar concepto ONP:", error);
-    }
-  };
-
-  const removeONPConcept = async (employeeId) => {
-    try {
-      const allConcepts = await entitiesAPI.PayrollConcept.filter({ employee_id: employeeId });
-      const onpConcepts = allConcepts.filter(c => c.concept_name === "ONP");
-
-      for (const concept of onpConcepts) {
-        await entitiesAPI.PayrollConcept.delete(concept.id);
-      }
-    } catch (error) {
-      console.error("Error al eliminar concepto ONP:", error);
-    }
-  };
 
   const createDerechohabienteMutation = useMutation({
     mutationFn: async (data) => {
