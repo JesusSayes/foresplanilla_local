@@ -157,15 +157,40 @@ test("Cambio de porcentajes AFP: se refleja sin regenerar conceptos", () => {
   assert(resB.items.some(i => i.name.includes("AFP B")), "Debe usar la nueva AFP");
 });
 
-// 9. El cálculo utiliza totalIncome y no únicamente base_salary
-test("Cálculo usa totalIncome, no base_salary", () => {
-  const emp = makeEmployee({ base_salary: 5000 }); // base_salary distinto al totalIncome
+// 9. Base pensionaria = remuneración básica ejecutada + asignación familiar (NO totalIncome)
+test("Base pensionaria usa remuneración básica + asignación familiar, no total ingresos", async () => {
+  const emp = makeEmployee({ base_salary: 5000 });
   const afp = makeAFP();
-  const totalIncome = 2000; // totalIncome != base_salary
+  const concepts = [
+    { employee_id: "x", concept_type: "Ingreso", concept_category: "Remuneración Base", concept_name: "Remuneración Básica", is_dynamic: false, amount: 2000, is_recurring: true },
+    { employee_id: "x", concept_type: "Ingreso", concept_category: "Asignaciones", concept_name: "Asignación Familiar", is_dynamic: false, amount: 113, is_recurring: true },
+    { employee_id: "x", concept_type: "Ingreso", concept_category: "Asignaciones", concept_name: "Movilidad", is_dynamic: false, amount: 300, is_recurring: true },
+  ];
   const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
-  const res = calc.calculatePensionContribution(totalIncome, { afp });
-  const aporte = round2(2000 * 0.10);
-  assert(res.items[0].amount === aporte, `Aporte debe calcularse sobre totalIncome=2000 (${aporte}), vino ${res.items[0].amount}`);
+  const result = await calc.calculatePayroll(concepts, { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp });
+  const pensionDeds = result.deductions.filter(d => d.concept_category === "AFP/ONP");
+  // Base esperada = 2000 (rem. básica) + 113 (asig. familiar) = 2113. NO incluye 300 de movilidad.
+  const baseEsperada = 2113;
+  const aporteEsperado = round2(baseEsperada * 0.10);
+  const aporte = pensionDeds.find(d => /aporte obligatorio/i.test(d.concept_name));
+  assert(aporte, "Debe existir el ítem Aporte Obligatorio");
+  assert(aporte.calculated_amount === aporteEsperado, `Aporte sobre base ${baseEsperada} = ${aporteEsperado}, vino ${aporte.calculated_amount}`);
+  assert(aporte.calculated_amount !== round2(2413 * 0.10), "El aporte NO debe incluir la movilidad en la base");
+});
+
+// 9b. Sin asignación familiar: base = solo remuneración básica ejecutada
+test("Sin asignación familiar: base = solo remuneración básica ejecutada", async () => {
+  const emp = makeEmployee({ base_salary: 5000 });
+  const afp = makeAFP();
+  const concepts = [
+    { employee_id: "x", concept_type: "Ingreso", concept_category: "Remuneración Base", concept_name: "Remuneración Básica", is_dynamic: false, amount: 2000, is_recurring: true },
+    { employee_id: "x", concept_type: "Ingreso", concept_category: "Asignaciones", concept_name: "Movilidad", is_dynamic: false, amount: 300, is_recurring: true },
+  ];
+  const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
+  const result = await calc.calculatePayroll(concepts, { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp });
+  const aporte = result.deductions.find(d => /aporte obligatorio/i.test(d.concept_name));
+  const aporteEsperado = round2(2000 * 0.10);
+  assert(aporte.calculated_amount === aporteEsperado, `Base solo rem. básica 2000 => aporte ${aporteEsperado}, vino ${aporte.calculated_amount}`);
 });
 
 // 10. Redondeo individual de cada componente y del total AFP
