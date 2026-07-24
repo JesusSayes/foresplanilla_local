@@ -1286,6 +1286,29 @@ export default function PayrollManagement() {
     return deduped.reduce((sum, it) => sum + safeNum(it.amount), 0);
   };
 
+  // Extrae el desglose de AFP/ONP desde el breakdown de descuentos de la boleta.
+  // Cada componente (aporte obligatorio, prima de seguro, comisión, u ONP) viene
+  // como un ítem independiente con concept_category === "AFP/ONP".
+  // Retorna null si no hay breakdown disponible (boletas antiguas sin resumen).
+  const getAfpBreakdown = (payslip) => {
+    const items = payslip?.calculation_summary?.breakdown?.deductions?.items;
+    if (!Array.isArray(items)) return null;
+    const pensionItems = items.filter(it =>
+      it.concept_category === "AFP/ONP" || it.system_logic_type === "pension_contribution"
+    );
+    if (pensionItems.length === 0) return null;
+    const find = (re) => {
+      const m = pensionItems.find(it => re.test(it.name || ""));
+      return m ? safeNum(m.amount) : 0;
+    };
+    return {
+      aporte: find(/aporte obligatorio/i),
+      prima: find(/prima de seguro|prima seguro/i),
+      comision: find(/comisi[oó]n/i),
+      onp: find(/^onp\b|snp/i),
+    };
+  };
+
   const exportToExcel = (payslipsData, filename, filterType) => {
     // Si se pasa filterType, filtrar solo las boletas de ese tipo
     const data = filterType ? payslipsData.filter(p => p.payroll_type === filterType) : payslipsData;
@@ -1303,6 +1326,8 @@ export default function PayrollManagement() {
       const netoPagar = dedupedTotalIncome != null
         ? dedupedTotalIncome - safeNum(p.total_deductions)
         : safeNum(p.net_pay);
+      // Desglose AFP/ONP desde el breakdown (coincide con el PDF de la boleta)
+      const afp = getAfpBreakdown(p);
       return {
         "N°": idx + 1,
         "Tipo Doc": emp?.document_type || "",
@@ -1322,7 +1347,11 @@ export default function PayrollManagement() {
         "Bonificaciones": safeNum(p.bonuses),
         "Asignación familiar": safeNum(p.family_allowance),
         "Total Ingresos": totalIngresos,
-        "AFP/ONP": safeNum(p.pension_deduction),
+        "AFP Aporte Obligatorio": afp ? afp.aporte : 0,
+        "AFP Prima de Seguro": afp ? afp.prima : 0,
+        "AFP Comisión": afp ? afp.comision : 0,
+        "ONP": afp ? afp.onp : 0,
+        "AFP/ONP Total": safeNum(p.pension_deduction),
         "Impuesto Renta": safeNum(p.income_tax),
         "Desc. Tardanzas": safeNum(p.tardiness_discount),
         "Desc. Faltas": safeNum(p.absence_discount),
