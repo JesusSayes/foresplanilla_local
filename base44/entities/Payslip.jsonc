@@ -132,7 +132,7 @@
     "income_tax": {
       "type": "number",
       "default": 0,
-      "description": "Impuesto 5ta categor\u00eda"
+      "description": "Impuesto 5ta categoria"
     },
     "tardiness_discount": {
       "type": "number",
@@ -189,6 +189,10 @@
     "notes": {
       "type": "string",
       "description": "Notas o comentarios adicionales"
+    },
+    "calculation_summary": {
+      "type": "object",
+      "description": "Resumen de c\u00e1lculo del motor (breakdown de ingresos, descuentos y aportes con nombres, c\u00f3digos, montos y categor\u00edas). Permite que el PDF y el Excel de boletas generadas muestren el desglose AFP (aporte obligatorio, prima de seguro, comisi\u00f3n) y dem\u00e1s conceptos."
     }
   },
   "required": [

@@ -608,6 +608,7 @@ model payslip {
   activity_cost_amount    Decimal?  @db.Decimal(18, 2)
   food_cost_amount        Decimal?  @db.Decimal(18, 2)
   transport_cost_amount   Decimal?  @db.Decimal(18, 2)
+  calculation_summary     Json?
 }
 
 model payslip_template {

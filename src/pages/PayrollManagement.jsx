@@ -1225,6 +1225,65 @@ export default function PayrollManagement() {
     return match ? safeNum(match.amount) : null;
   };
 
+  // Deduplica conceptos de costo en el breakdown de ingresos: para cada variable
+  // de costo (activity_cost, food_cost, transport_cost) conserva un único item,
+  // prefiriendo el concepto prorrateado (fórmula con worked_days) que corresponde
+  // al concepto general configurado. Evita doble conteo en el Total Ingresos
+  // cuando existen conceptos redundantes (ej. "Actividad" y "Costo de Actividad").
+  const dedupeIncomesByCost = (payslip) => {
+    const items = payslip?.calculation_summary?.breakdown?.incomes?.items;
+    if (!Array.isArray(items)) return null;
+    const costVars = ["activity_cost", "food_cost", "transport_cost"];
+    const groups = {};
+    items.forEach(it => {
+      const f = _normStr(it.calculation_formula || it.formula || "");
+      const cv = costVars.find(v => f.includes(v));
+      if (!cv) return;
+      if (!groups[cv]) groups[cv] = [];
+      groups[cv].push(it);
+    });
+    const keepSet = new Set();
+    Object.values(groups).forEach(arr => {
+      const preferred = arr.find(it => /worked_days/i.test(it.calculation_formula || it.formula || "")) || arr[0];
+      keepSet.add(preferred);
+    });
+    return items.filter(it => {
+      const f = _normStr(it.calculation_formula || it.formula || "");
+      const cv = costVars.find(v => f.includes(v));
+      if (!cv) return true;
+      return keepSet.has(it);
+    });
+  };
+
+  const computeDedupedTotalIncome = (payslip) => {
+    const deduped = dedupeIncomesByCost(payslip);
+    if (!deduped) return null;
+    return deduped.reduce((sum, it) => sum + safeNum(it.amount), 0);
+  };
+
+  // Extrae el desglose de AFP/ONP desde el breakdown de descuentos de la boleta.
+  // Cada componente (aporte obligatorio, prima de seguro, comisión, u ONP) viene
+  // como un ítem independiente con concept_category === "AFP/ONP".
+  // Retorna null si no hay breakdown disponible (boletas antiguas sin resumen).
+  const getAfpBreakdown = (payslip) => {
+    const items = payslip?.calculation_summary?.breakdown?.deductions?.items;
+    if (!Array.isArray(items)) return null;
+    const pensionItems = items.filter(it =>
+      it.concept_category === "AFP/ONP" || it.system_logic_type === "pension_contribution"
+    );
+    if (pensionItems.length === 0) return null;
+    const find = (re) => {
+      const m = pensionItems.find(it => re.test(it.name || ""));
+      return m ? safeNum(m.amount) : 0;
+    };
+    return {
+      aporte: find(/aporte obligatorio/i),
+      prima: find(/prima de seguro|prima seguro/i),
+      comision: find(/comisi[oó]n/i),
+      onp: find(/^onp\b|snp/i),
+    };
+  };
+
   const exportToExcel = (payslipsData, filename, filterType) => {
     // Si se pasa filterType, filtrar solo las boletas de ese tipo
     const data = filterType ? payslipsData.filter(p => p.payroll_type === filterType) : payslipsData;
@@ -1236,6 +1295,14 @@ export default function PayrollManagement() {
       const periodoLabel = p.period && p.period.trim()
         ? p.period
         : (p.month && p.year ? format(new Date(p.year, p.month - 1), 'MMMM yyyy', { locale: es }) : "");
+      // Total de ingresos deduplicado (consistente con la boleta) y neto recalculado
+      const dedupedTotalIncome = computeDedupedTotalIncome(p);
+      const totalIngresos = dedupedTotalIncome != null ? dedupedTotalIncome : safeNum(p.total_income);
+      const netoPagar = dedupedTotalIncome != null
+        ? dedupedTotalIncome - safeNum(p.total_deductions)
+        : safeNum(p.net_pay);
+      // Desglose AFP/ONP desde el breakdown (coincide con el PDF de la boleta)
+      const afp = getAfpBreakdown(p);
       return {
         "N°": idx + 1,
         "Tipo Doc": emp?.document_type || "",
@@ -1254,15 +1321,19 @@ export default function PayrollManagement() {
         "Costo Movilidad": safeNum(p.transport_cost_amount ?? getCostFromSummary(p, "transport_cost", ["movilidad", "costo movilidad"])),
         "Bonificaciones": safeNum(p.bonuses),
         "Asignación familiar": safeNum(p.family_allowance),
-        "Total Ingresos": safeNum(p.total_income),
-        "AFP/ONP": safeNum(p.pension_deduction),
+        "Total Ingresos": totalIngresos,
+        "AFP Aporte Obligatorio": afp ? afp.aporte : 0,
+        "AFP Prima de Seguro": afp ? afp.prima : 0,
+        "AFP Comisión": afp ? afp.comision : 0,
+        "ONP": afp ? afp.onp : 0,
+        "AFP/ONP Total": safeNum(p.pension_deduction),
         "Impuesto Renta": safeNum(p.income_tax),
         "Desc. Tardanzas": safeNum(p.tardiness_discount),
         "Desc. Faltas": safeNum(p.absence_discount),
         "Desc. Adelanto": safeNum(p.advance_deduction),
         "Otros Descuentos": safeNum(p.other_deductions),
         "Total Descuentos": safeNum(p.total_deductions),
-        "Neto a Pagar": safeNum(p.net_pay),
+        "Neto a Pagar": netoPagar,
         "Estado": p.status || "Calculada",
       };
     });

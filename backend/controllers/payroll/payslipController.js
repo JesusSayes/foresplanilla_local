@@ -149,7 +149,10 @@ export const bulkCreate = async (req, res) => {
         status: p.status || "generated",
         notes: p.notes || null,
         created_by_id: p.created_by_id || null,
-        is_sample: p.is_sample || false
+        is_sample: p.is_sample || false,
+        ...(p.calculation_summary != null
+          ? { calculation_summary: p.calculation_summary }
+          : {})
       };
 
     });
