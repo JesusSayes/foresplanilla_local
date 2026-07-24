@@ -703,24 +703,30 @@ export default function PayrollManagement() {
       // Obtener conceptos del empleado (generales + específicos + fijos del empleado)
       const generalConcepts = payrollConcepts.filter(c => c.employee_id === "general");
       const specificConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
+      // Fuente única de configuración: los conceptos de planilla configurados (PayrollConcept).
+      // Los campos del contrato (activity_cost, food_cost, transport_cost) son DATOS que los
+      // conceptos configurados pueden referenciar vía fórmula. Para evitar duplicidad, los
+      // conceptos fijos autogenerados desde el contrato SOLO se incluyen si NO existe un
+      // concepto configurado que cubra el mismo costo (por variable de fórmula o por nombre).
       const configuredConcepts = [...generalConcepts, ...specificConcepts];
-      const existingConceptNames = new Set(
-        configuredConcepts.map(c => (c.concept_name || "").toLowerCase().trim())
-      );
-      const fixedConceptVariables = {
-        "Costo Actividad": "activity_cost",
-        "Costo Alimento": "food_cost",
-        "Costo Movilidad": "transport_cost",
+      const coversCost = (costVariable, nameRegex) =>
+        configuredConcepts.some(c => {
+          const formula = String(c.calculation_formula || "").toLowerCase();
+          const name = (c.concept_name || "").toLowerCase().trim();
+          return formula.includes(costVariable) || nameRegex.test(name);
+        });
+      const costCoverage = {
+        activity_cost: coversCost("activity_cost", /actividad/i),
+        food_cost: coversCost("food_cost", /alimentaci[oó]n|alimento/i),
+        transport_cost: coversCost("transport_cost", /movilidad|transporte/i),
       };
-      // Si el costo ya tiene un concepto configurado (por nombre o variable de fórmula),
-      // se conserva ese cálculo. En caso contrario se mantiene el monto del contrato.
-      const missingEmployeeFixedConcepts = employeeFixedConcepts.filter(fixedConcept => {
-        const variable = fixedConceptVariables[fixedConcept.concept_name];
-        return !configuredConcepts.some(concept =>
-          (variable && new RegExp(`\\b${variable}\\b`).test(String(concept.calculation_formula || "")))
-        ) && !existingConceptNames.has((fixedConcept.concept_name || "").toLowerCase().trim());
+      const fixedConceptsForMonth = employeeFixedConcepts.filter(c => {
+        if (c.concept_name === "Costo Actividad") return !costCoverage.activity_cost;
+        if (c.concept_name === "Costo Alimento") return !costCoverage.food_cost;
+        if (c.concept_name === "Costo Movilidad") return !costCoverage.transport_cost;
+        return true;
       });
-      const allEmpConcepts = [...configuredConcepts, ...missingEmployeeFixedConcepts];
+      const allEmpConcepts = [...generalConcepts, ...specificConcepts, ...fixedConceptsForMonth];
 
       // Porcentaje quincenal desde la configuración (decimal, ej: 0.40)
       const quincenalPct = (payrollConfig?.quincenal_percentage ?? 40) / 100;

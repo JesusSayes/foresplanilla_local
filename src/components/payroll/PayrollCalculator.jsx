@@ -236,10 +236,11 @@ export class PayrollCalculator {
   /**
    * Calcula el descuento automático al sistema de pensiones (AFP u ONP)
    * según la configuración del empleado y su AFP asignada.
-   * @param {number} totalIncome - Total de ingresos computables
+   * @param {number} pensionBase - Base pensionaria = remuneración básica ejecutada
+   *   (según días trabajados) + asignación familiar. NO incluye el total de ingresos.
    * @param {Object} context - Contexto de cálculo (incluye afp)
    */
-  calculatePensionContribution(totalIncome, context) {
+  calculatePensionContribution(pensionBase, context) {
     const employee = this.employee;
     const pensionSystem = employee.pension_system;
 
@@ -247,19 +248,21 @@ export class PayrollCalculator {
       return { items: [], totalAmount: 0, name: "", code: "", detail: "Sin sistema de pensiones configurado" };
     }
 
+    const base = Math.max(0, Number(pensionBase) || 0);
+
     // Devuelve { items: [{name, code, amount, detail}], totalAmount, name, code, detail }
     // Cada item se agrega como un descuento independiente en la boleta (según ley peruana:
     // aporte obligatorio, comisión y prima de seguro se muestran por separado).
 
     if (pensionSystem === "ONP") {
-      const amount = totalIncome * 0.13;
+      const amount = base * 0.13;
       const rounded = Math.round(amount * 100) / 100;
       return {
-        items: [{ name: "ONP", code: "0602", amount: rounded, detail: `ONP 13% de S/${totalIncome.toFixed(2)}` }],
+        items: [{ name: "ONP", code: "0602", amount: rounded, detail: `ONP 13% de S/${base.toFixed(2)}` }],
         totalAmount: rounded,
         name: "ONP",
         code: "0602",
-        detail: `ONP 13% de S/${totalIncome.toFixed(2)}`,
+        detail: `ONP 13% de S/${base.toFixed(2)}`,
       };
     }
 
@@ -279,32 +282,32 @@ export class PayrollCalculator {
       const round2 = (v) => Math.round(v * 100) / 100;
 
       const items = [];
-      // 1) Aporte obligatorio (sobre totalIncome)
-      const aporteAmount = round2(totalIncome * (obligatory / 100));
+      // 1) Aporte obligatorio (sobre la base pensionaria)
+      const aporteAmount = round2(base * (obligatory / 100));
       items.push({
         name: `Aporte Obligatorio AFP ${afp.name}`,
         code: "0601",
         amount: aporteAmount,
-        detail: `Aporte obligatorio ${obligatory}% de S/${totalIncome.toFixed(2)}`,
+        detail: `Aporte obligatorio ${obligatory}% de S/${base.toFixed(2)}`,
       });
       // 2) Prima de seguro (solo si el porcentaje es mayor que cero)
       if (insurance > 0) {
-        const seguroAmount = round2(totalIncome * (insurance / 100));
+        const seguroAmount = round2(base * (insurance / 100));
         items.push({
           name: `Prima de Seguro AFP ${afp.name}`,
           code: "0601",
           amount: seguroAmount,
-          detail: `Prima de seguro ${insurance}% de S/${totalIncome.toFixed(2)}`,
+          detail: `Prima de seguro ${insurance}% de S/${base.toFixed(2)}`,
         });
       }
       // 3) Comisión (solo en régimen Flujo y si el porcentaje es mayor que cero).
       if (!isMixta && commission > 0) {
-        const comisionAmount = round2(totalIncome * (commission / 100));
+        const comisionAmount = round2(base * (commission / 100));
         items.push({
           name: `Comisión AFP ${afp.name}`,
           code: "0601",
           amount: comisionAmount,
-          detail: `Comisión flujo ${commission}% de S/${totalIncome.toFixed(2)}`,
+          detail: `Comisión ${commission}% de S/${base.toFixed(2)}`,
         });
       }
 
@@ -350,7 +353,7 @@ export class PayrollCalculator {
         continue;
       }
 
-      // Este concepto depende del total de ingresos y se calcula después del bucle.
+      // Este concepto depende de la base pensionaria y se calcula después del bucle.
       const formula = String(concept.calculation_formula || "").trim().toLowerCase();
       // Ignorar conceptos pensionarios autogenerados heredados (AFP - ..., ONP sin
       // categoría): el cálculo centralizado los reemplaza para evitar duplicidad y
@@ -382,16 +385,34 @@ export class PayrollCalculator {
       return this.shouldApplyConcept(c) &&
         (c.system_logic_type === "pension_contribution" || formula === "pension_contribution");
     });
+    // Base pensionaria: ÚNICAMENTE la remuneración básica ejecutada (según días trabajados)
+    // + asignación familiar. NO se usa el total de ingresos (movilidad, costos, etc. no son
+    // remuneración asegurable). Según normativa peruana la AFP/ONP se calcula sobre la
+    // remuneración asegurable = remuneración básica + asignación familiar.
+    const executedBaseSalary = safe(
+      incomes.find(c =>
+        c.concept_category === "Remuneración Base" ||
+        /remuneraci[oó]n\s*b[aá]sica/i.test(c.concept_name || "")
+      )?.calculated_amount || 0
+    );
+    const executedFamilyAllowance = safe(
+      incomes.find(c =>
+        c.system_logic_type === "family_allowance" ||
+        /asignaci[oó]n\s*familiar/i.test(c.concept_name || "")
+      )?.calculated_amount || 0
+    );
+    const pensionBase = safe(executedBaseSalary + executedFamilyAllowance);
+
     // Auto-calcular descuento de AFP/ONP de forma centralizada (única fuente automática).
-    // Se calcula DESPUÉS de procesar todos los ingresos para usar totalIncome real.
+    // Se calcula DESPUÉS de procesar todos los ingresos para usar la base pensionaria real.
     // Se omite si existe una sobrescritura manual explícita (concept_category === "AFP/ONP"),
-    // en planillas quincenales, o si totalIncome es cero o negativo.
+    // en planillas quincenales, o si la base pensionaria es cero o negativa.
     const applicableConcepts = concepts.filter(c =>
       c !== pensionSystemConcept && this.shouldApplyConcept(c)
     );
     const hasManualOverride = hasManualPensionOverride(applicableConcepts);
-    if (!hasManualOverride && this.payrollType !== "Quincenal" && totalIncome > 0) {
-      const pensionCalc = this.calculatePensionContribution(totalIncome, context);
+    if (!hasManualOverride && this.payrollType !== "Quincenal" && pensionBase > 0) {
+      const pensionCalc = this.calculatePensionContribution(pensionBase, context);
       // Agregar cada componente (aporte obligatorio, prima de seguro, comisión) como
       // un descuento independiente, según la ley peruana.
       (pensionCalc.items || []).forEach((item) => {
