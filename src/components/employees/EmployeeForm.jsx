@@ -85,7 +85,7 @@ export default function EmployeeForm({
     setLookingUpDni(true);
     try {
       const response = await fetch(`https://apiperu.dev/api/dni/${dni}`, {
-        headers: { "Authorization": "Bearer 20b6666ddda099db4204cf53854f8ca04d950a4eead89029e77999b0726181cb" }
+        headers: { "Authorization": "Bearer 61864887dd1f3918ec09fc9a10bc2e7fa46ba777f867d23d355a800bb5d68396" }
       });
       const data = await response.json();
       if (data.success && data.data) {
