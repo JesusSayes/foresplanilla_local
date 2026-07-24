@@ -84,10 +84,7 @@ export default function EmployeeForm({
     }
     setLookingUpDni(true);
     try {
-      const response = await fetch(`https://apiperu.dev/api/dni/${dni}`, {
-        headers: { "Authorization": "Bearer 61864887dd1f3918ec09fc9a10bc2e7fa46ba777f867d23d355a800bb5d68396" }
-      });
-      const data = await response.json();
+      const { data } = await base44.functions.invoke('consultarDni', { dni });
       if (data.success && data.data) {
         const { nombres, apellido_paterno, apellido_materno } = data.data;
         setFormData({
