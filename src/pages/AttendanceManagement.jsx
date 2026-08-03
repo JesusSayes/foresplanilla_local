@@ -1009,10 +1009,32 @@ export default function AttendanceManagement() {
         v => v.employee_id === emp.id && String(v.start_date).slice(0, 10) <= rowDate && String(v.end_date).slice(0, 10) >= rowDate
       ) || null;
       const isVacation = emp.record?.status === "Vacaciones" || !!vacation;
+
+      // Horario programado para este empleado y fecha
+      const schedForRow = getEmployeeScheduleForDate(emp.id, rowDate);
+      const dowForRow = new Date(rowDate + "T00:00:00").getDay();
+      const stMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+      const enMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+      const schedStRaw = schedForRow?.[stMap[dowForRow]] || null;
+      const schedEnRaw = schedForRow?.[enMap[dowForRow]] || null;
+      const isDayOff = schedForRow && (!schedStRaw || !schedEnRaw);
+      const horarioProg = !schedForRow
+        ? 'Sin horario'
+        : isDayOff
+          ? 'Día libre'
+          : `${schedStRaw}–${schedEnRaw}`;
+      const condicionDia = !schedForRow
+        ? 'Sin horario programado'
+        : isDayOff
+          ? 'Día libre'
+          : 'Día laborable';
+
+      // Buscar TODOS los incidentes para este empleado y fecha
       const incidentsForRow = freshIncidents.filter(
         i => i.employee_id === emp.id && String(i.incident_date).slice(0, 10) === rowDate
       );
       const incident = incidentsForRow.find(i => i.status === 'Aprobada')
+        || incidentsForRow.find(i => i.status === 'Pendiente')
         || incidentsForRow[0]
         || null;
       const estadoMarcacion = isVacation
@@ -1026,6 +1048,7 @@ export default function AttendanceManagement() {
       const enMap2 = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
       const schedStartEx = schedForRowEx?.[stMap2[dowForRow2]] || "09:00";
       const schedEndEx   = schedForRowEx?.[enMap2[dowForRow2]] || "18:00";
+      const isDayOffEx = schedForRowEx && (!schedForRowEx[stMap2[dowForRow2]] || !schedForRowEx[enMap2[dowForRow2]]);
       const breakMinEx   = schedForRowEx?.break_duration_minutes ?? 60;
       const breakStEx    = schedForRowEx?.break_start || null;
 
@@ -1035,10 +1058,10 @@ export default function AttendanceManagement() {
 
       let excelHours, excelLate;
       if (estadoMarcacion === 'Vacaciones') {
-        excelHours = schedForRowEx ? Math.max(0, (
+        excelHours = (schedForRowEx && !isDayOffEx) ? Math.max(0, (
           (parseInt(schedEndEx.split(':')[0]) * 60 + parseInt(schedEndEx.split(':')[1])) -
           (parseInt(schedStartEx.split(':')[0]) * 60 + parseInt(schedStartEx.split(':')[1])) - breakMinEx
-        ) / 60) : 8;
+        ) / 60) : 0;
         excelLate = 0;
       } else {
         const excelMetrics = calcEffectiveMetrics({
@@ -1094,18 +1117,23 @@ export default function AttendanceManagement() {
         tiempoPapeleta = `${justMetrics.totalWorkedHours.toFixed(2)} h`;
       }
 
-      // Para vacaciones: mostrar horario programado como marcación
-      const { firstClockIn, lastClockOut } = getSegmentClockTimes(emp.record);
-      let entradaExcel = timeStrToExcelFraction(firstClockIn);
-      let salidaExcel  = timeStrToExcelFraction(lastClockOut);
-      if (estadoMarcacion === 'Vacaciones') {
+      // Para vacaciones: mostrar horario programado como marcación (salvo día libre)
+      const { firstClockIn: rowFirstIn, lastClockOut: rowLastOut } = getSegmentClockTimes(emp.record);
+      let entradaExcel = timeStrToExcelFraction(rowFirstIn);
+      let salidaExcel  = timeStrToExcelFraction(rowLastOut);
+      if (estadoMarcacion === 'Vacaciones' && !isDayOffEx) {
         entradaExcel = timeStrToExcelFraction(schedStartEx);
         salidaExcel  = timeStrToExcelFraction(schedEndEx);
       }
 
+      const diaSemana = format(parseDateLima(rowDate), "EEEE", { locale: es });
+      const diaSemanaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+
       return {
-        'Horario Programado': schedForRowEx ? `${schedStartEx}-${schedEndEx}` : 'Sin horario',
+        'Horario Programado': horarioProg,
+        'Condición del día': condicionDia,
         'Fecha': rowDate,
+        'Día': diaSemanaCap,
         'Tipo Doc': emp.document_type,
         'DNI': emp.document_number,
         'Nombres': emp.first_name,

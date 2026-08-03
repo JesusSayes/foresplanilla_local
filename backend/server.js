@@ -73,6 +73,7 @@ import incidentTypesRoutes from './routes/incidentTypes.js';
 import subdiariosRoutes from './routes/subdiarios.js';
 import tipoAnexosRoutes from './routes/tipoAnexos.js';
 import historialRemunerativoRoutes from './routes/historialRemunerativo.js';
+import dniRoutes from './routes/dni.js';
 import { notifyExpiringContracts } from './services/contractNotificationService.js';
 
 dotenv.config();
@@ -180,6 +181,7 @@ app.use('/api/incident-types', incidentTypesRoutes);
 app.use('/api/subdiarios', subdiariosRoutes);
 app.use('/api/tipo-anexos', tipoAnexosRoutes);
 app.use('/api/historial-remunerativo', historialRemunerativoRoutes);
+app.use('/api/dni', dniRoutes);
 
 // Cron configuration
 const CRON_TIMEZONE = process.env.CRON_TIMEZONE || 'America/Lima';
