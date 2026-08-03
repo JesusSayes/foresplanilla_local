@@ -1,5 +1,6 @@
 import React from "react";
 import { getPublicAssetUrl } from "@/api/apiConfig";
+import localClient from "@/api/localClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,10 +89,7 @@ export default function EmployeeForm({
     }
     setLookingUpDni(true);
     try {
-      const response = await fetch(`https://apiperu.dev/api/dni/${dni}`, {
-        headers: { "Authorization": "Bearer 20b6666ddda099db4204cf53854f8ca04d950a4eead89029e77999b0726181cb" }
-      });
-      const data = await response.json();
+      const { data } = await localClient.post('/api/dni/consultar', { dni });
       if (data.success && data.data) {
         const { nombres, apellido_paterno, apellido_materno } = data.data;
         setFormData({

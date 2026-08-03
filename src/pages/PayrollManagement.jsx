@@ -807,7 +807,14 @@ export default function PayrollManagement() {
       const baseSalaryForCalc = safePayrollNumber(emp.base_salary); // Siempre usar el salario del contrato
       const dailyRate = baseSalaryForCalc > 0 ? roundMoney(baseSalaryForCalc / 30) : 0;
       // Regla quincenal: NO aplicar descuentos por inasistencias/tardanzas
-      const tardinessDiscount = payrollType === "Quincenal" ? 0 : roundMoney(lateRecords.length * dailyRate);
+      // Descuento por tardanzas: (salario_diario / 8) * (minutos_tardanza / 60).
+      // Se descuenta únicamente el tiempo de tardanza (en horas) sobre el valor hora,
+      // NO un día completo por cada tardanza. Los registros con tardanza ≤ 10 minutos
+      // (tolerancia) ya fueron excluidos al construir lateRecords.
+      const totalLateMinutes = lateRecords.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
+      const hourlyRate = dailyRate > 0 ? roundMoney(dailyRate / 8) : 0;
+      const tardinessDiscount = payrollType === "Quincenal" ? 0 : roundMoney(hourlyRate * (totalLateMinutes / 60));
+      // Descuento por inasistencias: un día de salario por cada falta completa.
       const absenceDiscount = payrollType === "Quincenal" ? 0 : roundMoney(absentRecords.length * dailyRate);
 
       // Buscar adelanto quincenal si es mensual.
