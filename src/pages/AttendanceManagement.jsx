@@ -973,6 +973,11 @@ export default function AttendanceManagement() {
         : isDayOff
           ? 'Día libre'
           : `${schedStRaw}–${schedEnRaw}`;
+      const condicionDia = !schedForRow
+        ? 'Sin horario programado'
+        : isDayOff
+          ? 'Día libre'
+          : 'Día laborable';
 
       // Buscar TODOS los incidentes para este empleado y fecha
       const incidentsForRow = freshIncidents.filter(
@@ -1085,6 +1090,7 @@ export default function AttendanceManagement() {
 
       return {
         'Horario Programado': horarioProg,
+        'Condición del día': condicionDia,
         'Fecha': rowDate,
         'Día': diaSemanaCap,
         'Tipo Doc': emp.document_type,
