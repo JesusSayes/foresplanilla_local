@@ -1049,6 +1049,7 @@ export default function AttendanceManagement() {
       const schedStartEx = schedForRowEx?.[stMap2[dowForRow2]] || "09:00";
       const schedEndEx   = schedForRowEx?.[enMap2[dowForRow2]] || "18:00";
       const isDayOffEx = schedForRowEx && (!schedForRowEx[stMap2[dowForRow2]] || !schedForRowEx[enMap2[dowForRow2]]);
+      const isUnscheduledDayEx = !schedForRowEx || isDayOffEx;
       const breakMinEx   = schedForRowEx?.break_duration_minutes ?? 60;
       const breakStEx    = schedForRowEx?.break_start || null;
 
@@ -1056,7 +1057,7 @@ export default function AttendanceManagement() {
         i => i.employee_id === emp.id && String(i.incident_date).slice(0, 10) === rowDate && i.status === 'Aprobada'
       );
 
-      let excelHours, excelLate;
+      let excelHours, excelLate, excelRawHours = 0;
       if (estadoMarcacion === 'Vacaciones') {
         excelHours = (schedForRowEx && !isDayOffEx) ? Math.max(0, (
           (parseInt(schedEndEx.split(':')[0]) * 60 + parseInt(schedEndEx.split(':')[1])) -
@@ -1071,8 +1072,10 @@ export default function AttendanceManagement() {
           schedEnd: schedEndEx,
           breakMinutes: breakMinEx,
           breakStart: breakStEx,
+          isUnscheduledDay: isUnscheduledDayEx,
         });
         excelHours = excelMetrics.totalWorkedHours;
+        excelRawHours = excelMetrics.rawWorkedHours;
         excelLate  = applyLateTolerance(
           excelMetrics.remainingLateMinutes,
           schedForRowEx?.tolerance_minutes ?? 10
@@ -1143,7 +1146,11 @@ export default function AttendanceManagement() {
         'Sede': emp.site || 'Sin sede',
         'Entrada': entradaExcel,
         'Salida': salidaExcel,
-        'Horas Marcadas': hoursDecimalToExcelFraction(emp.record?.regular_hours ?? emp.record?.worked_hours ?? 0),
+        'Horas Marcadas': hoursDecimalToExcelFraction(
+          (isUnscheduledDayEx && estadoMarcacion !== 'Vacaciones')
+            ? excelRawHours
+            : (emp.record?.regular_hours ?? emp.record?.worked_hours ?? 0)
+        ),
         'Horas Efectivas (marcadas+justificadas)': hoursDecimalToExcelFraction(excelHours),
         'Tardanza Efectiva (min)': excelLate,
         'HE 25%': hoursDecimalToExcelFraction(excelHE25),
@@ -1216,8 +1223,11 @@ export default function AttendanceManagement() {
     const dow = new Date(rowDate + "T00:00:00").getDay();
     const stMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
     const enMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-    const schedStart = schedForRow?.[stMap[dow]] || "09:00";
-    const schedEnd   = schedForRow?.[enMap[dow]] || "18:00";
+    const rawDayStart = schedForRow?.[stMap[dow]] || null;
+    const rawDayEnd   = schedForRow?.[enMap[dow]] || null;
+    const isUnscheduledDay = !schedForRow || !rawDayStart || !rawDayEnd;
+    const schedStart = rawDayStart || "09:00";
+    const schedEnd   = rawDayEnd || "18:00";
     const breakMin   = schedForRow?.break_duration_minutes ?? 60;
     const breakSt    = schedForRow?.break_start || null;
 
@@ -1233,6 +1243,7 @@ export default function AttendanceManagement() {
         schedEnd,
         breakMinutes: breakMin,
         breakStart: breakSt,
+        isUnscheduledDay,
       }),
       schedStart,
       schedEnd,
