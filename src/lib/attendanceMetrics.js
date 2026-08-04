@@ -64,7 +64,70 @@ export function calcEffectiveMetrics({
   schedEnd,
   breakMinutes = 60,
   breakStart = null,
+  isUnscheduledDay = false,
 }) {
+  // ── Día libre / sin horario programado, con marcaciones válidas ──────────
+  // Cuando no existe horario para la fecha (o es "Día libre"), no se recortan
+  // las marcaciones a un horario predeterminado (09:00–18:00).
+  //   Horas Marcadas = Σ (Salida − Entrada) por segmento (resta directa)
+  //   Horas Efectivas = Horas Marcadas + Horas Justificadas − Refrigerio (una vez, ≥ 0)
+  if (isUnscheduledDay) {
+    const segFields = [
+      ["clock_in", "clock_out"],
+      ["clock_in_2", "clock_out_2"],
+      ["clock_in_3", "clock_out_3"],
+      ["clock_in_4", "clock_out_4"],
+    ];
+    let rawMins = 0;
+    for (const [inField, outField] of segFields) {
+      const ci = record?.[inField] ? String(record[inField]).slice(0, 5) : null;
+      const co = record?.[outField] ? String(record[outField]).slice(0, 5) : null;
+      if (ci && co) {
+        let d = toMin(co) - toMin(ci);
+        if (d < 0) d += 1440; // cruce de medianoche
+        rawMins += Math.max(0, d);
+      }
+    }
+    // Unión de intervalos justificados aprobados (sin duplicar superpuestos)
+    const justIntervals = [];
+    for (const inc of approvedIncidents) {
+      if (inc.full_day_justification) continue; // sin horario → no se computa día completo
+      const js = inc.justified_time_start;
+      const je = inc.justified_time_end;
+      if (!js || !je) continue;
+      justIntervals.push([toMin(js), toMin(je)]);
+    }
+    justIntervals.sort((a, b) => a[0] - b[0]);
+    const mergedJust = [];
+    for (const [s, e] of justIntervals) {
+      if (mergedJust.length === 0 || s > mergedJust[mergedJust.length - 1][1]) {
+        mergedJust.push([s, e]);
+      } else {
+        mergedJust[mergedJust.length - 1][1] = Math.max(mergedJust[mergedJust.length - 1][1], e);
+      }
+    }
+    let justMins = 0;
+    for (const [s, e] of mergedJust) {
+      let d = e - s;
+      if (d < 0) d += 1440;
+      justMins += Math.max(0, d);
+    }
+    const effectiveBreak = Math.max(0, breakMinutes);
+    const totalMins = Math.max(0, rawMins + justMins - effectiveBreak);
+    return {
+      rawWorkedHours: rawMins / 60,
+      justifiedHours: justMins / 60,
+      totalWorkedHours: totalMins / 60,
+      fullDayHours: 0,
+      baseLateMinutes: 0,
+      remainingLateMinutes: 0,
+      lateMinutesJustified: 0,
+      coverageMinutes: totalMins,
+      intervals: [],
+      isUnscheduledDay: true,
+    };
+  }
+
   const schedStartMin = toMin(schedStart);
   const schedEndMin   = toMin(schedEnd);
   const isNightShift  = schedEndMin < schedStartMin;
