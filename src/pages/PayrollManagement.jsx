@@ -504,17 +504,28 @@ export default function PayrollManagement() {
         ? allEmployees
         : allEmployees.filter(emp => canAccessDepartment(emp.department_name));
     
-    // Filtrar solo empleados activos o cesados que aún tenían días en el periodo
+    // Validación general de superposición del vínculo laboral con el período:
+    //   - Excluir Suspendidos (comportamiento existente).
+    //   - Incluir solo si hire_date <= periodEnd (si hire_date existe; si está vacío, se incluye).
+    //   - Si termination_date existe, incluir solo si termination_date >= periodStart.
+    //   - Cesado sin termination_date: excluir (no se puede verificar superposición).
+    // Compara fechas normalizadas YYYY-MM-DD (lexicográfico) para evitar desfases de timezone.
+    const periodStartStr = `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-01`;
+    const lastDayNum = new Date(selectedYear, selectedMonth, 0).getDate();
+    const periodEndStr = `${selectedYear}-${String(selectedMonth).padStart(2,'0')}-${String(lastDayNum).padStart(2,'0')}`;
+
     filteredEmployees = filteredEmployees.filter(emp => {
-      // Excluir Suspendidos
       if (emp.status === "Suspendido") return false;
-      // Si cesado, verificar que la fecha de cese sea dentro o después del inicio del periodo
-      if (emp.status === "Cesado") {
-        if (!emp.termination_date) return false;
-        const termDate = new Date(emp.termination_date.split("T")[0]);
-        return termDate >= periodStart; // Cesó durante o antes del fin del periodo
+      if (emp.status === "Cesado" && !emp.termination_date) return false;
+      if (emp.hire_date) {
+        const hireDateStr = emp.hire_date.split("T")[0];
+        if (hireDateStr > periodEndStr) return false;
       }
-      return true; // Activo: incluir
+      if (emp.termination_date) {
+        const termDateStr = emp.termination_date.split("T")[0];
+        if (termDateStr < periodStartStr) return false;
+      }
+      return true;
     });
 
     // Filtrar por tipo de contrato según el tipo de planilla:
