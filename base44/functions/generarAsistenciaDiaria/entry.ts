@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
             overtime_hours_35:   0,
             is_late:             false,
             late_minutes:        0,
-            is_absent:           !isExempt,
+            is_absent:           false,
             overtime_authorized: schedule.overtime_authorized || false,
             status:              isExempt ? "Completo" : "Ausente",
             notes:               isExempt

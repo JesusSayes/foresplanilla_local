@@ -152,7 +152,7 @@ export async function backfillAsistenciaEmpleado({ employee_id, date_from = "202
       overtime_authorized: overtimeAuth,
       is_late:             false,
       late_minutes:        0,
-      is_absent:           !isExempt,
+      is_absent:           false,
       status:              isExempt ? "Completo" : "Ausente",
       notes:               isExempt
         ? "Registro automático - Exonerado de marcación física"

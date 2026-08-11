@@ -290,7 +290,7 @@ const recalcularTodaAsistenciaService = {
             overtime_hours_35: metrics.overtime_hours_35,
             is_late: metrics.is_late,
             late_minutes: metrics.late_minutes,
-            is_absent: metrics.is_absent,
+            is_absent: status === "Ausente",
             scheduled_start:
               metrics.scheduled_start || record.scheduled_start,
             scheduled_end:
