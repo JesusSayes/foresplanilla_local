@@ -718,13 +718,25 @@ export default function PayrollManagement() {
         ? 0
         : empAttendance.filter(r => r.status === "Justificado").length;
       
+      // Horas extras y nocturnas calculadas desde los registros de asistencia del periodo.
+      // horas_nocturnas: los registros de asistencia aún no cuentan con un campo dedicado,
+      // por lo que se conserva en 0 hasta que exista una fuente de datos válida para calcularlas.
+      const overtimeHours25 = empAttendance.reduce(
+        (sum, record) => sum + Number(record.overtime_hours_25 || 0), 0
+      );
+      const overtimeHours35 = empAttendance.reduce(
+        (sum, record) => sum + Number(record.overtime_hours_35 || 0), 0
+      );
+      const nightHours = empAttendance.reduce(
+        (sum, record) => sum + Number(record.horas_nocturnas ?? record.night_hours ?? 0), 0
+      );
       const attendanceData = {
         worked_days: workedDays,
         regular_hours: empAttendance.reduce((sum, r) => sum + (r.worked_hours || 0), 0),
-        overtime_hours: 0,
-        horas_extras_25: 0,
-        horas_extras_35: 0,
-        horas_nocturnas: 0,
+        overtime_hours: overtimeHours25 + overtimeHours35,
+        horas_extras_25: overtimeHours25,
+        horas_extras_35: overtimeHours35,
+        horas_nocturnas: nightHours,
       };
 
       // Conceptos fijos del empleado (actividad, alimento, movilidad)
@@ -956,7 +968,10 @@ export default function PayrollManagement() {
         activity_cost_amount: roundMoney(findCalculatedCost(result.incomes, "activity_cost", ["actividad", "costo actividad"])),
         food_cost_amount: roundMoney(findCalculatedCost(result.incomes, "food_cost", ["alimentación", "costo alimentación", "costo alimento"])),
         transport_cost_amount: roundMoney(findCalculatedCost(result.incomes, "transport_cost", ["movilidad", "costo movilidad"])),
-        overtime_pay: 0,
+        // overtime_pay: suma monetaria de los conceptos de Horas Extras (25%, 35% y, si
+        // existe, horas nocturnas) calculados por el motor. Ya están incluidos en
+        // total_income vía result.totals.totalIncome, por lo que no se agregan nuevamente.
+        overtime_pay: roundMoney(sumIncomesByCategory(result.incomes, "Horas Extras")),
         // Bonificaciones: suma de conceptos de ingreso calculados con categoría "Bonificaciones".
         // La asignación familiar queda excluida (tiene categoría "Asignaciones" y su propia columna).
         bonuses: roundMoney(sumIncomesByCategory(result.incomes, "Bonificaciones")),
