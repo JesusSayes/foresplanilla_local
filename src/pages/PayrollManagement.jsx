@@ -943,7 +943,7 @@ export default function PayrollManagement() {
         advance_payment_id: advancePaymentId,
         worked_days: workedDays,
         subsidized_days: subsidizedDays,
-        non_worked_days: payrollType === "Quincenal" ? 0 : empAttendance.filter(r => r.status === "Ausente").length,
+        non_worked_days: payrollType === "Quincenal" ? 0 : absentRecords.length,
         regular_hours: attendanceData.regular_hours,
         overtime_hours: empAttendance.reduce((sum, r) => sum + (r.overtime_hours_25 || 0) + (r.overtime_hours_35 || 0), 0),
         // Remuneración base calculada: suma de ingresos con categoría "Remuneración Base".
