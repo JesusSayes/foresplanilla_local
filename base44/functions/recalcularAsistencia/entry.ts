@@ -284,7 +284,7 @@ Deno.serve(async (req) => {
         overtime_hours_35: finalOT35,
         is_late: finalIsLate,
         late_minutes: finalLate,
-        is_absent: metrics.is_absent,
+        is_absent: finalStatus === "Ausente",
         scheduled_start: metrics.scheduled_start || record.scheduled_start,
         scheduled_end: metrics.scheduled_end || record.scheduled_end,
         status: finalStatus,
