@@ -155,13 +155,18 @@ export default function ManagerApprovals() {
   };
 
   // Crea/sobreescribe registros de asistencia para cada día del período de vacaciones
-  const createAttendanceRecordsForVacation = async (request) => {
+  // o permiso sin goce. Para permiso sin goce usa el status "Permiso sin goce" y
+  // ajusta las horas según sea día completo o por horas.
+  const createAttendanceRecordsForLeave = async (request) => {
     const startStr = extractDateStr(request.start_date);
     const endStr = extractDateStr(request.end_date);
     if (!startStr || !endStr) {
-      console.error("[Vacaciones] Fechas inválidas:", request.start_date, request.end_date);
+      console.error("[Asistencia] Fechas inválidas:", request.start_date, request.end_date);
       return;
     }
+
+    const isSinGoce = request.request_type === "Permiso sin goce";
+    const isFullDay = request.is_full_day !== false; // default true
 
     // Obtener horarios y datos del empleado
     const [allSchedules, empData] = await Promise.all([
@@ -195,12 +200,63 @@ export default function ManagerApprovals() {
       existingByDate[normalizedDate] = r;
     });
 
-    const vacationPayload = (dateStr) => {
+    // Horas solicitadas para permiso sin goce por horas
+    const hoursRequested = Number(request.hours_requested || 0);
+
+    const buildPayload = (dateStr) => {
       const { start, end } = getScheduledTimesForDate(allSchedules, request.employee_id, empDeptName, dateStr);
-      // Calcular horas trabajadas según horario real
       const [sh, sm2] = start.split(":").map(Number);
       const [eh, em2] = end.split(":").map(Number);
-      const workedHours = Math.max(0, ((eh * 60 + em2) - (sh * 60 + sm2)) / 60);
+      const scheduledWorkedHours = Math.max(0, ((eh * 60 + em2) - (sh * 60 + sm2)) / 60);
+
+      // Permiso sin goce: status dedicado, no cuenta como falta ni trabajado
+      if (isSinGoce) {
+        if (isFullDay) {
+          // Día completo: no se trabajó, no se descuenta como falta (el descuento
+          // viene del prorrateo al restar el día de worked_days en nómina).
+          return {
+            employee_id: request.employee_id,
+            date: dateStr,
+            clock_in: null,
+            clock_out: null,
+            scheduled_start: start,
+            scheduled_end: end,
+            worked_hours: 0,
+            regular_hours: 0,
+            overtime_hours_25: 0,
+            overtime_hours_35: 0,
+            overtime_authorized: false,
+            is_late: false,
+            late_minutes: 0,
+            is_absent: false,
+            status: "Permiso sin goce",
+            notes: "Permiso sin goce (día completo)",
+          };
+        }
+        // Por horas: se trabajó el día menos las horas de permiso. El descuento
+        // monetario viene del PayrollConcept; aquí solo ajustamos las horas.
+        const adjustedHours = Math.max(0, scheduledWorkedHours - hoursRequested);
+        return {
+          employee_id: request.employee_id,
+          date: dateStr,
+          clock_in: start,
+          clock_out: end,
+          scheduled_start: start,
+          scheduled_end: end,
+          worked_hours: adjustedHours,
+          regular_hours: adjustedHours,
+          overtime_hours_25: 0,
+          overtime_hours_35: 0,
+          overtime_authorized: false,
+          is_late: false,
+          late_minutes: 0,
+          is_absent: false,
+          status: "Permiso sin goce",
+          notes: `Permiso sin goce (horas): ${request.time_start || ""} - ${request.time_end || ""}`,
+        };
+      }
+
+      // Vacaciones / Permiso con goce / Licencia médica: status "Vacaciones"
       return {
         employee_id: request.employee_id,
         date: dateStr,
@@ -208,8 +264,8 @@ export default function ManagerApprovals() {
         clock_out: end,
         scheduled_start: start,
         scheduled_end: end,
-        worked_hours: workedHours,
-        regular_hours: workedHours,
+        worked_hours: scheduledWorkedHours,
+        regular_hours: scheduledWorkedHours,
         overtime_hours_25: 0,
         overtime_hours_35: 0,
         overtime_authorized: false,
@@ -217,7 +273,7 @@ export default function ManagerApprovals() {
         late_minutes: 0,
         is_absent: false,
         status: "Vacaciones",
-        notes: `Vacaciones aprobadas (${request.request_type})`,
+        notes: `${request.request_type} aprobado`,
       };
     };
 
@@ -225,14 +281,54 @@ export default function ManagerApprovals() {
     let updated = 0;
     for (const dateStr of allDates) {
       if (existingByDate[dateStr]) {
-        await base44.entities.AttendanceRecord.update(existingByDate[dateStr].id, vacationPayload(dateStr));
+        await base44.entities.AttendanceRecord.update(existingByDate[dateStr].id, buildPayload(dateStr));
         updated++;
       } else {
-        await base44.entities.AttendanceRecord.create(vacationPayload(dateStr));
+        await base44.entities.AttendanceRecord.create(buildPayload(dateStr));
         created++;
       }
     }
-    console.log(`[Vacaciones] Asistencia procesada: ${created} creados, ${updated} actualizados.`);
+    console.log(`[Asistencia] ${request.request_type}: ${created} creados, ${updated} actualizados.`);
+  };
+
+  // Crea un PayrollConcept de descuento para permiso sin goce POR HORAS.
+  // Evita duplicados verificando si ya existe un concepto del mismo nombre/mes/año.
+  const createSinGoceHoursConcept = async (request, emp) => {
+    if (!emp || !emp.base_salary) return;
+    const dayStr = extractDateStr(request.start_date) || request.start_date;
+    const [y, m] = dayStr.split("-").map(Number);
+    const hoursRequested = Number(request.hours_requested || 0);
+    if (hoursRequested <= 0) return;
+
+    // Evitar duplicado: si ya existe un concepto de permiso sin goce (horas) para
+    // este empleado/mes/año, no crear otro.
+    const existing = await base44.entities.PayrollConcept.filter({
+      employee_id: request.employee_id,
+      month: m,
+      year: y,
+    });
+    const alreadyExists = (existing || []).some(
+      c => c.concept_name === "Permiso sin goce (horas)"
+    );
+    if (alreadyExists) return;
+
+    const hourlyRate = (emp.base_salary / 30) / 8;
+    const discountAmount = Math.round(hourlyRate * hoursRequested * 100) / 100;
+
+    await base44.entities.PayrollConcept.create({
+      employee_id: request.employee_id,
+      concept_type: "Descuento",
+      concept_category: "Descuentos Varios",
+      concept_name: "Permiso sin goce (horas)",
+      amount: discountAmount,
+      is_dynamic: false,
+      month: m,
+      year: y,
+      is_recurring: false,
+      is_applied: false,
+      applies_to_payroll_types: ["Mensual", "Adicional", "SNP"],
+      notes: `Descuento por ${hoursRequested} horas de permiso sin goce (${format(parseDateLima(request.start_date), "dd/MM/yyyy")})`,
+    });
   };
 
   const updateRequestMutation = useMutation({
@@ -256,31 +352,16 @@ export default function ManagerApprovals() {
           }
         }
         
-        // Si es permiso sin goce, crear concepto de descuento en planilla
-        if (request.request_type === "Permiso sin goce") {
+        // Permiso sin goce: descuento monetario SOLO para permisos por horas.
+        // Los de día completo se descuentan restando días trabajados en nómina
+        // (prorrateo de remuneración base), sin concepto de descuento.
+        if (request.request_type === "Permiso sin goce" && request.is_full_day === false) {
           const emp = employees.find(e => e.id === request.employee_id);
-          if (emp && emp.base_salary) {
-            const startDateStr = extractDateStr(request.start_date) || request.start_date;
-            const [startY, startM] = startDateStr.split("-").map(Number);
-            const discountAmount = (emp.base_salary / 30) * request.total_days;
-            
-            await base44.entities.PayrollConcept.create({
-              employee_id: request.employee_id,
-              concept_type: "Descuento",
-              concept_name: "Permiso sin goce",
-              amount: discountAmount,
-              is_dynamic: false,
-              month: startM,
-              year: startY,
-              is_recurring: false,
-              is_applied: false,
-              notes: `Descuento por ${request.total_days} días de permiso sin goce (${format(parseDateLima(request.start_date), "dd/MM/yyyy")} - ${format(parseDateLima(request.end_date), "dd/MM/yyyy")})`
-            });
-          }
+          await createSinGoceHoursConcept(request, emp);
         }
 
         // Crear/sobreescribir registros de asistencia para TODOS los días del período
-        await createAttendanceRecordsForVacation(request);
+        await createAttendanceRecordsForLeave(request);
       }
       
       return updatedRequest;

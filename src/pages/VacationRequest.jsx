@@ -155,6 +155,27 @@ export default function VacationRequest() {
       return;
     }
 
+    // Validación de permiso por horas: el rango horario debe ser válido
+    if (!formData.is_full_day) {
+      if (!formData.start_time || !formData.end_time) {
+        toast.error("Por favor ingresa la hora de inicio y fin del permiso");
+        return;
+      }
+      const [sh, sm] = formData.start_time.split(":").map(Number);
+      const [eh, em] = formData.end_time.split(":").map(Number);
+      const startMin = sh * 60 + sm;
+      const endMin = eh * 60 + em;
+      if (endMin <= startMin) {
+        toast.error("La hora de fin debe ser mayor a la hora de inicio");
+        return;
+      }
+      const hoursRequested = Number(((endMin - startMin) / 60).toFixed(2));
+      if (hoursRequested <= 0) {
+        toast.error("Las horas solicitadas deben ser mayores a 0");
+        return;
+      }
+    }
+
     // Convertir el Date del picker a string "yyyy-MM-dd" en zona local (evita desfase UTC)
     const startStr = dateToStringLima(formData.start_date);
     const endStr = dateToStringLima(formData.end_date);
@@ -164,6 +185,14 @@ export default function VacationRequest() {
     const totalDays = differenceInDays(endForCalc, startForCalc) + 1;
     const businessDays = differenceInBusinessDays(endForCalc, startForCalc) + 1;
 
+    // Horas solicitadas para permiso por horas
+    let hoursRequested = 0;
+    if (!formData.is_full_day) {
+      const [sh, sm] = formData.start_time.split(":").map(Number);
+      const [eh, em] = formData.end_time.split(":").map(Number);
+      hoursRequested = Number((((eh * 60 + em) - (sh * 60 + sm)) / 60).toFixed(2));
+    }
+
     const requestData = {
       employee_id: employeeIdToUse,
       request_type: formData.request_type,
@@ -171,6 +200,10 @@ export default function VacationRequest() {
       end_date: endStr,
       total_days: formData.is_full_day ? totalDays : 1,
       business_days: formData.is_full_day ? businessDays : 1,
+      is_full_day: formData.is_full_day,
+      hours_requested: formData.is_full_day ? 0 : hoursRequested,
+      time_start: formData.is_full_day ? null : formData.start_time,
+      time_end: formData.is_full_day ? null : formData.end_time,
       reason: formData.reason,
       supporting_document_url: formData.supporting_document_url,
       status: "Pendiente",
@@ -460,6 +493,9 @@ export default function VacationRequest() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Vacaciones">Vacaciones</SelectItem>
+                          <SelectItem value="Permiso sin goce">Permiso sin goce</SelectItem>
+                          <SelectItem value="Permiso con goce">Permiso con goce</SelectItem>
+                          <SelectItem value="Licencia médica">Licencia médica</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

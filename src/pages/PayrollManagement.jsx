@@ -713,6 +713,13 @@ export default function PayrollManagement() {
         workedDays = 30; // mes completo → siempre 30
       }
       if (workedDays < 0) workedDays = 0;
+      // Permiso sin goce (día completo): restar de días trabajados. El descuento
+      // viene del prorrateo de la remuneración base al reducir worked_days.
+      // Los permisos por horas no restan días (su descuento es un PayrollConcept).
+      const sinGoceFullDays = payrollType === "Quincenal"
+        ? 0
+        : empAttendance.filter(r => r.status === "Permiso sin goce" && (r.notes || "").includes("día completo")).length;
+      workedDays = Math.max(0, workedDays - sinGoceFullDays);
       // Días subsidiados: justificaciones aprobadas que cubren el día completo (descanso médico, etc.)
       const subsidizedDays = payrollType === "Quincenal"
         ? 0
