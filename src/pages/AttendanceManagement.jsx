@@ -32,6 +32,9 @@ import AttendanceEditRequestsPanel from "../components/attendance/AttendanceEdit
 import AttendanceValidationModal from "../components/attendance/AttendanceValidationModal";
 import IncidentDetailModal from "../components/attendance/IncidentDetailModal";
 import PaginationBar from "@/components/ui/PaginationBar";
+import PeriodApprovalModal from "../components/attendance/PeriodApprovalModal";
+import IncidentsTabContent from "../components/attendance/IncidentsTabContent";
+import SolicitudesPeriodoTab from "../components/attendance/SolicitudesPeriodoTab";
 
 
 export default function AttendanceManagement() {
@@ -68,6 +71,16 @@ export default function AttendanceManagement() {
   const [incidentPage, setIncidentPage] = useState(1);
   const [incidentSubTab, setIncidentSubTab] = useState("pending");
   const INCIDENT_PAGE_SIZE = 20;
+
+  // Aprobación/rechazo masivo por periodo
+  const [periodAction, setPeriodAction] = useState(null); // { group, mode }
+  const [periodLoading, setPeriodLoading] = useState(false);
+
+  // Filtros de la vista "Solicitudes por periodo"
+  const [solSearchTerm, setSolSearchTerm] = useState("");
+  const [solStatusFilter, setSolStatusFilter] = useState("Pendiente");
+  const [solDateFrom, setSolDateFrom] = useState("");
+  const [solDateTo, setSolDateTo] = useState("");
 
   const [overtimeSearchTerm, setOvertimeSearchTerm] = useState("");
   const [overtimeDateFilter, setOvertimeDateFilter] = useState("");
@@ -494,58 +507,73 @@ export default function AttendanceManagement() {
     }
   };
 
+  // Ejecuta la aprobación de un único incidente (comentario parametrizable).
+  // Usado por el flujo individual y por la aprobación masiva por periodo.
+  const executeApprove = async (incident, comments) => {
+    await base44.entities.AttendanceIncident.update(incident.id, {
+      status: "Aprobada",
+      reviewed_by: `${effectiveEmployee?.first_name} ${effectiveEmployee?.last_name}`,
+      review_date: todayLima(),
+      review_comments: comments || "Aprobada",
+    });
+
+    // Si el tipo de incidente es "Permiso", actualizar clock_in/clock_out del registro
+    const incType = incidentTypes.find(t => t.name === incident.incident_type);
+    if (incType?.affectation === "Permiso") {
+      const dateStr = incident.incident_date;
+      const sched = getEmployeeScheduleForDate(incident.employee_id, dateStr);
+      const dow = new Date(dateStr + "T00:00:00").getDay();
+      const dayStarts = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+      const dayEnds = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+      const sStart = sched?.[dayStarts[dow]] || "09:00";
+      const sEnd = sched?.[dayEnds[dow]] || "18:00";
+
+      const existingRecords = await base44.entities.AttendanceRecord.filter({
+        employee_id: incident.employee_id,
+        date: dateStr,
+      });
+      const record = existingRecords?.[0];
+      if (record) {
+        await base44.entities.AttendanceRecord.update(record.id, {
+          clock_in: sStart,
+          clock_out: sEnd,
+        });
+      } else {
+        await base44.entities.AttendanceRecord.create({
+          employee_id: incident.employee_id,
+          date: dateStr,
+          clock_in: sStart,
+          clock_out: sEnd,
+          scheduled_start: sStart,
+          scheduled_end: sEnd,
+          status: "Justificado",
+          is_absent: false,
+        });
+      }
+    }
+
+    // Recalcular tardanzas y HE
+    await base44.functions.invoke("recalcularAsistencia", {
+      employee_id: incident.employee_id,
+      date_from: incident.incident_date,
+      date_to: incident.incident_date,
+    });
+  };
+
+  // Ejecuta el rechazo de un único incidente.
+  const executeReject = async (incident, comments) => {
+    await base44.entities.AttendanceIncident.update(incident.id, {
+      status: "Rechazada",
+      reviewed_by: `${effectiveEmployee?.first_name} ${effectiveEmployee?.last_name}`,
+      review_date: todayLima(),
+      review_comments: comments,
+    });
+  };
+
   const handleApproveIncident = async (incident) => {
     setIsApproving(true);
     try {
-      await base44.entities.AttendanceIncident.update(incident.id, {
-        status: "Aprobada",
-        reviewed_by: `${effectiveEmployee?.first_name} ${effectiveEmployee?.last_name}`,
-        review_date: todayLima(),
-        review_comments: reviewComments || "Aprobada",
-      });
-
-      // Si el tipo de incidente es "Permiso", actualizar clock_in/clock_out del registro
-      const incType = incidentTypes.find(t => t.name === incident.incident_type);
-      if (incType?.affectation === "Permiso") {
-        const dateStr = incident.incident_date;
-        const sched = getEmployeeScheduleForDate(incident.employee_id, dateStr);
-        const dow = new Date(dateStr + "T00:00:00").getDay();
-        const dayStarts = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
-        const dayEnds = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-        const sStart = sched?.[dayStarts[dow]] || "09:00";
-        const sEnd = sched?.[dayEnds[dow]] || "18:00";
-
-        const existingRecords = await base44.entities.AttendanceRecord.filter({
-          employee_id: incident.employee_id,
-          date: dateStr,
-        });
-        const record = existingRecords?.[0];
-        if (record) {
-          await base44.entities.AttendanceRecord.update(record.id, {
-            clock_in: sStart,
-            clock_out: sEnd,
-          });
-        } else {
-          await base44.entities.AttendanceRecord.create({
-            employee_id: incident.employee_id,
-            date: dateStr,
-            clock_in: sStart,
-            clock_out: sEnd,
-            scheduled_start: sStart,
-            scheduled_end: sEnd,
-            status: "Justificado",
-            is_absent: false,
-          });
-        }
-      }
-
-      // Recalcular tardanzas y HE
-      await base44.functions.invoke("recalcularAsistencia", {
-        employee_id: incident.employee_id,
-        date_from: incident.incident_date,
-        date_to: incident.incident_date,
-      });
-
+      await executeApprove(incident, reviewComments || "Aprobada");
       queryClient.invalidateQueries(["allIncidents"]);
       queryClient.invalidateQueries(["todayAttendance"]);
       toast.success("Justificación aprobada correctamente");
@@ -573,6 +601,43 @@ export default function AttendanceManagement() {
         review_comments: reviewComments,
       }
     });
+  };
+
+  // Confirmar la acción masiva sobre un grupo (periodo). Solo afecta a los
+  // incidentes Pendiente del grupo y recalcula cada fecha aprobada.
+  const confirmPeriodAction = async (comments) => {
+    if (!periodAction) return;
+    const { group, mode } = periodAction;
+    if (mode === "reject" && !comments.trim()) {
+      toast.error("Debes ingresar un motivo de rechazo");
+      return;
+    }
+    const pending = group.incidents.filter(i => i.status === "Pendiente");
+    const skipped = group.incidents.length - pending.length;
+    setPeriodLoading(true);
+    let done = 0;
+    let errors = 0;
+    for (const inc of pending) {
+      try {
+        if (mode === "approve") {
+          await executeApprove(inc, comments || "Aprobada");
+        } else {
+          await executeReject(inc, comments);
+        }
+        done++;
+      } catch (e) {
+        errors++;
+      }
+    }
+    queryClient.invalidateQueries(["allIncidents"]);
+    queryClient.invalidateQueries(["todayAttendance"]);
+    setPeriodLoading(false);
+    setPeriodAction(null);
+    const verb = mode === "approve" ? "aprobada(s)" : "rechazada(s)";
+    const parts = [`${done} fecha(s) ${verb}`];
+    if (skipped > 0) parts.push(`${skipped} ya resuelta(s)`);
+    if (errors > 0) parts.push(`${errors} error(es)`);
+    toast.success(parts.join(" · "));
   };
 
   const [justifyingSchedule, setJustifyingSchedule] = useState(null);
@@ -1391,7 +1456,7 @@ export default function AttendanceManagement() {
 
           <Tabs defaultValue="attendance" className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full sm:w-auto">
+              <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full sm:w-auto">
                 <TabsTrigger value="attendance">
                   Asistencia del Día
                   {employeesWithRecords.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{employeesWithRecords.length}</Badge>}
@@ -1399,6 +1464,9 @@ export default function AttendanceManagement() {
                 <TabsTrigger value="incidents">
                   Justificaciones
                   {allIncidents.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{allIncidents.length}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="solicitudes">
+                  Solicitudes por Periodo
                 </TabsTrigger>
                 <TabsTrigger value="overtime-alerts">
                   Alertas HE
@@ -2017,203 +2085,46 @@ export default function AttendanceManagement() {
                          </TabsContent>
 
             {/* Incidents Tab */}
-            <TabsContent value="incidents" className="space-y-4">
-              {/* Filtros globales de justificaciones */}
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative flex-1 min-w-[180px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <Input placeholder="Buscar por nombre..." value={incidentSearchTerm} onChange={(e) => { setIncidentSearchTerm(e.target.value); setIncidentPage(1); }} className="pl-9" />
-                </div>
-                <Select value={incidentTypeFilter} onValueChange={(v) => { setIncidentTypeFilter(v); setIncidentPage(1); }}>
-                  <SelectTrigger className="w-52"><SelectValue placeholder="Tipo de incidente" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los tipos</SelectItem>
-                    {[...new Set(allIncidents.map(i => i.incident_type).filter(Boolean))].sort().map(t => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input type="date" value={incidentDateFilter} onChange={(e) => { setIncidentDateFilter(e.target.value); setIncidentPage(1); }} className="w-40" title="Filtrar por fecha" />
-                {incidentDateFilter && <Button size="sm" variant="outline" onClick={() => { setIncidentDateFilter(""); setIncidentPage(1); }}>✕ Fecha</Button>}
-                <Button size="sm" variant="outline" className="bg-green-600 text-white hover:bg-green-700" onClick={handleExportIncidentsExcel}>
-                  <Download className="w-4 h-4 mr-1" />Excel
-                </Button>
-                <div className="ml-auto">
-                  <PaginationBar inline currentPage={incidentPage} totalItems={applyIncidentFilters(allIncidents).length} pageSize={INCIDENT_PAGE_SIZE} onPageChange={setIncidentPage} />
-                </div>
-              </div>
-              <Tabs value={incidentSubTab} onValueChange={(v) => { setIncidentSubTab(v); setIncidentPage(1); }}>
-                <TabsList className="grid w-full max-w-xl grid-cols-3 mb-6">
-                  <TabsTrigger value="pending">Pendientes {pendingIncidents.length > 0 && <Badge className="ml-2 bg-orange-600 text-white">{pendingIncidents.length}</Badge>}</TabsTrigger>
-                  <TabsTrigger value="approved">Aprobadas {approvedIncidents.length > 0 && <Badge className="ml-2 bg-green-600 text-white">{approvedIncidents.length}</Badge>}</TabsTrigger>
-                  <TabsTrigger value="rejected">Rechazadas {rejectedIncidents.length > 0 && <Badge className="ml-2 bg-red-600 text-white">{rejectedIncidents.length}</Badge>}</TabsTrigger>
-                </TabsList>
+            <IncidentsTabContent
+              allIncidents={allIncidents}
+              pendingIncidents={pendingIncidents}
+              approvedIncidents={approvedIncidents}
+              rejectedIncidents={rejectedIncidents}
+              allEmployees={allEmployees}
+              incidentSearchTerm={incidentSearchTerm}
+              setIncidentSearchTerm={setIncidentSearchTerm}
+              incidentTypeFilter={incidentTypeFilter}
+              setIncidentTypeFilter={setIncidentTypeFilter}
+              incidentDateFilter={incidentDateFilter}
+              setIncidentDateFilter={setIncidentDateFilter}
+              incidentPage={incidentPage}
+              setIncidentPage={setIncidentPage}
+              INCIDENT_PAGE_SIZE={INCIDENT_PAGE_SIZE}
+              incidentSubTab={incidentSubTab}
+              setIncidentSubTab={setIncidentSubTab}
+              applyIncidentFilters={applyIncidentFilters}
+              canApproveIncidents={canApproveIncidents}
+              onReview={(incident) => { setReviewingIncident(incident); setShowIncidentModal(true); }}
+              onPeriodAction={(group, mode) => setPeriodAction({ group, mode })}
+              onExportIncidentsExcel={handleExportIncidentsExcel}
+            />
 
-                <TabsContent value="pending">
-                  <Card className="border-0 shadow-lg">
-                    <CardHeader className="border-b bg-slate-50/50"><CardTitle className="text-xl font-bold">Justificaciones Pendientes de Aprobación</CardTitle></CardHeader>
-                    <CardContent className="p-6">
-                      {(() => {
-                        const filtered = applyIncidentFilters(pendingIncidents);
-                        const paged = filtered.slice((incidentPage - 1) * INCIDENT_PAGE_SIZE, incidentPage * INCIDENT_PAGE_SIZE);
-                        return filtered.length === 0 ? (
-                          <div className="text-center py-12"><CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones pendientes</p></div>
-                        ) : (
-                          <>
-                          <div className="space-y-4">
-                          {paged.map(incident => {
-                            const emp = allEmployees.find(e => e.id === incident.employee_id);
-                            return (
-                              <div key={incident.id} className="p-4 border border-slate-200 rounded-lg">
-                                <div className="flex items-start justify-between mb-4">
-                                  <div className="flex-1">
-                                    <h4 className="font-bold text-slate-900 mb-1">{emp ? `${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                    <p className="text-sm text-slate-600 mb-2">{emp?.position}</p>
-                                    <div className="flex gap-4 text-sm">
-                                      <Badge className="bg-orange-100 text-orange-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(parseDateLima(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="p-3 bg-slate-50 rounded-lg mb-4">
-                                  <p className="text-sm font-semibold text-slate-900 mb-1">Justificación:</p>
-                                  <p className="text-sm text-slate-700">{incident.justification}</p>
-                                </div>
-                                {incident.supporting_document_url && (
-                                  <div className="mb-4">
-                                    <a href={incident.supporting_document_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:underline bg-indigo-50 px-3 py-2 rounded-lg">
-                                      <Download className="w-4 h-4" />Ver documento adjunto
-                                    </a>
-                                  </div>
-                                )}
-                                {canApproveIncidents ? (
-                                <div className="flex gap-3">
-                                  <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => { setReviewingIncident(incident); setShowIncidentModal(true); }}>
-                                    <CheckCircle className="w-4 h-4 mr-2" />Aprobar
-                                  </Button>
-                                  <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setReviewingIncident(incident); setShowIncidentModal(true); }}>
-                                    <XCircle className="w-4 h-4 mr-2" />Rechazar
-                                  </Button>
-                                </div>
-                                ) : (
-                                  <p className="text-xs text-slate-500 text-center py-2">No tienes permisos para aprobar o rechazar justificaciones.</p>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                          </>
-                        );
-                      })()}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="approved">
-                  <Card className="border-0 shadow-lg">
-                    <CardHeader className="border-b bg-green-50/50"><CardTitle className="text-xl font-bold flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-600" />Justificaciones Aprobadas</CardTitle></CardHeader>
-                    <CardContent className="p-6">
-                      {(() => {
-                        const filtered = applyIncidentFilters(approvedIncidents);
-                        const paged = filtered.slice((incidentPage - 1) * INCIDENT_PAGE_SIZE, incidentPage * INCIDENT_PAGE_SIZE);
-                        return filtered.length === 0 ? (
-                          <div className="text-center py-12"><AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones aprobadas</p></div>
-                        ) : (
-                          <>
-                          <div className="space-y-4">
-                          {paged.map(incident => {
-                            const emp = allEmployees.find(e => e.id === incident.employee_id);
-                            return (
-                              <div key={incident.id} className="p-4 border border-green-200 bg-green-50/30 rounded-lg">
-                                <div className="flex items-start justify-between mb-4">
-                                  <div className="flex-1">
-                                    <h4 className="font-bold text-slate-900 mb-1">{emp ? `${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                    <p className="text-sm text-slate-600 mb-2">{emp?.position}</p>
-                                    <div className="flex gap-4 text-sm flex-wrap">
-                                      <Badge className="bg-green-100 text-green-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(parseDateLima(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
-                                      <Badge className="bg-green-600 text-white">Aprobada</Badge>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="p-3 bg-white rounded-lg mb-3">
-                                  <p className="text-sm font-semibold text-slate-900 mb-1">Justificación:</p>
-                                  <p className="text-sm text-slate-700">{incident.justification}</p>
-                                </div>
-                                {incident.review_comments && (
-                                  <div className="p-3 bg-green-100 border border-green-200 rounded-lg mb-3">
-                                    <p className="text-sm font-semibold text-green-900 mb-1">Comentarios de aprobación:</p>
-                                    <p className="text-sm text-green-800">{incident.review_comments}</p>
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-4 text-xs text-slate-600">
-                                  <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
-                                  <span>Fecha: {incident.review_date ? format(parseDateLima(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                          </div>
-                          </>
-                          );
-                          })()}
-                          </CardContent>
-                          </Card>
-                          </TabsContent>
-
-                          <TabsContent value="rejected">
-                  <Card className="border-0 shadow-lg">
-                    <CardHeader className="border-b bg-red-50/50"><CardTitle className="text-xl font-bold flex items-center gap-2"><XCircle className="w-5 h-5 text-red-600" />Justificaciones Rechazadas</CardTitle></CardHeader>
-                    <CardContent className="p-6">
-                      {(() => {
-                        const filtered = applyIncidentFilters(rejectedIncidents);
-                        const paged = filtered.slice((incidentPage - 1) * INCIDENT_PAGE_SIZE, incidentPage * INCIDENT_PAGE_SIZE);
-                        return filtered.length === 0 ? (
-                          <div className="text-center py-12"><AlertCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" /><p className="text-slate-600">No hay justificaciones rechazadas</p></div>
-                        ) : (
-                          <>
-                          <div className="space-y-4">
-                          {paged.map(incident => {
-                            const emp = allEmployees.find(e => e.id === incident.employee_id);
-                            return (
-                              <div key={incident.id} className="p-4 border border-red-200 bg-red-50/30 rounded-lg">
-                                <div className="flex items-start justify-between mb-4">
-                                  <div className="flex-1">
-                                    <h4 className="font-bold text-slate-900 mb-1">{emp ? `${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                    <p className="text-sm text-slate-600 mb-2">{emp?.position}</p>
-                                    <div className="flex gap-4 text-sm flex-wrap">
-                                      <Badge className="bg-red-100 text-red-700">{incident.incident_type}</Badge>
-                                      <span className="text-slate-600">📅 {format(parseDateLima(incident.incident_date), "dd MMM yyyy", { locale: es })}</span>
-                                      <Badge className="bg-red-600 text-white">Rechazada</Badge>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="p-3 bg-white rounded-lg mb-3">
-                                  <p className="text-sm font-semibold text-slate-900 mb-1">Justificación:</p>
-                                  <p className="text-sm text-slate-700">{incident.justification}</p>
-                                </div>
-                                {incident.review_comments && (
-                                  <div className="p-3 bg-red-100 border border-red-200 rounded-lg mb-3">
-                                    <p className="text-sm font-semibold text-red-900 mb-1">Motivo de rechazo:</p>
-                                    <p className="text-sm text-red-800">{incident.review_comments}</p>
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-4 text-xs text-slate-600">
-                                  <span>Revisado por: {incident.reviewed_by || "N/A"}</span><span>•</span>
-                                  <span>Fecha: {incident.review_date ? format(parseDateLima(incident.review_date), "dd MMM yyyy", { locale: es }) : "N/A"}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                          </div>
-                          </>
-                          );
-                          })()}
-                          </CardContent>
-                          </Card>
-                          </TabsContent>
-                          </Tabs>
-                          </TabsContent>
+            {/* Solicitudes por periodo Tab */}
+            <SolicitudesPeriodoTab
+              allIncidents={allIncidents}
+              allEmployees={allEmployees}
+              accessibleEmployeeIds={accessibleEmployeeIds}
+              canApproveIncidents={canApproveIncidents}
+              onPeriodAction={(group, mode) => setPeriodAction({ group, mode })}
+              solSearchTerm={solSearchTerm}
+              setSolSearchTerm={setSolSearchTerm}
+              solStatusFilter={solStatusFilter}
+              setSolStatusFilter={setSolStatusFilter}
+              solDateFrom={solDateFrom}
+              setSolDateFrom={setSolDateFrom}
+              solDateTo={solDateTo}
+              setSolDateTo={setSolDateTo}
+            />
 
                                   {/* Edit Requests Tab */}
                                   <TabsContent value="edit-requests" className="space-y-6">
@@ -2362,6 +2273,9 @@ export default function AttendanceManagement() {
                   <div className="p-4 bg-slate-50 rounded-lg">
                     <p className="text-sm text-slate-600 mb-2"><strong>Tipo:</strong> {reviewingIncident.incident_type}</p>
                     <p className="text-sm text-slate-600 mb-2"><strong>Fecha:</strong> {format(parseDateLima(reviewingIncident.incident_date), "dd 'de' MMMM, yyyy", { locale: es })}</p>
+                    {reviewingIncident.codigo_solicitud && (
+                      <p className="text-sm text-slate-600 mb-2"><strong>Solicitud:</strong> <Badge variant="outline" className="text-xs">{reviewingIncident.codigo_solicitud}</Badge></p>
+                    )}
                     {reviewingIncident.full_day_justification ? (
                       <p className="text-sm text-slate-600 mb-2"><strong>Período:</strong> <Badge className="bg-blue-100 text-blue-700">Día completo (8 horas)</Badge></p>
                     ) : (
@@ -2437,6 +2351,18 @@ export default function AttendanceManagement() {
             incident={incidentDetailData}
             employee={incidentDetailEmployee}
             onClose={() => { setShowIncidentDetail(false); setIncidentDetailData(null); setIncidentDetailEmployee(null); }}
+          />
+        )}
+
+        {/* Period Approval Modal — aprobar/rechazar todo el periodo */}
+        {periodAction && (
+          <PeriodApprovalModal
+            group={periodAction.group}
+            mode={periodAction.mode}
+            employees={allEmployees}
+            loading={periodLoading}
+            onConfirm={(comments) => confirmPeriodAction(comments)}
+            onClose={() => { if (!periodLoading) setPeriodAction(null); }}
           />
         )}
 
