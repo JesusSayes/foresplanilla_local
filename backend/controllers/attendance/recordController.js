@@ -66,7 +66,9 @@ export const create = async (req, res) => {
     }
     const now = new Date();
 
-    const shouldProtectInitialValues = data.status === "Justificado" || data.status === "Vacaciones";
+    const shouldProtectInitialValues = data.status === "Justificado" ||
+      data.status === "Vacaciones" ||
+      data.status === "Permiso sin goce";
     const protectedFields = shouldProtectInitialValues
       ? [...AUTO_CALCULATED_ATTENDANCE_FIELDS].filter(field => Object.hasOwn(data, field))
       : [];
@@ -81,6 +83,10 @@ export const create = async (req, res) => {
         scheduled_start: data.scheduled_start,
         scheduled_end: data.scheduled_end,
         worked_hours: data.worked_hours,
+        regular_hours: data.regular_hours,
+        overtime_hours_25: data.overtime_hours_25,
+        overtime_hours_35: data.overtime_hours_35,
+        overtime_authorized: data.overtime_authorized,
         is_late: data.is_late ?? false,
         late_minutes: data.late_minutes ?? 0,
         is_absent: data.is_absent ?? false,

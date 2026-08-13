@@ -237,6 +237,10 @@ const recalcularAsistenciaService = {
       let updated = 0;
 
       for (const record of recordsInRange) {
+        if (record.status === "Permiso sin goce") {
+          continue;
+        }
+
         const schedule = getScheduleForDate(
           employee_id,
           emp.department_name,
@@ -270,7 +274,7 @@ const recalcularAsistenciaService = {
 
         let status;
 
-        // PRESERVAR VACACIONES
+        // Preservar vacaciones.
         if (record.status === "Vacaciones") {
           status = "Vacaciones";
         }

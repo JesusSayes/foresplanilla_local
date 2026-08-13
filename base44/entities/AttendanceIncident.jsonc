@@ -100,6 +100,10 @@
     "review_comments": {
       "type": "string",
       "description": "Comentarios de la revisi\u00f3n"
+    },
+    "codigo_solicitud": {
+      "type": "string",
+      "description": "C\u00f3digo \u00fanico de la solicitud. Agrupa los incidentes de un mismo pedido multi-fecha (y los de un solo d\u00eda) para permitir aprobaci\u00f3n/rechazo por periodo completo. Los incidentes hist\u00f3ricos sin c\u00f3digo se tratan como grupos unitarios."
     }
   },
   "required": [

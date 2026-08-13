@@ -54,6 +54,7 @@ model attendance_incident {
   is_sample               Boolean?
   authorizer_id           String?
   authorizer_name         String?
+  codigo_solicitud        String?   @db.VarChar(50)
 }
 
 model attendance_record {
@@ -861,6 +862,10 @@ model vacation_request {
   rejection_reason        String?
   created_by_id           String?   @db.VarChar(255)
   is_sample               Boolean   @default(false)
+  is_full_day             Boolean   @default(true)
+  hours_requested         Decimal   @default(0) @db.Decimal(10, 2)
+  time_start              String?   @db.VarChar(5)
+  time_end                String?   @db.VarChar(5)
 
   @@index([start_date, end_date], map: "idx_vacation_request_dates")
   @@index([employee_id], map: "idx_vacation_request_employee")
