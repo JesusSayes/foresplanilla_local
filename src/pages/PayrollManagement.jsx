@@ -1361,6 +1361,8 @@ export default function PayrollManagement() {
         "Costo Movilidad": safeNum(p.transport_cost_amount ?? getCostFromSummary(p, "transport_cost", ["movilidad", "costo movilidad"])),
         "Bonificaciones": safeNum(p.bonuses),
         "Asignación familiar": safeNum(p.family_allowance),
+        "Horas Extra": safeNum(p.overtime_hours),
+        "Pago Horas Extra": safeNum(p.overtime_pay),
         "Total Ingresos": totalIngresos,
         "AFP Aporte Obligatorio": afp ? afp.aporte : 0,
         "AFP Prima de Seguro": afp ? afp.prima : 0,
