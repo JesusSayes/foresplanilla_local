@@ -221,8 +221,8 @@ const recalcularTodaAsistenciaService = {
       const updates = [];
 
       for (const record of records) {
-        // Preservar vacaciones
-        if (record.status === "Vacaciones") {
+        // Preservar estados cuyas métricas fueron definidas por una aprobación.
+        if (record.status === "Vacaciones" || record.status === "Permiso sin goce") {
           skipped++;
           continue;
         }

@@ -65,6 +65,7 @@ export const remove = async (req, res) => {
 
 export const filter = async (req, res) => {
   try {
+    const filters = req.body || {};
     const {
       status,    // ?status=Activo
       code,      // ?code=ABC (contains)
@@ -77,7 +78,10 @@ export const filter = async (req, res) => {
     const concepts = await prisma.payroll_concept.findMany({
       where: {
         ...(status && { status }),
-        ...(code && { code: { contains: code, mode: 'insensitive' } })  // Búsqueda parcial
+        ...(code && { code: { contains: code, mode: 'insensitive' } }), // Búsqueda parcial
+        ...(filters.employee_id && { employee_id: filters.employee_id }),
+        ...(filters.month != null && { month: Number(filters.month) }),
+        ...(filters.year != null && { year: Number(filters.year) }),
       },
       orderBy: {
         [field]: desc ? 'desc' : 'asc'

@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
     // Preparar todas las actualizaciones
     const updates = [];
     for (const record of allRecords) {
-      if (record.status === "Vacaciones") { skipped++; continue; }
+      if (record.status === "Vacaciones" || record.status === "Permiso sin goce") { skipped++; continue; }
       const emp = empById[record.employee_id];
       if (!emp) { skipped++; continue; }
 
