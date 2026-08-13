@@ -24,6 +24,16 @@ const toDateStr = value => {
   return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
 };
 
+// Genera un código de solicitud único (ej: SOL-20260812-A3F2) para agrupar los
+// incidentes de un mismo pedido (multi-fecha o de un solo día).
+const generateCodigoSolicitud = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const ymd = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `SOL-${ymd}-${rand}`;
+};
+
 // ── Component ────────────────────────────────────────────────────────────────
 export default function JustifyModal({
   justifyingEmployee,
@@ -228,6 +238,10 @@ export default function JustifyModal({
       const incidentsByDate = {};
       allIncidentsInRange.forEach(i => { incidentsByDate[toDateStr(i.incident_date)] = i; });
 
+      // Código de solicitud único para todo el pedido. Se reutiliza el existente
+      // al editar (para no romper la agrupación) y se genera uno nuevo al crear.
+      const codigoSolicitud = existingIncident?.codigo_solicitud || generateCodigoSolicitud();
+
       for (const dStr of targetDates) {
         // ── Guardar incidente ──────────────────────────────────────────────
         const incidentPayload = {
@@ -242,6 +256,7 @@ export default function JustifyModal({
           hours_to_adjust: hoursToAdjust,
           late_minutes_to_adjust: 0,
           status: "Pendiente",
+          codigo_solicitud: codigoSolicitud,
         };
 
         const existingInc = incidentsByDate[dStr];

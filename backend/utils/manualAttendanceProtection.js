@@ -20,7 +20,11 @@ export const MANUAL_PROTECTION_METADATA_FIELDS = new Set([
   "manually_modified_at",
 ]);
 
-const AUTHORITATIVE_MANUAL_STATUSES = new Set(["Justificado", "Vacaciones"]);
+const AUTHORITATIVE_MANUAL_STATUSES = new Set([
+  "Justificado",
+  "Vacaciones",
+  "Permiso sin goce",
+]);
 
 const comparableValue = value => {
   if (value === null || value === undefined) return value;

@@ -34,6 +34,24 @@
       "type": "integer",
       "description": "D\u00edas h\u00e1biles"
     },
+    "is_full_day": {
+      "type": "boolean",
+      "default": true,
+      "description": "True si el permiso es por d\u00eda(s) completo(s); false si es por horas. Aplica principalmente a permisos sin goce."
+    },
+    "hours_requested": {
+      "type": "number",
+      "default": 0,
+      "description": "Horas de permiso solicitadas (solo cuando is_full_day=false). Para permiso sin goce por horas define el descuento monetario proporcional."
+    },
+    "time_start": {
+      "type": "string",
+      "description": "Hora de inicio del permiso por horas (HH:mm). Solo aplica cuando is_full_day=false."
+    },
+    "time_end": {
+      "type": "string",
+      "description": "Hora de fin del permiso por horas (HH:mm). Solo aplica cuando is_full_day=false."
+    },
     "reason": {
       "type": "string",
       "description": "Motivo de la solicitud"

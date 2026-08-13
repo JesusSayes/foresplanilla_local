@@ -87,6 +87,10 @@ export async function recalcularAsistencia({ employee_id, date_from, date_to } =
   let updated = 0;
 
   for (const record of records) {
+    if (record.status === "Permiso sin goce") {
+      continue;
+    }
+
     const dateStr = record.date.toISOString().slice(0, 10);
     const schedule = getScheduleForDate(employee_id, emp.department_name, allSchedules, dateStr);
     const overtimeAuth = record.overtime_authorized ?? schedule?.overtime_authorized ?? false;

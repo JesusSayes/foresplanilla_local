@@ -218,6 +218,15 @@ Deno.serve(async (req) => {
     let updated = 0;
 
     for (const record of recordsInRange) {
+      // Preservar registros de permiso sin goce: no recalcular métricas ni status.
+      // El descuento se aplica en nómina (días completos restan de worked_days;
+      // horas generan concepto de descuento). Recalcular sobrescribiría las horas
+      // ajustadas y el status, rompiendo el descuento.
+      if (record.status === "Permiso sin goce") {
+        updated++;
+        continue;
+      }
+
       const schedule = getScheduleForDate(employee_id, emp.department_name, allSchedules, record.date);
       // HE autorizadas: solo si el registro tiene overtime_authorized=true Y no hay alerta pendiente
       const hasScheduleAuth = schedule?.overtime_authorized ?? false;

@@ -110,10 +110,11 @@
         "Ausente",
         "Justificado",
         "Vacaciones",
-        "Compensaci\u00f3n"
+        "Compensaci\u00f3n",
+        "Permiso sin goce"
       ],
       "default": "Completo",
-      "description": "Estado del registro"
+      "description": "Estado del registro. 'Permiso sin goce' indica un d\u00eda u horas de permiso sin goce de haber: no cuenta como trabajado, ni subsidiado, ni falta; descuenta de d\u00edas trabajados (d\u00eda completo) o genera descuento monetario (horas)."
     },
     "notes": {
       "type": "string",

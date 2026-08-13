@@ -88,6 +88,12 @@ const recalcularAsistencia = async (req, res) => {
     let updated = 0;
 
     for (const record of recordsInRange) {
+      // Los permisos sin goce contienen horas ajustadas para el descuento de
+      // planilla; recalcularlos sobrescribiría esas horas y su estado.
+      if (record.status === "Permiso sin goce") {
+        continue;
+      }
+
       const dateStr = record.date ? record.date.toISOString().slice(0, 10) : null;
       if (!dateStr) continue;
 
