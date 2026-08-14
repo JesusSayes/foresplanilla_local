@@ -668,6 +668,7 @@ export default function ConsultaPlanillas() {
             <div class="metrics">
               <div class="metric"><span class="mlbl">Días trabajados</span><span class="mval">${p.worked_days || 0}</span></div>
               <div class="metric"><span class="mlbl">Horas extras</span><span class="mval">${p.overtime_hours || 0}</span></div>
+              ${(Number(p.overtime_hours_25) > 0 || Number(p.overtime_hours_35) > 0) ? `<div class="metric"><span class="mlbl">HE 25% / 35%</span><span class="mval" style="font-size:9pt;">${Number(p.overtime_hours_25 || 0).toFixed(2)} / ${Number(p.overtime_hours_35 || 0).toFixed(2)}</span></div>` : ""}
               <div class="metric"><span class="mlbl">Sistema pensiones</span><span class="mval">${emp.pension_system || "N/A"}</span></div>
             </div>
             <div class="two-cols">

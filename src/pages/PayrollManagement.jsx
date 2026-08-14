@@ -964,7 +964,9 @@ export default function PayrollManagement() {
         subsidized_days: subsidizedDays,
         non_worked_days: payrollType === "Quincenal" ? 0 : absentRecords.length,
         regular_hours: attendanceData.regular_hours,
-        overtime_hours: empAttendance.reduce((sum, r) => sum + (r.overtime_hours_25 || 0) + (r.overtime_hours_35 || 0), 0),
+        overtime_hours: roundMoney(overtimeHours25 + overtimeHours35),
+        overtime_hours_25: roundMoney(overtimeHours25),
+        overtime_hours_35: roundMoney(overtimeHours35),
         // Remuneración base calculada: suma de ingresos con categoría "Remuneración Base".
         // Si no existe el concepto, conserva el salario nominal del contrato.
         base_salary: getCalculatedBaseSalary(result.incomes, emp.base_salary),
@@ -1349,6 +1351,28 @@ export default function PayrollManagement() {
     };
   };
 
+  // Extrae el desglose del pago de horas extras al 25% y 35% desde el breakdown
+  // de ingresos de la boleta. Busca ítems con categoría "Horas Extras" y los
+  // separa según el nombre contenga "25" o "35". Retorna null si no hay breakdown.
+  const getOvertimePaySplit = (payslip) => {
+    const items = payslip?.calculation_summary?.breakdown?.incomes?.items;
+    if (!Array.isArray(items)) return null;
+    const heItems = items.filter(it =>
+      _normStr(it.concept_category) === "horas extras" ||
+      /horas?\s*extras?\s*(al\s*)?25/i.test(it.name || "") ||
+      /horas?\s*extras?\s*(al\s*)?35/i.test(it.name || "")
+    );
+    if (heItems.length === 0) return null;
+    let pay25 = 0, pay35 = 0;
+    heItems.forEach(it => {
+      const name = _normStr(it.name || "");
+      if (/25/.test(name)) pay25 += safeNum(it.amount);
+      else if (/35/.test(name)) pay35 += safeNum(it.amount);
+      // Si no menciona 25 ni 35, no se puede clasificar → se ignora del desglose
+    });
+    return { pay25: roundMoney(pay25), pay35: roundMoney(pay35) };
+  };
+
   const exportToExcel = (payslipsData, filename, filterType) => {
     // Si se pasa filterType, filtrar solo las boletas de ese tipo
     const data = filterType ? payslipsData.filter(p => p.payroll_type === filterType) : payslipsData;
@@ -1368,6 +1392,8 @@ export default function PayrollManagement() {
         : safeNum(p.net_pay);
       // Desglose AFP/ONP desde el breakdown (coincide con el PDF de la boleta)
       const afp = getAfpBreakdown(p);
+      // Desglose de pago de horas extras al 25% y 35% (si está disponible en el breakdown)
+      const hePay = getOvertimePaySplit(p);
       return {
         "N°": idx + 1,
         "Tipo Doc": emp?.document_type || "",
@@ -1386,7 +1412,11 @@ export default function PayrollManagement() {
         "Costo Movilidad": safeNum(p.transport_cost_amount ?? getCostFromSummary(p, "transport_cost", ["movilidad", "costo movilidad"])),
         "Bonificaciones": safeNum(p.bonuses),
         "Asignación familiar": safeNum(p.family_allowance),
+        "HE 25%": safeNum(p.overtime_hours_25),
+        "HE 35%": safeNum(p.overtime_hours_35),
         "Horas Extra": safeNum(p.overtime_hours),
+        "Pago HE 25%": hePay ? hePay.pay25 : 0,
+        "Pago HE 35%": hePay ? hePay.pay35 : 0,
         "Pago Horas Extra": safeNum(p.overtime_pay),
         "Total Ingresos": totalIngresos,
         "AFP Aporte Obligatorio": afp ? afp.aporte : 0,

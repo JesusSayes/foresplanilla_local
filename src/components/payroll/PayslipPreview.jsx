@@ -214,6 +214,9 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
 
   const jornada = toHorasMinutos(payslip.regular_hours || 0);
   const sobret  = toHorasMinutos(payslip.overtime_hours || 0);
+  const sobret25 = toHorasMinutos(payslip.overtime_hours_25 || 0);
+  const sobret35 = toHorasMinutos(payslip.overtime_hours_35 || 0);
+  const hasOvertimeSplit = safePayrollNumber(payslip.overtime_hours_25) > 0 || safePayrollNumber(payslip.overtime_hours_35) > 0;
 
   const conceptRow = (code, label, ing, desc) =>
     `<tr><td class="c-code">${code}</td><td class="c-lbl">${label}</td><td class="c-ing">${ing !== "" ? `S/ ${ing}` : ""}</td><td class="c-des">${desc !== "" ? `S/ ${desc}` : ""}</td><td class="c-net"></td></tr>`;
@@ -312,6 +315,7 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
           <td>${jornada.horas}</td>
           <td>${jornada.minutos}</td>
         </tr>
+        ${hasOvertimeSplit ? `<tr><td colspan="4" style="font-size:6.5pt;text-align:right;color:#475569;">Sobretiempo: HE 25% ${sobret25.horas}h ${sobret25.minutos}m · HE 35% ${sobret35.horas}h ${sobret35.minutos}m</td><td colspan="2" style="font-size:6.5pt;text-align:center;color:#475569;">Total: ${sobret.horas}h ${sobret.minutos}m</td></tr>` : ""}
       </thead>
     </table>
 
@@ -426,6 +430,9 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
   const { ingresos, descuentos, aportTrab, aportEmpl } = buildConceptRows(payslip, conceptsMap);
   const jornada = toHorasMinutos(payslip.regular_hours || 0);
   const sobret  = toHorasMinutos(payslip.overtime_hours || 0);
+  const sobret25 = toHorasMinutos(payslip.overtime_hours_25 || 0);
+  const sobret35 = toHorasMinutos(payslip.overtime_hours_35 || 0);
+  const hasOvertimeSplit = safePayrollNumber(payslip.overtime_hours_25) > 0 || safePayrollNumber(payslip.overtime_hours_35) > 0;
 
   // Totales calculados desde los ítems mostrados (garantiza consistencia)
   const totalIngresosDisplay = ingresos.reduce((s, r) => s + Math.abs(r.amount), 0);
@@ -559,7 +566,16 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
                 <td className="border border-slate-300 px-2 py-1 font-semibold text-center">{payslip.subsidized_days || 0}</td>
                 <td className="border border-slate-300 px-2 py-1">{emp.tax_residence || "Domiciliado"}</td>
                 <td className="border border-slate-300 px-2 py-1 text-center">{jornada.horas}h {jornada.minutos}m</td>
-                <td className="border border-slate-300 px-2 py-1 text-center">{sobret.horas}h {sobret.minutos}m</td>
+                <td className="border border-slate-300 px-2 py-1 text-center">
+                  <div>{sobret.horas}h {sobret.minutos}m</div>
+                  {hasOvertimeSplit && (
+                    <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                      <span className="text-amber-600">25%: {sobret25.horas}h {sobret25.minutos}m</span>
+                      <span className="mx-1 text-slate-300">·</span>
+                      <span className="text-orange-600">35%: {sobret35.horas}h {sobret35.minutos}m</span>
+                    </div>
+                  )}
+                </td>
               </tr>
             </tbody>
           </table>
