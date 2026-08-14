@@ -44,7 +44,10 @@ export default function ProcessRenewalModal({
         const daysUntilExpiration = differenceInDays(endDate, today);
         const matchingRules = activeRules.filter(rule => {
           const typeMatches = (rule.contract_types || []).includes(c.contract_type);
-          const daysMatch = daysUntilExpiration < rule.days_before_expiration && daysUntilExpiration > 0;
+          // Incluye contratos ya vencidos (días negativos) que siguen marcados como Vigente:
+          // son los más urgentes de renovar. El umbral "menos de X días" cubre tanto
+          // los próximos a vencer como los vencidos pendientes de renovación.
+          const daysMatch = daysUntilExpiration < rule.days_before_expiration;
           const renewableMatch = !rule.only_renewable || c.renewable;
           return typeMatches && daysMatch && renewableMatch;
         });
@@ -108,7 +111,10 @@ export default function ProcessRenewalModal({
       const emp = allEmployees.find(e => e.id === contract.employee_id);
       const empName = emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido";
 
-      addLog("info", `Evaluando contrato de ${empName} (${contract.position || "sin cargo"}) — vence en ${daysUntilExpiration} día(s), regla: "${rule.name}".`);
+      const daysLabel = daysUntilExpiration < 0
+        ? `vencido hace ${Math.abs(daysUntilExpiration)} día(s)`
+        : `vence en ${daysUntilExpiration} día(s)`;
+      addLog("info", `Evaluando contrato de ${empName} (${contract.position || "sin cargo"}) — ${daysLabel}, regla: "${rule.name}".`);
 
       // Notificación
       if (rule.send_notification) {
@@ -286,7 +292,9 @@ export default function ProcessRenewalModal({
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h4 className="font-semibold text-slate-900 truncate">{empName}</h4>
                                 <Badge className={daysUntilExpiration <= 15 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}>
-                                  {daysUntilExpiration} día{daysUntilExpiration !== 1 ? "s" : ""}
+                                  {daysUntilExpiration < 0
+                                    ? `Vencido hace ${Math.abs(daysUntilExpiration)} día${Math.abs(daysUntilExpiration) !== 1 ? "s" : ""}`
+                                    : `${daysUntilExpiration} día${daysUntilExpiration !== 1 ? "s" : ""}`}
                                 </Badge>
                               </div>
                               <p className="text-xs text-slate-500 mt-0.5">
