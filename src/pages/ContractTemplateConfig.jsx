@@ -14,6 +14,7 @@ import {
   Star, Copy, CheckCircle, AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
+import { usePermissions } from "@/components/hooks/usePermissions";
 
 const DEFAULT_TEMPLATE = {
   template_name: "",
@@ -81,6 +82,7 @@ const CONTRACT_TYPES = [
 export default function ContractTemplateConfig() {
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const [showForm, setShowForm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
@@ -464,13 +466,21 @@ export default function ContractTemplateConfig() {
     { key: "{signed_date}", desc: "Fecha de firma del contrato" },
   ];
 
-  if (!employee || employee.role !== "admin") {
+  if (permissionsLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!hasPermission("contracts.templates")) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <Card className="max-w-md">
           <CardContent className="p-8 text-center">
             <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
-            <p className="text-slate-600">Solo administradores pueden configurar plantillas</p>
+            <p className="text-slate-600">No tienes permisos para configurar plantillas de contratos</p>
           </CardContent>
         </Card>
       </div>

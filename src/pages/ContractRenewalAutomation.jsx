@@ -15,10 +15,12 @@ import {
 import { format, addDays, differenceInDays, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { usePermissions } from "@/components/hooks/usePermissions";
 
 export default function ContractRenewalAutomation() {
   const [currentUser, setCurrentUser] = useState(null);
   const [employee, setEmployee] = useState(null);
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const [showRuleForm, setShowRuleForm] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
   const [ruleData, setRuleData] = useState({
@@ -310,13 +312,21 @@ export default function ContractRenewalAutomation() {
 
   const expiringContracts = getExpiringContracts();
 
-  if (!employee || employee.role !== "admin") {
+  if (permissionsLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!hasPermission("contracts.renewal")) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <Card className="max-w-md">
           <CardContent className="p-8 text-center">
             <h3 className="text-xl font-bold text-slate-900 mb-2">Acceso Denegado</h3>
-            <p className="text-slate-600">Solo administradores pueden configurar automatizaciones</p>
+            <p className="text-slate-600">No tienes permisos para configurar la automatización de renovación</p>
           </CardContent>
         </Card>
       </div>
