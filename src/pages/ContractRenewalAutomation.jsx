@@ -77,7 +77,7 @@ export default function ContractRenewalAutomation() {
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
     queryFn: async () => {
-      return await base44.entities.Employee.filter({ status: "Activo" });
+      return await base44.entities.Employee.list("-created_date", 500);
     },
   });
 

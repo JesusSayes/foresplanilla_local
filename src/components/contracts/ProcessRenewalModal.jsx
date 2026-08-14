@@ -4,9 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   X, Settings, CheckCircle, AlertTriangle, FileText, Bell,
-  Loader2, Play, ArrowLeft, RotateCcw
+  Loader2, Play, ArrowLeft, RotateCcw, Search
 } from "lucide-react";
 import { format, differenceInDays, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -30,9 +33,18 @@ export default function ProcessRenewalModal({
   const [log, setLog] = useState([]);
   const [summary, setSummary] = useState(null);
   const [processing, setProcessing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [includeExpired, setIncludeExpired] = useState(true);
+  const [selectedContractIds, setSelectedContractIds] = useState(new Set());
   const logEndRef = useRef(null);
 
   const activeRules = useMemo(() => (rules || []).filter(r => r.is_active), [rules]);
+
+  // Helper: nombre del empleado desde allEmployees (sin depender de filtro de status)
+  const getEmployeeNameById = (employeeId) => {
+    const emp = (allEmployees || []).find(e => e.id === employeeId);
+    return emp ? `${emp.first_name} ${emp.last_name}` : null;
+  };
 
   // Contratos candidatos: vigentes con fecha de vencimiento que coinciden con al menos una regla activa
   const candidateContracts = useMemo(() => {
@@ -55,7 +67,34 @@ export default function ProcessRenewalModal({
       })
       .filter(item => item.matchingRules.length > 0)
       .sort((a, b) => a.daysUntilExpiration - b.daysUntilExpiration);
-  }, [contracts, activeRules]);
+  }, [contracts, activeRules, allEmployees]);
+
+  // Contratos visibles: filtrados por búsqueda y por toggle de vencidos
+  const visibleContracts = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return candidateContracts.filter(({ contract, daysUntilExpiration }) => {
+      // Toggle de vencidos: si está apagado, excluir días negativos
+      if (!includeExpired && daysUntilExpiration < 0) return false;
+      // Búsqueda por nombre, cargo, número de contrato o tipo
+      if (term) {
+        const empName = getEmployeeNameById(contract.employee_id) || "";
+        const haystack = [
+          empName,
+          contract.position || "",
+          contract.contract_number || "",
+          contract.contract_type || "",
+        ].join(" ").toLowerCase();
+        if (!haystack.includes(term)) return false;
+      }
+      return true;
+    });
+  }, [candidateContracts, searchTerm, includeExpired]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedCount = useMemo(() => {
+    return visibleContracts.filter(({ contract }) => selectedContractIds.has(contract.id)).length;
+  }, [visibleContracts, selectedContractIds]);
+
+  const allVisibleSelected = visibleContracts.length > 0 && visibleContracts.every(({ contract }) => selectedContractIds.has(contract.id));
 
   // Inicializar asignaciones por defecto (primera regla que coincida) cuando se abre el modal
   useEffect(() => {
@@ -67,6 +106,10 @@ export default function ProcessRenewalModal({
         }
       });
       setAssignments(defaultAssignments);
+      // Seleccionar todos los candidatos por defecto
+      setSelectedContractIds(new Set(candidateContracts.map(({ contract }) => contract.id)));
+      setSearchTerm("");
+      setIncludeExpired(true);
       setPhase(PHASE_SELECT);
       setLog([]);
       setSummary(null);
@@ -98,9 +141,10 @@ export default function ProcessRenewalModal({
     let errorsCount = 0;
     const processedNames = new Set();
 
-    addLog("info", `Iniciando procesamiento de ${candidateContracts.length} contrato(s) candidato(s)...`);
+    const toProcess = visibleContracts.filter(({ contract }) => selectedContractIds.has(contract.id));
+    addLog("info", `Iniciando procesamiento de ${toProcess.length} contrato(s) seleccionado(s)...`);
 
-    for (const { contract, daysUntilExpiration } of candidateContracts) {
+    for (const { contract, daysUntilExpiration } of toProcess) {
       const ruleId = assignments[contract.id];
       const rule = activeRules.find(r => r.id === ruleId);
       if (!rule) {
@@ -203,7 +247,7 @@ export default function ProcessRenewalModal({
 
     addLog("info", `Procesamiento finalizado.`);
     setSummary({
-      total: candidateContracts.length,
+      total: toProcess.length,
       notifications: notificationsCreated,
       drafts: draftsCreated,
       errors: errorsCount,
@@ -274,32 +318,101 @@ export default function ProcessRenewalModal({
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
                     <Bell className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                     <p className="text-sm text-blue-800">
-                      Se encontraron <strong>{candidateContracts.length}</strong> contrato(s) próximo(s) a vencer.
+                      Se encontraron <strong>{candidateContracts.length}</strong> contrato(s) que coinciden con las reglas activas.
+                      {selectedCount < candidateContracts.length && (
+                        <> Tienes <strong>{selectedCount}</strong> seleccionado(s) para procesar.</>
+                      )}
                       {activeRules.length > 1
                         ? " Selecciona qué regla aplicar a cada uno antes de procesar."
-                        : " Se aplicará la única regla activa a todos."}
+                        : " Se aplicará la única regla activa a todos los seleccionados."}
                     </p>
                   </div>
 
-                  <div className="space-y-2">
-                    {candidateContracts.map(({ contract, daysUntilExpiration, matchingRules }) => {
-                      const emp = allEmployees.find(e => e.id === contract.employee_id);
-                      const empName = emp ? `${emp.first_name} ${emp.last_name}` : "Empleado desconocido";
+                  {/* Barra de herramientas: búsqueda + toggle vencidos */}
+                  <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                    <div className="relative flex-1 w-full">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        placeholder="Buscar por empleado, cargo, número o tipo de contrato..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Switch
+                        checked={includeExpired}
+                        onCheckedChange={setIncludeExpired}
+                        id="include-expired"
+                      />
+                      <label htmlFor="include-expired" className="text-sm text-slate-700 cursor-pointer select-none">
+                        Incluir vencidos
+                      </label>
+                    </div>
+                  </div>
+
+                  {visibleContracts.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-slate-600 font-medium">No hay contratos que coincidan con la búsqueda</p>
+                      <p className="text-sm text-slate-500 mt-1">Ajusta el término de búsqueda o activa "Incluir vencidos".</p>
+                    </div>
+                  ) : (
+                  <>
+                  {/* Seleccionar todos los visibles */}
+                  <div className="flex items-center gap-2 px-1">
+                    <Checkbox
+                      id="select-all"
+                      checked={allVisibleSelected}
+                      onCheckedChange={(checked) => {
+                        setSelectedContractIds(prev => {
+                          const next = new Set(prev);
+                          if (checked) {
+                            visibleContracts.forEach(({ contract }) => next.add(contract.id));
+                          } else {
+                            visibleContracts.forEach(({ contract }) => next.delete(contract.id));
+                          }
+                          return next;
+                        });
+                      }}
+                    />
+                    <label htmlFor="select-all" className="text-sm text-slate-700 cursor-pointer select-none">
+                      {allVisibleSelected ? "Deseleccionar todos" : "Seleccionar todos"} los visibles ({visibleContracts.length})
+                    </label>
+                  </div>
+
+                  <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
+                    {visibleContracts.map(({ contract, daysUntilExpiration, matchingRules }) => {
+                      const empName = getEmployeeNameById(contract.employee_id) || "Empleado no encontrado";
+                      const isSelected = selectedContractIds.has(contract.id);
                       return (
-                        <div key={contract.id} className="p-3 border border-slate-200 rounded-lg bg-white">
+                        <div key={contract.id} className={`p-3 border rounded-lg bg-white transition-colors ${isSelected ? "border-indigo-300 bg-indigo-50/30" : "border-slate-200"}`}>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="font-semibold text-slate-900 truncate">{empName}</h4>
-                                <Badge className={daysUntilExpiration <= 15 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}>
-                                  {daysUntilExpiration < 0
-                                    ? `Vencido hace ${Math.abs(daysUntilExpiration)} día${Math.abs(daysUntilExpiration) !== 1 ? "s" : ""}`
-                                    : `${daysUntilExpiration} día${daysUntilExpiration !== 1 ? "s" : ""}`}
-                                </Badge>
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  setSelectedContractIds(prev => {
+                                    const next = new Set(prev);
+                                    if (checked) next.add(contract.id);
+                                    else next.delete(contract.id);
+                                    return next;
+                                  });
+                                }}
+                                className="mt-1"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="font-semibold text-slate-900 truncate">{empName}</h4>
+                                  <Badge className={daysUntilExpiration < 0 ? "bg-red-100 text-red-700" : daysUntilExpiration <= 15 ? "bg-orange-100 text-orange-700" : "bg-amber-100 text-amber-700"}>
+                                    {daysUntilExpiration < 0
+                                      ? `Vencido hace ${Math.abs(daysUntilExpiration)} día${Math.abs(daysUntilExpiration) !== 1 ? "s" : ""}`
+                                      : `${daysUntilExpiration} día${daysUntilExpiration !== 1 ? "s" : ""}`}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  {contract.position || "Sin cargo"} • {contract.contract_type} • Vence: {format(new Date(contract.end_date), "dd/MM/yyyy")}
+                                </p>
                               </div>
-                              <p className="text-xs text-slate-500 mt-0.5">
-                                {contract.position || "Sin cargo"} • {contract.contract_type} • Vence: {format(new Date(contract.end_date), "dd/MM/yyyy")}
-                              </p>
                             </div>
                             <div className="sm:w-64 shrink-0">
                               {matchingRules.length === 1 ? (
@@ -327,6 +440,8 @@ export default function ProcessRenewalModal({
                       );
                     })}
                   </div>
+                  </>
+                  )}
                 </>
               )}
             </div>
@@ -381,11 +496,11 @@ export default function ProcessRenewalModal({
               <Button variant="outline" onClick={onClose}>Cancelar</Button>
               <Button
                 className="bg-blue-600 hover:bg-blue-700"
-                disabled={candidateContracts.length === 0 || activeRules.length === 0}
+                disabled={selectedCount === 0 || activeRules.length === 0}
                 onClick={handleStartProcessing}
               >
                 <Play className="w-4 h-4 mr-2" />
-                Iniciar Procesamiento
+                Iniciar Procesamiento ({selectedCount})
               </Button>
             </>
           )}
