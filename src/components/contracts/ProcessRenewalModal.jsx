@@ -34,7 +34,7 @@ export default function ProcessRenewalModal({
   const [summary, setSummary] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [includeExpired, setIncludeExpired] = useState(true);
+  const [includeExpired, setIncludeExpired] = useState(false);
   const [selectedContractIds, setSelectedContractIds] = useState(new Set());
   const logEndRef = useRef(null);
 
@@ -59,7 +59,7 @@ export default function ProcessRenewalModal({
           // Incluye contratos ya vencidos (días negativos) que siguen marcados como Vigente:
           // son los más urgentes de renovar. El umbral "menos de X días" cubre tanto
           // los próximos a vencer como los vencidos pendientes de renovación.
-          const daysMatch = daysUntilExpiration < rule.days_before_expiration;
+          const daysMatch = daysUntilExpiration <= rule.days_before_expiration;
           const renewableMatch = !rule.only_renewable || c.renewable;
           return typeMatches && daysMatch && renewableMatch;
         });
@@ -109,7 +109,7 @@ export default function ProcessRenewalModal({
       // Seleccionar todos los candidatos por defecto
       setSelectedContractIds(new Set(candidateContracts.map(({ contract }) => contract.id)));
       setSearchTerm("");
-      setIncludeExpired(true);
+      setIncludeExpired(false);
       setPhase(PHASE_SELECT);
       setLog([]);
       setSummary(null);
