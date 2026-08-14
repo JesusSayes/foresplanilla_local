@@ -10,12 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { 
   Calendar, Plus, Edit, Trash2, Bell, FileText, 
-  CheckCircle, AlertTriangle, Settings
+  AlertTriangle, Settings
 } from "lucide-react";
-import { format, addDays, differenceInDays, addMonths } from "date-fns";
-import { es } from "date-fns/locale";
+import { format, differenceInDays } from "date-fns";
 import { toast } from "sonner";
 import { usePermissions } from "@/components/hooks/usePermissions";
+import ProcessRenewalModal from "@/components/contracts/ProcessRenewalModal";
 
 export default function ContractRenewalAutomation() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -35,6 +35,7 @@ export default function ContractRenewalAutomation() {
     draft_extension_months: 12,
   });
   const [emailInput, setEmailInput] = useState("");
+  const [showProcessModal, setShowProcessModal] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -112,25 +113,6 @@ export default function ContractRenewalAutomation() {
     },
   });
 
-  const createDraftContractMutation = useMutation({
-    mutationFn: async (data) => {
-      return await base44.entities.Contract.create(data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(["allContracts"]);
-      toast.success("Borrador de contrato creado");
-    },
-  });
-
-  const createNotificationMutation = useMutation({
-    mutationFn: async (data) => {
-      return await base44.entities.Notification.create(data);
-    },
-    onSuccess: () => {
-      toast.success("Notificación enviada");
-    },
-  });
-
   const handleSubmit = () => {
     if (!ruleData.name) {
       toast.error("Ingresa un nombre para la regla");
@@ -192,112 +174,12 @@ export default function ContractRenewalAutomation() {
     });
   };
 
-  const handleProcessAutomation = async () => {
-    toast.info("Procesando automatización...");
-    
-    const today = new Date();
-    let notificationsCreated = 0;
-    let draftsCreated = 0;
+  const handleProcessAutomation = () => {
+    setShowProcessModal(true);
+  };
 
-    for (const rule of rules.filter(r => r.is_active)) {
-      const expiringContracts = contracts.filter(c => {
-        if (!c.end_date || c.status !== "Vigente") return false;
-        
-        const endDate = new Date(c.end_date);
-        const daysUntilExpiration = differenceInDays(endDate, today);
-        
-        const typeMatches = rule.contract_types.includes(c.contract_type);
-        const daysMatch = daysUntilExpiration <= rule.days_before_expiration && daysUntilExpiration > 0;
-        const renewableMatch = !rule.only_renewable || c.renewable;
-        
-        return typeMatches && daysMatch && renewableMatch;
-      });
-
-      for (const contract of expiringContracts) {
-        const emp = allEmployees.find(e => e.id === contract.employee_id);
-        if (!emp) continue;
-
-        // Crear notificación
-        if (rule.send_notification) {
-          const notificationData = {
-            user_email: currentUser.email,
-            type: "contract_renewal",
-            title: `Contrato próximo a vencer: ${emp.first_name} ${emp.last_name}`,
-            message: `El contrato de ${emp.first_name} ${emp.last_name} (${contract.position}) vence el ${format(new Date(contract.end_date), "dd/MM/yyyy")}. ${rule.auto_create_draft ? "Se ha creado un borrador automático." : "Requiere revisión."}`,
-            is_read: false,
-            link: "/ContractManagement"
-          };
-
-          await createNotificationMutation.mutateAsync(notificationData);
-          
-          // Enviar emails si están configurados
-          if (rule.notification_emails?.length > 0) {
-            for (const email of rule.notification_emails) {
-              try {
-                await base44.integrations.Core.SendEmail({
-                  to: email,
-                  subject: `Alerta: Contrato próximo a vencer - ${emp.first_name} ${emp.last_name}`,
-                  body: `
-                    El contrato del empleado ${emp.first_name} ${emp.last_name} está próximo a vencer.
-                    
-                    Detalles:
-                    - Cargo: ${contract.position}
-                    - Tipo: ${contract.contract_type}
-                    - Fecha de vencimiento: ${format(new Date(contract.end_date), "dd 'de' MMMM 'de' yyyy", { locale: es })}
-                    - Días restantes: ${differenceInDays(new Date(contract.end_date), today)}
-                    
-                    ${rule.auto_create_draft ? "Se ha creado un borrador de renovación automáticamente en el sistema." : "Por favor, revisa y gestiona la renovación del contrato."}
-                    
-                    Accede al sistema para más detalles.
-                  `
-                });
-              } catch (error) {
-                console.error("Error enviando email:", error);
-              }
-            }
-          }
-          
-          notificationsCreated++;
-        }
-
-        // Crear borrador automático
-        if (rule.auto_create_draft && contract.renewable) {
-          const newStartDate = new Date(contract.end_date);
-          newStartDate.setDate(newStartDate.getDate() + 1);
-          
-          const newEndDate = addMonths(newStartDate, rule.draft_extension_months || 12);
-
-          const draftData = {
-            employee_id: contract.employee_id,
-            contract_number: `${contract.contract_number || emp.employee_code}-REN-${format(new Date(), "yyyyMMdd")}`,
-            contract_type: contract.contract_type,
-            start_date: format(newStartDate, "yyyy-MM-dd"),
-            end_date: format(newEndDate, "yyyy-MM-dd"),
-            position: contract.position,
-            department: contract.department,
-            work_location: contract.work_location,
-            salary: contract.salary,
-            activity_cost: contract.activity_cost ?? 0,
-            food_cost: contract.food_cost ?? 0,
-            transport_cost: contract.transport_cost ?? 0,
-            work_schedule: contract.work_schedule,
-            weekly_hours: contract.weekly_hours,
-            functions: contract.functions,
-            benefits: contract.benefits,
-            trial_period_days: 0,
-            renewable: contract.renewable,
-            status: "Vencido",
-            signed_date: format(new Date(), "yyyy-MM-dd"),
-            notes: `[BORRADOR AUTOMÁTICO] Renovación del contrato ${contract.contract_number || contract.id}. Generado automáticamente por regla: ${rule.name}`,
-          };
-
-          await createDraftContractMutation.mutateAsync(draftData);
-          draftsCreated++;
-        }
-      }
-    }
-
-    toast.success(`✓ Procesado: ${notificationsCreated} notificaciones, ${draftsCreated} borradores creados`);
+  const handleProcessCompleted = () => {
+    queryClient.invalidateQueries(["allContracts"]);
   };
 
   const getExpiringContracts = () => {
@@ -488,6 +370,17 @@ export default function ContractRenewalAutomation() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal de Procesamiento */}
+      <ProcessRenewalModal
+        open={showProcessModal}
+        onClose={() => setShowProcessModal(false)}
+        rules={rules}
+        contracts={contracts}
+        allEmployees={allEmployees}
+        currentUser={currentUser}
+        onCompleted={handleProcessCompleted}
+      />
 
       {/* Form Modal */}
       {showRuleForm && (
