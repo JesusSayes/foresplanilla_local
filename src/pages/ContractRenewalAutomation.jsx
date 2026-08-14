@@ -429,7 +429,7 @@ export default function ContractRenewalAutomation() {
                   onChange={(e) => setRuleData({ ...ruleData, days_before_expiration: parseInt(e.target.value) })}
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  La regla se activará cuando falten estos días para el vencimiento
+                  La regla se activará cuando falten <strong>menos</strong> de estos días para el vencimiento (ej: 16 = contratos con menos de 16 días restantes)
                 </p>
               </div>
 

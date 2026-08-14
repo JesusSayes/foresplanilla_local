@@ -44,7 +44,7 @@ export default function ProcessRenewalModal({
         const daysUntilExpiration = differenceInDays(endDate, today);
         const matchingRules = activeRules.filter(rule => {
           const typeMatches = (rule.contract_types || []).includes(c.contract_type);
-          const daysMatch = daysUntilExpiration <= rule.days_before_expiration && daysUntilExpiration > 0;
+          const daysMatch = daysUntilExpiration < rule.days_before_expiration && daysUntilExpiration > 0;
           const renewableMatch = !rule.only_renewable || c.renewable;
           return typeMatches && daysMatch && renewableMatch;
         });
