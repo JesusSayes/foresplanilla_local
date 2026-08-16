@@ -19,7 +19,6 @@ import PayslipPreview from "../components/payroll/PayslipPreview";
 import PlanillaCompletaView from "../components/payroll/PlanillaCompletaView";
 import ConfigFirmantesModal from "../components/payroll/ConfigFirmantesModal";
 import { safePayrollNumber, formatMoney } from "@/lib/payrollUtils";
-import { getActiveEmpresaCodigo, resolveMapeos } from "@/lib/empresaContable";
 
 const TIPO_COLORS = {
   Quincenal:    "bg-blue-100 text-blue-700 border-blue-200",
@@ -112,11 +111,6 @@ export default function ConsultaPlanillas() {
     queryFn: () => base44.entities.CostCenter.list("code"),
   });
 
-  const { data: configContable = [] } = useQuery({
-    queryKey: ["configuracionContable", getActiveEmpresaCodigo()],
-    queryFn: () => base44.entities.ConfiguracionContable.filter({ empresa_codigo: getActiveEmpresaCodigo() }),
-  });
-
   // Agrupar boletas en cabeceras de planilla
   const grupos = React.useMemo(() => {
     const map = {};
@@ -205,18 +199,6 @@ export default function ConsultaPlanillas() {
       const fechaRegistro = format(new Date(), "yyyy-MM-dd");
       const comprobante = grupo.payroll_number || `${isSNP ? "RH" : "PL"}-${annomes}`;
 
-      // Resolver cuentas desde la configuración contable de la empresa activa
-      const empresaCodigo = getActiveEmpresaCodigo();
-      const mapeos = resolveMapeos(configContable, "tipo_planilla", payrollType);
-      const mapeoDebe = mapeos.find(m => m.debe_haber === "D");
-      const mapeosHaber = mapeos.filter(m => m.debe_haber === "H");
-      const mapeoNeto = mapeosHaber[0];
-      const mapeoDescuentos = mapeosHaber[1];
-      const subdiarioDefault = mapeoDebe?.subdiario || (isSNP ? "07" : "08");
-      const cuentaDebe = mapeoDebe?.cuenta || (isSNP ? "6320000" : "6210000");
-      const cuentaNetoCfg = mapeoNeto?.cuenta || (isSNP ? "4212100" : "4110000");
-      const cuentaDescuentosCfg = mapeoDescuentos?.cuenta || (isSNP ? "4017100" : "4030000");
-
       // Eliminar asientos anteriores de esta planilla para actualizar
       const existing = allAsientos.filter(
         a => a.payroll_period === period && a.payroll_type === payrollType &&
@@ -260,8 +242,7 @@ export default function ConsultaPlanillas() {
           // Campos comunes a todos los movimientos de este trabajador
           const base = {
             annomes,
-            empresa_codigo: empresaCodigo,
-            subdiario: subdiarioDefault,
+            subdiario: "07",           // Subdiario Honorarios
             comprobante,
             fecha_doc: fechaDoc,
             fecha_vencimiento: fechaDoc,
@@ -285,31 +266,31 @@ export default function ConsultaPlanillas() {
             anulado: false,
           };
 
-          // DEBE: cuenta configurable (honorarios brutos)
+          // DEBE: 6320000 Servicios de Terceros (honorarios brutos)
           asientosToCreate.push({
             ...base,
-            cuenta: cuentaDebe,
+            cuenta: "6320000",
             importe: importeBruto,
             importe_soles: importeBruto,
             debe_haber: "D",
             glosa_mov: `${glosaEmp} - Honorario bruto`,
           });
 
-          // HABER: cuenta configurable (neto a pagar)
+          // HABER: 4212100 Honorarios por pagar (neto)
           asientosToCreate.push({
             ...base,
-            cuenta: cuentaNetoCfg,
+            cuenta: "4212100",
             importe: importeNeto,
             importe_soles: importeNeto,
             debe_haber: "H",
             glosa_mov: `${glosaEmp} - Neto a pagar`,
           });
 
-          // HABER: cuenta configurable (retención 4ta categoría)
+          // HABER: 4017100 Retención de 4ta categoría (si hay descuentos)
           if (importeRet > 0) {
             asientosToCreate.push({
               ...base,
-              cuenta: cuentaDescuentosCfg,
+              cuenta: "4017100",
               importe: importeRet,
               importe_soles: importeRet,
               debe_haber: "H",
@@ -355,8 +336,7 @@ export default function ConsultaPlanillas() {
 
           const base = {
             annomes,
-            empresa_codigo: empresaCodigo,
-            subdiario: subdiarioDefault,
+            subdiario: "08",
             comprobante,
             fecha_doc: fechaDoc,
             fecha_registro: fechaRegistro,
@@ -378,7 +358,7 @@ export default function ConsultaPlanillas() {
 
           asientosToCreate.push({
             ...base,
-            cuenta: cuentaDebe,
+            cuenta: "6210000",
             importe: Math.round(data.totalIncome * 100) / 100,
             importe_soles: Math.round(data.totalIncome * 100) / 100,
             debe_haber: "D",
@@ -387,7 +367,7 @@ export default function ConsultaPlanillas() {
 
           asientosToCreate.push({
             ...base,
-            cuenta: cuentaNetoCfg,
+            cuenta: "4110000",
             importe: Math.round(data.totalNeto * 100) / 100,
             importe_soles: Math.round(data.totalNeto * 100) / 100,
             debe_haber: "H",
@@ -397,7 +377,7 @@ export default function ConsultaPlanillas() {
           if (data.totalDeductions > 0) {
             asientosToCreate.push({
               ...base,
-              cuenta: cuentaDescuentosCfg,
+              cuenta: "4030000",
               importe: Math.round(data.totalDeductions * 100) / 100,
               importe_soles: Math.round(data.totalDeductions * 100) / 100,
               debe_haber: "H",

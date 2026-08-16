@@ -6,11 +6,6 @@
       "type": "string",
       "description": "Per\u00edodo contable en formato AAAAMM (ej: 202604)"
     },
-    "empresa_codigo": {
-      "type": "string",
-      "default": "003",
-      "description": "C\u00f3digo de empresa (001/002 prueba, 003 final). Los asientos legacy sin este campo se asocian a la empresa 003."
-    },
     "subdiario": {
       "type": "string",
       "description": "C\u00f3digo del subdiario contable (ej: 08=Planillas, 01=Caja, etc.)"
