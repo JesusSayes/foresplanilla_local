@@ -9,8 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search, Download, Upload, RefreshCw, CheckCircle, XCircle,
-  AlertCircle, Clock, BookOpen, Filter, Eye, Loader2
+  AlertCircle, Clock, BookOpen, Filter, Eye, Loader2, Settings, Copy, Building2
 } from "lucide-react";
+import ConfiguracionContableModal from "@/components/contabilidad/ConfiguracionContableModal";
+import { EMPRESAS_CONTABLES, getActiveEmpresaCodigo, setActiveEmpresaCodigo as saveEmpresaActiva } from "@/lib/empresaContable";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -52,6 +54,16 @@ export default function AsientosContables() {
   // Detail modal
   const [selectedAsiento, setSelectedAsiento] = useState(null);
   const [migratingIds, setMigratingIds] = useState(new Set());
+  const [activeEmpresaCodigo, setActiveEmpresaCodigo] = useState(getActiveEmpresaCodigo());
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [replicating, setReplicating] = useState(false);
+
+  const activeEmpresa = EMPRESAS_CONTABLES.find(e => e.codigo === activeEmpresaCodigo) || EMPRESAS_CONTABLES[2];
+
+  const handleEmpresaChange = (v) => {
+    setActiveEmpresaCodigo(v);
+    saveEmpresaActiva(v);
+  };
 
   useEffect(() => {
     base44.auth.me().then(user => {
@@ -114,7 +126,10 @@ export default function AsientosContables() {
     const matchDH = filterDH === "all" || a.debe_haber === filterDH;
     const matchAnulado = filterAnulado === "all" || (filterAnulado === "si" ? a.anulado : !a.anulado);
     const matchTipoPlanilla = filterTipoPlanilla === "all" || a.payroll_type === filterTipoPlanilla;
-    return matchSearch && matchPeriodo && matchSubdiario && matchOrigen && matchMigracion && matchDH && matchAnulado && matchTipoPlanilla;
+    const matchEmpresa = activeEmpresaCodigo === "003"
+      ? (!a.empresa_codigo || a.empresa_codigo === "003")
+      : a.empresa_codigo === activeEmpresaCodigo;
+    return matchSearch && matchPeriodo && matchSubdiario && matchOrigen && matchMigracion && matchDH && matchAnulado && matchTipoPlanilla && matchEmpresa;
   });
 
   // Estadísticas
@@ -201,6 +216,47 @@ export default function AsientosContables() {
       });
     }
     toast.success(`${pendientes.length} asientos marcados como migrados`);
+  };
+
+  // Replicar asientos de empresa de prueba (001/002) a empresa final (003)
+  const handleReplicarEmpresaFinal = async () => {
+    const pendientes = filtered.filter(a => a.estado_migracion === "Pendiente" && !a.anulado);
+    if (pendientes.length === 0) {
+      toast.info("No hay asientos pendientes para replicar en la selección actual");
+      return;
+    }
+    if (!confirm(`¿Replicar ${pendientes.length} asientos a la Empresa Final (003)?\n\nLos asientos actuales se marcarán como Migrados y se crearán copias en la empresa 003.`)) return;
+    setReplicating(true);
+    try {
+      const copias = pendientes.map(a => {
+        const { id, created_date, updated_date, created_by_id, ...rest } = a;
+        return {
+          ...rest,
+          empresa_codigo: "003",
+          estado_migracion: "Pendiente",
+          migrado: false,
+          fecha_migracion: null,
+          migrado_por: "",
+          error_migracion: "",
+        };
+      });
+      await base44.entities.AsientoContable.bulkCreate(copias);
+      for (const a of pendientes) {
+        await base44.entities.AsientoContable.update(a.id, {
+          estado_migracion: "Migrado",
+          migrado: true,
+          fecha_migracion: new Date().toISOString(),
+          migrado_por: currentUser?.email || "",
+        });
+      }
+      queryClient.invalidateQueries(["asientosContables"]);
+      toast.success(`${pendientes.length} asientos replicados a Empresa Final (003)`);
+    } catch (error) {
+      toast.error("Error al replicar asientos");
+      console.error(error);
+    } finally {
+      setReplicating(false);
+    }
   };
 
   // Exporta con la cadena de conexión exacta que requiere el sistema contable externo
@@ -293,7 +349,40 @@ export default function AsientosContables() {
             </h1>
             <p className="text-slate-600 text-lg">Consulta, control y migración de asientos al sistema contable</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
+            {/* Selector global de empresa */}
+            <Select value={activeEmpresaCodigo} onValueChange={handleEmpresaChange}>
+              <SelectTrigger className="w-56">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-slate-500" />
+                  <SelectValue />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {EMPRESAS_CONTABLES.map((emp) => (
+                  <SelectItem key={emp.codigo} value={emp.codigo}>
+                    {emp.codigo} — {emp.nombre} {emp.es_prueba ? "(Prueba)" : "(Final)"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {activeEmpresa?.es_prueba && (
+              <Badge className="bg-amber-100 text-amber-700 border-amber-200">Modo Prueba</Badge>
+            )}
+            <Button variant="outline" onClick={() => setShowConfigModal(true)}>
+              <Settings className="w-4 h-4 mr-2" />Configuración Contable
+            </Button>
+            {activeEmpresa?.es_prueba && (
+              <Button
+                variant="outline"
+                className="bg-green-600 text-white hover:bg-green-700"
+                onClick={handleReplicarEmpresaFinal}
+                disabled={replicating}
+              >
+                {replicating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Copy className="w-4 h-4 mr-2" />}
+                Replicar a Empresa Final
+              </Button>
+            )}
             <Button variant="outline" onClick={() => queryClient.invalidateQueries(["asientosContables"])}>
               <RefreshCw className="w-4 h-4 mr-2" />Actualizar
             </Button>
@@ -571,6 +660,13 @@ export default function AsientosContables() {
             onClose={() => setSelectedAsiento(null)}
           />
         )}
+
+        {/* Modal configuración contable */}
+        <ConfiguracionContableModal
+          open={showConfigModal}
+          onClose={() => setShowConfigModal(false)}
+          empresaActiva={activeEmpresa}
+        />
       </div>
     </div>
   );
