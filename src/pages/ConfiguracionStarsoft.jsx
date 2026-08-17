@@ -15,11 +15,8 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
-const EMPRESAS = [
-  { code: "001", label: "001 — Empresa de Prueba", tipo: "Prueba", color: "bg-amber-100 text-amber-700 border-amber-300" },
-  { code: "002", label: "002 — Empresa de Prueba", tipo: "Prueba", color: "bg-amber-100 text-amber-700 border-amber-300" },
-  { code: "003", label: "003 — Producción", tipo: "Producción", color: "bg-green-100 text-green-700 border-green-300" },
-];
+const EMPRESA_PRODUCCION = "003";
+const esProduccion = (code) => String(code).padStart(3, "0") === EMPRESA_PRODUCCION;
 
 export default function ConfiguracionStarsoft() {
   const queryClient = useQueryClient();
@@ -112,7 +109,7 @@ export default function ConfiguracionStarsoft() {
     }
   };
 
-  const empresaActual = EMPRESAS.find(e => e.code === form.cod_empresa) || EMPRESAS[2];
+  const esProd = esProduccion(form.cod_empresa);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -192,31 +189,64 @@ export default function ConfiguracionStarsoft() {
             {/* Selector de empresa */}
             <div>
               <Label className="text-sm font-semibold text-slate-700 mb-2 block">
-                Código de Empresa (codEmpresa) <span className="text-red-500">*</span>
+                Empresa Destino <span className="text-red-500">*</span>
               </Label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {EMPRESAS.map(emp => (
-                  <button
-                    key={emp.code}
-                    type="button"
-                    onClick={() => setForm({ ...form, cod_empresa: emp.code })}
-                    className={`p-4 rounded-xl border-2 transition-all text-left ${
-                      form.cod_empresa === emp.code
-                        ? "border-indigo-500 bg-indigo-50 shadow-md"
-                        : "border-slate-200 bg-white hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-slate-900 text-lg">{emp.code}</span>
-                      <Badge className={emp.color}>{emp.tipo}</Badge>
-                    </div>
-                    <p className="text-xs text-slate-500">{emp.label.replace(/^\d{3} — /, "")}</p>
-                  </button>
-                ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Prueba (editable) */}
+                <button
+                  type="button"
+                  onClick={() => !esProd && setForm({ ...form, cod_empresa: form.cod_empresa || "001" })}
+                  className={`p-4 rounded-xl border-2 transition-all text-left ${
+                    !esProd
+                      ? "border-amber-500 bg-amber-50 shadow-md"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-slate-900 text-lg">Empresa de Prueba</span>
+                    <Badge className="bg-amber-100 text-amber-700 border-amber-300">Prueba</Badge>
+                  </div>
+                  <p className="text-xs text-slate-500">Código editable (001, 002, 04, 06, …)</p>
+                </button>
+
+                {/* Producción (fijo 003) */}
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, cod_empresa: EMPRESA_PRODUCCION })}
+                  className={`p-4 rounded-xl border-2 transition-all text-left ${
+                    esProd
+                      ? "border-green-500 bg-green-50 shadow-md"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-slate-900 text-lg">003 — Producción</span>
+                    <Badge className="bg-green-100 text-green-700 border-green-300">Producción</Badge>
+                  </div>
+                  <p className="text-xs text-slate-500">Código fijo (no editable)</p>
+                </button>
               </div>
-              <p className="text-xs text-slate-400 mt-2">
-                Por defecto: <strong>003 (Producción)</strong>. 001 y 002 son empresas de prueba.
-              </p>
+
+              {/* Campo editable del código de empresa de prueba */}
+              {!esProd && (
+                <div className="mt-3">
+                  <Label className="text-sm font-semibold text-slate-700">Código de Empresa (codEmpresa)</Label>
+                  <Input
+                    value={form.cod_empresa}
+                    onChange={e => setForm({ ...form, cod_empresa: e.target.value })}
+                    placeholder="001, 002, 04, 06, ..."
+                    className="mt-1.5 max-w-xs"
+                  />
+                  <p className="text-xs text-amber-600 mt-1.5">
+                    Ingrese el código de la empresa de prueba en Starsoft.
+                  </p>
+                </div>
+              )}
+              {esProd && (
+                <p className="text-xs text-green-600 mt-2">
+                  Empresa de producción fija en <strong>003</strong>.
+                </p>
+              )}
             </div>
 
             {/* Código de sistema */}
@@ -324,15 +354,17 @@ export default function ConfiguracionStarsoft() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${empresaActual.color.split(" ")[0]}`}>
-                  <Building2 className={`w-5 h-5 ${empresaActual.color.split(" ")[1]}`} />
+                <div className={`p-2 rounded-lg ${esProd ? "bg-green-100" : "bg-amber-100"}`}>
+                  <Building2 className={`w-5 h-5 ${esProd ? "text-green-700" : "text-amber-700"}`} />
                 </div>
                 <div>
                   <p className="text-sm text-slate-500">Empresa destino actual</p>
-                  <p className="font-bold text-slate-900">{empresaActual.label}</p>
+                  <p className="font-bold text-slate-900">{form.cod_empresa || "—"} {esProd ? "(Producción)" : "(Prueba)"}</p>
                 </div>
               </div>
-              <Badge className={empresaActual.color}>{empresaActual.tipo}</Badge>
+              <Badge className={esProd ? "bg-green-100 text-green-700 border-green-300" : "bg-amber-100 text-amber-700 border-amber-300"}>
+                {esProd ? "Producción" : "Prueba"}
+              </Badge>
             </div>
           </CardContent>
         </Card>

@@ -17,13 +17,8 @@
     },
     "cod_empresa": {
       "type": "string",
-      "enum": [
-        "001",
-        "002",
-        "003"
-      ],
       "default": "003",
-      "description": "C\u00f3digo de empresa Starsoft destino. 001 y 002 son empresas de prueba; 003 es producci\u00f3n (valor por defecto)."
+      "description": "C\u00f3digo de empresa Starsoft destino. 003 es producci\u00f3n (valor fijo). Para pruebas puede ser cualquier c\u00f3digo editable (001, 002, 04, 06, etc.)."
     },
     "cod_sistema": {
       "type": "string",
