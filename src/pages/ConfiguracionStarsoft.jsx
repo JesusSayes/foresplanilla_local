@@ -28,8 +28,11 @@ export default function ConfiguracionStarsoft() {
     cod_sistema: "01",
     auth_url: "",
     api_url: "",
+    client_id: "",
+    client_secret: "",
     notes: "",
   });
+  const [showSecret, setShowSecret] = useState(false);
   const [configId, setConfigId] = useState(null);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
@@ -49,6 +52,8 @@ export default function ConfiguracionStarsoft() {
         cod_sistema: c.cod_sistema || "01",
         auth_url: c.auth_url || "",
         api_url: c.api_url || "",
+        client_id: c.client_id || "",
+        client_secret: c.client_secret || "",
         notes: c.notes || "",
       });
       if (c.last_test_status) {
@@ -123,7 +128,7 @@ export default function ConfiguracionStarsoft() {
           </p>
         </div>
 
-        {/* Estado de credenciales (secretos) */}
+        {/* Credenciales de API */}
         <Card className="border-0 shadow-lg mb-6">
           <CardHeader className="border-b bg-slate-50/50">
             <CardTitle className="text-base flex items-center gap-2">
@@ -131,31 +136,45 @@ export default function ConfiguracionStarsoft() {
               Credenciales de API
             </CardTitle>
             <CardDescription>
-              ClientID y ClientSecret se gestionan como secretos del backend por seguridad. Configúrelos en el dashboard de la app (Settings → Secrets).
+              ClientID y ClientSecret generados en Starsoft para el uso de las APIs. Se almacenan en la configuración con acceso restringido a administradores.
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-4 space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-slate-500" />
-                  <span className="text-sm font-medium text-slate-700">STARSOFT_CLIENT_ID</span>
-                </div>
-                <Badge className="bg-slate-200 text-slate-600">Secreto</Badge>
+          <CardContent className="p-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-semibold text-slate-700">ClientID <span className="text-red-500">*</span></Label>
+                <Input
+                  type={showSecret ? "text" : "password"}
+                  value={form.client_id}
+                  onChange={e => setForm({ ...form, client_id: e.target.value })}
+                  placeholder="Ingrese el ClientID"
+                  className="mt-1.5"
+                />
               </div>
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-slate-500" />
-                  <span className="text-sm font-medium text-slate-700">STARSOFT_CLIENT_SECRET</span>
-                </div>
-                <Badge className="bg-slate-200 text-slate-600">Secreto</Badge>
+              <div>
+                <Label className="text-sm font-semibold text-slate-700">ClientSecret <span className="text-red-500">*</span></Label>
+                <Input
+                  type={showSecret ? "text" : "password"}
+                  value={form.client_secret}
+                  onChange={e => setForm({ ...form, client_secret: e.target.value })}
+                  placeholder="Ingrese el ClientSecret"
+                  className="mt-1.5"
+                />
               </div>
             </div>
+            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showSecret}
+                onChange={e => setShowSecret(e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              Mostrar credenciales
+            </label>
             <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
               <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
               <p className="text-sm text-blue-700">
-                Use el botón <strong>Probar Conexión</strong> para verificar que los secretos estén correctamente configurados.
-                Si la prueba falla con "Credenciales no configuradas", defina los secretos en el dashboard.
+                Use el botón <strong>Probar Conexión</strong> para verificar que las credenciales y la empresa destino sean válidas.
               </p>
             </div>
           </CardContent>

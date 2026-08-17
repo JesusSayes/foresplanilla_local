@@ -1,5 +1,4 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.40";
-import { secrets } from "base44:runtime";
 
 export default async function (req: Request): Promise<Response> {
   try {
@@ -27,12 +26,12 @@ export default async function (req: Request): Promise<Response> {
       );
     }
 
-    // Leer credenciales desde secretos
-    const clientId = secrets.get("STARSOFT_CLIENT_ID");
-    const clientSecret = secrets.get("STARSOFT_CLIENT_SECRET");
+    // Leer credenciales desde la configuración (entidad)
+    const clientId = config.client_id;
+    const clientSecret = config.client_secret;
     if (!clientId || !clientSecret) {
       return Response.json(
-        { error: "Credenciales Starsoft no configuradas. Defina STARSOFT_CLIENT_ID y STARSOFT_CLIENT_SECRET en el dashboard de secretos." },
+        { error: "Credenciales Starsoft no configuradas. Ingrese ClientID y ClientSecret en la página de Configuración Starsoft." },
         { status: 400 }
       );
     }
