@@ -194,7 +194,7 @@ export default function ConfiguracionStarsoft() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Prueba (editable) */}
                 <div
-                  onClick={() => !esProd && setForm({ ...form, cod_empresa: form.cod_empresa || "001" })}
+                  onClick={() => setForm({ ...form, cod_empresa: esProd ? "001" : (form.cod_empresa || "001") })}
                   className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
                     !esProd
                       ? "border-amber-500 bg-amber-50 shadow-md"
