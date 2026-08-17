@@ -610,6 +610,8 @@ model payslip {
   food_cost_amount        Decimal?  @db.Decimal(18, 2)
   transport_cost_amount   Decimal?  @db.Decimal(18, 2)
   calculation_summary     Json?
+  overtime_hours_25       Decimal?  @default(0) @db.Decimal(18, 2)
+  overtime_hours_35       Decimal?  @default(0) @db.Decimal(18, 2)
 }
 
 model payslip_template {

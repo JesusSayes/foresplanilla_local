@@ -124,6 +124,8 @@ export const bulkCreate = async (req, res) => {
         subsidized_days: Number(p.subsidized_days || 0),
         regular_hours: Number(p.regular_hours || 0),
         overtime_hours: Number(p.overtime_hours || 0),
+        overtime_hours_25: Number(p.overtime_hours_25 || 0),
+        overtime_hours_35: Number(p.overtime_hours_35 || 0),
         base_salary: Number(p.base_salary || 0),
         family_allowance: Number(p.family_allowance || 0),
         activity_cost_amount: Number(p.activity_cost_amount || 0),
