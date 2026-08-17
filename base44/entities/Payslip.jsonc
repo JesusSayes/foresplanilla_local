@@ -69,7 +69,17 @@
     "overtime_hours": {
       "type": "number",
       "default": 0,
-      "description": "Horas extras trabajadas"
+      "description": "Horas extras trabajadas (suma total: HE 25% + HE 35%)"
+    },
+    "overtime_hours_25": {
+      "type": "number",
+      "default": 0,
+      "description": "Horas extras al 25% (primeras 2h extra del d\u00eda). Sumadas desde attendance_record.overtime_hours_25."
+    },
+    "overtime_hours_35": {
+      "type": "number",
+      "default": 0,
+      "description": "Horas extras al 35% (a partir de la 3ra hora extra del d\u00eda). Sumadas desde attendance_record.overtime_hours_35."
     },
     "base_salary": {
       "type": "number",
