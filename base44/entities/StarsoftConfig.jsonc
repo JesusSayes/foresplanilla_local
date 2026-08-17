@@ -1,0 +1,150 @@
+{
+  "name": "StarsoftConfig",
+  "type": "object",
+  "properties": {
+    "config_name": {
+      "type": "string",
+      "default": "Configuraci\u00f3n Starsoft",
+      "description": "Nombre identificador de la configuraci\u00f3n"
+    },
+    "cod_empresa": {
+      "type": "string",
+      "enum": [
+        "001",
+        "002",
+        "003"
+      ],
+      "default": "003",
+      "description": "C\u00f3digo de empresa Starsoft destino. 001 y 002 son empresas de prueba; 003 es producci\u00f3n (valor por defecto)."
+    },
+    "cod_sistema": {
+      "type": "string",
+      "default": "01",
+      "description": "C\u00f3digo del sistema Starsoft enviado en la autenticaci\u00f3n"
+    },
+    "auth_url": {
+      "type": "string",
+      "description": "URL del endpoint de autenticaci\u00f3n de Starsoft (POST con clientID, clientSecret, codEmpresa, codSistema)"
+    },
+    "api_url": {
+      "type": "string",
+      "description": "URL del endpoint de env\u00edo/migraci\u00f3n de asientos contables de Starsoft (POST con Bearer token)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Configuraci\u00f3n activa (se usa la primera activa para migrar)"
+    },
+    "last_test_status": {
+      "type": "string",
+      "enum": [
+        "",
+        "success",
+        "error"
+      ],
+      "default": "",
+      "description": "Resultado de la \u00faltima prueba de conexi\u00f3n"
+    },
+    "last_test_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de la \u00faltima prueba de conexi\u00f3n"
+    },
+    "last_test_message": {
+      "type": "string",
+      "description": "Mensaje devuelto en la \u00faltima prueba de conexi\u00f3n"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "cod_empresa",
+    "auth_url",
+    "api_url"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_accounting": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_accounting": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_view_accounting": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_accounting": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_accounting": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    }
+  }
+}

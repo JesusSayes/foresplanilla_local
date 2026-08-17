@@ -9,6 +9,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import BeneficiosSociales from './pages/BeneficiosSociales';
+import ConfiguracionStarsoft from './pages/ConfiguracionStarsoft';
 import HistorialRemunerativo from './pages/HistorialRemunerativo';
 import CompensacionTardanzas from './pages/CompensacionTardanzas';
 import PageGuard from '@/components/PageGuard';
@@ -71,6 +72,7 @@ const AuthenticatedApp = () => {
         );
       })}
       <Route path="/BeneficiosSociales" element={<LayoutWrapper currentPageName="BeneficiosSociales"><PageGuard requiredPermission="payroll.view_all"><BeneficiosSociales /></PageGuard></LayoutWrapper>} />
+      <Route path="/ConfiguracionStarsoft" element={<LayoutWrapper currentPageName="ConfiguracionStarsoft"><PageGuard {...PAGE_PERMISSIONS.ConfiguracionStarsoft}><ConfiguracionStarsoft /></PageGuard></LayoutWrapper>} />
       <Route path="/HistorialRemunerativo" element={<LayoutWrapper currentPageName="HistorialRemunerativo"><PageGuard requiredPermission="payroll.view_all"><HistorialRemunerativo /></PageGuard></LayoutWrapper>} />
       <Route path="/CompensacionTardanzas" element={<LayoutWrapper currentPageName="CompensacionTardanzas"><PageGuard {...PAGE_PERMISSIONS.CompensacionTardanzas}><CompensacionTardanzas /></PageGuard></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />

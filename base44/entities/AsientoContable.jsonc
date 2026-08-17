@@ -159,6 +159,16 @@
       ],
       "description": "Tipo de planilla relacionada"
     },
+    "empresa": {
+      "type": "string",
+      "enum": [
+        "001",
+        "002",
+        "003"
+      ],
+      "default": "003",
+      "description": "C\u00f3digo de empresa Starsoft destino (001/002=prueba, 003=producci\u00f3n). Se incluye en la trama enviada al API."
+    },
     "migrado": {
       "type": "boolean",
       "default": false,

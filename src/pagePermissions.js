@@ -24,6 +24,7 @@ export const PAGE_PERMISSIONS = {
   SunatExport: { requiredPermission: "payroll.view_all" },
   AsientosContables: { requiredPermission: "payroll.view_all" },
   CuentasContables: { requiredPermission: "payroll.view_all" },
+  ConfiguracionStarsoft: { requiredAnyPermissions: ["accounting.manage", "system.admin"] },
   BeneficiosSociales: { requiredPermission: "payroll.view_all" },
   HistorialRemunerativo: { requiredPermission: "payroll.view_all" },
   PayrollConcepts: { requiredPermission: "payroll.view_all" },
