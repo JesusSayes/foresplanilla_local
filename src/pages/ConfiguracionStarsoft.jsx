@@ -193,21 +193,31 @@ export default function ConfiguracionStarsoft() {
               </Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Prueba (editable) */}
-                <button
-                  type="button"
+                <div
                   onClick={() => !esProd && setForm({ ...form, cod_empresa: form.cod_empresa || "001" })}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${
+                  className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
                     !esProd
                       ? "border-amber-500 bg-amber-50 shadow-md"
                       : "border-slate-200 bg-white hover:border-slate-300"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-slate-900 text-lg">Empresa de Prueba</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-slate-900 text-base">Empresa de Prueba</span>
                     <Badge className="bg-amber-100 text-amber-700 border-amber-300">Prueba</Badge>
                   </div>
-                  <p className="text-xs text-slate-500">Código editable (001, 002, 04, 06, …)</p>
-                </button>
+                  <Label className="text-xs font-medium text-slate-500 mb-1 block">Código de empresa</Label>
+                  <Input
+                    value={esProd ? "" : form.cod_empresa}
+                    onChange={e => setForm({ ...form, cod_empresa: e.target.value })}
+                    onClick={e => e.stopPropagation()}
+                    placeholder="001, 002, 004, 006..."
+                    disabled={esProd}
+                    className={`text-lg font-bold ${esProd ? "opacity-40" : "border-amber-300 bg-white focus:border-amber-500"}`}
+                  />
+                  <p className="text-xs text-amber-600 mt-1.5">
+                    Escriba aquí el código de la empresa de prueba.
+                  </p>
+                </div>
 
                 {/* Producción (fijo 003) */}
                 <button
@@ -224,29 +234,13 @@ export default function ConfiguracionStarsoft() {
                     <Badge className="bg-green-100 text-green-700 border-green-300">Producción</Badge>
                   </div>
                   <p className="text-xs text-slate-500">Código fijo (no editable)</p>
+                  {esProd && (
+                    <p className="text-xs text-green-600 mt-1.5 font-medium">
+                      ✓ Empresa de producción seleccionada
+                    </p>
+                  )}
                 </button>
               </div>
-
-              {/* Campo editable del código de empresa de prueba */}
-              {!esProd && (
-                <div className="mt-3">
-                  <Label className="text-sm font-semibold text-slate-700">Código de Empresa (codEmpresa)</Label>
-                  <Input
-                    value={form.cod_empresa}
-                    onChange={e => setForm({ ...form, cod_empresa: e.target.value })}
-                    placeholder="001, 002, 04, 06, ..."
-                    className="mt-1.5 max-w-xs"
-                  />
-                  <p className="text-xs text-amber-600 mt-1.5">
-                    Ingrese el código de la empresa de prueba en Starsoft.
-                  </p>
-                </div>
-              )}
-              {esProd && (
-                <p className="text-xs text-green-600 mt-2">
-                  Empresa de producción fija en <strong>003</strong>.
-                </p>
-              )}
             </div>
 
             {/* Código de sistema */}
