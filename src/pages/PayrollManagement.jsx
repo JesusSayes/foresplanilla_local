@@ -257,6 +257,19 @@ export default function PayrollManagement() {
   });
   const { data: payrollConfig } = payrollConfigQuery;
 
+  // Vacaciones aprobadas: se consultan con datos frescos al calcular la planilla
+  // para excluir del descuento por tardanzas/inasistencias los días cubiertos por
+  // vacaciones aprobadas (incluso si el AttendanceRecord tiene valores residuales).
+  const vacationsQuery = useQuery({
+    queryKey: ["approvedVacations"],
+    queryFn: async () => {
+      const all = await withRetry(() => base44.entities.VacationRequest.list("-created_date", 2000));
+      return all.filter(v => v.status === "Aprobada" || v.status === "Aprobado");
+    },
+    staleTime: 0,
+  });
+  const { data: approvedVacations = [] } = vacationsQuery;
+
   // Bandera combinada de carga/errores de los datos críticos para el cálculo de planilla.
   // Diferencia una consulta pendiente (payrollDataLoading=true) de un resultado válido vacío.
   const payrollDataLoading =
@@ -266,7 +279,8 @@ export default function PayrollManagement() {
     payrollConceptsQuery.isPending ||
     rmvQuery.isPending ||
     afpsQuery.isPending ||
-    payrollConfigQuery.isPending;
+    payrollConfigQuery.isPending ||
+    vacationsQuery.isPending;
 
   const payrollDataError =
     employeesQuery.isError ||
@@ -275,7 +289,8 @@ export default function PayrollManagement() {
     payrollConceptsQuery.isError ||
     rmvQuery.isError ||
     afpsQuery.isError ||
-    payrollConfigQuery.isError;
+    payrollConfigQuery.isError ||
+    vacationsQuery.isError;
 
   const createPayslipsMutation = useMutation({
     mutationFn: async (payslips) => {
@@ -439,6 +454,7 @@ export default function PayrollManagement() {
         ["allAfps"],
         ["payrollConfig"],
         ["payslips", selectedMonth, selectedYear],
+        ["approvedVacations"],
       ];
       await Promise.all(criticalKeys.map(key => queryClient.refetchQueries({ queryKey: key, exact: true })));
 
@@ -457,6 +473,7 @@ export default function PayrollManagement() {
       const allAfps = queryClient.getQueryData(["allAfps"]) ?? [];
       const payrollConfig = queryClient.getQueryData(["payrollConfig"]) ?? { quincenal_percentage: 40, quincenal_cutoff_day: 7 };
       const existingPayslips = queryClient.getQueryData(["payslips", selectedMonth, selectedYear]) ?? [];
+      const approvedVacations = queryClient.getQueryData(["approvedVacations"]) ?? [];
 
       const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
     
@@ -813,8 +830,25 @@ export default function PayrollManagement() {
       }
 
       // Calcular descuentos por asistencia (solo para planillas NO quincenales)
-      const lateRecords = empAttendance.filter(r => r.is_late && r.late_minutes > 10);
-      const absentRecords = empAttendance.filter(r => r.is_absent);
+      // Excluir los registros cubiertos por vacaciones aprobadas: un día de
+      // vacaciones no debe generar descuento por tardanza ni por inasistencia,
+      // incluso si el AttendanceRecord tiene valores residuales (is_late,
+      // late_minutes, is_absent) por haberse aprobado la vacación después.
+      const normDate = (d) => (d ? String(d).split("T")[0].slice(0, 10) : "");
+      const isCoveredByApprovedVacation = (employeeId, recordDate) => {
+        const d = normDate(recordDate);
+        return approvedVacations.some(vacation =>
+          vacation.employee_id === employeeId &&
+          normDate(vacation.start_date) <= d &&
+          normDate(vacation.end_date) >= d
+        );
+      };
+      const attendanceForDiscounts = empAttendance.filter(
+        record => !isCoveredByApprovedVacation(emp.id, record.date)
+      );
+
+      const lateRecords = attendanceForDiscounts.filter(r => r.is_late && Number(r.late_minutes || 0) > 10);
+      const absentRecords = attendanceForDiscounts.filter(r => r.is_absent);
 
       // Datos adicionales para lógica del sistema (derechohabientes, tardanzas, inasistencias)
       const extraContext = {
