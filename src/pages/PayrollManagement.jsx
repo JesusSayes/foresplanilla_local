@@ -31,6 +31,14 @@ import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUp
 import { safePayrollNumber, roundMoney, sanitizePayslip } from "@/lib/payrollUtils";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 import { isEmploymentDateValid } from "@/lib/employmentDate";
+import {
+  _normStr,
+  sumIncomesByCategory,
+  sumOvertimeIncomes,
+  getCalculatedBaseSalary,
+  findCalculatedCost,
+  findCalculatedFamilyAllowance,
+} from "@/lib/payrollIncomeHelpers";
 
 // Rate limiter global + retry con backoff exponencial para errores de rate-limit
 // Garantiza un gap mínimo entre TODAS las llamadas API y reintenta en caso de 429
@@ -88,53 +96,9 @@ const createLimiter = (maxConcurrent = 1) => {
 };
 const apiLimiter = createLimiter(2);
 
-// ── Identificación de conceptos calculados dentro de result.incomes ──────────
-// Permite extraer los importes efectivamente calculados por el motor para los
-// campos dedicados de la boleta (remuneración base, costos, asignación familiar).
-const _normStr = (s) => String(s || "").toLowerCase().trim();
-
-// Suma los calculated_amount de los ingresos cuya categoría coincide (normalizada).
-const sumIncomesByCategory = (incomes, category) => {
-  if (!Array.isArray(incomes)) return 0;
-  const cat = _normStr(category);
-  return incomes
-    .filter(c => _normStr(c.concept_category) === cat)
-    .reduce((sum, c) => sum + safePayrollNumber(c.calculated_amount), 0);
-};
-
-// Remuneración base calculada: suma de ingresos con categoría "Remuneración Base".
-// Si no existe el concepto, conserva el salario nominal del contrato (fallback).
-const getCalculatedBaseSalary = (incomes, fallback) => {
-  if (!Array.isArray(incomes)) return safePayrollNumber(fallback);
-  const baseConcepts = incomes.filter(c => _normStr(c.concept_category) === "remuneración base");
-  if (baseConcepts.length === 0) return safePayrollNumber(fallback);
-  return roundMoney(baseConcepts.reduce((s, c) => s + safePayrollNumber(c.calculated_amount), 0));
-};
-
-// Encuentra el monto calculado de un concepto de costo.
-// Primario: la fórmula contiene la variable (activity_cost, food_cost, transport_cost).
-// Respaldo: el nombre del concepto coincide con palabras clave.
-const findCalculatedCost = (incomes, varName, nameKeywords) => {
-  if (!Array.isArray(incomes)) return 0;
-  let match = incomes.find(c => {
-    const f = _normStr(c.calculation_formula);
-    return f && f.includes(varName);
-  });
-  if (match) return safePayrollNumber(match.calculated_amount);
-  match = incomes.find(c => {
-    const n = _normStr(c.concept_name);
-    return nameKeywords.some(kw => n.includes(kw));
-  });
-  return match ? safePayrollNumber(match.calculated_amount) : 0;
-};
-
-// Encuentra la asignación familiar calculada (lógica del sistema o nombre).
-const findCalculatedFamilyAllowance = (incomes) => {
-  if (!Array.isArray(incomes)) return 0;
-  let match = incomes.find(c => c.system_logic_type === "family_allowance");
-  if (!match) match = incomes.find(c => _normStr(c.concept_name).includes("asignación familiar"));
-  return match ? safePayrollNumber(match.calculated_amount) : 0;
-};
+// Helpers de identificación de conceptos (_normStr, sumIncomesByCategory,
+// sumOvertimeIncomes, getCalculatedBaseSalary, findCalculatedCost,
+// findCalculatedFamilyAllowance) importados desde @/lib/payrollIncomeHelpers.
 
 export default function PayrollManagement() {
   const { user: currentUser } = useAuth();
@@ -950,7 +914,7 @@ export default function PayrollManagement() {
         // overtime_pay: suma monetaria de los conceptos de Horas Extras (25%, 35% y, si
         // existe, horas nocturnas) calculados por el motor. Ya están incluidos en
         // total_income vía result.totals.totalIncome, por lo que no se agregan nuevamente.
-        overtime_pay: roundMoney(sumIncomesByCategory(result.incomes, "Horas Extras")),
+        overtime_pay: roundMoney(sumOvertimeIncomes(result.incomes)),
         // Bonificaciones: suma de conceptos de ingreso calculados con categoría "Bonificaciones".
         // La asignación familiar queda excluida (tiene categoría "Asignaciones" y su propia columna).
         bonuses: roundMoney(sumIncomesByCategory(result.incomes, "Bonificaciones")),
@@ -1392,7 +1356,9 @@ export default function PayrollManagement() {
         "Horas Extra": safeNum(p.overtime_hours),
         "Pago HE 25%": hePay ? hePay.pay25 : 0,
         "Pago HE 35%": hePay ? hePay.pay35 : 0,
-        "Pago Horas Extra": safeNum(p.overtime_pay),
+        "Pago Horas Extra": hePay && (safeNum(hePay.pay25) + safeNum(hePay.pay35)) > 0
+          ? roundMoney(safeNum(hePay.pay25) + safeNum(hePay.pay35))
+          : safeNum(p.overtime_pay),
         "Total Ingresos": totalIngresos,
         "AFP Aporte Obligatorio": afp ? afp.aporte : 0,
         "AFP Prima de Seguro": afp ? afp.prima : 0,
