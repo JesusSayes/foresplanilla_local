@@ -163,7 +163,7 @@ export default async function (req: Request): Promise<Response> {
             Accept: "application/json",
             Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify(trama),
+          body: JSON.stringify({ asientos: [trama] }),
         });
         const sendText = await sendRes.text();
         let sendData: any;
@@ -174,8 +174,10 @@ export default async function (req: Request): Promise<Response> {
         }
 
         const ok = sendRes.ok && sendData.success !== false;
+        const datosArr = Array.isArray(sendData.datos) ? sendData.datos[0] : null;
         const code =
-          sendData.codigo || sendData.id || sendData.datos?.codigo || sendData.datos?.id || "OK";
+          sendData.codigo || sendData.id || sendData.datos?.codigo || sendData.datos?.id ||
+          (datosArr?.codigo || datosArr?.id) || "OK";
 
         if (ok) {
           await base44.asServiceRole.entities.AsientoContable.update(a.id, {
