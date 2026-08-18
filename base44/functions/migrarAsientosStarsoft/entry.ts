@@ -116,23 +116,36 @@ export default async function (req: Request): Promise<Response> {
 
     const results = { success: [] as string[], errors: [] as any[] };
 
+    // Starsoft/CONCAR espera fechas en formato DD/MM/YYYY. La entidad las guarda
+    // en ISO (YYYY-MM-DD). Convertimos antes de armar la trama.
+    const toDateDMY = (d: any): string => {
+      if (!d) return "";
+      const s = String(d);
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+      return s;
+    };
+    // annomes debe ser solo dígitos (AAAAMM), sin guiones ni separadores.
+    const sanitizeAnnomes = (a: any): string => String(a || "").replace(/\D/g, "");
+
     for (const a of asientos) {
       // Construir trama con los campos requeridos por Starsoft
       const trama: Record<string, any> = {
         empresa: a.empresa || config.cod_empresa,
         cuenta: a.cuenta || "",
-        annomes: a.annomes || "",
+        annomes: sanitizeAnnomes(a.annomes),
         subdiario: a.subdiario || "",
         comprobante: a.comprobante || "",
-        fecha_Documento: a.fecha_doc || "",
+        fecha_Documento: toDateDMY(a.fecha_doc),
         tipo_Anexo: a.tipo_anexo || "",
         cod_Proveedor: a.cod_anexo || "",
         tipo_Doc: a.tipo_doc || "",
         nro_Doc: a.nro_doc || "",
-        fecha_Vencimiento: a.fecha_vencimiento || a.fecha_doc || "",
+        fecha_Vencimiento: toDateDMY(a.fecha_vencimiento || a.fecha_doc),
         importe_Doc: a.importe ?? 0,
         conversion_Tc: a.conversion_tc || "M",
-        fecha_Registro: a.fecha_registro || "",
+        fecha_Registro: toDateDMY(a.fecha_registro),
         tc: a.tc ?? 1,
         glosa: a.glosa || "",
         destino_Compra: a.centro_costos || "",
@@ -176,8 +189,20 @@ export default async function (req: Request): Promise<Response> {
           });
           results.success.push(a.id);
         } else {
-          const errMsg =
-            sendData.message || sendData.error || sendData.mensaje || `HTTP ${sendRes.status}`;
+          // Extraer el mensaje de rechazo de Starsoft desde los campos que pueda
+          // usar (message, error, mensaje, detail, datos, errors[]). Si no hay
+          // ninguno, mostrar la respuesta cruda para que se vea la causa real.
+          let errMsg =
+            sendData.message || sendData.error || sendData.mensaje ||
+            sendData.detail || sendData.details || "";
+          if (!errMsg && sendData.datos && typeof sendData.datos === "object") {
+            errMsg = sendData.datos.message || sendData.datos.error || sendData.datos.mensaje || "";
+          }
+          if (!errMsg && Array.isArray(sendData.errors)) errMsg = sendData.errors.join("; ");
+          if (!errMsg && Array.isArray(sendData.datos) && sendData.datos.length) {
+            errMsg = sendData.datos.map((x: any) => (typeof x === "string" ? x : JSON.stringify(x))).join("; ");
+          }
+          if (!errMsg) errMsg = `HTTP ${sendRes.status} — Respuesta: ${sendText.slice(0, 400)}`;
           await base44.asServiceRole.entities.AsientoContable.update(a.id, {
             estado_migracion: "Error",
             migrado: false,
@@ -189,6 +214,8 @@ export default async function (req: Request): Promise<Response> {
             comprobante: a.comprobante,
             cuenta: a.cuenta,
             error: errMsg,
+            status: sendRes.status,
+            raw: sendText.slice(0, 1000),
           });
         }
       } catch (err: any) {
