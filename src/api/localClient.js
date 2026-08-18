@@ -99,4 +99,15 @@ export const contractNotificationsAPI = {
   },
 };
 
+export const starsoftAPI = {
+  testConnection: async () => {
+    const response = await localClient.post('/api/starsoft/migrate', { mode: 'test' });
+    return response.data;
+  },
+  migrate: async (data) => {
+    const response = await localClient.post('/api/starsoft/migrate', data);
+    return response.data;
+  },
+};
+
 export default localClient;
