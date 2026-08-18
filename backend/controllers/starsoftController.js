@@ -251,13 +251,14 @@ export const migrate = async (req, res, next) => {
             Accept: 'application/json',
             Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify(trama),
+          body: JSON.stringify({ asientos: [trama] }),
         });
         const sendData = await parseResponse(sendResponse);
         const ok = sendResponse.ok && sendData.success !== false;
 
         if (ok) {
-          const code = sendData.codigo || sendData.id || sendData.datos?.codigo || sendData.datos?.id || 'OK';
+          const datos = Array.isArray(sendData.datos) ? sendData.datos[0] : sendData.datos;
+          const code = sendData.codigo || sendData.id || datos?.codigo || datos?.id || 'OK';
           await prisma.$executeRaw`
             UPDATE asiento_contable
             SET estado_migracion = 'Migrado', migrado = TRUE, fecha_migracion = NOW(),
