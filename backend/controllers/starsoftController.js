@@ -53,6 +53,34 @@ const parseResponse = async (response) => {
   }
 };
 
+const toDateDMY = (value) => {
+  if (!value) return '';
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const day = String(value.getUTCDate()).padStart(2, '0');
+    const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+    return `${day}/${month}/${value.getUTCFullYear()}`;
+  }
+
+  const date = String(value);
+  const isoMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+  return date;
+};
+
+const sanitizeAnnomes = (value) => String(value || '').replace(/\D/g, '');
+
+const getStarsoftErrorMessage = (data, status) => {
+  let message = data?.message || data?.error || data?.mensaje || data?.detail || data?.details || '';
+  if (!message && data?.datos && !Array.isArray(data.datos) && typeof data.datos === 'object') {
+    message = data.datos.message || data.datos.error || data.datos.mensaje || '';
+  }
+  if (!message && Array.isArray(data?.errors)) message = data.errors.join('; ');
+  if (!message && Array.isArray(data?.datos)) {
+    message = data.datos.map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('; ');
+  }
+  return message || `HTTP ${status} — Respuesta: ${JSON.stringify(data).slice(0, 400)}`;
+};
+
 export const listConfigs = async (req, res, next) => {
   try {
     const onlyActive = req.body?.is_active === true || req.query?.is_active === 'true';
@@ -194,18 +222,18 @@ export const migrate = async (req, res, next) => {
       const trama = {
         empresa: asiento.empresa || config.cod_empresa,
         cuenta: asiento.cuenta || '',
-        annomes: asiento.annomes || '',
+        annomes: sanitizeAnnomes(asiento.annomes),
         subdiario: asiento.subdiario || '',
         comprobante: asiento.comprobante || '',
-        fecha_Documento: asiento.fecha_doc || '',
+        fecha_Documento: toDateDMY(asiento.fecha_doc),
         tipo_Anexo: asiento.tipo_anexo || '',
         cod_Proveedor: asiento.cod_anexo || '',
         tipo_Doc: asiento.tipo_doc || '',
         nro_Doc: asiento.nro_doc || '',
-        fecha_Vencimiento: asiento.fecha_vencimiento || asiento.fecha_doc || '',
+        fecha_Vencimiento: toDateDMY(asiento.fecha_vencimiento || asiento.fecha_doc),
         importe_Doc: asiento.importe ?? 0,
         conversion_Tc: asiento.conversion_tc || 'M',
-        fecha_Registro: asiento.fecha_registro || '',
+        fecha_Registro: toDateDMY(asiento.fecha_registro),
         tc: asiento.tc ?? 1,
         glosa: asiento.glosa || '',
         destino_Compra: asiento.centro_costos || '',
@@ -239,7 +267,7 @@ export const migrate = async (req, res, next) => {
           `;
           results.success.push(asiento.id);
         } else {
-          const message = sendData.message || sendData.error || sendData.mensaje || `HTTP ${sendResponse.status}`;
+          const message = getStarsoftErrorMessage(sendData, sendResponse.status);
           await markAsError(asiento.id, message);
           results.errors.push({ id: asiento.id, comprobante: asiento.comprobante, cuenta: asiento.cuenta, error: message });
         }

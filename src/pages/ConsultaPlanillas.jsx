@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import PayslipPreview from "../components/payroll/PayslipPreview";
 import PlanillaCompletaView from "../components/payroll/PlanillaCompletaView";
 import ConfigFirmantesModal from "../components/payroll/ConfigFirmantesModal";
-import { safePayrollNumber, formatMoney } from "@/lib/payrollUtils";
+import { safePayrollNumber, formatMoney, roundMoney } from "@/lib/payrollUtils";
 import { parseDateLima } from "@/lib/dateUtils";
 
 const TIPO_COLORS = {
@@ -237,9 +237,9 @@ export default function ConsultaPlanillas() {
           const ccCode = cc?.code || "";
           const codAnexo = emp.document_number || "";
           const empName = `${emp.first_name} ${emp.last_name}`;
-          const importeBruto = Math.round((p.total_income || 0) * 100) / 100;
-          const importeRet   = Math.round((p.total_deductions || 0) * 100) / 100;
-          const importeNeto  = Math.round((p.net_pay || 0) * 100) / 100;
+          const importeBruto = roundMoney(p.total_income);
+          const importeRet   = roundMoney(p.total_deductions);
+          const importeNeto  = roundMoney(p.net_pay);
           const glosa    = `SNP ${period}`;
           const glosaEmp = `RH ${empName} - ${period}`;
           const nroDoc   = `RH-${annomes}-${emp.document_number}`;
@@ -327,9 +327,9 @@ export default function ConsultaPlanillas() {
           if (!ccMap[ccId]) {
             ccMap[ccId] = { cc, ccId, totalIncome: 0, totalDeductions: 0, totalNeto: 0, employeeCount: 0 };
           }
-          ccMap[ccId].totalIncome += p.total_income || 0;
-          ccMap[ccId].totalDeductions += p.total_deductions || 0;
-          ccMap[ccId].totalNeto += p.net_pay || 0;
+          ccMap[ccId].totalIncome += safePayrollNumber(p.total_income);
+          ccMap[ccId].totalDeductions += safePayrollNumber(p.total_deductions);
+          ccMap[ccId].totalNeto += safePayrollNumber(p.net_pay);
           ccMap[ccId].employeeCount += 1;
         }
 
@@ -364,8 +364,8 @@ export default function ConsultaPlanillas() {
           asientosToCreate.push({
             ...base,
             cuenta: "6210000",
-            importe: Math.round(data.totalIncome * 100) / 100,
-            importe_soles: Math.round(data.totalIncome * 100) / 100,
+            importe: roundMoney(data.totalIncome),
+            importe_soles: roundMoney(data.totalIncome),
             debe_haber: "D",
             glosa_mov: glosaCC,
           });
@@ -373,8 +373,8 @@ export default function ConsultaPlanillas() {
           asientosToCreate.push({
             ...base,
             cuenta: "4110000",
-            importe: Math.round(data.totalNeto * 100) / 100,
-            importe_soles: Math.round(data.totalNeto * 100) / 100,
+            importe: roundMoney(data.totalNeto),
+            importe_soles: roundMoney(data.totalNeto),
             debe_haber: "H",
             glosa_mov: `${glosaCC} - Neto a pagar`,
           });
@@ -383,8 +383,8 @@ export default function ConsultaPlanillas() {
             asientosToCreate.push({
               ...base,
               cuenta: "4030000",
-              importe: Math.round(data.totalDeductions * 100) / 100,
-              importe_soles: Math.round(data.totalDeductions * 100) / 100,
+              importe: roundMoney(data.totalDeductions),
+              importe_soles: roundMoney(data.totalDeductions),
               debe_haber: "H",
               glosa_mov: `${glosaCC} - Descuentos/Tributos`,
             });
