@@ -144,6 +144,7 @@ export const entitiesAPI = {
       return response.data;
     }
   },
+  StarsoftConfig: createEntityAPI('/api/starsoft-config'),
 };
 
 export default entitiesAPI;

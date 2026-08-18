@@ -295,6 +295,9 @@ export default function Layout({ children, currentPageName }) {
       if (hasAnyPermission(["accounting.view", "accounting.manage", "payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create", "payroll.calculate"])) {
         submenu.push({ name: "Asientos Contables", path: "AsientosContables" });
         submenu.push({ name: "Cuentas Contables", path: "CuentasContables" });
+        if (isAdmin || hasPermission("accounting.manage")) {
+          submenu.push({ name: "Configuración Starsoft", path: "ConfiguracionStarsoft" });
+        }
       }
       if (hasAnyPermission(["payroll.view_all", "payroll.process", "payroll.approve", "payroll.view_department", "payroll.create", "payroll.calculate"])) {
         submenu.push({ name: "Exportar SUNAT (T-Registro / PLAME)", path: "SunatExport" });

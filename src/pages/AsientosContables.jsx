@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from '@/api/entitiesClient';
+import { starsoftAPI } from '@/api/localClient';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,13 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Search, Download, Upload, RefreshCw, CheckCircle, XCircle,
-  AlertCircle, Clock, BookOpen, Filter, Eye, Loader2
+  AlertCircle, Clock, BookOpen, Filter, Eye, Loader2, Send
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
+import { usePermissions } from "../components/hooks/usePermissions";
 
 const ESTADO_CONFIG = {
   Pendiente: { color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: Clock },
@@ -37,6 +39,7 @@ const ORIGEN_COLORS = {
 
 export default function AsientosContables() {
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
 
@@ -53,6 +56,8 @@ export default function AsientosContables() {
   // Detail modal
   const [selectedAsiento, setSelectedAsiento] = useState(null);
   const [migratingIds, setMigratingIds] = useState(new Set());
+  const [migrandoStarsoft, setMigrandoStarsoft] = useState(false);
+  const [modalMigracion, setModalMigracion] = useState(null);
 
   useEffect(() => {
     if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
@@ -187,6 +192,38 @@ export default function AsientosContables() {
     toast.info("Asiento revertido a Pendiente");
   };
 
+  const handleMigrarStarsoft = async () => {
+    const pendientes = filtered.filter(a => a.estado_migracion === "Pendiente" && !a.anulado);
+    if (pendientes.length === 0) {
+      toast.info("No hay asientos pendientes para migrar en la selección actual");
+      return;
+    }
+    if (!confirm(`¿Migrar ${pendientes.length} asiento(s) a Starsoft vía API?\nEsto autenticará y enviará cada asiento. Los exitosos se marcarán como Migrados.`)) return;
+    setMigrandoStarsoft(true);
+    try {
+      const data = await starsoftAPI.migrate({
+        mode: "migrate",
+        asiento_ids: pendientes.map(a => a.id),
+      });
+      if (data?.error) {
+        toast.error(`Error: ${data.error}`);
+      } else {
+        setModalMigracion(data);
+        if (data.errores > 0) {
+          toast.warning(`Migración parcial: ${data.migrados} exitosos, ${data.errores} errores`);
+        } else {
+          toast.success(`${data.migrados} asiento(s) migrados a Starsoft`);
+        }
+      }
+      queryClient.invalidateQueries(["asientosContables"]);
+    } catch (err) {
+      const msg = err?.response?.data?.error || err.message;
+      toast.error(`Error de migración: ${msg}`);
+    } finally {
+      setMigrandoStarsoft(false);
+    }
+  };
+
   const handleMarcarMigradoLote = async () => {
     const pendientes = filtered.filter(a => a.estado_migracion === "Pendiente");
     if (pendientes.length === 0) { toast.info("No hay asientos pendientes en la selección actual"); return; }
@@ -209,6 +246,7 @@ export default function AsientosContables() {
   const handleExportExcel = () => {
     // Hoja 1: Cadena de conexión del sistema contable (campos exactos requeridos)
     const dataConexion = filtered.map(a => ({
+      "empresa":          a.empresa || "003",
       "cuenta":           a.cuenta || "",
       "annomes":          a.annomes || "",
       "subdiario":        a.subdiario || "",
@@ -303,11 +341,21 @@ export default function AsientosContables() {
               <Download className="w-4 h-4 mr-2" />Exportar Excel
             </Button>
             <Button
-              className="bg-indigo-600 hover:bg-indigo-700"
+              variant="outline"
               onClick={handleMarcarMigradoLote}
             >
               <Upload className="w-4 h-4 mr-2" />Marcar Migrados (lote)
             </Button>
+            {hasPermission("accounting.manage") && (
+              <Button
+                className="bg-indigo-600 hover:bg-indigo-700"
+                onClick={handleMigrarStarsoft}
+                disabled={migrandoStarsoft}
+              >
+                {migrandoStarsoft ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                Migrar a Starsoft
+              </Button>
+            )}
           </div>
         </div>
 
@@ -572,6 +620,52 @@ export default function AsientosContables() {
             tipoAnexos={tipoAnexos}
             onClose={() => setSelectedAsiento(null)}
           />
+        )}
+
+        {/* Modal resumen migración Starsoft */}
+        {modalMigracion && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" onClick={() => setModalMigracion(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-xl font-bold text-slate-900">Resumen de Migración a Starsoft</h2>
+                <button onClick={() => setModalMigracion(null)} className="text-slate-400 hover:text-slate-700 text-xl font-bold">✕</button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center p-4 bg-slate-50 rounded-xl">
+                    <p className="text-3xl font-bold text-slate-900">{modalMigracion.total}</p>
+                    <p className="text-xs text-slate-500 mt-1">Total enviados</p>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-xl">
+                    <p className="text-3xl font-bold text-green-600">{modalMigracion.migrados}</p>
+                    <p className="text-xs text-green-600 mt-1">Migrados</p>
+                  </div>
+                  <div className="text-center p-4 bg-red-50 rounded-xl">
+                    <p className="text-3xl font-bold text-red-600">{modalMigracion.errores}</p>
+                    <p className="text-xs text-red-600 mt-1">Errores</p>
+                  </div>
+                </div>
+                {modalMigracion.detalle_errores?.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-700 mb-2">Detalle de errores:</h3>
+                    <div className="max-h-60 overflow-y-auto space-y-2">
+                      {modalMigracion.detalle_errores.map((err, i) => (
+                        <div key={i} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-sm font-semibold text-red-800">
+                            {err.comprobante || "—"} · {err.cuenta || ""}
+                          </p>
+                          <p className="text-xs text-red-600 mt-0.5">{err.error}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <Button className="w-full bg-indigo-600 hover:bg-indigo-700" onClick={() => setModalMigracion(null)}>
+                  Cerrar
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
