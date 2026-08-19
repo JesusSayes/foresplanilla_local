@@ -216,75 +216,81 @@ export const migrate = async (req, res, next) => {
       SELECT * FROM asiento_contable
       WHERE id IN (${Prisma.join(asientoIds)})
     `;
-    const results = { success: [], errors: [] };
+    const payload = asientos.map(asiento => ({
+      cuenta: asiento.cuenta || '',
+      annomes: sanitizeAnnomes(asiento.annomes),
+      subdiario: asiento.subdiario || '',
+      comprobante: asiento.comprobante || '',
+      fecha_Registro: toDateDMY(asiento.fecha_registro),
+      fecha_Documento: toDateDMY(asiento.fecha_doc),
+      tipo_Anexo: asiento.tipo_anexo || '',
+      cod_Anexo: asiento.cod_anexo || '',
+      tipo_Doc: asiento.tipo_doc || '',
+      nro_Doc: asiento.nro_doc || '',
+      fecha_Vencimiento: asiento.fecha_vencimiento ? toDateDMY(asiento.fecha_vencimiento) : null,
+      importe: asiento.importe ?? 0,
+      conv_Tc: asiento.conversion_tc || 'M',
+      tc: asiento.tc ?? 1,
+      glosa: asiento.glosa || '',
+      glosa_Mov: asiento.glosa_mov || '',
+      anulado: !!asiento.anulado,
+      debe_Haber: asiento.debe_haber || '',
+      centro_Costos: asiento.centro_costos || '',
+    }));
 
-    for (const asiento of asientos) {
-      const trama = {
-        empresa: asiento.empresa || config.cod_empresa,
-        cuenta: asiento.cuenta || '',
-        annomes: sanitizeAnnomes(asiento.annomes),
-        subdiario: asiento.subdiario || '',
-        comprobante: asiento.comprobante || '',
-        fecha_Documento: toDateDMY(asiento.fecha_doc),
-        tipo_Anexo: asiento.tipo_anexo || '',
-        cod_Proveedor: asiento.cod_anexo || '',
-        tipo_Doc: asiento.tipo_doc || '',
-        nro_Doc: asiento.nro_doc || '',
-        fecha_Vencimiento: toDateDMY(asiento.fecha_vencimiento || asiento.fecha_doc),
-        importe_Doc: asiento.importe ?? 0,
-        conversion_Tc: asiento.conversion_tc || 'M',
-        fecha_Registro: toDateDMY(asiento.fecha_registro),
-        tc: asiento.tc ?? 1,
-        glosa: asiento.glosa || '',
-        destino_Compra: asiento.centro_costos || '',
-        centro_Costos: asiento.centro_costos || '',
-        glosa_Mov: asiento.glosa_mov || '',
-        anulado: asiento.anulado ? '1' : '0',
-        debe_Haber: asiento.debe_haber || '',
-      };
-
-      try {
-        const sendResponse = await fetch(config.api_url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ asientos: [trama] }),
-        });
-        const sendData = await parseResponse(sendResponse);
-        const ok = sendResponse.ok && sendData.success !== false;
-
-        if (ok) {
-          const datos = Array.isArray(sendData.datos) ? sendData.datos[0] : sendData.datos;
-          const code = sendData.codigo || sendData.id || datos?.codigo || datos?.id || 'OK';
-          await prisma.$executeRaw`
-            UPDATE asiento_contable
-            SET estado_migracion = 'Migrado', migrado = TRUE, fecha_migracion = NOW(),
-                migrado_por = ${req.user?.email || 'system'}, sistema_destino = 'Starsoft',
-                codigo_migracion = ${String(code)}, error_migracion = '', updated_date = NOW()
-            WHERE id = ${asiento.id}
-          `;
-          results.success.push(asiento.id);
-        } else {
-          const message = getStarsoftErrorMessage(sendData, sendResponse.status);
-          await markAsError(asiento.id, message);
-          results.errors.push({ id: asiento.id, comprobante: asiento.comprobante, cuenta: asiento.cuenta, error: message });
-        }
-      } catch (error) {
-        const message = `Error de red: ${error.message}`;
-        await markAsError(asiento.id, message);
-        results.errors.push({ id: asiento.id, comprobante: asiento.comprobante, cuenta: asiento.cuenta, error: message });
-      }
+    let sendResponse;
+    try {
+      sendResponse = await fetch(config.api_url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/plain',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      const message = `Error de red: ${error.message}`;
+      await Promise.all(asientos.map(asiento => markAsError(asiento.id, message)));
+      return res.status(502).json({
+        success: false,
+        error: message,
+        total: asientos.length,
+        migrados: 0,
+        errores: asientos.length,
+      });
     }
 
-    res.json({
-      success: true,
+    const sendData = await parseResponse(sendResponse);
+    const ok = sendResponse.ok && sendData.success === true;
+    const datos = Array.isArray(sendData.datos) ? sendData.datos[0] : sendData.datos;
+    const code = sendData.codigo || sendData.id || datos?.codigo || datos?.id || 'OK';
+
+    if (ok) {
+      await Promise.all(asientos.map(asiento => prisma.$executeRaw`
+        UPDATE asiento_contable
+        SET estado_migracion = 'Migrado', migrado = TRUE, fecha_migracion = NOW(),
+            migrado_por = ${req.user?.email || 'system'}, sistema_destino = 'Starsoft',
+            codigo_migracion = ${String(code)}, error_migracion = '', updated_date = NOW()
+        WHERE id = ${asiento.id}
+      `));
+      return res.json({
+        success: true,
+        total: asientos.length,
+        migrados: asientos.length,
+        errores: 0,
+      });
+    }
+
+    const message = getStarsoftErrorMessage(sendData, sendResponse.status);
+    await Promise.all(asientos.map(asiento => markAsError(asiento.id, message)));
+    return res.status(400).json({
+      success: false,
+      error: message,
       total: asientos.length,
-      migrados: results.success.length,
-      errores: results.errors.length,
-      detalle_errores: results.errors,
+      migrados: 0,
+      errores: asientos.length,
+      status: sendResponse.status,
     });
   } catch (error) {
     next(error);
