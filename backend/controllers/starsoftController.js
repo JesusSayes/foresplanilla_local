@@ -54,7 +54,7 @@ const parseResponse = async (response) => {
 };
 
 const toDateDMY = (value) => {
-  if (!value) return '';
+  if (!value) return null;
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     const day = String(value.getUTCDate()).padStart(2, '0');
     const month = String(value.getUTCMonth() + 1).padStart(2, '0');
@@ -64,7 +64,8 @@ const toDateDMY = (value) => {
   const date = String(value);
   const isoMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (isoMatch) return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
-  return date;
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(date)) return date;
+  return null;
 };
 
 const sanitizeAnnomes = (value) => String(value || '').replace(/\D/g, '');
@@ -221,7 +222,7 @@ export const migrate = async (req, res, next) => {
       annomes: sanitizeAnnomes(asiento.annomes),
       subdiario: asiento.subdiario || '',
       comprobante: asiento.comprobante || '',
-      fecha_Registro: toDateDMY(asiento.fecha_registro),
+      fecha_Registro: toDateDMY(asiento.fecha_registro) || toDateDMY(asiento.fecha_doc),
       fecha_Documento: toDateDMY(asiento.fecha_doc),
       tipo_Anexo: asiento.tipo_anexo || '',
       cod_Anexo: asiento.cod_anexo || '',
@@ -247,11 +248,11 @@ export const migrate = async (req, res, next) => {
           Accept: 'text/plain',
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ asientos: payload }),
       });
     } catch (error) {
       const message = `Error de red: ${error.message}`;
-      await Promise.all(asientos.map(asiento => markAsError(asiento.id, message)));
+      await markAsError(asientoIds, message);
       return res.status(502).json({
         success: false,
         error: message,
@@ -267,13 +268,13 @@ export const migrate = async (req, res, next) => {
     const code = sendData.codigo || sendData.id || datos?.codigo || datos?.id || 'OK';
 
     if (ok) {
-      await Promise.all(asientos.map(asiento => prisma.$executeRaw`
+      await prisma.$executeRaw`
         UPDATE asiento_contable
         SET estado_migracion = 'Migrado', migrado = TRUE, fecha_migracion = NOW(),
             migrado_por = ${req.user?.email || 'system'}, sistema_destino = 'Starsoft',
             codigo_migracion = ${String(code)}, error_migracion = '', updated_date = NOW()
-        WHERE id = ${asiento.id}
-      `));
+        WHERE id IN (${Prisma.join(asientoIds)})
+      `;
       return res.json({
         success: true,
         total: asientos.length,
@@ -283,7 +284,7 @@ export const migrate = async (req, res, next) => {
     }
 
     const message = getStarsoftErrorMessage(sendData, sendResponse.status);
-    await Promise.all(asientos.map(asiento => markAsError(asiento.id, message)));
+    await markAsError(asientoIds, message);
     return res.status(400).json({
       success: false,
       error: message,
@@ -297,11 +298,11 @@ export const migrate = async (req, res, next) => {
   }
 };
 
-const markAsError = (id, message) => prisma.$executeRaw`
+const markAsError = (ids, message) => prisma.$executeRaw`
   UPDATE asiento_contable
   SET estado_migracion = 'Error', migrado = FALSE, error_migracion = ${message},
       sistema_destino = 'Starsoft', updated_date = NOW()
-  WHERE id = ${id}
+  WHERE id IN (${Prisma.join(ids)})
 `;
 
 export default {
