@@ -114,16 +114,20 @@ export default async function (req: Request): Promise<Response> {
       id: { $in: asientoIds },
     });
 
-    // Starsoft/CONCAR espera fechas en formato DD/MM/YYYY. La entidad las guarda
-    // en ISO (YYYY-MM-DD). Convertimos antes de armar la trama.
-    const toDateDMY = (d: any): string | null => {
+    // La API REST de Starsoft usa System.Text.Json, que requiere fechas en
+    // formato ISO 8601 (YYYY-MM-DD) para convertir a System.DateTime. La
+    // entidad ya las guarda en ISO; solo normalizamos y garantizamos un valor
+    // válido (nunca string vacío ni null para los campos obligatorios).
+    const toISODate = (d: any): string | null => {
       if (!d) return null;
-      const s = String(d);
+      const s = String(d).split("T")[0];
       const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (m) return `${m[3]}/${m[2]}/${m[1]}`;
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+      if (m) return s.slice(0, 10);
+      const m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      if (m2) return `${m2[3]}-${m2[2]}-${m2[1]}`;
       return null;
     };
+    const todayISO = () => new Date().toISOString().split("T")[0];
     // annomes debe ser solo dígitos (AAAAMM), sin guiones ni separadores.
     const sanitizeAnnomes = (a: any): string => String(a || "").replace(/\D/g, "");
 
@@ -135,13 +139,13 @@ export default async function (req: Request): Promise<Response> {
       annomes: sanitizeAnnomes(a.annomes),
       subdiario: a.subdiario || "",
       comprobante: a.comprobante || "",
-      fecha_Registro: toDateDMY(a.fecha_registro) || toDateDMY(a.fecha_doc) || toDateDMY(new Date().toISOString()),
-      fecha_Documento: toDateDMY(a.fecha_doc) || toDateDMY(a.fecha_registro) || toDateDMY(new Date().toISOString()),
+      fecha_Registro: toISODate(a.fecha_registro) || toISODate(a.fecha_doc) || todayISO(),
+      fecha_Documento: toISODate(a.fecha_doc) || toISODate(a.fecha_registro) || todayISO(),
       tipo_Anexo: a.tipo_anexo || "",
       cod_Anexo: a.cod_anexo || "",
       tipo_Doc: a.tipo_doc || "",
       nro_Doc: a.nro_doc || "",
-      fecha_Vencimiento: a.fecha_vencimiento ? toDateDMY(a.fecha_vencimiento) : null,
+      fecha_Vencimiento: a.fecha_vencimiento ? toISODate(a.fecha_vencimiento) : null,
       importe: a.importe ?? 0,
       conv_Tc: a.conversion_tc || "M",
       tc: a.tc ?? 1,
