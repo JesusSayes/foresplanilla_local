@@ -199,6 +199,19 @@ export default function ConsultaPlanillas() {
       const fechaRegistro = format(new Date(), "yyyy-MM-dd");
       const comprobante = grupo.payroll_number || `${isSNP ? "RH" : "PL"}-${annomes}`;
 
+      // Obtener el código de empresa activo desde la configuración Starsoft.
+      // Si está activa la empresa de prueba usa su código; si está activa la de
+      // producción usa "003" (o el código configurado). Fallback "003".
+      let codEmpresaActiva = "003";
+      try {
+        const configs = await base44.entities.StarsoftConfig.filter({ is_active: true });
+        if (configs && configs.length > 0 && configs[0].cod_empresa) {
+          codEmpresaActiva = String(configs[0].cod_empresa);
+        }
+      } catch (e) {
+        console.warn("No se pudo leer la configuración Starsoft; usando empresa por defecto", e);
+      }
+
       // Eliminar asientos anteriores de esta planilla para actualizar
       const existing = allAsientos.filter(
         a => a.payroll_period === period && a.payroll_type === payrollType &&
@@ -262,6 +275,7 @@ export default function ConsultaPlanillas() {
             payroll_type: payrollType,
             payslip_id: p.id,
             origen: "Otro",            // Distingue de planilla regular
+            empresa: codEmpresaActiva,
             estado_migracion: "Pendiente",
             anulado: false,
           };
@@ -350,6 +364,7 @@ export default function ConsultaPlanillas() {
             centro_costos: ccCode,
             centro_costos_id: data.ccId !== "sin_cc" ? data.ccId : "",
             origen: "Planilla",
+            empresa: codEmpresaActiva,
             payroll_period: period,
             payroll_type: payrollType,
             estado_migracion: "Pendiente",
