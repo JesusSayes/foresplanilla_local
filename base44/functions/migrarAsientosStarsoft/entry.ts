@@ -164,14 +164,15 @@ export default async function (req: Request): Promise<Response> {
         body: JSON.stringify(payload),
       });
     } catch (err: any) {
-      await Promise.all(asientos.map((a: any) =>
-        base44.asServiceRole.entities.AsientoContable.update(a.id, {
+      await base44.asServiceRole.entities.AsientoContable.updateMany(
+        { id: { $in: asientoIds } },
+        { $set: {
           estado_migracion: "Error",
           migrado: false,
           error_migracion: `Error de red: ${err.message}`,
           sistema_destino: "Starsoft",
-        })
-      ));
+        } }
+      );
       return Response.json({
         success: false,
         error: `Error de red: ${err.message}`,
@@ -194,8 +195,9 @@ export default async function (req: Request): Promise<Response> {
       sendData.codigo || sendData.id || sendData.datos?.codigo || sendData.datos?.id || "OK";
 
     if (ok) {
-      await Promise.all(asientos.map((a: any) =>
-        base44.asServiceRole.entities.AsientoContable.update(a.id, {
+      await base44.asServiceRole.entities.AsientoContable.updateMany(
+        { id: { $in: asientoIds } },
+        { $set: {
           estado_migracion: "Migrado",
           migrado: true,
           fecha_migracion: new Date().toISOString(),
@@ -203,8 +205,8 @@ export default async function (req: Request): Promise<Response> {
           sistema_destino: "Starsoft",
           codigo_migracion: String(code),
           error_migracion: "",
-        })
-      ));
+        } }
+      );
       return Response.json({
         success: true,
         total: asientos.length,
@@ -225,14 +227,15 @@ export default async function (req: Request): Promise<Response> {
     }
     if (!errMsg) errMsg = `HTTP ${sendRes.status} — Respuesta: ${sendText.slice(0, 400)}`;
 
-    await Promise.all(asientos.map((a: any) =>
-      base44.asServiceRole.entities.AsientoContable.update(a.id, {
+    await base44.asServiceRole.entities.AsientoContable.updateMany(
+      { id: { $in: asientoIds } },
+      { $set: {
         estado_migracion: "Error",
         migrado: false,
         error_migracion: errMsg,
         sistema_destino: "Starsoft",
-      })
-    ));
+      } }
+    );
 
     return Response.json({
       success: false,
