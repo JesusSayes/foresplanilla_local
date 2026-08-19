@@ -116,13 +116,13 @@ export default async function (req: Request): Promise<Response> {
 
     // Starsoft/CONCAR espera fechas en formato DD/MM/YYYY. La entidad las guarda
     // en ISO (YYYY-MM-DD). Convertimos antes de armar la trama.
-    const toDateDMY = (d: any): string => {
-      if (!d) return "";
+    const toDateDMY = (d: any): string | null => {
+      if (!d) return null;
       const s = String(d);
       const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (m) return `${m[3]}/${m[2]}/${m[1]}`;
       if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
-      return s;
+      return null;
     };
     // annomes debe ser solo dígitos (AAAAMM), sin guiones ni separadores.
     const sanitizeAnnomes = (a: any): string => String(a || "").replace(/\D/g, "");
@@ -135,7 +135,7 @@ export default async function (req: Request): Promise<Response> {
       annomes: sanitizeAnnomes(a.annomes),
       subdiario: a.subdiario || "",
       comprobante: a.comprobante || "",
-      fecha_Registro: toDateDMY(a.fecha_registro),
+      fecha_Registro: toDateDMY(a.fecha_registro) || toDateDMY(a.fecha_doc),
       fecha_Documento: toDateDMY(a.fecha_doc),
       tipo_Anexo: a.tipo_anexo || "",
       cod_Anexo: a.cod_anexo || "",
@@ -161,7 +161,7 @@ export default async function (req: Request): Promise<Response> {
           Accept: "text/plain",
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ asientos: payload }),
       });
     } catch (err: any) {
       await base44.asServiceRole.entities.AsientoContable.updateMany(
