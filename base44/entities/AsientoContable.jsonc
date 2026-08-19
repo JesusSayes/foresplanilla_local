@@ -161,13 +161,8 @@
     },
     "empresa": {
       "type": "string",
-      "enum": [
-        "001",
-        "002",
-        "003"
-      ],
       "default": "003",
-      "description": "C\u00f3digo de empresa Starsoft destino (001/002=prueba, 003=producci\u00f3n). Se incluye en la trama enviada al API."
+      "description": "C\u00f3digo de empresa Starsoft destino. Se toma autom\u00e1ticamente de la configuraci\u00f3n Starsoft activa (empresa de prueba o producci\u00f3n) al generar el asiento. Puede ser cualquier c\u00f3digo (001, 002, 003, 04, 06, etc.)."
     },
     "migrado": {
       "type": "boolean",

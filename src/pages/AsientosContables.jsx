@@ -58,6 +58,7 @@ export default function AsientosContables() {
   const [migratingIds, setMigratingIds] = useState(new Set());
   const [migrandoStarsoft, setMigrandoStarsoft] = useState(false);
   const [modalMigracion, setModalMigracion] = useState(null);
+  const [progresoMigracion, setProgresoMigracion] = useState({ logs: [], total: 0, procesados: 0 });
 
   useEffect(() => {
     if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
@@ -198,31 +199,91 @@ export default function AsientosContables() {
       toast.info("No hay asientos pendientes para migrar en la selección actual");
       return;
     }
-    if (!confirm(`¿Migrar ${pendientes.length} asiento(s) a Starsoft vía API?\nEsto autenticará y enviará cada asiento. Los exitosos se marcarán como Migrados.`)) return;
+    if (!confirm(`¿Migrar ${pendientes.length} asiento(s) a Starsoft vía API?\nSe enviarán en lotes y se mostrará el avance por registro.`)) return;
+
     setMigrandoStarsoft(true);
     setModalMigracion(null);
-    try {
-      const data = await starsoftAPI.migrate({
-        mode: "migrate",
-        asiento_ids: pendientes.map(a => a.id),
-      });
-      if (data?.error) {
-        toast.error(`Error: ${data.error}`);
-      } else {
-        setModalMigracion(data);
-        if (data.errores > 0) {
-          toast.warning(`Migración parcial: ${data.migrados} exitosos, ${data.errores} errores`);
-        } else {
-          toast.success(`${data.migrados} asiento(s) migrados a Starsoft`);
-        }
-      }
-      queryClient.invalidateQueries(["asientosContables"]);
-    } catch (err) {
-      const msg = err?.response?.data?.error || err.message;
-      toast.error(`Error de migración: ${msg}`);
-    } finally {
-      setMigrandoStarsoft(false);
+    setProgresoMigracion({ logs: [], total: pendientes.length, procesados: 0 });
+
+    const CHUNK_SIZE = 20;
+    const chunks = [];
+    for (let i = 0; i < pendientes.length; i += CHUNK_SIZE) {
+      chunks.push(pendientes.slice(i, i + CHUNK_SIZE));
     }
+
+    let totalMigrados = 0;
+    let totalErrores = 0;
+    const detalleErrores = [];
+
+    for (const chunk of chunks) {
+      // Marcar los registros del lote como "procesando"
+      setProgresoMigracion(prev => ({
+        ...prev,
+        logs: [...prev.logs, ...chunk.map(a => ({
+          id: a.id, comprobante: a.comprobante, cuenta: a.cuenta,
+          estado: "procesando", mensaje: "Enviando a Starsoft…",
+        }))],
+      }));
+
+      try {
+        const data = await starsoftAPI.migrate({
+          mode: "migrate",
+          asiento_ids: chunk.map(a => a.id),
+        });
+        const ok = data?.success !== false && !data?.error;
+        const errMsg = data?.error || "";
+
+        setProgresoMigracion(prev => {
+          const newLogs = [...prev.logs];
+          chunk.forEach(a => {
+            const idx = newLogs.findIndex(l => l.id === a.id);
+            if (idx >= 0) {
+              newLogs[idx] = {
+                ...newLogs[idx],
+                estado: ok ? "ok" : "error",
+                mensaje: ok ? "Migrado correctamente" : errMsg,
+              };
+            }
+          });
+          return { ...prev, logs: newLogs, procesados: prev.procesados + chunk.length };
+        });
+
+        if (ok) {
+          totalMigrados += chunk.length;
+        } else {
+          totalErrores += chunk.length;
+          chunk.forEach(a => detalleErrores.push({ id: a.id, comprobante: a.comprobante, cuenta: a.cuenta, error: errMsg }));
+        }
+      } catch (err) {
+        const msg = err?.response?.data?.error || err.message;
+        totalErrores += chunk.length;
+        chunk.forEach(a => detalleErrores.push({ id: a.id, comprobante: a.comprobante, cuenta: a.cuenta, error: msg }));
+        setProgresoMigracion(prev => {
+          const newLogs = [...prev.logs];
+          chunk.forEach(a => {
+            const idx = newLogs.findIndex(l => l.id === a.id);
+            if (idx >= 0) {
+              newLogs[idx] = { ...newLogs[idx], estado: "error", mensaje: msg };
+            }
+          });
+          return { ...prev, logs: newLogs, procesados: prev.procesados + chunk.length };
+        });
+      }
+    }
+
+    setModalMigracion({
+      total: pendientes.length,
+      migrados: totalMigrados,
+      errores: totalErrores,
+      detalle_errores: detalleErrores,
+    });
+    queryClient.invalidateQueries(["asientosContables"]);
+    if (totalErrores > 0) {
+      toast.warning(`Migración finalizada: ${totalMigrados} exitosos, ${totalErrores} errores`);
+    } else {
+      toast.success(`${totalMigrados} asiento(s) migrados a Starsoft`);
+    }
+    setMigrandoStarsoft(false);
   };
 
   const handleMarcarMigradoLote = async () => {
@@ -626,21 +687,47 @@ export default function AsientosContables() {
         {/* Modal de progreso durante la migración a Starsoft */}
         {migrandoStarsoft && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
-              <div className="flex justify-center mb-5">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6">
+              <div className="flex items-center gap-3 mb-4">
                 <div className="relative">
-                  <Loader2 className="w-16 h-16 text-indigo-600 animate-spin" />
-                  <Send className="w-6 h-6 text-indigo-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                  <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+                  <Send className="w-4 h-4 text-indigo-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-lg font-bold text-slate-900">Migrando asientos a Starsoft</h2>
+                  <p className="text-slate-500 text-sm">
+                    Procesando <span className="font-bold text-indigo-600">{progresoMigracion.procesados}</span> de {progresoMigracion.total} asiento(s)…
+                  </p>
                 </div>
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Migrando asientos a Starsoft</h2>
-              <p className="text-slate-500 text-sm mb-4">
-                Enviando <span className="font-bold text-indigo-600">{filtered.filter(a => a.estado_migracion === "Pendiente" && !a.anulado).length}</span> asiento(s) pendiente(s) vía API…
-              </p>
-              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                <div className="bg-indigo-600 h-2 rounded-full animate-pulse" style={{ width: "70%" }} />
+              <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden mb-4">
+                <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300"
+                  style={{ width: `${progresoMigracion.total ? (progresoMigracion.procesados / progresoMigracion.total) * 100 : 0}%` }} />
               </div>
-              <p className="text-xs text-slate-400 mt-4">Este proceso autentica y envía el lote a Starsoft. No cierre la ventana.</p>
+              <div className="border border-slate-200 rounded-xl max-h-72 overflow-y-auto divide-y divide-slate-100">
+                {progresoMigracion.logs.length === 0 ? (
+                  <p className="p-4 text-sm text-slate-400 text-center">Iniciando proceso…</p>
+                ) : progresoMigracion.logs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-3 p-3 text-sm">
+                    <div className="shrink-0 mt-0.5">
+                      {log.estado === "procesando" && <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />}
+                      {log.estado === "ok" && <CheckCircle className="w-4 h-4 text-green-600" />}
+                      {log.estado === "error" && <XCircle className="w-4 h-4 text-red-600" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-800 truncate">
+                        <span className="text-indigo-700">{log.comprobante || "—"}</span>
+                        {" · "}
+                        <span className="font-mono text-xs text-slate-600">{log.cuenta || ""}</span>
+                      </p>
+                      <p className={`text-xs ${log.estado === "error" ? "text-red-600" : log.estado === "ok" ? "text-green-600" : "text-slate-500"}`}>
+                        {log.mensaje}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-slate-400 mt-3 text-center">No cierre esta ventana hasta que finalice el proceso.</p>
             </div>
           </div>
         )}
