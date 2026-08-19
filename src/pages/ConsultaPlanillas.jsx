@@ -200,16 +200,21 @@ export default function ConsultaPlanillas() {
       const comprobante = grupo.payroll_number || `${isSNP ? "RH" : "PL"}-${annomes}`;
 
       // Obtener el código de empresa activo desde la configuración Starsoft.
-      // Si está activa la empresa de prueba usa su código; si está activa la de
-      // producción usa "003" (o el código configurado). Fallback "003".
-      let codEmpresaActiva = "003";
+      // Si no hay configuración activa o no tiene código de empresa, se muestra
+      // un mensaje y se interrumpe la generación (no se asume "003" por defecto).
+      let codEmpresaActiva = null;
       try {
         const configs = await base44.entities.StarsoftConfig.filter({ is_active: true });
         if (configs && configs.length > 0 && configs[0].cod_empresa) {
           codEmpresaActiva = String(configs[0].cod_empresa);
         }
       } catch (e) {
-        console.warn("No se pudo leer la configuración Starsoft; usando empresa por defecto", e);
+        console.warn("No se pudo leer la configuración Starsoft", e);
+      }
+
+      if (!codEmpresaActiva) {
+        toast.error("No se pudo determinar el código de empresa destino. Active una empresa (Prueba o Producción) con su código en la Configuración Starsoft antes de generar los asientos.");
+        return;
       }
 
       // Eliminar asientos anteriores de esta planilla para actualizar
