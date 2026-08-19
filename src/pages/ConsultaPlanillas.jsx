@@ -202,7 +202,10 @@ export default function ConsultaPlanillas() {
       const annomes = `${grupo.year}${String(grupo.month).padStart(2, "0")}`;
       const fechaDoc = format(new Date(grupo.year, grupo.month - 1, 1), "yyyy-MM-dd");
       const fechaRegistro = format(new Date(), "yyyy-MM-dd");
-      const comprobante = grupo.payroll_number || `${isSNP ? "RH" : "PL"}-${annomes}`;
+      // Starsoft limita la columna COMPROBANTE a 4 caracteres en TB_IMPORTAR_STANDARD.
+      // Usar YYMM (4 dígitos) para evitar truncamiento. El subdiario ya distingue
+      // el tipo de planilla, y annomes conserva el período completo.
+      const comprobante = annomes.slice(-4);
 
       // Obtener el código de empresa activo desde la configuración Starsoft.
       // Si no hay configuración activa o no tiene código de empresa, se muestra
