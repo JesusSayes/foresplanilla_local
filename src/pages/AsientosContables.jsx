@@ -126,8 +126,8 @@ export default function AsientosContables() {
     migrados: filtered.filter(a => a.estado_migracion === "Migrado").length,
     errores: filtered.filter(a => a.estado_migracion === "Error").length,
     excluidos: filtered.filter(a => a.estado_migracion === "Excluido").length,
-    totalDebe: filtered.filter(a => a.debe_haber === "D" && !a.anulado).reduce((s, a) => s + (a.importe || 0), 0),
-    totalHaber: filtered.filter(a => a.debe_haber === "H" && !a.anulado).reduce((s, a) => s + (a.importe || 0), 0),
+    totalDebe: filtered.filter(a => a.debe_haber === "D" && !a.anulado).reduce((s, a) => s + (Number(a.importe) || 0), 0),
+    totalHaber: filtered.filter(a => a.debe_haber === "H" && !a.anulado).reduce((s, a) => s + (Number(a.importe) || 0), 0),
   };
 
   // Combinar catálogo de subdiarios con los que aparecen en asientos (por si hay sin catálogo aún)
@@ -195,6 +195,7 @@ export default function AsientosContables() {
     }
     if (!confirm(`¿Migrar ${pendientes.length} asiento(s) a Starsoft vía API?\nEsto autenticará y enviará cada asiento. Los exitosos se marcarán como Migrados.`)) return;
     setMigrandoStarsoft(true);
+    setModalMigracion(null);
     try {
       const res = await base44.functions.invoke("migrarAsientosStarsoft", {
         mode: "migrate",
@@ -614,6 +615,28 @@ export default function AsientosContables() {
             tipoAnexos={tipoAnexos}
             onClose={() => setSelectedAsiento(null)}
           />
+        )}
+
+        {/* Modal de progreso durante la migración a Starsoft */}
+        {migrandoStarsoft && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
+              <div className="flex justify-center mb-5">
+                <div className="relative">
+                  <Loader2 className="w-16 h-16 text-indigo-600 animate-spin" />
+                  <Send className="w-6 h-6 text-indigo-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                </div>
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">Migrando asientos a Starsoft</h2>
+              <p className="text-slate-500 text-sm mb-4">
+                Enviando <span className="font-bold text-indigo-600">{filtered.filter(a => a.estado_migracion === "Pendiente" && !a.anulado).length}</span> asiento(s) pendiente(s) vía API…
+              </p>
+              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div className="bg-indigo-600 h-2 rounded-full animate-pulse" style={{ width: "70%" }} />
+              </div>
+              <p className="text-xs text-slate-400 mt-4">Este proceso autentica y envía el lote a Starsoft. No cierre la ventana.</p>
+            </div>
+          </div>
         )}
 
         {/* Modal resumen migración Starsoft */}
