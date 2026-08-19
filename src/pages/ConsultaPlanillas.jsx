@@ -295,7 +295,7 @@ export default function ConsultaPlanillas() {
             importe: importeBruto,
             importe_soles: importeBruto,
             debe_haber: "D",
-            glosa_mov: `${glosaEmp} - Honorario bruto`,
+            glosa_mov: `${glosaEmp} - Honorario bruto`.slice(0, 40),
           });
 
           // HABER: 4212100 Honorarios por pagar (neto)
@@ -305,7 +305,7 @@ export default function ConsultaPlanillas() {
             importe: importeNeto,
             importe_soles: importeNeto,
             debe_haber: "H",
-            glosa_mov: `${glosaEmp} - Neto a pagar`,
+            glosa_mov: `${glosaEmp} - Neto a pagar`.slice(0, 40),
           });
 
           // HABER: 4017100 Retención de 4ta categoría (si hay descuentos)
@@ -316,7 +316,7 @@ export default function ConsultaPlanillas() {
               importe: importeRet,
               importe_soles: importeRet,
               debe_haber: "H",
-              glosa_mov: `${glosaEmp} - Retención 4ta categoría`,
+              glosa_mov: `${glosaEmp} - Retención 4ta categoría`.slice(0, 40),
             });
           }
         }
@@ -385,7 +385,7 @@ export default function ConsultaPlanillas() {
             importe: roundMoney(data.totalIncome),
             importe_soles: roundMoney(data.totalIncome),
             debe_haber: "D",
-            glosa_mov: glosaCC,
+            glosa_mov: glosaCC.slice(0, 40),
           });
 
           asientosToCreate.push({
@@ -394,7 +394,7 @@ export default function ConsultaPlanillas() {
             importe: roundMoney(data.totalNeto),
             importe_soles: roundMoney(data.totalNeto),
             debe_haber: "H",
-            glosa_mov: `${glosaCC} - Neto a pagar`,
+            glosa_mov: `${glosaCC} - Neto a pagar`.slice(0, 40),
           });
 
           if (data.totalDeductions > 0) {
@@ -404,7 +404,7 @@ export default function ConsultaPlanillas() {
               importe: roundMoney(data.totalDeductions),
               importe_soles: roundMoney(data.totalDeductions),
               debe_haber: "H",
-              glosa_mov: `${glosaCC} - Descuentos/Tributos`,
+              glosa_mov: `${glosaCC} - Descuentos/Tributos`.slice(0, 40),
             });
           }
         }
