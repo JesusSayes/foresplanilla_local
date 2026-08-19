@@ -15,8 +15,8 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
-const EMPRESA_PRODUCCION = "003";
-const esProduccion = (code) => String(code).padStart(3, "0") === EMPRESA_PRODUCCION;
+const PROD_DEFAULT = "003";
+const PRUEBA_DEFAULT = "001";
 
 export default function ConfiguracionStarsoft() {
   const queryClient = useQueryClient();
@@ -34,6 +34,7 @@ export default function ConfiguracionStarsoft() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [migrating, setMigrating] = useState(false);
+  const [empresaMode, setEmpresaMode] = useState("produccion"); // "produccion" | "prueba"
 
   const { data: config, isLoading } = useQuery({
     queryKey: ["starsoftConfig"],
@@ -44,6 +45,7 @@ export default function ConfiguracionStarsoft() {
     if (config && config.length > 0) {
       const c = config[0];
       setConfigId(c.id);
+      setEmpresaMode(String(c.cod_empresa || "003").padStart(3, "0") === PROD_DEFAULT ? "produccion" : "prueba");
       setForm({
         cod_empresa: c.cod_empresa || "003",
         cod_sistema: c.cod_sistema || "01",
@@ -109,7 +111,7 @@ export default function ConfiguracionStarsoft() {
     }
   };
 
-  const esProd = esProduccion(form.cod_empresa);
+  const esProd = empresaMode === "produccion";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -194,7 +196,12 @@ export default function ConfiguracionStarsoft() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Prueba (editable) */}
                 <div
-                  onClick={() => setForm({ ...form, cod_empresa: esProd ? "001" : (form.cod_empresa || "001") })}
+                  onClick={() => {
+                    setEmpresaMode("prueba");
+                    if (!form.cod_empresa || String(form.cod_empresa).padStart(3, "0") === PROD_DEFAULT) {
+                      setForm({ ...form, cod_empresa: PRUEBA_DEFAULT });
+                    }
+                  }}
                   className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
                     !esProd
                       ? "border-amber-500 bg-amber-50 shadow-md"
@@ -207,7 +214,7 @@ export default function ConfiguracionStarsoft() {
                   </div>
                   <Label className="text-xs font-medium text-slate-500 mb-1 block">Código de empresa</Label>
                   <Input
-                    value={esProd ? "" : form.cod_empresa}
+                    value={!esProd ? form.cod_empresa : ""}
                     onChange={e => setForm({ ...form, cod_empresa: e.target.value })}
                     onClick={e => e.stopPropagation()}
                     placeholder="001, 002, 004, 006..."
@@ -219,27 +226,35 @@ export default function ConfiguracionStarsoft() {
                   </p>
                 </div>
 
-                {/* Producción (fijo 003) */}
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, cod_empresa: EMPRESA_PRODUCCION })}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${
+                {/* Producción (editable) */}
+                <div
+                  onClick={() => {
+                    setEmpresaMode("produccion");
+                    if (!form.cod_empresa) setForm({ ...form, cod_empresa: PROD_DEFAULT });
+                  }}
+                  className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
                     esProd
                       ? "border-green-500 bg-green-50 shadow-md"
                       : "border-slate-200 bg-white hover:border-slate-300"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-slate-900 text-lg">003 — Producción</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-slate-900 text-base">Empresa de Producción</span>
                     <Badge className="bg-green-100 text-green-700 border-green-300">Producción</Badge>
                   </div>
-                  <p className="text-xs text-slate-500">Código fijo (no editable)</p>
-                  {esProd && (
-                    <p className="text-xs text-green-600 mt-1.5 font-medium">
-                      ✓ Empresa de producción seleccionada
-                    </p>
-                  )}
-                </button>
+                  <Label className="text-xs font-medium text-slate-500 mb-1 block">Código de empresa</Label>
+                  <Input
+                    value={esProd ? form.cod_empresa : ""}
+                    onChange={e => setForm({ ...form, cod_empresa: e.target.value })}
+                    onClick={e => e.stopPropagation()}
+                    placeholder="003..."
+                    disabled={!esProd}
+                    className={`text-lg font-bold ${!esProd ? "opacity-40" : "border-green-300 bg-white focus:border-green-500"}`}
+                  />
+                  <p className="text-xs text-green-600 mt-1.5">
+                    Escriba el código de empresa de producción (puede cambiar cada año).
+                  </p>
+                </div>
               </div>
             </div>
 

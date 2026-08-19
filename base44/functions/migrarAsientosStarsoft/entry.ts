@@ -163,7 +163,7 @@ export default async function (req: Request): Promise<Response> {
             Accept: "application/json",
             Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify({ asientos: [trama] }),
+          body: JSON.stringify([trama]),
         });
         const sendText = await sendRes.text();
         let sendData: any;
