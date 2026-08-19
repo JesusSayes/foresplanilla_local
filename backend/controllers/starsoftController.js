@@ -222,8 +222,8 @@ export const migrate = async (req, res, next) => {
       annomes: sanitizeAnnomes(asiento.annomes),
       subdiario: asiento.subdiario || '',
       comprobante: asiento.comprobante || '',
-      fecha_Registro: toDateDMY(asiento.fecha_registro) || toDateDMY(asiento.fecha_doc),
-      fecha_Documento: toDateDMY(asiento.fecha_doc),
+      fecha_Registro: toDateDMY(asiento.fecha_registro) || toDateDMY(asiento.fecha_doc) || toDateDMY(new Date()),
+      fecha_Documento: toDateDMY(asiento.fecha_doc) || toDateDMY(asiento.fecha_registro) || toDateDMY(new Date()),
       tipo_Anexo: asiento.tipo_anexo || '',
       cod_Anexo: asiento.cod_anexo || '',
       tipo_Doc: asiento.tipo_doc || '',
@@ -248,7 +248,7 @@ export const migrate = async (req, res, next) => {
           Accept: 'text/plain',
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ asientos: payload }),
+        body: JSON.stringify(payload),
       });
     } catch (error) {
       const message = `Error de red: ${error.message}`;

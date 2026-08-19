@@ -135,8 +135,8 @@ export default async function (req: Request): Promise<Response> {
       annomes: sanitizeAnnomes(a.annomes),
       subdiario: a.subdiario || "",
       comprobante: a.comprobante || "",
-      fecha_Registro: toDateDMY(a.fecha_registro) || toDateDMY(a.fecha_doc),
-      fecha_Documento: toDateDMY(a.fecha_doc),
+      fecha_Registro: toDateDMY(a.fecha_registro) || toDateDMY(a.fecha_doc) || toDateDMY(new Date().toISOString()),
+      fecha_Documento: toDateDMY(a.fecha_doc) || toDateDMY(a.fecha_registro) || toDateDMY(new Date().toISOString()),
       tipo_Anexo: a.tipo_anexo || "",
       cod_Anexo: a.cod_anexo || "",
       tipo_Doc: a.tipo_doc || "",
@@ -161,7 +161,7 @@ export default async function (req: Request): Promise<Response> {
           Accept: "text/plain",
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ asientos: payload }),
+        body: JSON.stringify(payload),
       });
     } catch (err: any) {
       await base44.asServiceRole.entities.AsientoContable.updateMany(
