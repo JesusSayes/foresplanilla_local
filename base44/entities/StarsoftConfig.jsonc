@@ -39,45 +39,47 @@
       "description": "Configuraci\u00f3n activa (se usa la primera activa para migrar)"
     },
     "cuentas_por_planilla": {
-      "type": "object",
-      "description": "Configuraci\u00f3n de cuentas contables (debe/haber) seg\u00fan el tipo de planilla. Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros). Estructura: { regular: { cuenta_debe, cuenta_haber_neto, cuenta_haber_descuentos }, snp: { cuenta_debe, cuenta_haber_neto, cuenta_haber_descuentos } }",
-      "properties": {
-        "regular": {
-          "type": "object",
-          "description": "Planilla de remuneraciones de plazo fijo (Quincenal, Mensual, Adicional)",
-          "properties": {
-            "cuenta_debe": {
-              "type": "string",
-              "description": "Cuenta del DEBE (gasto de sueldos/salarios)"
-            },
-            "cuenta_haber_neto": {
-              "type": "string",
-              "description": "Cuenta del HABER para el neto a pagar (remuneraciones por pagar)"
-            },
-            "cuenta_haber_descuentos": {
-              "type": "string",
-              "description": "Cuenta del HABER para descuentos/tributos (ESSALUD/AFP/etc.)"
-            }
+      "type": "array",
+      "description": "Lista de cuentas contables configuradas por tipo de planilla. Cada entrada define el tipo de planilla (regular/snp), la cuenta contable, si es debe o haber, y el uso (gasto, neto a pagar, descuentos/tributos). Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tipo_planilla": {
+            "type": "string",
+            "enum": [
+              "regular",
+              "snp"
+            ],
+            "description": "Tipo de planilla al que aplica la cuenta: regular (plazo fijo) o snp (honorarios)"
+          },
+          "cuenta": {
+            "type": "string",
+            "description": "C\u00f3digo de cuenta contable (ref. CuentaContable.cuenta)"
+          },
+          "debe_haber": {
+            "type": "string",
+            "enum": [
+              "D",
+              "H"
+            ],
+            "description": "D=Debe / H=Haber"
+          },
+          "uso": {
+            "type": "string",
+            "enum": [
+              "gasto",
+              "neto",
+              "descuentos"
+            ],
+            "description": "Uso del movimiento: gasto (DEBE - ingreso bruto/gasto de personal), neto (HABER - neto a pagar), descuentos (HABER - descuentos/tributos)"
           }
         },
-        "snp": {
-          "type": "object",
-          "description": "Servicios No Personales / Honorarios (Recibos de Honorarios)",
-          "properties": {
-            "cuenta_debe": {
-              "type": "string",
-              "description": "Cuenta del DEBE (servicios de terceros - honorarios brutos)"
-            },
-            "cuenta_haber_neto": {
-              "type": "string",
-              "description": "Cuenta del HABER para el neto a pagar (honorarios por pagar)"
-            },
-            "cuenta_haber_descuentos": {
-              "type": "string",
-              "description": "Cuenta del HABER para retenciones de 4ta categor\u00eda"
-            }
-          }
-        }
+        "required": [
+          "tipo_planilla",
+          "cuenta",
+          "debe_haber",
+          "uso"
+        ]
       }
     },
     "last_test_status": {

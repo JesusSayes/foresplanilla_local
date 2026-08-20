@@ -236,9 +236,24 @@ export default function ConsultaPlanillas() {
         regular: { cuenta_debe: "6210000", cuenta_haber_neto: "4110000", cuenta_haber_descuentos: "4030000" },
         snp: { cuenta_debe: "6320000", cuenta_haber_neto: "4212100", cuenta_haber_descuentos: "4017100" },
       };
-      const cuentasRegular = { ...DEFAULT_CUENTAS.regular, ...(cuentasConfig?.regular || {}) };
-      const cuentasSNP = { ...DEFAULT_CUENTAS.snp, ...(cuentasConfig?.snp || {}) };
-      const cuentasAplicar = isSNP ? cuentasSNP : cuentasRegular;
+
+      // Resuelve las cuentas configuradas desde el array (nueva estructura) o
+      // desde el objeto legacy { regular: {...}, snp: {...} }.
+      const tipoKey = isSNP ? "snp" : "regular";
+      let cuentasAplicar = { ...DEFAULT_CUENTAS[tipoKey] };
+      if (Array.isArray(cuentasConfig)) {
+        // Nueva estructura: array de entradas { tipo_planilla, cuenta, debe_haber, uso }
+        const porUso = { gasto: "cuenta_debe", neto: "cuenta_haber_neto", descuentos: "cuenta_haber_descuentos" };
+        cuentasConfig
+          .filter(e => e.tipo_planilla === tipoKey && e.cuenta)
+          .forEach(e => {
+            const field = porUso[e.uso];
+            if (field) cuentasAplicar[field] = e.cuenta;
+          });
+      } else if (cuentasConfig && cuentasConfig[tipoKey]) {
+        // Estructura legacy
+        cuentasAplicar = { ...cuentasAplicar, ...cuentasConfig[tipoKey] };
+      }
 
       if (!codEmpresaActiva) {
         toast.error("No se pudo determinar el código de empresa destino. Active una empresa (Prueba o Producción) con su código en la Configuración Starsoft antes de generar los asientos.");

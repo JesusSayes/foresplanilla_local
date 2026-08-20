@@ -30,12 +30,9 @@ export default function ConfiguracionStarsoft() {
     client_secret: "",
     notes: "",
   });
-  // Configuración de cuentas contables por tipo de planilla (debe/haber).
-  // Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).
-  const [cuentasPorPlanilla, setCuentasPorPlanilla] = useState({
-    regular: { cuenta_debe: "", cuenta_haber_neto: "", cuenta_haber_descuentos: "" },
-    snp: { cuenta_debe: "", cuenta_haber_neto: "", cuenta_haber_descuentos: "" },
-  });
+  // Configuración de cuentas contables por tipo de planilla (lista flexible).
+  // Cada entrada: { tipo_planilla, cuenta, debe_haber, uso }
+  const [cuentasPorPlanilla, setCuentasPorPlanilla] = useState([]);
   const [showSecret, setShowSecret] = useState(false);
   const [configId, setConfigId] = useState(null);
   const [testing, setTesting] = useState(false);
@@ -68,19 +65,19 @@ export default function ConfiguracionStarsoft() {
         client_secret: c.client_secret || "",
         notes: c.notes || "",
       });
-      if (c.cuentas_por_planilla) {
-        setCuentasPorPlanilla({
-          regular: {
-            cuenta_debe: c.cuentas_por_planilla.regular?.cuenta_debe || "",
-            cuenta_haber_neto: c.cuentas_por_planilla.regular?.cuenta_haber_neto || "",
-            cuenta_haber_descuentos: c.cuentas_por_planilla.regular?.cuenta_haber_descuentos || "",
-          },
-          snp: {
-            cuenta_debe: c.cuentas_por_planilla.snp?.cuenta_debe || "",
-            cuenta_haber_neto: c.cuentas_por_planilla.snp?.cuenta_haber_neto || "",
-            cuenta_haber_descuentos: c.cuentas_por_planilla.snp?.cuenta_haber_descuentos || "",
-          },
+      // cuentas_por_planilla ahora es un array de entradas { tipo_planilla, cuenta, debe_haber, uso }
+      if (Array.isArray(c.cuentas_por_planilla)) {
+        setCuentasPorPlanilla(c.cuentas_por_planilla);
+      } else if (c.cuentas_por_planilla && typeof c.cuentas_por_planilla === "object") {
+        // Migración desde estructura legacy { regular: {...}, snp: {...} }
+        const migradas = [];
+        ["regular", "snp"].forEach(tipo => {
+          const block = c.cuentas_por_planilla[tipo];
+          if (block?.cuenta_debe) migradas.push({ tipo_planilla: tipo, cuenta: block.cuenta_debe, debe_haber: "D", uso: "gasto" });
+          if (block?.cuenta_haber_neto) migradas.push({ tipo_planilla: tipo, cuenta: block.cuenta_haber_neto, debe_haber: "H", uso: "neto" });
+          if (block?.cuenta_haber_descuentos) migradas.push({ tipo_planilla: tipo, cuenta: block.cuenta_haber_descuentos, debe_haber: "H", uso: "descuentos" });
         });
+        setCuentasPorPlanilla(migradas);
       }
       if (c.last_test_status) {
         setTestResult({
@@ -408,23 +405,15 @@ export default function ConfiguracionStarsoft() {
             ) : (
               <>
                 <CuentasPlanillaSection
-                  titulo="Planilla de Remuneraciones (Plazo Fijo)"
-                  descripcion="Quincenal, Mensual o Adicional — sueldos y salarios de trabajadores en planilla."
-                  value={cuentasPorPlanilla.regular}
-                  onChange={(v) => setCuentasPorPlanilla({ ...cuentasPorPlanilla, regular: v })}
-                  cuentas={cuentasContables}
-                />
-                <CuentasPlanillaSection
-                  titulo="Servicios No Personales (Honorarios / SNP)"
-                  descripcion="Recibos de Honorarios — servicios no personales de 4ta categoría."
-                  value={cuentasPorPlanilla.snp}
-                  onChange={(v) => setCuentasPorPlanilla({ ...cuentasPorPlanilla, snp: v })}
+                  value={cuentasPorPlanilla}
+                  onChange={setCuentasPorPlanilla}
                   cuentas={cuentasContables}
                 />
                 <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                   <p className="text-sm text-blue-700">
-                    Si una cuenta no está configurada, se usarán las cuentas por defecto del sistema al generar los asientos.
+                    Agregue una cuenta por cada tipo de planilla y uso (Gasto/DEBE, Neto a Pagar/HABER, Descuentos y Tributos/HABER).
+                    Las cuentas no configuradas usarán los valores por defecto del sistema al generar los asientos.
                   </p>
                 </div>
               </>
