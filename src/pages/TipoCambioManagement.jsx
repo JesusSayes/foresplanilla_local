@@ -12,6 +12,7 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import PaginationBar from "@/components/ui/PaginationBar";
 
 function todayInPeru() {
   const now = new Date();
@@ -29,6 +30,8 @@ export default function TipoCambioManagement() {
   const [manualFecha, setManualFecha] = useState("");
   const [configUrl, setConfigUrl] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const today = todayInPeru();
 
@@ -411,13 +414,25 @@ export default function TipoCambioManagement() {
           <div className="lg:col-span-2">
             <Card className="border-0 shadow-lg">
               <CardHeader className="border-b bg-slate-50/50">
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-indigo-600" />
-                  Histórico de Tipos de Cambio
-                </CardTitle>
-                <p className="text-sm text-slate-500">
-                  {historial?.length || 0} registro(s) en total
-                </p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-indigo-600" />
+                      Histórico de Tipos de Cambio
+                    </CardTitle>
+                    <p className="text-sm text-slate-500">
+                      {historial?.length || 0} registro(s) en total
+                    </p>
+                  </div>
+                  <PaginationBar
+                    inline
+                    currentPage={currentPage}
+                    totalItems={historial?.length || 0}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                  />
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {isLoading ? (
@@ -437,7 +452,9 @@ export default function TipoCambioManagement() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {historial.map((reg) => (
+                        {historial
+                          .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                          .map((reg) => (
                           <tr key={reg.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-4 py-3 text-slate-900 font-medium">
                               {format(new Date(reg.fecha + "T00:00:00"), "dd/MM/yyyy", { locale: es })}
