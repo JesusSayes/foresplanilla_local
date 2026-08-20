@@ -5,10 +5,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Check, X, BookOpen } from "lucide-react";
+import CuentaContableSelect from "./CuentaContableSelect";
 
+// Mismos valores que el combo "Tipo de Contrato" del formulario de empleados (EmployeeForm).
 const TIPOS_PLANILLA = [
-  { value: "regular", label: "Planilla de Remuneraciones (Plazo Fijo)" },
-  { value: "snp", label: "Servicios No Personales (Honorarios / SNP)" },
+  { value: "Indeterminado", label: "Indeterminado" },
+  { value: "Plazo Fijo", label: "Plazo Fijo" },
+  { value: "Part-Time", label: "Part-Time" },
+  { value: "Prácticas", label: "Prácticas" },
+  { value: "SNP", label: "SNP" },
 ];
 
 const tipoLabel = (v) => TIPOS_PLANILLA.find(t => t.value === v)?.label || v;
@@ -27,7 +32,7 @@ const tipoLabel = (v) => TIPOS_PLANILLA.find(t => t.value === v)?.label || v;
 export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
   const entries = Array.isArray(value) ? value : [];
   const [editingIdx, setEditingIdx] = useState(null); // null | "new" | number
-  const [draft, setDraft] = useState({ tipo_planilla: "regular", cuenta: "", debe_haber: "D" });
+  const [draft, setDraft] = useState({ tipo_planilla: "Indeterminado", cuenta: "", debe_haber: "D" });
 
   const cuentaLabel = (codigo) => {
     if (!codigo) return "—";
@@ -36,7 +41,7 @@ export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
   };
 
   const startAdd = () => {
-    setDraft({ tipo_planilla: "regular", cuenta: "", debe_haber: "D" });
+    setDraft({ tipo_planilla: "Indeterminado", cuenta: "", debe_haber: "D" });
     setEditingIdx("new");
   };
 
@@ -47,7 +52,7 @@ export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
 
   const cancelEdit = () => {
     setEditingIdx(null);
-    setDraft({ tipo_planilla: "regular", cuenta: "", debe_haber: "D" });
+    setDraft({ tipo_planilla: "Indeterminado", cuenta: "", debe_haber: "D" });
   };
 
   const [dupError, setDupError] = useState("");
@@ -82,23 +87,11 @@ export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
   };
 
   const renderCuentaSelect = () => (
-    <Select
+    <CuentaContableSelect
       value={draft.cuenta || ""}
       onValueChange={(v) => setDraft({ ...draft, cuenta: v })}
-    >
-      <SelectTrigger className="h-9 text-sm">
-        <SelectValue placeholder="Seleccione la cuenta contable">
-          {draft.cuenta ? cuentaLabel(draft.cuenta) : "Seleccione la cuenta contable"}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {cuentas.map(c => (
-          <SelectItem key={c.id || c.cuenta} value={c.cuenta}>
-            {c.cuenta} — {c.descripcion}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+      cuentas={cuentas}
+    />
   );
 
   const renderTipoSelect = () => (
@@ -156,7 +149,7 @@ export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Tipo de Planilla</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Tipo de Contrato</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Cuenta Contable</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide w-40">Debe / Haber</th>
                 <th className="px-4 py-2.5 text-center text-xs font-semibold text-slate-600 uppercase tracking-wide w-32">Acciones</th>

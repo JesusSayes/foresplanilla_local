@@ -237,35 +237,40 @@ export default function ConsultaPlanillas() {
         snp: { cuenta_debe: "6320000", cuenta_haber_neto: "4212100", cuenta_haber_descuentos: "4017100" },
       };
 
-      // Resuelve las cuentas configuradas:
+      // Resuelve las cuentas contables según el tipo de contrato del empleado.
+      // La configuración (cuentas_por_planilla) usa los mismos valores que el combo
+      // "Tipo de Contrato" del formulario de empleados (Indeterminado, Plazo Fijo,
+      // Part-Time, Prácticas, SNP). Si no hay configuración para el tipo de contrato,
+      // se aplica el fallback (SNP → honorarios; demás → regular).
       // - Formato actual: array de { tipo_planilla, cuenta, debe_haber }
-      //   (un registro por cuenta; la cuenta del Haber se usa para neto y descuentos)
       // - Formato anterior: array de { tipo_planilla, cuenta_debe, cuenta_haber }
-      // - Formato intermedio: array de { tipo_planilla, cuenta, debe_haber, uso }
       // - Formato legacy: objeto { regular: {...}, snp: {...} }
-      const tipoKey = isSNP ? "snp" : "regular";
-      const cuentasAplicar = { ...DEFAULT_CUENTAS[tipoKey] };
-      if (Array.isArray(cuentasConfig)) {
-        const dEntry = cuentasConfig.find(e => e.tipo_planilla === tipoKey && e.debe_haber === "D" && e.cuenta);
-        const hEntry = cuentasConfig.find(e => e.tipo_planilla === tipoKey && e.debe_haber === "H" && e.cuenta);
-        if (dEntry?.cuenta) cuentasAplicar.cuenta_debe = dEntry.cuenta;
-        if (hEntry?.cuenta) {
-          cuentasAplicar.cuenta_haber_neto = hEntry.cuenta;
-          cuentasAplicar.cuenta_haber_descuentos = hEntry.cuenta;
+      const resolveCuentas = (contractType) => {
+        const baseKey = contractType === "SNP" ? "snp" : "regular";
+        const resolved = { ...DEFAULT_CUENTAS[baseKey] };
+        if (Array.isArray(cuentasConfig)) {
+          const dEntry = cuentasConfig.find(e => e.tipo_planilla === contractType && e.debe_haber === "D" && e.cuenta);
+          const hEntry = cuentasConfig.find(e => e.tipo_planilla === contractType && e.debe_haber === "H" && e.cuenta);
+          if (dEntry?.cuenta) resolved.cuenta_debe = dEntry.cuenta;
+          if (hEntry?.cuenta) {
+            resolved.cuenta_haber_neto = hEntry.cuenta;
+            resolved.cuenta_haber_descuentos = hEntry.cuenta;
+          }
+          // Compatibilidad con formato anterior {tipo_planilla, cuenta_debe, cuenta_haber}
+          const entryDebe = cuentasConfig.find(e => e.tipo_planilla === contractType && e.cuenta_debe !== undefined);
+          if (entryDebe?.cuenta_debe) resolved.cuenta_debe = entryDebe.cuenta_debe;
+          if (entryDebe?.cuenta_haber) {
+            resolved.cuenta_haber_neto = entryDebe.cuenta_haber;
+            resolved.cuenta_haber_descuentos = entryDebe.cuenta_haber;
+          }
+        } else if (cuentasConfig && cuentasConfig[baseKey]) {
+          // Estructura legacy { regular: {...}, snp: {...} }
+          resolved.cuenta_debe = cuentasConfig[baseKey].cuenta_debe || resolved.cuenta_debe;
+          resolved.cuenta_haber_neto = cuentasConfig[baseKey].cuenta_haber_neto || resolved.cuenta_haber_neto;
+          resolved.cuenta_haber_descuentos = cuentasConfig[baseKey].cuenta_haber_descuentos || resolved.cuenta_haber_descuentos;
         }
-        // Compatibilidad con formato anterior {tipo_planilla, cuenta_debe, cuenta_haber}
-        const entryDebe = cuentasConfig.find(e => e.tipo_planilla === tipoKey && e.cuenta_debe !== undefined);
-        if (entryDebe?.cuenta_debe) cuentasAplicar.cuenta_debe = entryDebe.cuenta_debe;
-        if (entryDebe?.cuenta_haber) {
-          cuentasAplicar.cuenta_haber_neto = entryDebe.cuenta_haber;
-          cuentasAplicar.cuenta_haber_descuentos = entryDebe.cuenta_haber;
-        }
-      } else if (cuentasConfig && cuentasConfig[tipoKey]) {
-        // Estructura legacy { regular: {...}, snp: {...} }
-        cuentasAplicar.cuenta_debe = cuentasConfig[tipoKey].cuenta_debe || cuentasAplicar.cuenta_debe;
-        cuentasAplicar.cuenta_haber_neto = cuentasConfig[tipoKey].cuenta_haber_neto || cuentasAplicar.cuenta_haber_neto;
-        cuentasAplicar.cuenta_haber_descuentos = cuentasConfig[tipoKey].cuenta_haber_descuentos || cuentasAplicar.cuenta_haber_descuentos;
-      }
+        return resolved;
+      };
 
       if (!codEmpresaActiva) {
         toast.error("No se pudo determinar el código de empresa destino. Active una empresa (Prueba o Producción) con su código en la Configuración Starsoft antes de generar los asientos.");
@@ -300,6 +305,9 @@ export default function ConsultaPlanillas() {
         for (const p of grupo.payslips) {
           const emp = allEmployees.find(e => e.id === p.employee_id);
           if (!emp) continue;
+
+          // Cuentas contables según el tipo de contrato del trabajador
+          const cuentasAplicar = resolveCuentas(emp.contract_type || "SNP");
 
           // Centro de costo del trabajador
           let assignment = costCenterAssignments.find(
@@ -403,21 +411,24 @@ export default function ConsultaPlanillas() {
 
           const ccId = assignment?.cost_center_id || "sin_cc";
           const cc = ccId !== "sin_cc" ? costCenters.find(c => c.id === ccId) : null;
+          const contractType = emp.contract_type || "Indeterminado";
+          const mapKey = `${ccId}__${contractType}`;
 
-          if (!ccMap[ccId]) {
-            ccMap[ccId] = { cc, ccId, totalIncome: 0, totalDeductions: 0, totalNeto: 0, employeeCount: 0 };
+          if (!ccMap[mapKey]) {
+            ccMap[mapKey] = { cc, ccId, contractType, totalIncome: 0, totalDeductions: 0, totalNeto: 0, employeeCount: 0 };
           }
-          ccMap[ccId].totalIncome += safePayrollNumber(p.total_income);
-          ccMap[ccId].totalDeductions += safePayrollNumber(p.total_deductions);
-          ccMap[ccId].totalNeto += safePayrollNumber(p.net_pay);
-          ccMap[ccId].employeeCount += 1;
+          ccMap[mapKey].totalIncome += safePayrollNumber(p.total_income);
+          ccMap[mapKey].totalDeductions += safePayrollNumber(p.total_deductions);
+          ccMap[mapKey].totalNeto += safePayrollNumber(p.net_pay);
+          ccMap[mapKey].employeeCount += 1;
         }
 
         for (const data of Object.values(ccMap)) {
+          const cuentasAplicar = resolveCuentas(data.contractType);
           const ccCode = data.cc?.code || "S/CC";
           const ccName = data.cc?.name || "Sin Centro de Costo";
           const glosa  = `${payrollType} - ${period}`;
-          const glosaCC = `${glosa} | ${ccCode} - ${ccName} (${data.employeeCount} emp.)`;
+          const glosaCC = `${glosa} | ${ccCode} - ${ccName} | ${data.contractType} (${data.employeeCount} emp.)`;
 
           const base = {
             annomes,

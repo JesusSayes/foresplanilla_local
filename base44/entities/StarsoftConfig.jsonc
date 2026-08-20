@@ -40,17 +40,20 @@
     },
     "cuentas_por_planilla": {
       "type": "array",
-      "description": "Lista de cuentas contables por tipo de planilla. Cada registro vincula un tipo de planilla con una cuenta contable y su rol (Debe o Haber). Para configurar un tipo de planilla completo se agregan dos registros: uno del DEBE (gasto) y uno del HABER (neto a pagar / descuentos). Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).",
+      "description": "Lista de cuentas contables por tipo de contrato. Cada registro vincula un tipo de contrato (igual al combo 'Tipo de Contrato' del formulario de empleados) con una cuenta contable y su rol (Debe o Haber). Para configurar un tipo de contrato completo se agregan dos registros: uno del DEBE (gasto) y uno del HABER (neto a pagar / descuentos). La generaci\u00f3n de asientos resuelve las cuentas seg\u00fan el tipo de contrato de cada empleado. Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).",
       "items": {
         "type": "object",
         "properties": {
           "tipo_planilla": {
             "type": "string",
             "enum": [
-              "regular",
-              "snp"
+              "Indeterminado",
+              "Plazo Fijo",
+              "Part-Time",
+              "Pr\u00e1cticas",
+              "SNP"
             ],
-            "description": "Tipo de planilla al que aplica la cuenta: regular (plazo fijo) o snp (honorarios)"
+            "description": "Tipo de contrato al que aplica la cuenta (mismos valores que el combo 'Tipo de Contrato' del formulario de empleados)"
           },
           "cuenta": {
             "type": "string",
