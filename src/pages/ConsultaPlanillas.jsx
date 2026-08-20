@@ -270,7 +270,7 @@ export default function ConsultaPlanillas() {
             fecha_registro: fechaRegistro,
             tipo_doc: "RH",            // Recibo de Honorarios
             nro_doc: nroDoc,
-            tipo_anexo: "P",           // Proveedor (contratista)
+            tipo_anexo: "08",          // Honorarios (Servicios No Personales / 4ta categoría)
             cod_anexo: codAnexo,
             conversion_tc: "M",
             moneda: "PEN",
@@ -364,7 +364,7 @@ export default function ConsultaPlanillas() {
             fecha_registro: fechaRegistro,
             tipo_doc: "PL",
             nro_doc: comprobante,
-            tipo_anexo: "T",           // Trabajador
+            tipo_anexo: "004",         // Trabajadores (planilla en indeterminado plazo)
             conversion_tc: "M",
             moneda: "PEN",
             tc: 1,
