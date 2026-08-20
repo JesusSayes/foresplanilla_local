@@ -1,179 +1,238 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, X, BookOpen } from "lucide-react";
 
 const TIPOS_PLANILLA = [
   { value: "regular", label: "Planilla de Remuneraciones (Plazo Fijo)" },
   { value: "snp", label: "Servicios No Personales (Honorarios / SNP)" },
 ];
 
-const USOS = [
-  { value: "gasto", label: "Gasto / Egreso", debe_haber: "D" },
-  { value: "neto", label: "Neto a Pagar", debe_haber: "H" },
-  { value: "descuentos", label: "Descuentos / Tributos", debe_haber: "H" },
-];
+const tipoLabel = (v) => TIPOS_PLANILLA.find(t => t.value === v)?.label || v;
 
 /**
- * Editor de lista flexible de cuentas contables por tipo de planilla.
- * El usuario agrega entradas indicando: tipo de planilla, cuenta contable,
- * debe/haber y uso (gasto, neto, descuentos).
+ * Datagrid CRUD de cuentas contables por tipo de planilla.
+ * Cada entrada vincula un tipo de planilla con su cuenta del DEBE y su cuenta del HABER.
  *
  * Props:
- *  - value: array de entradas [{ tipo_planilla, cuenta, debe_haber, uso }]
+ *  - value: array de { tipo_planilla, cuenta_debe, cuenta_haber }
  *  - onChange: (newValue) => void
  *  - cuentas: lista de CuentaContable activas
  */
 export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
   const entries = Array.isArray(value) ? value : [];
+  const [editingIdx, setEditingIdx] = useState(null); // null | "new" | number
+  const [draft, setDraft] = useState({ tipo_planilla: "regular", cuenta_debe: "", cuenta_haber: "" });
 
-  const addEntry = () => {
-    onChange([...entries, { tipo_planilla: "regular", cuenta: "", debe_haber: "D", uso: "gasto" }]);
+  const cuentaLabel = (codigo) => {
+    if (!codigo) return "—";
+    const c = cuentas.find(c => c.cuenta === codigo);
+    return c ? `${c.cuenta} — ${c.descripcion}` : codigo;
   };
 
-  const updateEntry = (idx, field, val) => {
-    const next = entries.map((e, i) => (i === idx ? { ...e, [field]: val } : e));
-    // Si cambia debe_haber, ajustar el uso para que sea coherente
-    if (field === "debe_haber") {
-      if (val === "D") next[idx].uso = "gasto";
-      else if (val === "H" && next[idx].uso === "gasto") next[idx].uso = "neto";
+  const startAdd = () => {
+    // Preseleccionar el primer tipo de planilla no usado
+    const usados = entries.map(e => e.tipo_planilla);
+    const libre = TIPOS_PLANILLA.find(t => !usados.includes(t.value))?.value || "regular";
+    setDraft({ tipo_planilla: libre, cuenta_debe: "", cuenta_haber: "" });
+    setEditingIdx("new");
+  };
+
+  const startEdit = (idx) => {
+    setDraft({ ...entries[idx] });
+    setEditingIdx(idx);
+  };
+
+  const cancelEdit = () => {
+    setEditingIdx(null);
+    setDraft({ tipo_planilla: "regular", cuenta_debe: "", cuenta_haber: "" });
+  };
+
+  const saveDraft = () => {
+    if (!draft.tipo_planilla || !draft.cuenta_debe || !draft.cuenta_haber) return;
+    if (editingIdx === "new") {
+      // Evitar duplicados de tipo de planilla
+      if (entries.some(e => e.tipo_planilla === draft.tipo_planilla)) {
+        return;
+      }
+      onChange([...entries, { ...draft }]);
+    } else if (typeof editingIdx === "number") {
+      const next = entries.map((e, i) => (i === editingIdx ? { ...draft } : e));
+      onChange(next);
     }
-    // Si cambia uso, ajustar debe_haber según el uso
-    if (field === "uso") {
-      const uso = USOS.find(u => u.value === val);
-      if (uso) next[idx].debe_haber = uso.debe_haber;
-    }
-    onChange(next);
+    cancelEdit();
   };
 
   const removeEntry = (idx) => {
     onChange(entries.filter((_, i) => i !== idx));
   };
 
-  const cuentaLabel = (codigo) => {
-    const c = cuentas.find(c => c.cuenta === codigo);
-    return c ? `${c.cuenta} — ${c.descripcion}` : (codigo || "—");
+  const tiposDisponibles = (currentTipo) => {
+    const usados = entries.map(e => e.tipo_planilla);
+    return TIPOS_PLANILLA.filter(t => !usados.includes(t.value) || t.value === currentTipo);
   };
 
+  const renderCuentaSelect = (field, placeholder) => (
+    <Select
+      value={draft[field] || ""}
+      onValueChange={(v) => setDraft({ ...draft, [field]: v === "__none__" ? "" : v })}
+    >
+      <SelectTrigger className="h-9 text-sm">
+        <SelectValue placeholder={placeholder}>
+          {draft[field] ? cuentaLabel(draft[field]) : placeholder}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none__">— Sin configurar —</SelectItem>
+        {cuentas.map(c => (
+          <SelectItem key={c.id || c.cuenta} value={c.cuenta}>
+            {c.cuenta} — {c.descripcion}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  const isEditing = editingIdx !== null;
+
   return (
-    <div className="space-y-3">
-      {entries.length === 0 ? (
-        <div className="text-center py-6 text-sm text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+    <div className="space-y-4">
+      {entries.length === 0 && !isEditing && (
+        <div className="text-center py-8 text-sm text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+          <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
           No hay cuentas contables configuradas. Haga clic en "Agregar Cuenta" para empezar.
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {entries.map((entry, idx) => {
-            const usosDisponibles = entry.debe_haber === "D"
-              ? USOS.filter(u => u.debe_haber === "D")
-              : USOS.filter(u => u.debe_haber === "H");
-            return (
-              <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end p-3 rounded-lg bg-white border border-slate-200">
-                {/* Tipo de planilla */}
-                <div className="md:col-span-3">
-                  <Label className="text-[11px] font-semibold text-slate-500 uppercase">Tipo de Planilla</Label>
-                  <Select
-                    value={entry.tipo_planilla}
-                    onValueChange={(v) => updateEntry(idx, "tipo_planilla", v)}
-                  >
-                    <SelectTrigger className="mt-1 h-9 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIPOS_PLANILLA.map(t => (
-                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Cuenta contable */}
-                <div className="md:col-span-4">
-                  <Label className="text-[11px] font-semibold text-slate-500 uppercase">Cuenta Contable</Label>
-                  <Select
-                    value={entry.cuenta || ""}
-                    onValueChange={(v) => updateEntry(idx, "cuenta", v === "__none__" ? "" : v)}
-                  >
-                    <SelectTrigger className="mt-1 h-9 text-sm">
-                      <SelectValue placeholder="Seleccione la cuenta">
-                        {entry.cuenta ? cuentaLabel(entry.cuenta) : "Seleccione la cuenta"}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— Sin configurar —</SelectItem>
-                      {cuentas.map(c => (
-                        <SelectItem key={c.id || c.cuenta} value={c.cuenta}>
-                          {c.cuenta} — {c.descripcion}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Debe / Haber */}
-                <div className="md:col-span-2">
-                  <Label className="text-[11px] font-semibold text-slate-500 uppercase">Debe / Haber</Label>
-                  <Select
-                    value={entry.debe_haber}
-                    onValueChange={(v) => updateEntry(idx, "debe_haber", v)}
-                  >
-                    <SelectTrigger className="mt-1 h-9 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="D">Debe (D)</SelectItem>
-                      <SelectItem value="H">Haber (H)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Uso */}
-                <div className="md:col-span-2">
-                  <Label className="text-[11px] font-semibold text-slate-500 uppercase">Uso</Label>
-                  <Select
-                    value={entry.uso}
-                    onValueChange={(v) => updateEntry(idx, "uso", v)}
-                  >
-                    <SelectTrigger className="mt-1 h-9 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {usosDisponibles.map(u => (
-                        <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Eliminar */}
-                <div className="md:col-span-1 flex justify-end">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 text-red-600 border-red-200 hover:bg-red-50"
-                    onClick={() => removeEntry(idx)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
         </div>
       )}
 
-      <Button
-        variant="outline"
-        onClick={addEntry}
-        className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-        disabled={cuentas.length === 0}
-      >
-        <Plus className="w-4 h-4 mr-2" />
-        Agregar Cuenta
-      </Button>
+      {/* Datagrid */}
+      {(entries.length > 0 || isEditing) && (
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Tipo de Planilla</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Cuenta Contable (Debe)</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Cuenta Contable (Haber)</th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold text-slate-600 uppercase tracking-wide w-32">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {/* Fila de edición "nueva" al inicio */}
+              {editingIdx === "new" && (
+                <tr className="bg-indigo-50/50">
+                  <td className="px-4 py-2.5">
+                    <Select
+                      value={draft.tipo_planilla}
+                      onValueChange={(v) => setDraft({ ...draft, tipo_planilla: v })}
+                    >
+                      <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {tiposDisponibles(draft.tipo_planilla).map(t => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </td>
+                  <td className="px-4 py-2.5">{renderCuentaSelect("cuenta_debe", "Cuenta del debe")}</td>
+                  <td className="px-4 py-2.5">{renderCuentaSelect("cuenta_haber", "Cuenta del haber")}</td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center justify-center gap-1">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={saveDraft} disabled={!draft.cuenta_debe || !draft.cuenta_haber}>
+                        <Check className="w-4 h-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500 hover:bg-slate-100" onClick={cancelEdit}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {/* Filas existentes */}
+              {entries.map((entry, idx) => (
+                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                  {editingIdx === idx ? (
+                    <>
+                      <td className="px-4 py-2.5">
+                        <Select
+                          value={draft.tipo_planilla}
+                          onValueChange={(v) => setDraft({ ...draft, tipo_planilla: v })}
+                        >
+                          <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {tiposDisponibles(draft.tipo_planilla).map(t => (
+                              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-4 py-2.5">{renderCuentaSelect("cuenta_debe", "Cuenta del debe")}</td>
+                      <td className="px-4 py-2.5">{renderCuentaSelect("cuenta_haber", "Cuenta del haber")}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center justify-center gap-1">
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={saveDraft} disabled={!draft.cuenta_debe || !draft.cuenta_haber}>
+                            <Check className="w-4 h-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500 hover:bg-slate-100" onClick={cancelEdit}>
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-4 py-2.5">
+                        <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200">{tipoLabel(entry.tipo_planilla)}</Badge>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <Badge className="bg-red-100 text-red-700 border-red-200 shrink-0">D</Badge>
+                          <span className="text-slate-700 truncate">{cuentaLabel(entry.cuenta_debe)}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <Badge className="bg-green-100 text-green-700 border-green-200 shrink-0">H</Badge>
+                          <span className="text-slate-700 truncate">{cuentaLabel(entry.cuenta_haber)}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center justify-center gap-1">
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" onClick={() => startEdit(idx)}>
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => removeEntry(idx)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Botón agregar */}
+      {!isEditing && (
+        <Button
+          variant="outline"
+          onClick={startAdd}
+          className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+          disabled={cuentas.length === 0 || entries.length >= TIPOS_PLANILLA.length}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Agregar Cuenta Contable
+        </Button>
+      )}
+      {entries.length >= TIPOS_PLANILLA.length && !isEditing && (
+        <p className="text-xs text-slate-400">Ya hay una configuración para cada tipo de planilla. Edite o elimine una existente para agregar otra.</p>
+      )}
     </div>
   );
 }

@@ -237,22 +237,33 @@ export default function ConsultaPlanillas() {
         snp: { cuenta_debe: "6320000", cuenta_haber_neto: "4212100", cuenta_haber_descuentos: "4017100" },
       };
 
-      // Resuelve las cuentas configuradas desde el array (nueva estructura) o
-      // desde el objeto legacy { regular: {...}, snp: {...} }.
+      // Resuelve las cuentas configuradas:
+      // - Formato actual: array de { tipo_planilla, cuenta_debe, cuenta_haber }
+      //   (la cuenta_haber se usa para el neto a pagar y los descuentos/tributos)
+      // - Formato intermedio: array de { tipo_planilla, cuenta, debe_haber, uso }
+      // - Formato legacy: objeto { regular: {...}, snp: {...} }
       const tipoKey = isSNP ? "snp" : "regular";
-      let cuentasAplicar = { ...DEFAULT_CUENTAS[tipoKey] };
+      const cuentasAplicar = { ...DEFAULT_CUENTAS[tipoKey] };
       if (Array.isArray(cuentasConfig)) {
-        // Nueva estructura: array de entradas { tipo_planilla, cuenta, debe_haber, uso }
+        const entryDebe = cuentasConfig.find(e => e.tipo_planilla === tipoKey && e.cuenta_debe !== undefined);
+        if (entryDebe?.cuenta_debe) cuentasAplicar.cuenta_debe = entryDebe.cuenta_debe;
+        if (entryDebe?.cuenta_haber) {
+          cuentasAplicar.cuenta_haber_neto = entryDebe.cuenta_haber;
+          cuentasAplicar.cuenta_haber_descuentos = entryDebe.cuenta_haber;
+        }
+        // Compatibilidad con formato intermedio {tipo_planilla, cuenta, debe_haber, uso}
         const porUso = { gasto: "cuenta_debe", neto: "cuenta_haber_neto", descuentos: "cuenta_haber_descuentos" };
         cuentasConfig
-          .filter(e => e.tipo_planilla === tipoKey && e.cuenta)
+          .filter(e => e.tipo_planilla === tipoKey && e.cuenta && e.uso)
           .forEach(e => {
             const field = porUso[e.uso];
-            if (field) cuentasAplicar[field] = e.cuenta;
+            if (field && e.cuenta) cuentasAplicar[field] = e.cuenta;
           });
       } else if (cuentasConfig && cuentasConfig[tipoKey]) {
-        // Estructura legacy
-        cuentasAplicar = { ...cuentasAplicar, ...cuentasConfig[tipoKey] };
+        // Estructura legacy { regular: {...}, snp: {...} }
+        cuentasAplicar.cuenta_debe = cuentasConfig[tipoKey].cuenta_debe || cuentasAplicar.cuenta_debe;
+        cuentasAplicar.cuenta_haber_neto = cuentasConfig[tipoKey].cuenta_haber_neto || cuentasAplicar.cuenta_haber_neto;
+        cuentasAplicar.cuenta_haber_descuentos = cuentasConfig[tipoKey].cuenta_haber_descuentos || cuentasAplicar.cuenta_haber_descuentos;
       }
 
       if (!codEmpresaActiva) {

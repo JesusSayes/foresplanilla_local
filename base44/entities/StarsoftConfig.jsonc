@@ -40,7 +40,7 @@
     },
     "cuentas_por_planilla": {
       "type": "array",
-      "description": "Lista de cuentas contables configuradas por tipo de planilla. Cada entrada define el tipo de planilla (regular/snp), la cuenta contable, si es debe o haber, y el uso (gasto, neto a pagar, descuentos/tributos). Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).",
+      "description": "Lista de configuraciones de cuentas contables por tipo de planilla. Cada entrada vincula un tipo de planilla con su cuenta del debe (gasto) y su cuenta del haber (neto a pagar / descuentos). Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).",
       "items": {
         "type": "object",
         "properties": {
@@ -50,35 +50,21 @@
               "regular",
               "snp"
             ],
-            "description": "Tipo de planilla al que aplica la cuenta: regular (plazo fijo) o snp (honorarios)"
+            "description": "Tipo de planilla al que aplica la configuraci\u00f3n: regular (plazo fijo) o snp (honorarios)"
           },
-          "cuenta": {
+          "cuenta_debe": {
             "type": "string",
-            "description": "C\u00f3digo de cuenta contable (ref. CuentaContable.cuenta)"
+            "description": "C\u00f3digo de cuenta contable del DEBE (gasto de personal / honorarios brutos)"
           },
-          "debe_haber": {
+          "cuenta_haber": {
             "type": "string",
-            "enum": [
-              "D",
-              "H"
-            ],
-            "description": "D=Debe / H=Haber"
-          },
-          "uso": {
-            "type": "string",
-            "enum": [
-              "gasto",
-              "neto",
-              "descuentos"
-            ],
-            "description": "Uso del movimiento: gasto (DEBE - ingreso bruto/gasto de personal), neto (HABER - neto a pagar), descuentos (HABER - descuentos/tributos)"
+            "description": "C\u00f3digo de cuenta contable del HABER (neto a pagar y descuentos/tributos)"
           }
         },
         "required": [
           "tipo_planilla",
-          "cuenta",
-          "debe_haber",
-          "uso"
+          "cuenta_debe",
+          "cuenta_haber"
         ]
       }
     },

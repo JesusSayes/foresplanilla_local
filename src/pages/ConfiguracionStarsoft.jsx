@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CuentasPlanillaSection from "@/components/starsoft/CuentasPlanillaSection";
 
 const PROD_DEFAULT = "003";
@@ -65,17 +66,35 @@ export default function ConfiguracionStarsoft() {
         client_secret: c.client_secret || "",
         notes: c.notes || "",
       });
-      // cuentas_por_planilla ahora es un array de entradas { tipo_planilla, cuenta, debe_haber, uso }
+      // Normalizar cuentas_por_planilla al formato actual: array de { tipo_planilla, cuenta_debe, cuenta_haber }
       if (Array.isArray(c.cuentas_por_planilla)) {
-        setCuentasPorPlanilla(c.cuentas_por_planilla);
+        const normalizadas = [];
+        const porTipo = {};
+        c.cuentas_por_planilla.forEach(e => {
+          if (e.tipo_planilla && e.cuenta_debe !== undefined && e.cuenta_haber !== undefined) {
+            // Formato actual
+            normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta_debe: e.cuenta_debe || "", cuenta_haber: e.cuenta_haber || "" });
+          } else if (e.tipo_planilla && e.cuenta) {
+            // Formato intermedio {tipo_planilla, cuenta, debe_haber, uso}
+            if (!porTipo[e.tipo_planilla]) porTipo[e.tipo_planilla] = { tipo_planilla: e.tipo_planilla, cuenta_debe: "", cuenta_haber: "" };
+            if (e.uso === "gasto" && e.debe_haber === "D") porTipo[e.tipo_planilla].cuenta_debe = e.cuenta;
+            else if (e.uso === "neto" && e.debe_haber === "H") porTipo[e.tipo_planilla].cuenta_haber = e.cuenta;
+          }
+        });
+        Object.values(porTipo).forEach(v => { if (v.cuenta_debe || v.cuenta_haber) normalizadas.push(v); });
+        setCuentasPorPlanilla(normalizadas);
       } else if (c.cuentas_por_planilla && typeof c.cuentas_por_planilla === "object") {
         // Migración desde estructura legacy { regular: {...}, snp: {...} }
         const migradas = [];
         ["regular", "snp"].forEach(tipo => {
           const block = c.cuentas_por_planilla[tipo];
-          if (block?.cuenta_debe) migradas.push({ tipo_planilla: tipo, cuenta: block.cuenta_debe, debe_haber: "D", uso: "gasto" });
-          if (block?.cuenta_haber_neto) migradas.push({ tipo_planilla: tipo, cuenta: block.cuenta_haber_neto, debe_haber: "H", uso: "neto" });
-          if (block?.cuenta_haber_descuentos) migradas.push({ tipo_planilla: tipo, cuenta: block.cuenta_haber_descuentos, debe_haber: "H", uso: "descuentos" });
+          if (block && (block.cuenta_debe || block.cuenta_haber_neto)) {
+            migradas.push({
+              tipo_planilla: tipo,
+              cuenta_debe: block.cuenta_debe || "",
+              cuenta_haber: block.cuenta_haber_neto || "",
+            });
+          }
         });
         setCuentasPorPlanilla(migradas);
       }
@@ -151,6 +170,16 @@ export default function ConfiguracionStarsoft() {
           </p>
         </div>
 
+        <Tabs defaultValue="general" className="mb-6">
+          <TabsList className="grid grid-cols-2 w-full max-w-md mb-4">
+            <TabsTrigger value="general" className="gap-1.5">
+              <Building2 className="w-3.5 h-3.5" /> Empresa y Conexión
+            </TabsTrigger>
+            <TabsTrigger value="cuentas" className="gap-1.5">
+              <BookOpen className="w-3.5 h-3.5" /> Cuentas por Planilla
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="general">
         {/* Credenciales de API */}
         <Card className="border-0 shadow-lg mb-6">
           <CardHeader className="border-b bg-slate-50/50">
@@ -382,8 +411,10 @@ export default function ConfiguracionStarsoft() {
           </CardContent>
         </Card>
 
+          </TabsContent>
+          <TabsContent value="cuentas">
         {/* Configuración de cuentas por tipo de planilla */}
-        <Card className="border-0 shadow-lg mb-6">
+        <Card className="border-0 shadow-lg">
           <CardHeader className="border-b bg-slate-50/50">
             <CardTitle className="text-base flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-indigo-600" />
@@ -420,6 +451,9 @@ export default function ConfiguracionStarsoft() {
             )}
           </CardContent>
         </Card>
+
+          </TabsContent>
+        </Tabs>
 
         {/* Resumen empresa activa */}
         <Card className="border-0 shadow-lg">
