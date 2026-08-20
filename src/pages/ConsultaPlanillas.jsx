@@ -220,14 +220,25 @@ export default function ConsultaPlanillas() {
       // Si no hay configuración activa o no tiene código de empresa, se muestra
       // un mensaje y se interrumpe la generación (no se asume "003" por defecto).
       let codEmpresaActiva = null;
+      let cuentasConfig = null;
       try {
         const configs = await base44.entities.StarsoftConfig.filter({ is_active: true });
         if (configs && configs.length > 0 && configs[0].cod_empresa) {
           codEmpresaActiva = String(configs[0].cod_empresa);
+          cuentasConfig = configs[0].cuentas_por_planilla || null;
         }
       } catch (e) {
         console.warn("No se pudo leer la configuración Starsoft", e);
       }
+
+      // Cuentas por defecto del sistema (fallback si no están configuradas)
+      const DEFAULT_CUENTAS = {
+        regular: { cuenta_debe: "6210000", cuenta_haber_neto: "4110000", cuenta_haber_descuentos: "4030000" },
+        snp: { cuenta_debe: "6320000", cuenta_haber_neto: "4212100", cuenta_haber_descuentos: "4017100" },
+      };
+      const cuentasRegular = { ...DEFAULT_CUENTAS.regular, ...(cuentasConfig?.regular || {}) };
+      const cuentasSNP = { ...DEFAULT_CUENTAS.snp, ...(cuentasConfig?.snp || {}) };
+      const cuentasAplicar = isSNP ? cuentasSNP : cuentasRegular;
 
       if (!codEmpresaActiva) {
         toast.error("No se pudo determinar el código de empresa destino. Active una empresa (Prueba o Producción) con su código en la Configuración Starsoft antes de generar los asientos.");
@@ -313,31 +324,31 @@ export default function ConsultaPlanillas() {
             anulado: false,
           };
 
-          // DEBE: 6320000 Servicios de Terceros (honorarios brutos)
+          // DEBE: Servicios de Terceros (honorarios brutos) - cuenta configurable
           asientosToCreate.push({
             ...base,
-            cuenta: "6320000",
+            cuenta: cuentasAplicar.cuenta_debe,
             importe: importeBruto,
             importe_soles: importeBruto,
             debe_haber: "D",
             glosa_mov: `${glosaEmp} - Honorario bruto`.slice(0, 40),
           });
 
-          // HABER: 4212100 Honorarios por pagar (neto)
+          // HABER: Honorarios por pagar (neto) - cuenta configurable
           asientosToCreate.push({
             ...base,
-            cuenta: "4212100",
+            cuenta: cuentasAplicar.cuenta_haber_neto,
             importe: importeNeto,
             importe_soles: importeNeto,
             debe_haber: "H",
             glosa_mov: `${glosaEmp} - Neto a pagar`.slice(0, 40),
           });
 
-          // HABER: 4017100 Retención de 4ta categoría (si hay descuentos)
+          // HABER: Retención de 4ta categoría (si hay descuentos) - cuenta configurable
           if (importeRet > 0) {
             asientosToCreate.push({
               ...base,
-              cuenta: "4017100",
+              cuenta: cuentasAplicar.cuenta_haber_descuentos,
               importe: importeRet,
               importe_soles: importeRet,
               debe_haber: "H",
@@ -406,7 +417,7 @@ export default function ConsultaPlanillas() {
 
           asientosToCreate.push({
             ...base,
-            cuenta: "6210000",
+            cuenta: cuentasAplicar.cuenta_debe,
             importe: roundMoney(data.totalIncome),
             importe_soles: roundMoney(data.totalIncome),
             debe_haber: "D",
@@ -415,7 +426,7 @@ export default function ConsultaPlanillas() {
 
           asientosToCreate.push({
             ...base,
-            cuenta: "4110000",
+            cuenta: cuentasAplicar.cuenta_haber_neto,
             importe: roundMoney(data.totalNeto),
             importe_soles: roundMoney(data.totalNeto),
             debe_haber: "H",
@@ -425,7 +436,7 @@ export default function ConsultaPlanillas() {
           if (data.totalDeductions > 0) {
             asientosToCreate.push({
               ...base,
-              cuenta: "4030000",
+              cuenta: cuentasAplicar.cuenta_haber_descuentos,
               importe: roundMoney(data.totalDeductions),
               importe_soles: roundMoney(data.totalDeductions),
               debe_haber: "H",

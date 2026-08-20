@@ -9,11 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Settings, ShieldCheck, Loader2, CheckCircle, XCircle, KeyRound,
-  Building2, Link2, Send, AlertCircle, Save
+  Building2, Link2, Send, AlertCircle, Save, BookOpen
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import CuentasPlanillaSection from "@/components/starsoft/CuentasPlanillaSection";
 
 const PROD_DEFAULT = "003";
 const PRUEBA_DEFAULT = "001";
@@ -29,6 +30,12 @@ export default function ConfiguracionStarsoft() {
     client_secret: "",
     notes: "",
   });
+  // Configuración de cuentas contables por tipo de planilla (debe/haber).
+  // Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).
+  const [cuentasPorPlanilla, setCuentasPorPlanilla] = useState({
+    regular: { cuenta_debe: "", cuenta_haber_neto: "", cuenta_haber_descuentos: "" },
+    snp: { cuenta_debe: "", cuenta_haber_neto: "", cuenta_haber_descuentos: "" },
+  });
   const [showSecret, setShowSecret] = useState(false);
   const [configId, setConfigId] = useState(null);
   const [testing, setTesting] = useState(false);
@@ -39,6 +46,12 @@ export default function ConfiguracionStarsoft() {
   const { data: config, isLoading } = useQuery({
     queryKey: ["starsoftConfig"],
     queryFn: () => base44.entities.StarsoftConfig.filter({ is_active: true }),
+  });
+
+  // Cuentas contables disponibles (Datos Maestros) para configurar debe/haber por planilla
+  const { data: cuentasContables = [] } = useQuery({
+    queryKey: ["cuentasContablesStarsoft"],
+    queryFn: () => base44.entities.CuentaContable.filter({ is_active: true }),
   });
 
   useEffect(() => {
@@ -55,6 +68,20 @@ export default function ConfiguracionStarsoft() {
         client_secret: c.client_secret || "",
         notes: c.notes || "",
       });
+      if (c.cuentas_por_planilla) {
+        setCuentasPorPlanilla({
+          regular: {
+            cuenta_debe: c.cuentas_por_planilla.regular?.cuenta_debe || "",
+            cuenta_haber_neto: c.cuentas_por_planilla.regular?.cuenta_haber_neto || "",
+            cuenta_haber_descuentos: c.cuentas_por_planilla.regular?.cuenta_haber_descuentos || "",
+          },
+          snp: {
+            cuenta_debe: c.cuentas_por_planilla.snp?.cuenta_debe || "",
+            cuenta_haber_neto: c.cuentas_por_planilla.snp?.cuenta_haber_neto || "",
+            cuenta_haber_descuentos: c.cuentas_por_planilla.snp?.cuenta_haber_descuentos || "",
+          },
+        });
+      }
       if (c.last_test_status) {
         setTestResult({
           status: c.last_test_status,
@@ -67,7 +94,7 @@ export default function ConfiguracionStarsoft() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = { ...form, is_active: true };
+      const payload = { ...form, is_active: true, cuentas_por_planilla: cuentasPorPlanilla };
       if (configId) {
         return base44.entities.StarsoftConfig.update(configId, payload);
       }
@@ -354,6 +381,53 @@ export default function ConfiguracionStarsoft() {
                   </div>
                 </div>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Configuración de cuentas por tipo de planilla */}
+        <Card className="border-0 shadow-lg mb-6">
+          <CardHeader className="border-b bg-slate-50/50">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-indigo-600" />
+              Cuentas Contables por Tipo de Planilla
+            </CardTitle>
+            <CardDescription>
+              Configure las cuentas del debe y haber que se usarán al generar los asientos contables.
+              Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 space-y-5">
+            {cuentasContables.length === 0 ? (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-700">
+                  No hay cuentas contables registradas. Registre cuentas en Datos Maestros → Cuentas Contables para habilitar esta configuración.
+                </p>
+              </div>
+            ) : (
+              <>
+                <CuentasPlanillaSection
+                  titulo="Planilla de Remuneraciones (Plazo Fijo)"
+                  descripcion="Quincenal, Mensual o Adicional — sueldos y salarios de trabajadores en planilla."
+                  value={cuentasPorPlanilla.regular}
+                  onChange={(v) => setCuentasPorPlanilla({ ...cuentasPorPlanilla, regular: v })}
+                  cuentas={cuentasContables}
+                />
+                <CuentasPlanillaSection
+                  titulo="Servicios No Personales (Honorarios / SNP)"
+                  descripcion="Recibos de Honorarios — servicios no personales de 4ta categoría."
+                  value={cuentasPorPlanilla.snp}
+                  onChange={(v) => setCuentasPorPlanilla({ ...cuentasPorPlanilla, snp: v })}
+                  cuentas={cuentasContables}
+                />
+                <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                  <p className="text-sm text-blue-700">
+                    Si una cuenta no está configurada, se usarán las cuentas por defecto del sistema al generar los asientos.
+                  </p>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
