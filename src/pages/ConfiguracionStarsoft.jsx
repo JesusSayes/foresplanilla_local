@@ -46,10 +46,15 @@ export default function ConfiguracionStarsoft() {
     queryFn: () => base44.entities.StarsoftConfig.filter({ is_active: true }),
   });
 
-  // Cuentas contables disponibles (Datos Maestros) para configurar debe/haber por planilla
+  // Cuentas contables disponibles (Datos Maestros) para configurar debe/haber por planilla.
+  // Se cargan todas las cuentas excepto las explícitamente inactivas (is_active=false),
+  // ya que registros históricos tienen is_active=null.
   const { data: cuentasContables = [] } = useQuery({
     queryKey: ["cuentasContablesStarsoft"],
-    queryFn: () => base44.entities.CuentaContable.filter({ is_active: true }),
+    queryFn: async () => {
+      const all = await base44.entities.CuentaContable.list();
+      return (all || []).filter((c) => c.is_active !== false);
+    },
   });
 
   useEffect(() => {
