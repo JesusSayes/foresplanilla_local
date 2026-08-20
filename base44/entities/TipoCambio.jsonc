@@ -1,0 +1,87 @@
+{
+  "name": "TipoCambio",
+  "type": "object",
+  "properties": {
+    "fecha": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del tipo de cambio (YYYY-MM-DD)"
+    },
+    "valor_compra": {
+      "type": "number",
+      "description": "Valor de compra (S/ por USD)"
+    },
+    "valor_venta": {
+      "type": "number",
+      "description": "Valor de venta (S/ por USD)"
+    },
+    "estado": {
+      "type": "boolean",
+      "default": true,
+      "description": "Registro activo"
+    },
+    "fuente": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "manual"
+      ],
+      "default": "auto",
+      "description": "Origen del registro: auto (API SUNAT) o manual"
+    },
+    "registrado_por": {
+      "type": "string",
+      "description": "Email del usuario que registr\u00f3 manualmente (solo fuente=manual)"
+    }
+  },
+  "required": [
+    "fecha",
+    "valor_compra",
+    "valor_venta"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    },
+    "read": {},
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    }
+  }
+}

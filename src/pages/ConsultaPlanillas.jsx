@@ -116,6 +116,20 @@ export default function ConsultaPlanillas() {
     queryFn: () => entitiesAPI.CostCenter.list("code"),
   });
 
+  const { data: tiposAnexo = [] } = useQuery({
+    queryKey: ["tiposAnexoConsulta"],
+    queryFn: () => entitiesAPI.TipoAnexo.list("codigo_tipo_anexo"),
+  });
+
+  // Devuelve el código de tipo de anexo según su descripción (TRABAJADORES, HONORARIOS, etc.)
+  const getTipoAnexoCodigo = (descripcion) => {
+    const found = tiposAnexo.find(
+      t => String(t.descripcion || "").trim().toUpperCase() === descripcion.toUpperCase()
+        && (t.estado || "A") === "A"
+    );
+    return found?.codigo_tipo_anexo || "";
+  };
+
   // Agrupar boletas en cabeceras de planilla
   const grupos = React.useMemo(() => {
     const map = {};
@@ -211,17 +225,70 @@ export default function ConsultaPlanillas() {
       // Si no hay configuración activa o no tiene código de empresa, se muestra
       // un mensaje y se interrumpe la generación (no se asume "003" por defecto).
       let codEmpresaActiva = null;
+      let cuentasConfig = null;
       try {
         const configs = await entitiesAPI.StarsoftConfig.filter({ is_active: true });
         if (configs && configs.length > 0 && configs[0].cod_empresa) {
           codEmpresaActiva = String(configs[0].cod_empresa);
+          cuentasConfig = configs[0].cuentas_por_planilla || null;
         }
       } catch (e) {
         console.warn("No se pudo leer la configuración Starsoft", e);
       }
 
+      // Cuentas por defecto del sistema (fallback si no están configuradas)
+      const DEFAULT_CUENTAS = {
+        regular: { cuenta_debe: "6210000", cuenta_haber_neto: "4110000", cuenta_haber_descuentos: "4030000" },
+        snp: { cuenta_debe: "6320000", cuenta_haber_neto: "4212100", cuenta_haber_descuentos: "4017100" },
+      };
+
+      // Resuelve las cuentas contables según el tipo de contrato del empleado.
+      // La configuración (cuentas_por_planilla) usa los mismos valores que el combo
+      // "Tipo de Contrato" del formulario de empleados (Indeterminado, Plazo Fijo,
+      // Part-Time, Prácticas, SNP). Si no hay configuración para el tipo de contrato,
+      // se aplica el fallback (SNP → honorarios; demás → regular).
+      // - Formato actual: array de { tipo_planilla, cuenta, debe_haber }
+      // - Formato anterior: array de { tipo_planilla, cuenta_debe, cuenta_haber }
+      // - Formato legacy: objeto { regular: {...}, snp: {...} }
+      const resolveCuentas = (contractType) => {
+        const baseKey = contractType === "SNP" ? "snp" : "regular";
+        const resolved = { ...DEFAULT_CUENTAS[baseKey] };
+        if (Array.isArray(cuentasConfig)) {
+          const dEntry = cuentasConfig.find(e => e.tipo_planilla === contractType && e.debe_haber === "D" && e.cuenta);
+          const hEntry = cuentasConfig.find(e => e.tipo_planilla === contractType && e.debe_haber === "H" && e.cuenta);
+          if (dEntry?.cuenta) resolved.cuenta_debe = dEntry.cuenta;
+          if (hEntry?.cuenta) {
+            resolved.cuenta_haber_neto = hEntry.cuenta;
+            resolved.cuenta_haber_descuentos = hEntry.cuenta;
+          }
+          // Compatibilidad con formato anterior {tipo_planilla, cuenta_debe, cuenta_haber}
+          const entryDebe = cuentasConfig.find(e => e.tipo_planilla === contractType && e.cuenta_debe !== undefined);
+          if (entryDebe?.cuenta_debe) resolved.cuenta_debe = entryDebe.cuenta_debe;
+          if (entryDebe?.cuenta_haber) {
+            resolved.cuenta_haber_neto = entryDebe.cuenta_haber;
+            resolved.cuenta_haber_descuentos = entryDebe.cuenta_haber;
+          }
+        } else if (cuentasConfig && cuentasConfig[baseKey]) {
+          // Estructura legacy { regular: {...}, snp: {...} }
+          resolved.cuenta_debe = cuentasConfig[baseKey].cuenta_debe || resolved.cuenta_debe;
+          resolved.cuenta_haber_neto = cuentasConfig[baseKey].cuenta_haber_neto || resolved.cuenta_haber_neto;
+          resolved.cuenta_haber_descuentos = cuentasConfig[baseKey].cuenta_haber_descuentos || resolved.cuenta_haber_descuentos;
+        }
+        return resolved;
+      };
       if (!codEmpresaActiva) {
         toast.error("No se pudo determinar el código de empresa destino. Active una empresa (Prueba o Producción) con su código en la Configuración Starsoft antes de generar los asientos.");
+        return;
+      }
+
+      // Resolver el tipo de anexo desde la tabla Tipos de Anexo (Datos Maestros).
+      // Planilla regular → TRABAJADORES; SNP → HONORARIOS.
+      const tipoAnexoTrabajadores = getTipoAnexoCodigo("TRABAJADORES");
+      const tipoAnexoHonorarios = getTipoAnexoCodigo("HONORARIOS");
+      const tipoAnexoAplicar = isSNP ? tipoAnexoHonorarios : tipoAnexoTrabajadores;
+      if (!tipoAnexoAplicar) {
+        const faltante = isSNP ? "HONORARIOS" : "TRABAJADORES";
+        toast.error(`No se encontró el tipo de anexo "${faltante}" en la tabla de Tipos de Anexo (Datos Maestros). Regístrelo y reintente.`);
         return;
       }
 
@@ -242,6 +309,9 @@ export default function ConsultaPlanillas() {
         for (const p of grupo.payslips) {
           const emp = allEmployees.find(e => e.id === p.employee_id);
           if (!emp) continue;
+
+          // Cuentas contables según el tipo de contrato del trabajador
+          const cuentasAplicar = resolveCuentas(emp.contract_type || "SNP");
 
           // Centro de costo del trabajador
           let assignment = costCenterAssignments.find(
@@ -275,7 +345,7 @@ export default function ConsultaPlanillas() {
             fecha_registro: fechaRegistro,
             tipo_doc: "RH",            // Recibo de Honorarios
             nro_doc: nroDoc,
-            tipo_anexo: "P",           // Proveedor (contratista)
+            tipo_anexo: tipoAnexoAplicar, // Honorarios (desde Tipos de Anexo)
             cod_anexo: codAnexo,
             conversion_tc: "M",
             moneda: "PEN",
@@ -293,31 +363,31 @@ export default function ConsultaPlanillas() {
             anulado: false,
           };
 
-          // DEBE: 6320000 Servicios de Terceros (honorarios brutos)
+          // DEBE: Servicios de Terceros (honorarios brutos) - cuenta configurable
           asientosToCreate.push({
             ...base,
-            cuenta: "6320000",
+            cuenta: cuentasAplicar.cuenta_debe,
             importe: importeBruto,
             importe_soles: importeBruto,
             debe_haber: "D",
             glosa_mov: `${glosaEmp} - Honorario bruto`.slice(0, 40),
           });
 
-          // HABER: 4212100 Honorarios por pagar (neto)
+          // HABER: Honorarios por pagar (neto) - cuenta configurable
           asientosToCreate.push({
             ...base,
-            cuenta: "4212100",
+            cuenta: cuentasAplicar.cuenta_haber_neto,
             importe: importeNeto,
             importe_soles: importeNeto,
             debe_haber: "H",
             glosa_mov: `${glosaEmp} - Neto a pagar`.slice(0, 40),
           });
 
-          // HABER: 4017100 Retención de 4ta categoría (si hay descuentos)
+          // HABER: Retención de 4ta categoría (si hay descuentos) - cuenta configurable
           if (importeRet > 0) {
             asientosToCreate.push({
               ...base,
-              cuenta: "4017100",
+              cuenta: cuentasAplicar.cuenta_haber_descuentos,
               importe: importeRet,
               importe_soles: importeRet,
               debe_haber: "H",
@@ -345,21 +415,24 @@ export default function ConsultaPlanillas() {
 
           const ccId = assignment?.cost_center_id || "sin_cc";
           const cc = ccId !== "sin_cc" ? costCenters.find(c => c.id === ccId) : null;
+          const contractType = emp.contract_type || "Indeterminado";
+          const mapKey = `${ccId}__${contractType}`;
 
-          if (!ccMap[ccId]) {
-            ccMap[ccId] = { cc, ccId, totalIncome: 0, totalDeductions: 0, totalNeto: 0, employeeCount: 0 };
+          if (!ccMap[mapKey]) {
+            ccMap[mapKey] = { cc, ccId, contractType, totalIncome: 0, totalDeductions: 0, totalNeto: 0, employeeCount: 0 };
           }
-          ccMap[ccId].totalIncome += safePayrollNumber(p.total_income);
-          ccMap[ccId].totalDeductions += safePayrollNumber(p.total_deductions);
-          ccMap[ccId].totalNeto += safePayrollNumber(p.net_pay);
-          ccMap[ccId].employeeCount += 1;
+          ccMap[mapKey].totalIncome += safePayrollNumber(p.total_income);
+          ccMap[mapKey].totalDeductions += safePayrollNumber(p.total_deductions);
+          ccMap[mapKey].totalNeto += safePayrollNumber(p.net_pay);
+          ccMap[mapKey].employeeCount += 1;
         }
 
         for (const data of Object.values(ccMap)) {
+          const cuentasAplicar = resolveCuentas(data.contractType);
           const ccCode = data.cc?.code || "S/CC";
           const ccName = data.cc?.name || "Sin Centro de Costo";
           const glosa  = `${payrollType} - ${period}`;
-          const glosaCC = `${glosa} | ${ccCode} - ${ccName} (${data.employeeCount} emp.)`;
+          const glosaCC = `${glosa} | ${ccCode} - ${ccName} | ${data.contractType} (${data.employeeCount} emp.)`;
 
           const base = {
             annomes,
@@ -369,7 +442,7 @@ export default function ConsultaPlanillas() {
             fecha_registro: fechaRegistro,
             tipo_doc: "PL",
             nro_doc: comprobante,
-            tipo_anexo: "T",           // Trabajador
+            tipo_anexo: tipoAnexoAplicar, // Trabajadores (desde Tipos de Anexo)
             conversion_tc: "M",
             moneda: "PEN",
             tc: 1,
@@ -386,7 +459,7 @@ export default function ConsultaPlanillas() {
 
           asientosToCreate.push({
             ...base,
-            cuenta: "6210000",
+            cuenta: cuentasAplicar.cuenta_debe,
             importe: roundMoney(data.totalIncome),
             importe_soles: roundMoney(data.totalIncome),
             debe_haber: "D",
@@ -395,7 +468,7 @@ export default function ConsultaPlanillas() {
 
           asientosToCreate.push({
             ...base,
-            cuenta: "4110000",
+            cuenta: cuentasAplicar.cuenta_haber_neto,
             importe: roundMoney(data.totalNeto),
             importe_soles: roundMoney(data.totalNeto),
             debe_haber: "H",
@@ -405,7 +478,7 @@ export default function ConsultaPlanillas() {
           if (data.totalDeductions > 0) {
             asientosToCreate.push({
               ...base,
-              cuenta: "4030000",
+              cuenta: cuentasAplicar.cuenta_haber_descuentos,
               importe: roundMoney(data.totalDeductions),
               importe_soles: roundMoney(data.totalDeductions),
               debe_haber: "H",
