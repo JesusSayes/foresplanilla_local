@@ -246,6 +246,7 @@ export default function TipoCambioWidget({ employee }) {
                 {config?.api_url
                   ? "Intenta obtenerlo automáticamente o regístralo manualmente."
                   : "Configura la URL del API para obtenerlo automáticamente."}
+              </p>
             </div>
 
             {isAdmin && config?.api_url && (
