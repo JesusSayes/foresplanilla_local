@@ -40,7 +40,7 @@
     },
     "cuentas_por_planilla": {
       "type": "array",
-      "description": "Lista de configuraciones de cuentas contables por tipo de planilla. Cada entrada vincula un tipo de planilla con su cuenta del debe (gasto) y su cuenta del haber (neto a pagar / descuentos). Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).",
+      "description": "Lista de cuentas contables por tipo de planilla. Cada registro vincula un tipo de planilla con una cuenta contable y su rol (Debe o Haber). Para configurar un tipo de planilla completo se agregan dos registros: uno del DEBE (gasto) y uno del HABER (neto a pagar / descuentos). Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).",
       "items": {
         "type": "object",
         "properties": {
@@ -50,21 +50,25 @@
               "regular",
               "snp"
             ],
-            "description": "Tipo de planilla al que aplica la configuraci\u00f3n: regular (plazo fijo) o snp (honorarios)"
+            "description": "Tipo de planilla al que aplica la cuenta: regular (plazo fijo) o snp (honorarios)"
           },
-          "cuenta_debe": {
+          "cuenta": {
             "type": "string",
-            "description": "C\u00f3digo de cuenta contable del DEBE (gasto de personal / honorarios brutos)"
+            "description": "C\u00f3digo de cuenta contable (ref. CuentaContable.cuenta)"
           },
-          "cuenta_haber": {
+          "debe_haber": {
             "type": "string",
-            "description": "C\u00f3digo de cuenta contable del HABER (neto a pagar y descuentos/tributos)"
+            "enum": [
+              "D",
+              "H"
+            ],
+            "description": "D=Debe (gasto de personal / honorarios brutos) / H=Haber (neto a pagar y descuentos/tributos)"
           }
         },
         "required": [
           "tipo_planilla",
-          "cuenta_debe",
-          "cuenta_haber"
+          "cuenta",
+          "debe_haber"
         ]
       }
     },

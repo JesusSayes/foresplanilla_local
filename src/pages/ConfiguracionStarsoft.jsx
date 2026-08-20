@@ -32,7 +32,7 @@ export default function ConfiguracionStarsoft() {
     notes: "",
   });
   // Configuración de cuentas contables por tipo de planilla (lista flexible).
-  // Cada entrada: { tipo_planilla, cuenta, debe_haber, uso }
+  // Cada entrada: { tipo_planilla, cuenta, debe_haber }
   const [cuentasPorPlanilla, setCuentasPorPlanilla] = useState([]);
   const [showSecret, setShowSecret] = useState(false);
   const [configId, setConfigId] = useState(null);
@@ -66,34 +66,31 @@ export default function ConfiguracionStarsoft() {
         client_secret: c.client_secret || "",
         notes: c.notes || "",
       });
-      // Normalizar cuentas_por_planilla al formato actual: array de { tipo_planilla, cuenta_debe, cuenta_haber }
+      // Normalizar cuentas_por_planilla al formato actual: array de { tipo_planilla, cuenta, debe_haber }
       if (Array.isArray(c.cuentas_por_planilla)) {
         const normalizadas = [];
-        const porTipo = {};
         c.cuentas_por_planilla.forEach(e => {
-          if (e.tipo_planilla && e.cuenta_debe !== undefined && e.cuenta_haber !== undefined) {
+          if (e.tipo_planilla && e.cuenta && e.debe_haber) {
             // Formato actual
-            normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta_debe: e.cuenta_debe || "", cuenta_haber: e.cuenta_haber || "" });
-          } else if (e.tipo_planilla && e.cuenta) {
-            // Formato intermedio {tipo_planilla, cuenta, debe_haber, uso}
-            if (!porTipo[e.tipo_planilla]) porTipo[e.tipo_planilla] = { tipo_planilla: e.tipo_planilla, cuenta_debe: "", cuenta_haber: "" };
-            if (e.uso === "gasto" && e.debe_haber === "D") porTipo[e.tipo_planilla].cuenta_debe = e.cuenta;
-            else if (e.uso === "neto" && e.debe_haber === "H") porTipo[e.tipo_planilla].cuenta_haber = e.cuenta;
+            normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta: e.cuenta, debe_haber: e.debe_haber });
+          } else if (e.tipo_planilla && e.cuenta_debe !== undefined && e.cuenta_haber !== undefined) {
+            // Formato anterior {tipo_planilla, cuenta_debe, cuenta_haber} -> dos registros
+            if (e.cuenta_debe) normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta: e.cuenta_debe, debe_haber: "D" });
+            if (e.cuenta_haber) normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta: e.cuenta_haber, debe_haber: "H" });
+          } else if (e.tipo_planilla && e.cuenta && e.debe_haber && e.uso) {
+            // Formato intermedio {tipo_planilla, cuenta, debe_haber, uso} -> conservar sin uso
+            normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta: e.cuenta, debe_haber: e.debe_haber });
           }
         });
-        Object.values(porTipo).forEach(v => { if (v.cuenta_debe || v.cuenta_haber) normalizadas.push(v); });
         setCuentasPorPlanilla(normalizadas);
       } else if (c.cuentas_por_planilla && typeof c.cuentas_por_planilla === "object") {
         // Migración desde estructura legacy { regular: {...}, snp: {...} }
         const migradas = [];
         ["regular", "snp"].forEach(tipo => {
           const block = c.cuentas_por_planilla[tipo];
-          if (block && (block.cuenta_debe || block.cuenta_haber_neto)) {
-            migradas.push({
-              tipo_planilla: tipo,
-              cuenta_debe: block.cuenta_debe || "",
-              cuenta_haber: block.cuenta_haber_neto || "",
-            });
+          if (block) {
+            if (block.cuenta_debe) migradas.push({ tipo_planilla: tipo, cuenta: block.cuenta_debe, debe_haber: "D" });
+            if (block.cuenta_haber_neto) migradas.push({ tipo_planilla: tipo, cuenta: block.cuenta_haber_neto, debe_haber: "H" });
           }
         });
         setCuentasPorPlanilla(migradas);
@@ -443,7 +440,7 @@ export default function ConfiguracionStarsoft() {
                 <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                   <p className="text-sm text-blue-700">
-                    Agregue una cuenta por cada tipo de planilla y uso (Gasto/DEBE, Neto a Pagar/HABER, Descuentos y Tributos/HABER).
+                    Agregue un registro por cada cuenta: indique el tipo de planilla, la cuenta contable y si es del <strong>Debe</strong> (gasto) o del <strong>Haber</strong> (neto a pagar / descuentos).
                     Las cuentas no configuradas usarán los valores por defecto del sistema al generar los asientos.
                   </p>
                 </div>
@@ -454,26 +451,6 @@ export default function ConfiguracionStarsoft() {
 
           </TabsContent>
         </Tabs>
-
-        {/* Resumen empresa activa */}
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${esProd ? "bg-green-100" : "bg-amber-100"}`}>
-                  <Building2 className={`w-5 h-5 ${esProd ? "text-green-700" : "text-amber-700"}`} />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Empresa destino actual</p>
-                  <p className="font-bold text-slate-900">{form.cod_empresa || "—"} {esProd ? "(Producción)" : "(Prueba)"}</p>
-                </div>
-              </div>
-              <Badge className={esProd ? "bg-green-100 text-green-700 border-green-300" : "bg-amber-100 text-amber-700 border-amber-300"}>
-                {esProd ? "Producción" : "Prueba"}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

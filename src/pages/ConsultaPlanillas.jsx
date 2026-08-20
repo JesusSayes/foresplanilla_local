@@ -238,27 +238,28 @@ export default function ConsultaPlanillas() {
       };
 
       // Resuelve las cuentas configuradas:
-      // - Formato actual: array de { tipo_planilla, cuenta_debe, cuenta_haber }
-      //   (la cuenta_haber se usa para el neto a pagar y los descuentos/tributos)
+      // - Formato actual: array de { tipo_planilla, cuenta, debe_haber }
+      //   (un registro por cuenta; la cuenta del Haber se usa para neto y descuentos)
+      // - Formato anterior: array de { tipo_planilla, cuenta_debe, cuenta_haber }
       // - Formato intermedio: array de { tipo_planilla, cuenta, debe_haber, uso }
       // - Formato legacy: objeto { regular: {...}, snp: {...} }
       const tipoKey = isSNP ? "snp" : "regular";
       const cuentasAplicar = { ...DEFAULT_CUENTAS[tipoKey] };
       if (Array.isArray(cuentasConfig)) {
+        const dEntry = cuentasConfig.find(e => e.tipo_planilla === tipoKey && e.debe_haber === "D" && e.cuenta);
+        const hEntry = cuentasConfig.find(e => e.tipo_planilla === tipoKey && e.debe_haber === "H" && e.cuenta);
+        if (dEntry?.cuenta) cuentasAplicar.cuenta_debe = dEntry.cuenta;
+        if (hEntry?.cuenta) {
+          cuentasAplicar.cuenta_haber_neto = hEntry.cuenta;
+          cuentasAplicar.cuenta_haber_descuentos = hEntry.cuenta;
+        }
+        // Compatibilidad con formato anterior {tipo_planilla, cuenta_debe, cuenta_haber}
         const entryDebe = cuentasConfig.find(e => e.tipo_planilla === tipoKey && e.cuenta_debe !== undefined);
         if (entryDebe?.cuenta_debe) cuentasAplicar.cuenta_debe = entryDebe.cuenta_debe;
         if (entryDebe?.cuenta_haber) {
           cuentasAplicar.cuenta_haber_neto = entryDebe.cuenta_haber;
           cuentasAplicar.cuenta_haber_descuentos = entryDebe.cuenta_haber;
         }
-        // Compatibilidad con formato intermedio {tipo_planilla, cuenta, debe_haber, uso}
-        const porUso = { gasto: "cuenta_debe", neto: "cuenta_haber_neto", descuentos: "cuenta_haber_descuentos" };
-        cuentasConfig
-          .filter(e => e.tipo_planilla === tipoKey && e.cuenta && e.uso)
-          .forEach(e => {
-            const field = porUso[e.uso];
-            if (field && e.cuenta) cuentasAplicar[field] = e.cuenta;
-          });
       } else if (cuentasConfig && cuentasConfig[tipoKey]) {
         // Estructura legacy { regular: {...}, snp: {...} }
         cuentasAplicar.cuenta_debe = cuentasConfig[tipoKey].cuenta_debe || cuentasAplicar.cuenta_debe;
