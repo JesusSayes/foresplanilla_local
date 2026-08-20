@@ -145,6 +145,8 @@ export const entitiesAPI = {
     }
   },
   StarsoftConfig: createEntityAPI('/api/starsoft-config'),
+  TipoCambio: createEntityAPI('/api/tipo-cambio'),
+  TipoCambioConfig: createEntityAPI('/api/tipo-cambio-config'),
 };
 
 export default entitiesAPI;

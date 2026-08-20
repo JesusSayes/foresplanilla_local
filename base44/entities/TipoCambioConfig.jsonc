@@ -1,0 +1,67 @@
+{
+  "name": "TipoCambioConfig",
+  "type": "object",
+  "properties": {
+    "api_url": {
+      "type": "string",
+      "description": "URL del API de tipo de cambio (ej: https://api.apis.net.pe/v1/tipo-cambio-sunat)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Configuraci\u00f3n activa"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "api_url"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    },
+    "read": {},
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    }
+  }
+}

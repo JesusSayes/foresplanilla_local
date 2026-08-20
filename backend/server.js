@@ -76,6 +76,8 @@ import historialRemunerativoRoutes from './routes/historialRemunerativo.js';
 import dniRoutes from './routes/dni.js';
 import starsoftRoutes from './routes/starsoft.js';
 import starsoftConfigRoutes from './routes/starsoftConfig.js';
+import tipoCambioRoutes from './routes/tipoCambio.js';
+import tipoCambioConfigRoutes from './routes/tipoCambioConfig.js';
 import { notifyExpiringContracts } from './services/contractNotificationService.js';
 
 dotenv.config();
@@ -186,6 +188,8 @@ app.use('/api/historial-remunerativo', historialRemunerativoRoutes);
 app.use('/api/dni', dniRoutes);
 app.use('/api/starsoft', starsoftRoutes);
 app.use('/api/starsoft-config', starsoftConfigRoutes);
+app.use('/api/tipo-cambio', tipoCambioRoutes);
+app.use('/api/tipo-cambio-config', tipoCambioConfigRoutes);
 
 // Cron configuration
 const CRON_TIMEZONE = process.env.CRON_TIMEZONE || 'America/Lima';

@@ -110,4 +110,11 @@ export const starsoftAPI = {
   },
 };
 
+export const tipoCambioAPI = {
+  obtenerDiario: async (data = {}) => {
+    const response = await localClient.post('/api/tipo-cambio/obtener-diario', data);
+    return response.data;
+  },
+};
+
 export default localClient;
