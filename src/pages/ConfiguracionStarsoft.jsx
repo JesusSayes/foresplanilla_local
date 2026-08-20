@@ -66,20 +66,20 @@ export default function ConfiguracionStarsoft() {
         client_secret: c.client_secret || "",
         notes: c.notes || "",
       });
-      // Normalizar cuentas_por_planilla al formato actual: array de { tipo_planilla, cuenta, debe_haber, is_active }
+      // Normalizar cuentas_por_planilla al formato actual: array de { tipo_planilla, cuenta, debe_haber }
       if (Array.isArray(c.cuentas_por_planilla)) {
         const normalizadas = [];
         c.cuentas_por_planilla.forEach(e => {
           if (e.tipo_planilla && e.cuenta && e.debe_haber) {
             // Formato actual
-            normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta: e.cuenta, debe_haber: e.debe_haber, is_active: e.is_active !== false });
+            normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta: e.cuenta, debe_haber: e.debe_haber });
           } else if (e.tipo_planilla && e.cuenta_debe !== undefined && e.cuenta_haber !== undefined) {
             // Formato anterior {tipo_planilla, cuenta_debe, cuenta_haber} -> dos registros
-            if (e.cuenta_debe) normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta: e.cuenta_debe, debe_haber: "D", is_active: true });
-            if (e.cuenta_haber) normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta: e.cuenta_haber, debe_haber: "H", is_active: true });
+            if (e.cuenta_debe) normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta: e.cuenta_debe, debe_haber: "D" });
+            if (e.cuenta_haber) normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta: e.cuenta_haber, debe_haber: "H" });
           } else if (e.tipo_planilla && e.cuenta && e.debe_haber && e.uso) {
             // Formato intermedio {tipo_planilla, cuenta, debe_haber, uso} -> conservar sin uso
-            normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta: e.cuenta, debe_haber: e.debe_haber, is_active: e.is_active !== false });
+            normalizadas.push({ tipo_planilla: e.tipo_planilla, cuenta: e.cuenta, debe_haber: e.debe_haber });
           }
         });
         setCuentasPorPlanilla(normalizadas);
@@ -89,8 +89,8 @@ export default function ConfiguracionStarsoft() {
         ["regular", "snp"].forEach(tipo => {
           const block = c.cuentas_por_planilla[tipo];
           if (block) {
-            if (block.cuenta_debe) migradas.push({ tipo_planilla: tipo, cuenta: block.cuenta_debe, debe_haber: "D", is_active: true });
-            if (block.cuenta_haber_neto) migradas.push({ tipo_planilla: tipo, cuenta: block.cuenta_haber_neto, debe_haber: "H", is_active: true });
+            if (block.cuenta_debe) migradas.push({ tipo_planilla: tipo, cuenta: block.cuenta_debe, debe_haber: "D" });
+            if (block.cuenta_haber_neto) migradas.push({ tipo_planilla: tipo, cuenta: block.cuenta_haber_neto, debe_haber: "H" });
           }
         });
         setCuentasPorPlanilla(migradas);

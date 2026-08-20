@@ -15,18 +15,19 @@ const tipoLabel = (v) => TIPOS_PLANILLA.find(t => t.value === v)?.label || v;
 
 /**
  * Datagrid CRUD de cuentas contables por tipo de planilla.
- * Cada registro vincula un tipo de planilla con UNA cuenta contable, su rol (Debe o Haber)
- * y su estado (activo/inactivo).
+ * Cada registro vincula un tipo de planilla con UNA cuenta contable y su rol (Debe o Haber).
+ * Para configurar un tipo de planilla completo se agregan dos registros:
+ * uno del DEBE (gasto) y uno del HABER (neto a pagar / descuentos).
  *
  * Props:
- *  - value: array de { tipo_planilla, cuenta, debe_haber, is_active }
+ *  - value: array de { tipo_planilla, cuenta, debe_haber }
  *  - onChange: (newValue) => void
- *  - cuentas: lista de CuentaContable activas (Datos Maestros)
+ *  - cuentas: lista de CuentaContable activas
  */
 export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
   const entries = Array.isArray(value) ? value : [];
   const [editingIdx, setEditingIdx] = useState(null); // null | "new" | number
-  const [draft, setDraft] = useState({ tipo_planilla: "regular", cuenta: "", debe_haber: "D", is_active: true });
+  const [draft, setDraft] = useState({ tipo_planilla: "regular", cuenta: "", debe_haber: "D" });
 
   const cuentaLabel = (codigo) => {
     if (!codigo) return "—";
@@ -35,7 +36,7 @@ export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
   };
 
   const startAdd = () => {
-    setDraft({ tipo_planilla: "regular", cuenta: "", debe_haber: "D", is_active: true });
+    setDraft({ tipo_planilla: "regular", cuenta: "", debe_haber: "D" });
     setEditingIdx("new");
   };
 
@@ -46,7 +47,7 @@ export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
 
   const cancelEdit = () => {
     setEditingIdx(null);
-    setDraft({ tipo_planilla: "regular", cuenta: "", debe_haber: "D", is_active: true });
+    setDraft({ tipo_planilla: "regular", cuenta: "", debe_haber: "D" });
   };
 
   const saveDraft = () => {
@@ -61,10 +62,6 @@ export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
 
   const removeEntry = (idx) => {
     onChange(entries.filter((_, i) => i !== idx));
-  };
-
-  const toggleActive = (idx) => {
-    onChange(entries.map((e, i) => (i === idx ? { ...e, is_active: !e.is_active } : e)));
   };
 
   const renderCuentaSelect = () => (
@@ -114,19 +111,6 @@ export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
     </Select>
   );
 
-  const renderEstadoSelect = () => (
-    <Select
-      value={draft.is_active ? "activo" : "inactivo"}
-      onValueChange={(v) => setDraft({ ...draft, is_active: v === "activo" })}
-    >
-      <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-      <SelectContent>
-        <SelectItem value="activo">Activo</SelectItem>
-        <SelectItem value="inactivo">Inactivo</SelectItem>
-      </SelectContent>
-    </Select>
-  );
-
   const isEditing = editingIdx !== null;
 
   const renderActions = (onSave, onCancel, saveDisabled) => (
@@ -158,7 +142,6 @@ export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Tipo de Planilla</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Cuenta Contable</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide w-40">Debe / Haber</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide w-32">Estado</th>
                 <th className="px-4 py-2.5 text-center text-xs font-semibold text-slate-600 uppercase tracking-wide w-32">Acciones</th>
               </tr>
             </thead>
@@ -169,19 +152,17 @@ export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
                   <td className="px-4 py-2.5">{renderTipoSelect()}</td>
                   <td className="px-4 py-2.5">{renderCuentaSelect()}</td>
                   <td className="px-4 py-2.5">{renderDebeHaberSelect()}</td>
-                  <td className="px-4 py-2.5">{renderEstadoSelect()}</td>
                   <td className="px-4 py-2.5">{renderActions(saveDraft, cancelEdit, !draft.cuenta)}</td>
                 </tr>
               )}
               {/* Filas existentes */}
               {entries.map((entry, idx) => (
-                <tr key={idx} className={`hover:bg-slate-50/50 transition-colors ${entry.is_active === false ? "opacity-50" : ""}`}>
+                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                   {editingIdx === idx ? (
                     <>
                       <td className="px-4 py-2.5">{renderTipoSelect()}</td>
                       <td className="px-4 py-2.5">{renderCuentaSelect()}</td>
                       <td className="px-4 py-2.5">{renderDebeHaberSelect()}</td>
-                      <td className="px-4 py-2.5">{renderEstadoSelect()}</td>
                       <td className="px-4 py-2.5">{renderActions(saveDraft, cancelEdit, !draft.cuenta)}</td>
                     </>
                   ) : (
@@ -198,20 +179,6 @@ export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
                         ) : (
                           <Badge className="bg-green-100 text-green-700 border-green-200">Haber (Neto / Descuentos)</Badge>
                         )}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <button
-                          type="button"
-                          onClick={() => toggleActive(idx)}
-                          className="inline-flex items-center gap-1.5"
-                          title={entry.is_active === false ? "Clic para activar" : "Clic para desactivar"}
-                        >
-                          {entry.is_active === false ? (
-                            <Badge className="bg-slate-100 text-slate-500 border-slate-200 cursor-pointer hover:bg-slate-200">Inactivo</Badge>
-                          ) : (
-                            <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 cursor-pointer hover:bg-emerald-200">Activo</Badge>
-                          )}
-                        </button>
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center justify-center gap-1">

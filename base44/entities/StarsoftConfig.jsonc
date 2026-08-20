@@ -40,7 +40,7 @@
     },
     "cuentas_por_planilla": {
       "type": "array",
-      "description": "Lista de cuentas contables por tipo de planilla. Cada registro vincula un tipo de planilla con una cuenta contable, su rol (Debe o Haber) y su estado (activo/inactivo). Para configurar un tipo de planilla completo se agregan dos registros: uno del DEBE (gasto) y uno del HABER (neto a pagar / descuentos). Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).",
+      "description": "Lista de cuentas contables por tipo de planilla. Cada registro vincula un tipo de planilla con una cuenta contable y su rol (Debe o Haber). Para configurar un tipo de planilla completo se agregan dos registros: uno del DEBE (gasto) y uno del HABER (neto a pagar / descuentos). Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).",
       "items": {
         "type": "object",
         "properties": {
@@ -63,11 +63,6 @@
               "H"
             ],
             "description": "D=Debe (gasto de personal / honorarios brutos) / H=Haber (neto a pagar y descuentos/tributos)"
-          },
-          "is_active": {
-            "type": "boolean",
-            "default": true,
-            "description": "Indica si la configuraci\u00f3n de cuenta est\u00e1 activa (se usa al generar asientos) o desactivada (se ignora)"
           }
         },
         "required": [
