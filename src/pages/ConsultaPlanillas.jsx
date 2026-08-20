@@ -246,8 +246,8 @@ export default function ConsultaPlanillas() {
       const tipoKey = isSNP ? "snp" : "regular";
       const cuentasAplicar = { ...DEFAULT_CUENTAS[tipoKey] };
       if (Array.isArray(cuentasConfig)) {
-        const dEntry = cuentasConfig.find(e => e.tipo_planilla === tipoKey && e.debe_haber === "D" && e.cuenta);
-        const hEntry = cuentasConfig.find(e => e.tipo_planilla === tipoKey && e.debe_haber === "H" && e.cuenta);
+        const dEntry = cuentasConfig.find(e => e.tipo_planilla === tipoKey && e.debe_haber === "D" && e.cuenta && e.is_active !== false);
+        const hEntry = cuentasConfig.find(e => e.tipo_planilla === tipoKey && e.debe_haber === "H" && e.cuenta && e.is_active !== false);
         if (dEntry?.cuenta) cuentasAplicar.cuenta_debe = dEntry.cuenta;
         if (hEntry?.cuenta) {
           cuentasAplicar.cuenta_haber_neto = hEntry.cuenta;
