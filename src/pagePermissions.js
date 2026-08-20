@@ -14,6 +14,7 @@ export const PAGE_PERMISSIONS = {
   AccessDeviceConfig: { requiredPermission: "system.admin" },
   SubdiarioManagement: { requiredPermission: "system.admin" },
   TipoAnexoManagement: { requiredPermission: "system.admin" },
+  TipoCambioManagement: { requiredPermission: "system.settings" },
 
   // ── System settings ──
   CompanySettings: { requiredPermission: "system.settings" },

@@ -13,7 +13,6 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
-import TipoCambioWidget from "@/components/tipoCambio/TipoCambioWidget";
 
 export default function MyProfile() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -246,9 +245,6 @@ export default function MyProfile() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Tipo de Cambio del día */}
-            <TipoCambioWidget employee={employee} />
           </div>
 
           {/* Information Cards */}

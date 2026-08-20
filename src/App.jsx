@@ -12,6 +12,7 @@ import BeneficiosSociales from './pages/BeneficiosSociales';
 import ConfiguracionStarsoft from './pages/ConfiguracionStarsoft';
 import HistorialRemunerativo from './pages/HistorialRemunerativo';
 import CompensacionTardanzas from './pages/CompensacionTardanzas';
+import TipoCambioManagement from './pages/TipoCambioManagement';
 import PageGuard from '@/components/PageGuard';
 import { PAGE_PERMISSIONS } from './pagePermissions';
 
@@ -75,6 +76,7 @@ const AuthenticatedApp = () => {
       <Route path="/ConfiguracionStarsoft" element={<LayoutWrapper currentPageName="ConfiguracionStarsoft"><PageGuard {...PAGE_PERMISSIONS.ConfiguracionStarsoft}><ConfiguracionStarsoft /></PageGuard></LayoutWrapper>} />
       <Route path="/HistorialRemunerativo" element={<LayoutWrapper currentPageName="HistorialRemunerativo"><PageGuard requiredPermission="payroll.view_all"><HistorialRemunerativo /></PageGuard></LayoutWrapper>} />
       <Route path="/CompensacionTardanzas" element={<LayoutWrapper currentPageName="CompensacionTardanzas"><PageGuard {...PAGE_PERMISSIONS.CompensacionTardanzas}><CompensacionTardanzas /></PageGuard></LayoutWrapper>} />
+      <Route path="/TipoCambioManagement" element={<LayoutWrapper currentPageName="TipoCambioManagement"><PageGuard {...PAGE_PERMISSIONS.TipoCambioManagement}><TipoCambioManagement /></PageGuard></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

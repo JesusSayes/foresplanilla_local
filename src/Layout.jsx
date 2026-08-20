@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
   LayoutDashboard, FileText, Calendar, Clock, 
-  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown, KeyRound, Eye, EyeOff, AlertCircle, Bell
+  User, Award, LogOut, Menu, X, Shield, CheckSquare, CalendarDays, Users, ChevronDown, KeyRound, Eye, EyeOff, AlertCircle, Bell, TrendingUp
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -510,6 +510,14 @@ export default function Layout({ children, currentPageName }) {
                           >
                             <Shield className="w-4 h-4" />
                             Datos Maestros
+                          </Link>
+                          <Link
+                            to={createPageUrl("TipoCambioManagement")}
+                            onClick={() => setOpenDropdown(null)}
+                            className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            <TrendingUp className="w-4 h-4" />
+                            Tipo de Cambio
                           </Link>
                           <Link
                             to={createPageUrl("UserManagement")}
