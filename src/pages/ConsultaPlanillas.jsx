@@ -111,6 +111,20 @@ export default function ConsultaPlanillas() {
     queryFn: () => base44.entities.CostCenter.list("code"),
   });
 
+  const { data: tiposAnexo = [] } = useQuery({
+    queryKey: ["tiposAnexoConsulta"],
+    queryFn: () => base44.entities.TipoAnexo.list("codigo_tipo_anexo"),
+  });
+
+  // Devuelve el código de tipo de anexo según su descripción (TRABAJADORES, HONORARIOS, etc.)
+  const getTipoAnexoCodigo = (descripcion) => {
+    const found = tiposAnexo.find(
+      t => String(t.descripcion || "").trim().toUpperCase() === descripcion.toUpperCase()
+        && (t.estado || "A") === "A"
+    );
+    return found?.codigo_tipo_anexo || "";
+  };
+
   // Agrupar boletas en cabeceras de planilla
   const grupos = React.useMemo(() => {
     const map = {};
@@ -220,6 +234,17 @@ export default function ConsultaPlanillas() {
         return;
       }
 
+      // Resolver el tipo de anexo desde la tabla Tipos de Anexo (Datos Maestros).
+      // Planilla regular → TRABAJADORES; SNP → HONORARIOS.
+      const tipoAnexoTrabajadores = getTipoAnexoCodigo("TRABAJADORES");
+      const tipoAnexoHonorarios = getTipoAnexoCodigo("HONORARIOS");
+      const tipoAnexoAplicar = isSNP ? tipoAnexoHonorarios : tipoAnexoTrabajadores;
+      if (!tipoAnexoAplicar) {
+        const faltante = isSNP ? "HONORARIOS" : "TRABAJADORES";
+        toast.error(`No se encontró el tipo de anexo "${faltante}" en la tabla de Tipos de Anexo (Datos Maestros). Regístrelo y reintente.`);
+        return;
+      }
+
       // Eliminar asientos anteriores de esta planilla para actualizar
       const existing = allAsientos.filter(
         a => a.payroll_period === period && a.payroll_type === payrollType &&
@@ -270,7 +295,7 @@ export default function ConsultaPlanillas() {
             fecha_registro: fechaRegistro,
             tipo_doc: "RH",            // Recibo de Honorarios
             nro_doc: nroDoc,
-            tipo_anexo: "08",          // Honorarios (Servicios No Personales / 4ta categoría)
+            tipo_anexo: tipoAnexoAplicar, // Honorarios (desde Tipos de Anexo)
             cod_anexo: codAnexo,
             conversion_tc: "M",
             moneda: "PEN",
@@ -364,7 +389,7 @@ export default function ConsultaPlanillas() {
             fecha_registro: fechaRegistro,
             tipo_doc: "PL",
             nro_doc: comprobante,
-            tipo_anexo: "004",         // Trabajadores (planilla en indeterminado plazo)
+            tipo_anexo: tipoAnexoAplicar, // Trabajadores (desde Tipos de Anexo)
             conversion_tc: "M",
             moneda: "PEN",
             tc: 1,
