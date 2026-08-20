@@ -189,13 +189,14 @@ export default function TipoCambioManagement() {
 
           {/* Acciones superiores derecha */}
           <div className="flex items-center gap-2">
-            {isAdmin && config?.api_url && (
+            {isAdmin && (
               <Button
                 onClick={() => fetchAutoMutation.mutate()}
-                disabled={fetchAutoMutation.isPending}
+                disabled={fetchAutoMutation.isPending || !config?.api_url}
+                title={!config?.api_url ? "Configure la URL del API primero" : "Ejecuta el API y registra el tipo de cambio de hoy"}
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${fetchAutoMutation.isPending ? "animate-spin" : ""}`} />
-                {fetchAutoMutation.isPending ? "Consultando..." : "Obtener hoy automáticamente"}
+                {fetchAutoMutation.isPending ? "Ejecutando..." : "Ejecutar API"}
               </Button>
             )}
             {isAdmin && (
