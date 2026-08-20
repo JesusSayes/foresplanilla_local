@@ -50,8 +50,25 @@ export default function CuentasPlanillaSection({ value, onChange, cuentas }) {
     setDraft({ tipo_planilla: "regular", cuenta: "", debe_haber: "D" });
   };
 
+  const [dupError, setDupError] = useState("");
+
+  const isDuplicate = (candidate, excludeIdx) => {
+    return entries.some((e, i) =>
+      i !== excludeIdx &&
+      e.tipo_planilla === candidate.tipo_planilla &&
+      String(e.cuenta) === String(candidate.cuenta) &&
+      e.debe_haber === candidate.debe_haber
+    );
+  };
+
   const saveDraft = () => {
+    setDupError("");
     if (!draft.tipo_planilla || !draft.cuenta || !draft.debe_haber) return;
+    const excludeIdx = typeof editingIdx === "number" ? editingIdx : -1;
+    if (isDuplicate(draft, excludeIdx)) {
+      setDupError("Ya existe una cuenta con el mismo tipo de planilla, cuenta y debe/haber.");
+      return;
+    }
     if (editingIdx === "new") {
       onChange([...entries, { ...draft }]);
     } else if (typeof editingIdx === "number") {

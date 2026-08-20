@@ -444,6 +444,16 @@ export default function ConfiguracionStarsoft() {
                     Las cuentas no configuradas usarán los valores por defecto del sistema al generar los asientos.
                   </p>
                 </div>
+                <div className="flex justify-end pt-2">
+                  <Button
+                    onClick={() => saveMutation.mutate()}
+                    disabled={saveMutation.isPending}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                    Guardar Cuentas por Planilla
+                  </Button>
+                </div>
               </>
             )}
           </CardContent>
