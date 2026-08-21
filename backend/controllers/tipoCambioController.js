@@ -14,6 +14,11 @@ const normalizeDate = (value) => {
   return String(value || '').slice(0, 10);
 };
 
+const serializeTipoCambio = (record) => record ? {
+  ...record,
+  fecha: normalizeDate(record.fecha),
+} : record;
+
 const tipoCambioWhere = (filters = {}) => {
   const conditions = [];
   if (filters.fecha) conditions.push(Prisma.sql`fecha = CAST(${normalizeDate(filters.fecha)} AS DATE)`);
@@ -45,7 +50,7 @@ export const list = async (req, res, next) => {
       SELECT * FROM tipo_cambio ${tipoCambioWhere(req.body || {})}
       ORDER BY fecha DESC, created_date DESC
     `);
-    res.json(rows);
+    res.json(rows.map(serializeTipoCambio));
   } catch (error) {
     next(error);
   }
@@ -55,7 +60,7 @@ export const get = async (req, res, next) => {
   try {
     const record = await findTipoCambio(req.params.id);
     if (!record) return res.status(404).json({ error: 'Tipo de cambio no encontrado' });
-    res.json(record);
+    res.json(serializeTipoCambio(record));
   } catch (error) {
     next(error);
   }
@@ -77,7 +82,7 @@ export const create = async (req, res, next) => {
       )
       RETURNING *
     `;
-    res.status(201).json(rows[0]);
+    res.status(201).json(serializeTipoCambio(rows[0]));
   } catch (error) {
     if (error.code === 'P2010' && String(error.meta?.message || '').includes('unique')) {
       return res.status(409).json({ error: 'Ya existe un tipo de cambio para esa fecha' });
@@ -106,7 +111,7 @@ export const update = async (req, res, next) => {
       WHERE id = ${req.params.id}
       RETURNING *
     `;
-    res.json(rows[0]);
+    res.json(serializeTipoCambio(rows[0]));
   } catch (error) {
     next(error);
   }
@@ -199,7 +204,7 @@ export const obtenerDiario = async (req, res, next) => {
       LIMIT 1
     `;
     if (!force && existing[0]) {
-      return res.json({ success: true, message: 'Tipo de cambio ya registrado para hoy.', data: existing[0], already_exists: true });
+      return res.json({ success: true, message: 'Tipo de cambio ya registrado para hoy.', data: serializeTipoCambio(existing[0]), already_exists: true });
     }
 
     const configs = await prisma.$queryRaw`
@@ -242,7 +247,7 @@ export const obtenerDiario = async (req, res, next) => {
         updated_date = NOW()
       RETURNING *
     `;
-    res.json({ success: true, message: existing[0] ? 'Tipo de cambio actualizado correctamente.' : 'Tipo de cambio registrado correctamente.', data: rows[0] });
+    res.json({ success: true, message: existing[0] ? 'Tipo de cambio actualizado correctamente.' : 'Tipo de cambio registrado correctamente.', data: serializeTipoCambio(rows[0]) });
   } catch (error) {
     next(error);
   }
