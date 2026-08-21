@@ -51,7 +51,7 @@ export default function ConfiguracionStarsoft() {
   const { data: cuentasContables = [] } = useQuery({
     queryKey: ["cuentasContablesStarsoft"],
     queryFn: async () => {
-      const all = await base44.entities.CuentaContable.list();
+      const all = await entitiesAPI.CuentaContable.list();
       return (all || []).filter((c) => c.is_active !== false);
     },
   });
