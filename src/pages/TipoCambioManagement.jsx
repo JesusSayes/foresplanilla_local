@@ -155,6 +155,10 @@ export default function TipoCambioManagement() {
       toast.error("Seleccione una fecha.");
       return;
     }
+    if (manualFecha > today) {
+      toast.error("No se puede registrar un tipo de cambio para una fecha futura.");
+      return;
+    }
     saveManualMutation.mutate({
       fecha: manualFecha,
       valor_compra: compra,
@@ -344,6 +348,23 @@ export default function TipoCambioManagement() {
                     )}
                   </div>
                 )}
+
+                {/* Botón siempre visible para registrar una fecha pasada específica */}
+                {isAdmin && (
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => {
+                      setManualFecha(today);
+                      setManualCompra("");
+                      setManualVenta("");
+                      setShowManual(true);
+                    }}
+                  >
+                    <CalendarDays className="w-4 h-4 mr-2" />
+                    Registrar fecha específica
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
@@ -357,10 +378,11 @@ export default function TipoCambioManagement() {
                 </CardHeader>
                 <CardContent className="p-4 space-y-3">
                   <div>
-                    <Label className="text-sm text-slate-600">Fecha</Label>
+                    <Label className="text-sm text-slate-600">Fecha (solo fechas pasadas o hoy)</Label>
                     <Input
                       type="date"
                       value={manualFecha}
+                      max={today}
                       onChange={(e) => setManualFecha(e.target.value)}
                       className="mt-1.5"
                     />
