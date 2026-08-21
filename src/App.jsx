@@ -11,7 +11,10 @@ import Login from "./pages/Login";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 import PageGuard from "@/components/PageGuard";
 import { PAGE_PERMISSIONS } from "./pagePermissions";
+import BeneficiosSociales from './pages/BeneficiosSociales';
 import ConfiguracionStarsoft from './pages/ConfiguracionStarsoft';
+import HistorialRemunerativo from './pages/HistorialRemunerativo';
+import TipoCambioManagement from './pages/TipoCambioManagement';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -83,10 +86,34 @@ const AuthenticatedApp = () => {
         />
       ))}
       <Route
+        path="/BeneficiosSociales"
+        element={
+          <ProtectedPage pageName="BeneficiosSociales">
+            <BeneficiosSociales />
+          </ProtectedPage>
+        }
+      />
+      <Route
         path="/ConfiguracionStarsoft"
         element={
           <ProtectedPage pageName="ConfiguracionStarsoft">
             <ConfiguracionStarsoft />
+          </ProtectedPage>
+        }
+      />
+      <Route
+        path="/HistorialRemunerativo"
+        element={
+          <ProtectedPage pageName="HistorialRemunerativo">
+            <HistorialRemunerativo />
+          </ProtectedPage>
+        }
+      />
+      <Route
+        path="/TipoCambioManagement"
+        element={
+          <ProtectedPage pageName="TipoCambioManagement">
+            <TipoCambioManagement />
           </ProtectedPage>
         }
       />

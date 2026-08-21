@@ -1305,23 +1305,51 @@ model notification_recipient {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model starsoft_config {
-  id                String    @id @db.VarChar(24)
-  config_name       String?   @default("Configuración Starsoft") @db.VarChar(255)
-  client_id         String?
-  client_secret     String?
-  cod_empresa       String?   @default("003") @db.VarChar(20)
-  cod_sistema       String?   @default("01") @db.VarChar(20)
-  auth_url          String?
-  api_url           String?
-  is_active         Boolean?  @default(true)
-  last_test_status  String?   @default("") @db.VarChar(20)
-  last_test_date    DateTime? @db.Timestamp(6)
-  last_test_message String?
-  notes             String?
-  created_date      DateTime? @default(now()) @db.Timestamp(6)
-  updated_date      DateTime? @default(now()) @db.Timestamp(6)
-  created_by        String?   @db.VarChar(255)
-  updated_by        String?   @db.VarChar(255)
+  id                   String    @id @db.VarChar(24)
+  config_name          String?   @default("Configuración Starsoft") @db.VarChar(255)
+  client_id            String?
+  client_secret        String?
+  cod_empresa          String?   @default("003") @db.VarChar(20)
+  cod_sistema          String?   @default("01") @db.VarChar(20)
+  auth_url             String?
+  api_url              String?
+  is_active            Boolean?  @default(true)
+  last_test_status     String?   @default("") @db.VarChar(20)
+  last_test_date       DateTime? @db.Timestamp(6)
+  last_test_message    String?
+  notes                String?
+  created_date         DateTime? @default(now()) @db.Timestamp(6)
+  updated_date         DateTime? @default(now()) @db.Timestamp(6)
+  created_by           String?   @db.VarChar(255)
+  updated_by           String?   @db.VarChar(255)
+  cuentas_por_planilla Json      @default("[]")
 
   @@index([is_active], map: "idx_starsoft_config_active")
+}
+
+model tipo_cambio {
+  id             String    @id @db.VarChar(24)
+  fecha          DateTime  @unique @db.Date
+  valor_compra   Decimal   @db.Decimal(10, 4)
+  valor_venta    Decimal   @db.Decimal(10, 4)
+  estado         Boolean   @default(true)
+  fuente         String    @default("auto") @db.VarChar(20)
+  registrado_por String?   @db.VarChar(320)
+  created_date   DateTime? @default(now()) @db.Timestamp(6)
+  updated_date   DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([fecha, estado], map: "idx_tipo_cambio_fecha_estado")
+}
+
+model tipo_cambio_config {
+  id           String    @id @db.VarChar(24)
+  api_url      String
+  is_active    Boolean   @default(true)
+  notes        String?
+  created_date DateTime? @default(now()) @db.Timestamp(6)
+  updated_date DateTime? @default(now()) @db.Timestamp(6)
+  created_by   String?   @db.VarChar(320)
+  updated_by   String?   @db.VarChar(320)
+
+  @@index([is_active], map: "idx_tipo_cambio_config_active")
 }

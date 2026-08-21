@@ -38,6 +38,43 @@
       "default": true,
       "description": "Configuraci\u00f3n activa (se usa la primera activa para migrar)"
     },
+    "cuentas_por_planilla": {
+      "type": "array",
+      "description": "Lista de cuentas contables por tipo de contrato. Cada registro vincula un tipo de contrato (igual al combo 'Tipo de Contrato' del formulario de empleados) con una cuenta contable y su rol (Debe o Haber). Para configurar un tipo de contrato completo se agregan dos registros: uno del DEBE (gasto) y uno del HABER (neto a pagar / descuentos). La generaci\u00f3n de asientos resuelve las cuentas seg\u00fan el tipo de contrato de cada empleado. Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tipo_planilla": {
+            "type": "string",
+            "enum": [
+              "Indeterminado",
+              "Plazo Fijo",
+              "Part-Time",
+              "Pr\u00e1cticas",
+              "SNP"
+            ],
+            "description": "Tipo de contrato al que aplica la cuenta (mismos valores que el combo 'Tipo de Contrato' del formulario de empleados)"
+          },
+          "cuenta": {
+            "type": "string",
+            "description": "C\u00f3digo de cuenta contable (ref. CuentaContable.cuenta)"
+          },
+          "debe_haber": {
+            "type": "string",
+            "enum": [
+              "D",
+              "H"
+            ],
+            "description": "D=Debe (gasto de personal / honorarios brutos) / H=Haber (neto a pagar y descuentos/tributos)"
+          }
+        },
+        "required": [
+          "tipo_planilla",
+          "cuenta",
+          "debe_haber"
+        ]
+      }
+    },
     "last_test_status": {
       "type": "string",
       "enum": [

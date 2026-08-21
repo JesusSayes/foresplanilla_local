@@ -9,11 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Settings, ShieldCheck, Loader2, CheckCircle, XCircle, KeyRound,
-  Building2, Link2, Send, AlertCircle, Save
+  Building2, Link2, Send, AlertCircle, Save, BookOpen
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import CuentasPlanillaSection from "@/components/starsoft/CuentasPlanillaSection";
 
 const PROD_DEFAULT = "003";
 const PRUEBA_DEFAULT = "001";
@@ -29,6 +31,9 @@ export default function ConfiguracionStarsoft() {
     client_secret: "",
     notes: "",
   });
+  // Configuración de cuentas contables por tipo de planilla (lista flexible).
+  // Cada entrada: { tipo_planilla, cuenta, debe_haber }
+  const [cuentasPorPlanilla, setCuentasPorPlanilla] = useState([]);
   const [showSecret, setShowSecret] = useState(false);
   const [configId, setConfigId] = useState(null);
   const [testing, setTesting] = useState(false);
@@ -38,6 +43,17 @@ export default function ConfiguracionStarsoft() {
   const { data: config } = useQuery({
     queryKey: ["starsoftConfig"],
     queryFn: () => entitiesAPI.StarsoftConfig.filter({ is_active: true }),
+  });
+
+  // Cuentas contables disponibles (Datos Maestros) para configurar debe/haber por planilla.
+  // Se cargan todas las cuentas excepto las explícitamente inactivas (is_active=false),
+  // ya que registros históricos tienen is_active=null.
+  const { data: cuentasContables = [] } = useQuery({
+    queryKey: ["cuentasContablesStarsoft"],
+    queryFn: async () => {
+      const all = await base44.entities.CuentaContable.list();
+      return (all || []).filter((c) => c.is_active !== false);
+    },
   });
 
   useEffect(() => {
@@ -54,6 +70,40 @@ export default function ConfiguracionStarsoft() {
         client_secret: c.client_secret || "",
         notes: c.notes || "",
       });
+      // Normalizar cuentas_por_planilla al formato actual: array de { tipo_planilla, cuenta, debe_haber }
+      // Migrar valores legacy "regular"/"snp" a los nuevos tipos de contrato.
+      const LEGACY_TIPO_MAP = { regular: "Plazo Fijo", snp: "SNP" };
+      const normalizeTipo = (t) => LEGACY_TIPO_MAP[t] || t;
+      if (Array.isArray(c.cuentas_por_planilla)) {
+        const normalizadas = [];
+        c.cuentas_por_planilla.forEach(e => {
+          if (e.tipo_planilla && e.cuenta && e.debe_haber) {
+            // Formato actual
+            normalizadas.push({ tipo_planilla: normalizeTipo(e.tipo_planilla), cuenta: e.cuenta, debe_haber: e.debe_haber });
+          } else if (e.tipo_planilla && e.cuenta_debe !== undefined && e.cuenta_haber !== undefined) {
+            // Formato anterior {tipo_planilla, cuenta_debe, cuenta_haber} -> dos registros
+            if (e.cuenta_debe) normalizadas.push({ tipo_planilla: normalizeTipo(e.tipo_planilla), cuenta: e.cuenta_debe, debe_haber: "D" });
+            if (e.cuenta_haber) normalizadas.push({ tipo_planilla: normalizeTipo(e.tipo_planilla), cuenta: e.cuenta_haber, debe_haber: "H" });
+          } else if (e.tipo_planilla && e.cuenta && e.debe_haber && e.uso) {
+            // Formato intermedio {tipo_planilla, cuenta, debe_haber, uso} -> conservar sin uso
+            normalizadas.push({ tipo_planilla: normalizeTipo(e.tipo_planilla), cuenta: e.cuenta, debe_haber: e.debe_haber });
+          }
+        });
+        setCuentasPorPlanilla(normalizadas);
+      } else if (c.cuentas_por_planilla && typeof c.cuentas_por_planilla === "object") {
+        // Migración desde estructura legacy { regular: {...}, snp: {...} }
+        // "regular" → "Plazo Fijo" y "snp" → "SNP" (nuevos valores por tipo de contrato)
+        const LEGACY_MAP = { regular: "Plazo Fijo", snp: "SNP" };
+        const migradas = [];
+        ["regular", "snp"].forEach(tipo => {
+          const block = c.cuentas_por_planilla[tipo];
+          if (block) {
+            if (block.cuenta_debe) migradas.push({ tipo_planilla: LEGACY_MAP[tipo], cuenta: block.cuenta_debe, debe_haber: "D" });
+            if (block.cuenta_haber_neto) migradas.push({ tipo_planilla: LEGACY_MAP[tipo], cuenta: block.cuenta_haber_neto, debe_haber: "H" });
+          }
+        });
+        setCuentasPorPlanilla(migradas);
+      }
       if (c.last_test_status) {
         setTestResult({
           status: c.last_test_status,
@@ -66,7 +116,7 @@ export default function ConfiguracionStarsoft() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = { ...form, is_active: true };
+      const payload = { ...form, is_active: true, cuentas_por_planilla: cuentasPorPlanilla };
       if (configId) {
         return entitiesAPI.StarsoftConfig.update(configId, payload);
       }
@@ -126,6 +176,16 @@ export default function ConfiguracionStarsoft() {
           </p>
         </div>
 
+        <Tabs defaultValue="general" className="mb-6">
+          <TabsList className="grid grid-cols-2 w-full max-w-md mb-4">
+            <TabsTrigger value="general" className="gap-1.5">
+              <Building2 className="w-3.5 h-3.5" /> Empresa y Conexión
+            </TabsTrigger>
+            <TabsTrigger value="cuentas" className="gap-1.5">
+              <BookOpen className="w-3.5 h-3.5" /> Cuentas por Planilla
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="general">
         {/* Credenciales de API */}
         <Card className="border-0 shadow-lg mb-6">
           <CardHeader className="border-b bg-slate-50/50">
@@ -357,25 +417,59 @@ export default function ConfiguracionStarsoft() {
           </CardContent>
         </Card>
 
-        {/* Resumen empresa activa */}
+          </TabsContent>
+          <TabsContent value="cuentas">
+        {/* Configuración de cuentas por tipo de planilla */}
         <Card className="border-0 shadow-lg">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${esProd ? "bg-green-100" : "bg-amber-100"}`}>
-                  <Building2 className={`w-5 h-5 ${esProd ? "text-green-700" : "text-amber-700"}`} />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Empresa destino actual</p>
-                  <p className="font-bold text-slate-900">{form.cod_empresa || "—"} {esProd ? "(Producción)" : "(Prueba)"}</p>
-                </div>
+          <CardHeader className="border-b bg-slate-50/50">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-indigo-600" />
+              Cuentas Contables por Tipo de Planilla
+            </CardTitle>
+            <CardDescription>
+              Configure las cuentas del debe y haber que se usarán al generar los asientos contables.
+              Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 space-y-5">
+            {cuentasContables.length === 0 ? (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-700">
+                  No hay cuentas contables registradas. Registre cuentas en Datos Maestros → Cuentas Contables para habilitar esta configuración.
+                </p>
               </div>
-              <Badge className={esProd ? "bg-green-100 text-green-700 border-green-300" : "bg-amber-100 text-amber-700 border-amber-300"}>
-                {esProd ? "Producción" : "Prueba"}
-              </Badge>
-            </div>
+            ) : (
+              <>
+                <CuentasPlanillaSection
+                  value={cuentasPorPlanilla}
+                  onChange={setCuentasPorPlanilla}
+                  cuentas={cuentasContables}
+                />
+                <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                  <p className="text-sm text-blue-700">
+                    Agregue un registro por cada cuenta: indique el tipo de planilla, la cuenta contable y si es del <strong>Debe</strong> (gasto) o del <strong>Haber</strong> (neto a pagar / descuentos).
+                    Las cuentas no configuradas usarán los valores por defecto del sistema al generar los asientos.
+                  </p>
+                </div>
+                <div className="flex justify-end pt-2">
+                  <Button
+                    onClick={() => saveMutation.mutate()}
+                    disabled={saveMutation.isPending}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                    Guardar Cuentas por Planilla
+                  </Button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
+
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
