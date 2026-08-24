@@ -138,7 +138,7 @@ export default function EmployeeForm({
   const calculateAge = (birthDate) => {
     if (!birthDate) return "";
     const today = new Date();
-    const birth = new Date(birthDate);
+    const birth = new Date(String(birthDate).slice(0, 10) + "T00:00:00");
     let age = today.getFullYear() - birth.getFullYear();
     const m = today.getMonth() - birth.getMonth();
     if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
@@ -760,7 +760,7 @@ export default function EmployeeForm({
                               <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm text-slate-600">
                                 <span><strong>Documento:</strong> {dh.document_type} {dh.document_number}</span>
                                 <span><strong>Relación:</strong> {dh.relationship}</span>
-                                <span><strong>Nacimiento:</strong> {dh.birth_date ? format(new Date(dh.birth_date), "dd/MM/yyyy") : "N/A"}</span>
+                                <span><strong>Nacimiento:</strong> {dh.birth_date ? format(new Date(String(dh.birth_date).slice(0, 10) + "T00:00:00"), "dd/MM/yyyy") : "N/A"}</span>
                                 <span><strong>Edad:</strong> {calculateAge(dh.birth_date)} años</span>
                                 {dh.phone && <span><strong>Teléfono:</strong> {dh.phone}</span>}
                                 {dh.email && <span><strong>Email:</strong> {dh.email}</span>}
