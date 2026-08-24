@@ -297,7 +297,7 @@ export default function AFPChangeHistoryPanel({ employee, afps = [], canEdit = f
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <Badge className={getChangeTypeColor(entry.change_type)}>{entry.change_type}</Badge>
                     <span className="text-xs font-medium text-slate-700">
-                      {entry.change_date ? format(new Date(entry.change_date + "T00:00:00"), "dd MMM yyyy", { locale: es }) : "Sin fecha"}
+                      {entry.change_date ? format(new Date(String(entry.change_date).slice(0, 10) + "T00:00:00"), "dd MMM yyyy", { locale: es }) : "Sin fecha"}
                     </span>
                   </div>
                   <div className="text-sm text-slate-700 space-y-0.5">
