@@ -31,9 +31,9 @@ export default function ConfiguracionStarsoft() {
     client_secret: "",
     notes: "",
   });
-  // Configuración de cuentas contables por tipo de planilla (lista flexible).
-  // Cada entrada: { tipo_planilla, cuenta, debe_haber }
-  const [cuentasPorPlanilla, setCuentasPorPlanilla] = useState([]);
+  // Homologación de cuentas por concepto PLAME (lista flexible).
+  // Cada entrada: { codigo_plame, concepto, categoria, cuenta, debe_haber }
+  const [cuentasPorConcepto, setCuentasPorConcepto] = useState([]);
   const [showSecret, setShowSecret] = useState(false);
   const [configId, setConfigId] = useState(null);
   const [testing, setTesting] = useState(false);
@@ -71,39 +71,10 @@ export default function ConfiguracionStarsoft() {
         client_secret: c.client_secret || "",
         notes: c.notes || "",
       });
-      // Normalizar cuentas_por_planilla al formato actual: array de { tipo_planilla, cuenta, debe_haber }
-      // Migrar valores legacy "regular"/"snp" a los nuevos tipos de contrato.
-      const LEGACY_TIPO_MAP = { regular: "Plazo Fijo", snp: "SNP" };
-      const normalizeTipo = (t) => LEGACY_TIPO_MAP[t] || t;
-      if (Array.isArray(c.cuentas_por_planilla)) {
-        const normalizadas = [];
-        c.cuentas_por_planilla.forEach(e => {
-          if (e.tipo_planilla && e.cuenta && e.debe_haber) {
-            // Formato actual
-            normalizadas.push({ tipo_planilla: normalizeTipo(e.tipo_planilla), cuenta: e.cuenta, debe_haber: e.debe_haber });
-          } else if (e.tipo_planilla && e.cuenta_debe !== undefined && e.cuenta_haber !== undefined) {
-            // Formato anterior {tipo_planilla, cuenta_debe, cuenta_haber} -> dos registros
-            if (e.cuenta_debe) normalizadas.push({ tipo_planilla: normalizeTipo(e.tipo_planilla), cuenta: e.cuenta_debe, debe_haber: "D" });
-            if (e.cuenta_haber) normalizadas.push({ tipo_planilla: normalizeTipo(e.tipo_planilla), cuenta: e.cuenta_haber, debe_haber: "H" });
-          } else if (e.tipo_planilla && e.cuenta && e.debe_haber && e.uso) {
-            // Formato intermedio {tipo_planilla, cuenta, debe_haber, uso} -> conservar sin uso
-            normalizadas.push({ tipo_planilla: normalizeTipo(e.tipo_planilla), cuenta: e.cuenta, debe_haber: e.debe_haber });
-          }
-        });
-        setCuentasPorPlanilla(normalizadas);
-      } else if (c.cuentas_por_planilla && typeof c.cuentas_por_planilla === "object") {
-        // Migración desde estructura legacy { regular: {...}, snp: {...} }
-        // "regular" → "Plazo Fijo" y "snp" → "SNP" (nuevos valores por tipo de contrato)
-        const LEGACY_MAP = { regular: "Plazo Fijo", snp: "SNP" };
-        const migradas = [];
-        ["regular", "snp"].forEach(tipo => {
-          const block = c.cuentas_por_planilla[tipo];
-          if (block) {
-            if (block.cuenta_debe) migradas.push({ tipo_planilla: LEGACY_MAP[tipo], cuenta: block.cuenta_debe, debe_haber: "D" });
-            if (block.cuenta_haber_neto) migradas.push({ tipo_planilla: LEGACY_MAP[tipo], cuenta: block.cuenta_haber_neto, debe_haber: "H" });
-          }
-        });
-        setCuentasPorPlanilla(migradas);
+      // Cargar homologación de cuentas por concepto (nueva estructura).
+      // Si no existe, se inicia vacío para configurar desde cero.
+      if (Array.isArray(c.cuentas_por_concepto)) {
+        setCuentasPorConcepto(c.cuentas_por_concepto.filter(e => e && e.codigo_plame && e.cuenta && e.debe_haber));
       }
       if (c.last_test_status) {
         setTestResult({
@@ -117,7 +88,7 @@ export default function ConfiguracionStarsoft() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = { ...form, is_active: true, cuentas_por_planilla: cuentasPorPlanilla };
+      const payload = { ...form, is_active: true, cuentas_por_concepto: cuentasPorConcepto };
       if (configId) {
         return base44.entities.StarsoftConfig.update(configId, payload);
       }
@@ -425,10 +396,10 @@ export default function ConfiguracionStarsoft() {
           <CardHeader className="border-b bg-slate-50/50">
             <CardTitle className="text-base flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-indigo-600" />
-              Cuentas Contables por Tipo de Planilla
+              Homologación de Cuentas por Concepto
             </CardTitle>
             <CardDescription>
-              Configure las cuentas del debe y haber que se usarán al generar los asientos contables.
+              Configure la cuenta contable y el lado (Debe/Haber) de cada concepto PLAME (ingresos, descuentos, aportaciones y neto a pagar).
               Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).
             </CardDescription>
           </CardHeader>
@@ -443,15 +414,15 @@ export default function ConfiguracionStarsoft() {
             ) : (
               <>
                 <CuentasPlanillaSection
-                  value={cuentasPorPlanilla}
-                  onChange={setCuentasPorPlanilla}
+                  value={cuentasPorConcepto}
+                  onChange={setCuentasPorConcepto}
                   cuentas={cuentasContables}
                 />
                 <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                   <p className="text-sm text-blue-700">
-                    Agregue un registro por cada cuenta: indique el tipo de planilla, la cuenta contable y si es del <strong>Debe</strong> (gasto) o del <strong>Haber</strong> (neto a pagar / descuentos).
-                    Las cuentas no configuradas usarán los valores por defecto del sistema al generar los asientos.
+                    Agregue un registro por cada concepto: indique el <strong>código PLAME</strong>, el nombre del concepto, la categoría (Ingreso, Descuento, Aportación o Neto), la cuenta contable y el lado <strong>Debe</strong> (gasto) o <strong>Haber</strong> (neto/descuentos).
+                    Al generar los asientos, cada concepto de la boleta genera su propia línea usando la cuenta homologada.
                   </p>
                 </div>
                 <div className="flex justify-end pt-2">
@@ -461,7 +432,7 @@ export default function ConfiguracionStarsoft() {
                     className="bg-indigo-600 hover:bg-indigo-700"
                   >
                     {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    Guardar Cuentas por Planilla
+                    Guardar Cuentas por Concepto
                   </Button>
                 </div>
               </>

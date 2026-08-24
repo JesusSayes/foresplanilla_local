@@ -40,20 +40,49 @@
     },
     "cuentas_por_planilla": {
       "type": "array",
-      "description": "Lista de cuentas contables por tipo de contrato. Cada registro vincula un tipo de contrato (igual al combo 'Tipo de Contrato' del formulario de empleados) con una cuenta contable y su rol (Debe o Haber). Para configurar un tipo de contrato completo se agregan dos registros: uno del DEBE (gasto) y uno del HABER (neto a pagar / descuentos). La generaci\u00f3n de asientos resuelve las cuentas seg\u00fan el tipo de contrato de cada empleado. Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).",
+      "description": "[DEPRECATED] Configuraci\u00f3n legacy de cuentas por tipo de contrato. Reemplazada por 'cuentas_por_concepto'. Se conserva solo para compatibilidad de lectura durante la transici\u00f3n.",
       "items": {
         "type": "object",
         "properties": {
           "tipo_planilla": {
+            "type": "string"
+          },
+          "cuenta": {
+            "type": "string"
+          },
+          "debe_haber": {
             "type": "string",
             "enum": [
-              "Indeterminado",
-              "Plazo Fijo",
-              "Part-Time",
-              "Pr\u00e1cticas",
-              "SNP"
+              "D",
+              "H"
+            ]
+          }
+        }
+      }
+    },
+    "cuentas_por_concepto": {
+      "type": "array",
+      "description": "Homologaci\u00f3n de cuentas contables por concepto PLAME. Cada registro vincula un concepto (c\u00f3digo PLAME + nombre) con una cuenta contable y su lado (Debe o Haber). Reemplaza la anterior configuraci\u00f3n por tipo de contrato y permite configurar ingresos, descuentos, aportaciones del empleador y neto a pagar en una sola tabla. La generaci\u00f3n de asientos resuelve las cuentas por c\u00f3digo de concepto (o por nombre como respaldo) leyendo el calculation_summary de cada boleta. La categor\u00eda 'Neto' (lado H) define la cuenta del neto a pagar. Las cuentas se seleccionan desde la tabla Cuentas Contables (Datos Maestros).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "codigo_plame": {
+            "type": "string",
+            "description": "C\u00f3digo PLAME del concepto (ej: 0121, 0201, 1004). Debe coincidir con el concept_code del calculation_summary."
+          },
+          "concepto": {
+            "type": "string",
+            "description": "Nombre descriptivo del concepto (ej: Remuneraci\u00f3n b\u00e1sica, Asignaci\u00f3n familiar)"
+          },
+          "categoria": {
+            "type": "string",
+            "enum": [
+              "Ingreso",
+              "Descuento",
+              "Aportaci\u00f3n",
+              "Neto"
             ],
-            "description": "Tipo de contrato al que aplica la cuenta (mismos valores que el combo 'Tipo de Contrato' del formulario de empleados)"
+            "description": "Categor\u00eda del concepto: Ingreso (DEBE gasto), Descuento (HABER), Aportaci\u00f3n (aporte del empleador), Neto (HABER neto a pagar)"
           },
           "cuenta": {
             "type": "string",
@@ -65,11 +94,13 @@
               "D",
               "H"
             ],
-            "description": "D=Debe (gasto de personal / honorarios brutos) / H=Haber (neto a pagar y descuentos/tributos)"
+            "description": "D=Debe / H=Haber"
           }
         },
         "required": [
-          "tipo_planilla",
+          "codigo_plame",
+          "concepto",
+          "categoria",
           "cuenta",
           "debe_haber"
         ]

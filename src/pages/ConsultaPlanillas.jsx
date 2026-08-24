@@ -216,66 +216,51 @@ export default function ConsultaPlanillas() {
       // el tipo de planilla, y annomes conserva el período completo.
       const comprobante = annomes.slice(-4);
 
-      // Obtener el código de empresa activo desde la configuración Starsoft.
-      // Si no hay configuración activa o no tiene código de empresa, se muestra
-      // un mensaje y se interrumpe la generación (no se asume "003" por defecto).
+      // Obtener el código de empresa activo y la homologación de cuentas por concepto
+      // desde la configuración Starsoft activa. Si no hay configuración activa o no
+      // tiene código de empresa, se interrumpe la generación (no se asume "003").
       let codEmpresaActiva = null;
-      let cuentasConfig = null;
+      let cuentasConcepto = [];
       try {
         const configs = await base44.entities.StarsoftConfig.filter({ is_active: true });
         if (configs && configs.length > 0 && configs[0].cod_empresa) {
           codEmpresaActiva = String(configs[0].cod_empresa);
-          cuentasConfig = configs[0].cuentas_por_planilla || null;
+          cuentasConcepto = Array.isArray(configs[0].cuentas_por_concepto) ? configs[0].cuentas_por_concepto : [];
         }
       } catch (e) {
         console.warn("No se pudo leer la configuración Starsoft", e);
       }
 
-      // Cuentas por defecto del sistema (fallback si no están configuradas)
-      const DEFAULT_CUENTAS = {
-        regular: { cuenta_debe: "6210000", cuenta_haber_neto: "4110000", cuenta_haber_descuentos: "4030000" },
-        snp: { cuenta_debe: "6320000", cuenta_haber_neto: "4212100", cuenta_haber_descuentos: "4017100" },
-      };
-
-      // Resuelve las cuentas contables según el tipo de contrato del empleado.
-      // La configuración (cuentas_por_planilla) usa los mismos valores que el combo
-      // "Tipo de Contrato" del formulario de empleados (Indeterminado, Plazo Fijo,
-      // Part-Time, Prácticas, SNP). Si no hay configuración para el tipo de contrato,
-      // se aplica el fallback (SNP → honorarios; demás → regular).
-      // - Formato actual: array de { tipo_planilla, cuenta, debe_haber }
-      // - Formato anterior: array de { tipo_planilla, cuenta_debe, cuenta_haber }
-      // - Formato legacy: objeto { regular: {...}, snp: {...} }
-      const resolveCuentas = (contractType) => {
-        const baseKey = contractType === "SNP" ? "snp" : "regular";
-        const resolved = { ...DEFAULT_CUENTAS[baseKey] };
-        if (Array.isArray(cuentasConfig)) {
-          const dEntry = cuentasConfig.find(e => e.tipo_planilla === contractType && e.debe_haber === "D" && e.cuenta);
-          const hEntry = cuentasConfig.find(e => e.tipo_planilla === contractType && e.debe_haber === "H" && e.cuenta);
-          if (dEntry?.cuenta) resolved.cuenta_debe = dEntry.cuenta;
-          if (hEntry?.cuenta) {
-            resolved.cuenta_haber_neto = hEntry.cuenta;
-            resolved.cuenta_haber_descuentos = hEntry.cuenta;
-          }
-          // Compatibilidad con formato anterior {tipo_planilla, cuenta_debe, cuenta_haber}
-          const entryDebe = cuentasConfig.find(e => e.tipo_planilla === contractType && e.cuenta_debe !== undefined);
-          if (entryDebe?.cuenta_debe) resolved.cuenta_debe = entryDebe.cuenta_debe;
-          if (entryDebe?.cuenta_haber) {
-            resolved.cuenta_haber_neto = entryDebe.cuenta_haber;
-            resolved.cuenta_haber_descuentos = entryDebe.cuenta_haber;
-          }
-        } else if (cuentasConfig && cuentasConfig[baseKey]) {
-          // Estructura legacy { regular: {...}, snp: {...} }
-          resolved.cuenta_debe = cuentasConfig[baseKey].cuenta_debe || resolved.cuenta_debe;
-          resolved.cuenta_haber_neto = cuentasConfig[baseKey].cuenta_haber_neto || resolved.cuenta_haber_neto;
-          resolved.cuenta_haber_descuentos = cuentasConfig[baseKey].cuenta_haber_descuentos || resolved.cuenta_haber_descuentos;
-        }
-        return resolved;
-      };
-
       if (!codEmpresaActiva) {
         toast.error("No se pudo determinar el código de empresa destino. Active una empresa (Prueba o Producción) con su código en la Configuración Starsoft antes de generar los asientos.");
         return;
       }
+
+      if (cuentasConcepto.length === 0) {
+        toast.error("No hay cuentas por concepto configuradas. Configure la homologación en Configuración Starsoft → Cuentas por Planilla antes de generar los asientos.");
+        return;
+      }
+
+      // Índices de resolución de la homologación: por código PLAME y por nombre (normalizado).
+      const normStr = (s) => String(s || "").toLowerCase().trim();
+      const homByCode = {};
+      const homByName = {};
+      let netoConfig = null;
+      cuentasConcepto.forEach(c => {
+        if (!c || !c.cuenta || !c.debe_haber) return;
+        if (c.categoria === "Neto" && c.debe_haber === "H" && !netoConfig) netoConfig = c;
+        if (c.codigo_plame) homByCode[String(c.codigo_plame)] = c;
+        if (c.concepto) homByName[normStr(c.concepto)] = c;
+      });
+
+      // Resuelve la cuenta contable y el lado (D/H) de un concepto del calculation_summary.
+      // Prioriza coincidencia por código PLAME; si no hay, busca por nombre normalizado.
+      const resolveConcept = (item) => {
+        if (!item) return null;
+        if (item.concept_code && homByCode[String(item.concept_code)]) return homByCode[String(item.concept_code)];
+        if (item.name && homByName[normStr(item.name)]) return homByName[normStr(item.name)];
+        return null;
+      };
 
       // Resolver el tipo de anexo desde la tabla Tipos de Anexo (Datos Maestros).
       // Planilla regular → TRABAJADORES; SNP → HONORARIOS.
@@ -299,195 +284,114 @@ export default function ConsultaPlanillas() {
 
       const asientosToCreate = [];
 
-      if (isSNP) {
-        // ── SNP: un asiento por persona (Recibo de Honorarios) ──────────────
-        // Estructura de cadena de conexión del sistema contable externo
-        for (const p of grupo.payslips) {
-          const emp = allEmployees.find(e => e.id === p.employee_id);
-          if (!emp) continue;
+      const missingConcepts = [];
+      const netoConfigMissing = !netoConfig;
 
-          // Cuentas contables según el tipo de contrato del trabajador
-          const cuentasAplicar = resolveCuentas(emp.contract_type || "SNP");
-
-          // Centro de costo del trabajador
-          let assignment = costCenterAssignments.find(
-            a => a.assignment_type === "Empleado" && a.employee_id === emp.id && a.is_active
+      const buildBase = (emp, p) => {
+        let assignment = costCenterAssignments.find(
+          a => a.assignment_type === "Empleado" && a.employee_id === emp.id && a.is_active
+        );
+        if (!assignment && emp.department_name) {
+          assignment = costCenterAssignments.find(
+            a => a.assignment_type === "Departamento" && a.department_name === emp.department_name && a.is_active
           );
-          if (!assignment && emp.department_name) {
-            assignment = costCenterAssignments.find(
-              a => a.assignment_type === "Departamento" && a.department_name === emp.department_name && a.is_active
-            );
-          }
-          const cc = assignment?.cost_center_id
-            ? costCenters.find(c => c.id === assignment.cost_center_id)
-            : null;
-          const ccCode = cc?.code || "";
-          const codAnexo = emp.document_number || "";
-          const empName = `${emp.first_name} ${emp.last_name}`;
-          const importeBruto = roundMoney(p.total_income);
-          const importeRet   = roundMoney(p.total_deductions);
-          const importeNeto  = roundMoney(p.net_pay);
-          const glosa    = `SNP ${period}`;
-          const glosaEmp = `RH ${empName} - ${period}`;
-          const nroDoc   = `RH-${annomes}-${emp.document_number}`;
+        }
+        const cc = assignment?.cost_center_id ? costCenters.find(c => c.id === assignment.cost_center_id) : null;
+        const empName = `${emp.first_name} ${emp.last_name}`;
+        const base = {
+          annomes,
+          subdiario: isSNP ? "07" : "08",
+          comprobante,
+          fecha_doc: fechaDoc,
+          fecha_registro: fechaRegistro,
+          tipo_doc: isSNP ? "RH" : "PL",
+          nro_doc: isSNP ? `RH-${annomes}-${emp.document_number}` : comprobante,
+          tipo_anexo: tipoAnexoAplicar,
+          cod_anexo: emp.document_number || "",
+          conversion_tc: "VTA",
+          moneda: "PEN",
+          tc: 1,
+          glosa: isSNP ? `SNP ${period}` : `${payrollType} - ${period}`,
+          centro_costos: cc?.code || "",
+          centro_costos_id: assignment?.cost_center_id || "",
+          employee_id: emp.id,
+          payroll_period: period,
+          payroll_type: payrollType,
+          payslip_id: p.id,
+          origen: isSNP ? "Otro" : "Planilla",
+          empresa: codEmpresaActiva,
+          estado_migracion: "Pendiente",
+          anulado: false,
+        };
+        if (isSNP) base.fecha_vencimiento = fechaDoc;
+        return { base, empName };
+      };
 
-          // Campos comunes a todos los movimientos de este trabajador
-          const base = {
-            annomes,
-            subdiario: "07",           // Subdiario Honorarios
-            comprobante,
-            fecha_doc: fechaDoc,
-            fecha_vencimiento: fechaDoc,
-            fecha_registro: fechaRegistro,
-            tipo_doc: "RH",            // Recibo de Honorarios
-            nro_doc: nroDoc,
-            tipo_anexo: tipoAnexoAplicar, // Honorarios (desde Tipos de Anexo)
-            cod_anexo: codAnexo,
-            conversion_tc: "VTA",
-            moneda: "PEN",
-            tc: 1,
-            glosa,
-            centro_costos: ccCode,
-            centro_costos_id: assignment?.cost_center_id || "",
-            employee_id: emp.id,
-            payroll_period: period,
-            payroll_type: payrollType,
-            payslip_id: p.id,
-            origen: "Otro",            // Distingue de planilla regular
-            empresa: codEmpresaActiva,
-            estado_migracion: "Pendiente",
-            anulado: false,
-          };
+      const pushLine = (base, cuenta, importe, debeHaber, glosaMov) => {
+        const imp = roundMoney(Math.abs(Number(importe) || 0));
+        if (imp === 0) return;
+        asientosToCreate.push({
+          ...base,
+          cuenta,
+          importe: imp,
+          importe_soles: imp,
+          debe_haber: debeHaber,
+          glosa_mov: String(glosaMov || "").slice(0, 40),
+        });
+      };
 
-          // DEBE: Servicios de Terceros (honorarios brutos) - cuenta configurable
-          asientosToCreate.push({
-            ...base,
-            cuenta: cuentasAplicar.cuenta_debe,
-            importe: importeBruto,
-            importe_soles: importeBruto,
-            debe_haber: "D",
-            glosa_mov: `${glosaEmp} - Honorario bruto`.slice(0, 40),
-          });
+      // Genera una línea de asiento por concepto por persona, leyendo el
+      // calculation_summary de cada boleta y resolviendo la cuenta desde la
+      // homologación (cuentas_por_concepto). Ya no se agrupa por centro de costo.
+      for (const p of grupo.payslips) {
+        const emp = allEmployees.find(e => e.id === p.employee_id);
+        if (!emp) continue;
 
-          // HABER: Honorarios por pagar (neto) - cuenta configurable
-          asientosToCreate.push({
-            ...base,
-            cuenta: cuentasAplicar.cuenta_haber_neto,
-            importe: importeNeto,
-            importe_soles: importeNeto,
-            debe_haber: "H",
-            glosa_mov: `${glosaEmp} - Neto a pagar`.slice(0, 40),
-          });
-
-          // HABER: Retención de 4ta categoría (si hay descuentos) - cuenta configurable
-          if (importeRet > 0) {
-            asientosToCreate.push({
-              ...base,
-              cuenta: cuentasAplicar.cuenta_haber_descuentos,
-              importe: importeRet,
-              importe_soles: importeRet,
-              debe_haber: "H",
-              glosa_mov: `${glosaEmp} - Retención 4ta categoría`.slice(0, 40),
-            });
-          }
+        const cs = p.calculation_summary;
+        if (!cs || !cs.breakdown) {
+          missingConcepts.push({ employee: `${emp.first_name} ${emp.last_name}`, code: "—", name: "Boleta sin desglose (calculation_summary)" });
+          continue;
         }
 
-      } else {
-        // ── PLANILLA REGULAR: agrupado por centro de costo ──────────────────
-        const ccMap = {};
+        const { base, empName } = buildBase(emp, p);
 
-        for (const p of grupo.payslips) {
-          const emp = allEmployees.find(e => e.id === p.employee_id);
-          if (!emp) continue;
-
-          let assignment = costCenterAssignments.find(
-            a => a.assignment_type === "Empleado" && a.employee_id === emp.id && a.is_active
-          );
-          if (!assignment && emp.department_name) {
-            assignment = costCenterAssignments.find(
-              a => a.assignment_type === "Departamento" && a.department_name === emp.department_name && a.is_active
-            );
-          }
-
-          const ccId = assignment?.cost_center_id || "sin_cc";
-          const cc = ccId !== "sin_cc" ? costCenters.find(c => c.id === ccId) : null;
-          const contractType = emp.contract_type || "Indeterminado";
-          const mapKey = `${ccId}__${contractType}`;
-
-          if (!ccMap[mapKey]) {
-            ccMap[mapKey] = { cc, ccId, contractType, totalIncome: 0, totalDeductions: 0, totalNeto: 0, employeeCount: 0 };
-          }
-          ccMap[mapKey].totalIncome += safePayrollNumber(p.total_income);
-          ccMap[mapKey].totalDeductions += safePayrollNumber(p.total_deductions);
-          ccMap[mapKey].totalNeto += safePayrollNumber(p.net_pay);
-          ccMap[mapKey].employeeCount += 1;
-        }
-
-        for (const data of Object.values(ccMap)) {
-          const cuentasAplicar = resolveCuentas(data.contractType);
-          const ccCode = data.cc?.code || "S/CC";
-          const ccName = data.cc?.name || "Sin Centro de Costo";
-          const glosa  = `${payrollType} - ${period}`;
-          const glosaCC = `${glosa} | ${ccCode} - ${ccName} | ${data.contractType} (${data.employeeCount} emp.)`;
-
-          const base = {
-            annomes,
-            subdiario: "08",
-            comprobante,
-            fecha_doc: fechaDoc,
-            fecha_registro: fechaRegistro,
-            tipo_doc: "PL",
-            nro_doc: comprobante,
-            tipo_anexo: tipoAnexoAplicar, // Trabajadores (desde Tipos de Anexo)
-            conversion_tc: "VTA",
-            moneda: "PEN",
-            tc: 1,
-            glosa,
-            centro_costos: ccCode,
-            centro_costos_id: data.ccId !== "sin_cc" ? data.ccId : "",
-            origen: "Planilla",
-            empresa: codEmpresaActiva,
-            payroll_period: period,
-            payroll_type: payrollType,
-            estado_migracion: "Pendiente",
-            anulado: false,
-          };
-
-          asientosToCreate.push({
-            ...base,
-            cuenta: cuentasAplicar.cuenta_debe,
-            importe: roundMoney(data.totalIncome),
-            importe_soles: roundMoney(data.totalIncome),
-            debe_haber: "D",
-            glosa_mov: glosaCC.slice(0, 40),
+        const processItems = (items, sectionLabel) => {
+          (items || []).forEach(item => {
+            const hom = resolveConcept(item);
+            if (!hom) {
+              missingConcepts.push({ employee: empName, code: item.concept_code || "—", name: item.name || "—" });
+              return;
+            }
+            pushLine(base, hom.cuenta, item.amount, hom.debe_haber, `${empName} - ${item.name || hom.concepto || sectionLabel}`);
           });
+        };
 
-          asientosToCreate.push({
-            ...base,
-            cuenta: cuentasAplicar.cuenta_haber_neto,
-            importe: roundMoney(data.totalNeto),
-            importe_soles: roundMoney(data.totalNeto),
-            debe_haber: "H",
-            glosa_mov: `${glosaCC} - Neto a pagar`.slice(0, 40),
-          });
+        processItems(cs.breakdown.incomes?.items, "Ingreso");
+        processItems(cs.breakdown.deductions?.items, "Descuento");
+        processItems(cs.breakdown.contributions?.items, "Aportación");
 
-          if (data.totalDeductions > 0) {
-            asientosToCreate.push({
-              ...base,
-              cuenta: cuentasAplicar.cuenta_haber_descuentos,
-              importe: roundMoney(data.totalDeductions),
-              importe_soles: roundMoney(data.totalDeductions),
-              debe_haber: "H",
-              glosa_mov: `${glosaCC} - Descuentos/Tributos`.slice(0, 40),
-            });
-          }
+        // Neto a pagar → HABER con la cuenta de categoría "Neto"
+        if (netoConfig) {
+          pushLine(base, netoConfig.cuenta, p.net_pay, "H", `${empName} - Neto a pagar`);
         }
       }
 
       await base44.entities.AsientoContable.bulkCreate(asientosToCreate);
       queryClient.invalidateQueries(["asientosContablesConsulta"]);
       const label = existing.length > 0 ? "Asientos actualizados" : "Asientos generados";
-      toast.success(`${label}: ${asientosToCreate.length} líneas${isSNP ? ` (${grupo.payslips.length} Recibos de Honorarios)` : ""}`);
+      let msg = `${label}: ${asientosToCreate.length} líneas${isSNP ? ` (${grupo.payslips.length} Recibos de Honorarios)` : ""}`;
+      if (missingConcepts.length > 0) {
+        const unique = new Set(missingConcepts.map(m => `${m.code}|${m.name}`));
+        msg += `. ${missingConcepts.length} concepto(s) sin homologar (${unique.size} únicos).`;
+      }
+      if (netoConfigMissing) {
+        msg += " Falta configurar la cuenta de Neto a pagar (categoría Neto, H).";
+      }
+      if (missingConcepts.length > 0 || netoConfigMissing) {
+        toast.warning(msg);
+      } else {
+        toast.success(msg);
+      }
     } catch (error) {
       toast.error("Error al generar asientos contables");
       console.error(error);
