@@ -209,7 +209,7 @@ export default function ConsultaPlanillas() {
       const payrollType = grupo.payroll_type;
       const isSNP = payrollType === "SNP";
       const annomes = `${grupo.year}${String(grupo.month).padStart(2, "0")}`;
-      const fechaDoc = format(new Date(grupo.year, grupo.month - 1, 1), "yyyy-MM-dd");
+      const fechaDoc = format(new Date(grupo.year, grupo.month, 0), "yyyy-MM-dd");
       const fechaRegistro = format(new Date(), "yyyy-MM-dd");
       // Starsoft limita la columna COMPROBANTE a 4 caracteres en TB_IMPORTAR_STANDARD.
       // Usar YYMM (4 dígitos) para evitar truncamiento. El subdiario ya distingue
@@ -343,7 +343,7 @@ export default function ConsultaPlanillas() {
             nro_doc: nroDoc,
             tipo_anexo: tipoAnexoAplicar, // Honorarios (desde Tipos de Anexo)
             cod_anexo: codAnexo,
-            conversion_tc: "M",
+            conversion_tc: "VTA",
             moneda: "PEN",
             tc: 1,
             glosa,
@@ -439,7 +439,7 @@ export default function ConsultaPlanillas() {
             tipo_doc: "PL",
             nro_doc: comprobante,
             tipo_anexo: tipoAnexoAplicar, // Trabajadores (desde Tipos de Anexo)
-            conversion_tc: "M",
+            conversion_tc: "VTA",
             moneda: "PEN",
             tc: 1,
             glosa,
