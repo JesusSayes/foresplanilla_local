@@ -182,6 +182,7 @@ export default function CompensationPanel({
         totalScheduledHours: 0,
         totalRegularHours: 0,
         totalOvertimeHours: 0,
+        usedOvertimeMinutes: approvedOvertimeByEmployee.get(emp.id) || 0,
         totalLateMinutes: 0,
         lateDays: 0,
         overtimeDays: 0,
@@ -255,7 +256,10 @@ export default function CompensationPanel({
       }
 
       if (filterType === "late" && stat.totalLateMinutes === 0) return false;
-      if (filterType === "overtime" && stat.totalOvertimeHours === 0)
+      if (
+        filterType === "overtime" &&
+        stat.totalOvertimeHours - (stat.usedOvertimeMinutes || 0) / 60 <= 0
+      )
         return false;
 
       return true;
@@ -272,6 +276,18 @@ export default function CompensationPanel({
       if (c.status === "Pendiente" || c.status === "Rechazada") {
         if (!map.has(c.employee_id)) map.set(c.employee_id, []);
         map.get(c.employee_id).push(c);
+      }
+    }
+    return map;
+  }, [existingCompensations]);
+
+  // Minutos de horas extras ya utilizados en compensaciones APROBADAS (por empleado)
+  const approvedOvertimeByEmployee = useMemo(() => {
+    const map = new Map();
+    for (const c of existingCompensations) {
+      if (c.status === "Aprobada") {
+        const mins = Math.round((c.hours_to_adjust || 0) * 60);
+        map.set(c.employee_id, (map.get(c.employee_id) || 0) + mins);
       }
     }
     return map;
@@ -411,7 +427,9 @@ export default function CompensationPanel({
       (acc, s) => ({
         scheduled: acc.scheduled + s.totalScheduledHours,
         regular: acc.regular + s.totalRegularHours,
-        overtime: acc.overtime + s.totalOvertimeHours,
+        overtime:
+          acc.overtime +
+          Math.max(0, s.totalOvertimeHours - (s.usedOvertimeMinutes || 0) / 60),
         late: acc.late + s.totalLateMinutes,
       }),
       { scheduled: 0, regular: 0, overtime: 0, late: 0 }
@@ -735,10 +753,14 @@ export default function CompensationPanel({
                     const hasEditableComp = editableCompsByEmployee.has(
                       stat.employee_id
                     );
-                    const overtimeMin = Math.round(stat.totalOvertimeHours * 60);
+                    const overtimeMin = Math.max(
+                      0,
+                      Math.round(stat.totalOvertimeHours * 60) -
+                        (stat.usedOvertimeMinutes || 0)
+                    );
                     const balanceMin = overtimeMin - stat.totalLateMinutes;
                     const hasIncidents =
-                      stat.totalLateMinutes > 0 || stat.totalOvertimeHours > 0;
+                      stat.totalLateMinutes > 0 || overtimeMin > 0;
                     return (
                       <tr
                         key={stat.employee_id}
@@ -812,12 +834,12 @@ export default function CompensationPanel({
                         <td className="px-2 py-2 text-center">
                           <span
                             className={`text-sm font-bold ${
-                              stat.totalOvertimeHours > 0
+                              overtimeMin > 0
                                 ? "text-blue-600"
                                 : "text-slate-300"
                             }`}
                           >
-                            {fmtHours(stat.totalOvertimeHours)}
+                            {fmtHours(overtimeMin / 60)}
                           </span>
                           {stat.overtimeDays > 0 && (
                             <span className="block text-[9px] text-blue-400">
