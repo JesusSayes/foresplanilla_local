@@ -12,6 +12,7 @@ const configFields = ({
   api_url = '',
   is_active = true,
   cuentas_por_planilla = [],
+  cuentas_por_concepto = [],
   notes = null,
 }) => ({
   config_name,
@@ -23,6 +24,7 @@ const configFields = ({
   api_url,
   is_active,
   cuentas_por_planilla,
+  cuentas_por_concepto,
   notes,
 });
 
@@ -115,14 +117,16 @@ export const createConfig = async (req, res, next) => {
     const id = generate24HexId();
     const data = configFields(req.body || {});
     const cuentasPorPlanilla = JSON.stringify(data.cuentas_por_planilla || []);
+    const cuentasPorConcepto = JSON.stringify(data.cuentas_por_concepto || []);
     const rows = await prisma.$queryRaw`
       INSERT INTO starsoft_config (
         id, config_name, client_id, client_secret, cod_empresa, cod_sistema,
-        auth_url, api_url, is_active, cuentas_por_planilla, notes, created_by
+        auth_url, api_url, is_active, cuentas_por_planilla, cuentas_por_concepto, notes, created_by
       ) VALUES (
         ${id}, ${data.config_name}, ${data.client_id}, ${data.client_secret},
         ${data.cod_empresa}, ${data.cod_sistema}, ${data.auth_url}, ${data.api_url},
-        ${data.is_active}, CAST(${cuentasPorPlanilla} AS JSONB), ${data.notes}, ${req.user?.email || 'system'}
+        ${data.is_active}, CAST(${cuentasPorPlanilla} AS JSONB), CAST(${cuentasPorConcepto} AS JSONB),
+        ${data.notes}, ${req.user?.email || 'system'}
       )
       RETURNING *
     `;
@@ -135,7 +139,10 @@ export const createConfig = async (req, res, next) => {
 export const updateConfig = async (req, res, next) => {
   try {
     const data = configFields(req.body || {});
+    const hasCuentasPorPlanilla = Object.prototype.hasOwnProperty.call(req.body || {}, 'cuentas_por_planilla');
+    const hasCuentasPorConcepto = Object.prototype.hasOwnProperty.call(req.body || {}, 'cuentas_por_concepto');
     const cuentasPorPlanilla = JSON.stringify(data.cuentas_por_planilla || []);
+    const cuentasPorConcepto = JSON.stringify(data.cuentas_por_concepto || []);
     const rows = await prisma.$queryRaw`
       UPDATE starsoft_config
       SET config_name = ${data.config_name},
@@ -146,7 +153,14 @@ export const updateConfig = async (req, res, next) => {
           auth_url = ${data.auth_url},
           api_url = ${data.api_url},
           is_active = ${data.is_active},
-          cuentas_por_planilla = CAST(${cuentasPorPlanilla} AS JSONB),
+          cuentas_por_planilla = CASE
+            WHEN ${hasCuentasPorPlanilla} THEN CAST(${cuentasPorPlanilla} AS JSONB)
+            ELSE cuentas_por_planilla
+          END,
+          cuentas_por_concepto = CASE
+            WHEN ${hasCuentasPorConcepto} THEN CAST(${cuentasPorConcepto} AS JSONB)
+            ELSE cuentas_por_concepto
+          END,
           notes = ${data.notes},
           updated_date = NOW(),
           updated_by = ${req.user?.email || 'system'}
@@ -246,6 +260,7 @@ export const migrate = async (req, res, next) => {
       anulado: !!asiento.anulado,
       debe_Haber: asiento.debe_haber || '',
       centro_Costos: asiento.centro_costos || '',
+      moneda: asiento.moneda === 'USD' ? 'ME' : asiento.moneda === 'PEN' ? 'MN' : (asiento.moneda || ''),
     }));
 
     let sendResponse;
