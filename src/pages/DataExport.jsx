@@ -336,7 +336,7 @@ const ENTITY_SCHEMAS = {
     name: "TEXT", description: "TEXT", permissions: "JSON",
     is_system_role: "BOOLEAN", department_restricted: "BOOLEAN",
     team_restricted: "BOOLEAN", site_restricted: "BOOLEAN",
-    allowed_sites: "JSON", block_financial_info: "BOOLEAN", priority: "INTEGER"
+    allowed_sites: "JSON", priority: "INTEGER"
   },
   Certificate: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
