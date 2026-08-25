@@ -154,6 +154,7 @@ export default async function (req: Request): Promise<Response> {
       anulado: !!a.anulado,
       debe_Haber: a.debe_haber || "",
       centro_Costos: a.centro_costos || "",
+      moneda: a.moneda === "USD" ? "ME" : a.moneda === "PEN" ? "MN" : (a.moneda || ""),
     }));
 
     let sendRes: Response;

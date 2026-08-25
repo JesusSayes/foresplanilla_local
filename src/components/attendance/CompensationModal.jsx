@@ -96,6 +96,18 @@ export default function CompensationModal({
     return periodRecords.filter((r) => r.employee_id === employee.id);
   }, [employee, periodRecords]);
 
+  // Minutos de HE ya utilizados en compensaciones APROBADAS (por fecha del empleado)
+  const approvedUsedByDate = useMemo(() => {
+    const map = {};
+    for (const c of existingCompensations) {
+      if (c.employee_id === employee?.id && c.status === "Aprobada") {
+        const mins = Math.round((c.hours_to_adjust || 0) * 60);
+        map[c.incident_date] = (map[c.incident_date] || 0) + mins;
+      }
+    }
+    return map;
+  }, [existingCompensations, employee]);
+
   // Generar TODOS los días del período (con y sin registro de asistencia)
   const allScheduledDays = useMemo(() => {
     if (!employee || !periodStart || !periodEnd) return [];
@@ -120,8 +132,13 @@ export default function CompensationModal({
           hasRecord: !!record,
           workedHours: record?.worked_hours ?? 0,
           lateMinutes: record?.late_minutes || 0,
-          overtimeMinutes: Math.round(
-            ((record?.overtime_hours_25 ?? 0) + (record?.overtime_hours_35 ?? 0)) * 60
+          overtimeMinutes: Math.max(
+            0,
+            Math.round(
+              ((record?.overtime_hours_25 ?? 0) +
+                (record?.overtime_hours_35 ?? 0)) *
+                60
+            ) - (approvedUsedByDate[dateStr] || 0)
           ),
         });
       }
@@ -147,7 +164,7 @@ export default function CompensationModal({
     }
 
     return days.sort((a, b) => a.date.localeCompare(b.date));
-  }, [employee, employeeSchedule, periodStart, periodEnd, allEmployeeRecords, editMode, pendingCompensations]);
+  }, [employee, employeeSchedule, periodStart, periodEnd, allEmployeeRecords, editMode, pendingCompensations, approvedUsedByDate]);
 
   const summary = useMemo(() => {
     const scheduledHours = employeeSchedule
@@ -157,16 +174,23 @@ export default function CompensationModal({
       (s, r) => s + (r.regular_hours ?? 0),
       0
     );
-    const overtimeHours = allEmployeeRecords.reduce(
-      (s, r) => s + (r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0),
+    const approvedUsedTotalMin = Object.values(approvedUsedByDate).reduce(
+      (a, b) => a + b,
       0
+    );
+    const overtimeHours = Math.max(
+      0,
+      allEmployeeRecords.reduce(
+        (s, r) => s + (r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0),
+        0
+      ) - approvedUsedTotalMin / 60
     );
     const lateMinutes = allEmployeeRecords.reduce(
       (s, r) => s + (r.late_minutes ?? 0),
       0
     );
     return { scheduledHours, regularHours, overtimeHours, lateMinutes };
-  }, [allEmployeeRecords, employeeSchedule, periodStart, periodEnd]);
+  }, [allEmployeeRecords, employeeSchedule, periodStart, periodEnd, approvedUsedByDate]);
 
   const compensatedDates = useMemo(() => {
     return new Set(
