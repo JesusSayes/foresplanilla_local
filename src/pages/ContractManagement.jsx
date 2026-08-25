@@ -382,8 +382,8 @@ export default function ContractManagement() {
   const stats = {
     total: contracts.length,
     vigentes: contracts.filter(c => c.status === "Vigente").length,
-    firmados: contracts.filter(c => c.is_digitally_signed).length,
-    pendienteFirma: contracts.filter(c => !c.is_digitally_signed && c.status === "Vigente").length,
+    firmados: contracts.filter(c => c.is_digitally_signed || c.signed_date).length,
+    pendienteFirma: contracts.filter(c => !c.is_digitally_signed && !c.signed_date && c.status === "Vigente").length,
   };
 
   const getStatusConfig = (status) => ({
