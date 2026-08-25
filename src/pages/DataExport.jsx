@@ -128,7 +128,8 @@ const ENTITY_SCHEMAS = {
     justified_time_start: "TEXT", justified_time_end: "TEXT",
     full_day_justification: "BOOLEAN", hours_to_adjust: "DECIMAL(18,2)",
     late_minutes_to_adjust: "INTEGER", authorizer_id: "TEXT", authorizer_name: "TEXT",
-    status: "TEXT", reviewed_by: "TEXT", review_date: "DATE", review_comments: "TEXT"
+    status: "TEXT", reviewed_by: "TEXT", review_date: "DATE", review_comments: "TEXT",
+    codigo_solicitud: "TEXT"
   },
   OvertimeAlert: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
@@ -182,6 +183,7 @@ const ENTITY_SCHEMAS = {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     employee_id: "TEXT", request_type: "TEXT", start_date: "DATE", end_date: "DATE",
     total_days: "INTEGER", business_days: "INTEGER", reason: "TEXT",
+    is_full_day: "BOOLEAN", hours_requested: "DECIMAL(18,2)", time_start: "TEXT", time_end: "TEXT",
     supporting_document_url: "TEXT", status: "TEXT",
     approved_by: "TEXT", approved_date: "DATE", rejection_reason: "TEXT", comments: "TEXT"
   },
@@ -198,7 +200,9 @@ const ENTITY_SCHEMAS = {
     payroll_number: "TEXT", advance_payment_id: "TEXT",
     worked_days: "INTEGER", non_worked_days: "INTEGER", subsidized_days: "INTEGER",
     regular_hours: "DECIMAL(18,2)", overtime_hours: "DECIMAL(18,2)",
+    overtime_hours_25: "DECIMAL(18,2)", overtime_hours_35: "DECIMAL(18,2)",
     base_salary: "DECIMAL(18,2)", family_allowance: "DECIMAL(18,2)",
+    activity_cost_amount: "DECIMAL(18,2)", food_cost_amount: "DECIMAL(18,2)", transport_cost_amount: "DECIMAL(18,2)",
     overtime_pay: "DECIMAL(18,2)", bonuses: "DECIMAL(18,2)",
     commissions: "DECIMAL(18,2)", other_income: "DECIMAL(18,2)", total_income: "DECIMAL(18,2)",
     pension_deduction: "DECIMAL(18,2)", health_insurance: "DECIMAL(18,2)",
@@ -206,13 +210,15 @@ const ENTITY_SCHEMAS = {
     absence_discount: "DECIMAL(18,2)", loan_deduction: "DECIMAL(18,2)",
     advance_deduction: "DECIMAL(18,2)", other_deductions: "DECIMAL(18,2)",
     total_deductions: "DECIMAL(18,2)", net_pay: "DECIMAL(18,2)",
-    payment_date: "DATE", pdf_url: "TEXT", status: "TEXT", notes: "TEXT"
+    payment_date: "DATE", pdf_url: "TEXT", status: "TEXT", notes: "TEXT",
+    calculation_summary: "JSON"
   },
   PayrollConcept: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     employee_id: "TEXT", concept_type: "TEXT", concept_category: "TEXT",
     concept_name: "TEXT", concept_code: "TEXT", description: "TEXT",
     amount: "DECIMAL(18,2)", is_dynamic: "BOOLEAN", calculation_formula: "TEXT",
+    system_logic_type: "TEXT",
     period: "TEXT", month: "INTEGER", year: "INTEGER",
     is_recurring: "BOOLEAN", is_mandatory: "BOOLEAN",
     applies_to_payroll_types: "JSON", is_applied: "BOOLEAN", payslip_id: "TEXT", notes: "TEXT"
@@ -330,7 +336,7 @@ const ENTITY_SCHEMAS = {
     name: "TEXT", description: "TEXT", permissions: "JSON",
     is_system_role: "BOOLEAN", department_restricted: "BOOLEAN",
     team_restricted: "BOOLEAN", site_restricted: "BOOLEAN",
-    allowed_sites: "JSON", priority: "INTEGER"
+    allowed_sites: "JSON", block_financial_info: "BOOLEAN", priority: "INTEGER"
   },
   Certificate: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
@@ -358,6 +364,24 @@ const ENTITY_SCHEMAS = {
   TipoAnexo: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     codigo_tipo_anexo: "TEXT", descripcion: "TEXT", estado: "TEXT"
+  },
+  StarsoftConfig: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    config_name: "TEXT", client_id: "TEXT", client_secret: "TEXT",
+    cod_empresa: "TEXT", cod_sistema: "TEXT", auth_url: "TEXT", api_url: "TEXT",
+    is_active: "BOOLEAN",
+    cuentas_por_planilla: "JSON",
+    cuentas_por_concepto: "JSON",
+    last_test_status: "TEXT", last_test_date: "TIMESTAMP", last_test_message: "TEXT", notes: "TEXT"
+  },
+  TipoCambioConfig: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    api_url: "TEXT", is_active: "BOOLEAN", notes: "TEXT"
+  },
+  TipoCambio: {
+    id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
+    fecha: "DATE", valor_compra: "DECIMAL(18,4)", valor_venta: "DECIMAL(18,4)",
+    estado: "BOOLEAN", fuente: "TEXT", registrado_por: "TEXT"
   },
   CompanyInfo: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
@@ -423,7 +447,8 @@ const ENTITY_GROUPS = [
   { label: "Vacaciones", entities: ["VacationRequest", "VacationBalance"] },
   { label: "Planillas y Remuneración", entities: ["Payslip", "PayrollConcept", "LoanType", "Loan", "LoanInstallment", "PayrollConfig", "HistorialRemunerativo"] },
   { label: "Centros de Costo", entities: ["CostCenter", "CostCenterAssignment", "CostCenterChangeLog", "CostCenterCategory", "AccountingAccount"] },
-  { label: "Contabilidad", entities: ["AsientoContable", "CuentaContable", "Subdiario", "TipoAnexo"] },
+  { label: "Contabilidad", entities: ["AsientoContable", "CuentaContable", "Subdiario", "TipoAnexo", "StarsoftConfig"] },
+  { label: "Tipo de Cambio", entities: ["TipoCambioConfig", "TipoCambio"] },
   { label: "Datos Maestros", entities: ["Holiday", "Position", "Department", "Bank", "Site", "AFP", "Profession", "Ubigeo", "RMV", "UIT", "SeguroVidaLey", "AreaUnidadCargo", "IncidentType"] },
   { label: "Roles y Permisos", entities: ["Role"] },
   { label: "Certificados", entities: ["Certificate"] },
