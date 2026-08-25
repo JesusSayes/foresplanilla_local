@@ -1323,6 +1323,7 @@ model starsoft_config {
   created_by           String?   @db.VarChar(255)
   updated_by           String?   @db.VarChar(255)
   cuentas_por_planilla Json      @default("[]")
+  cuentas_por_concepto Json      @default("[]")
 
   @@index([is_active], map: "idx_starsoft_config_active")
 }
