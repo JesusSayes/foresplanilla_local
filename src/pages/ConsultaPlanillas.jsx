@@ -123,7 +123,7 @@ export default function ConsultaPlanillas() {
 
   const { data: subdiariosCatalog = [] } = useQuery({
     queryKey: ["subdiariosConsulta"],
-    queryFn: () => base44.entities.Subdiario.list("codigo"),
+    queryFn: () => entitiesAPI.Subdiario.list("codigo"),
   });
 
   // Devuelve el código de tipo de anexo según su descripción (TRABAJADORES, HONORARIOS, etc.)

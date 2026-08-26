@@ -65,7 +65,7 @@ export default function ConfiguracionStarsoft() {
   const { data: subdiariosCatalog = [] } = useQuery({
     queryKey: ["subdiariosStarsoft"],
     queryFn: async () => {
-      const all = await base44.entities.Subdiario.list("codigo");
+      const all = await entitiesAPI.Subdiario.list("codigo");
       return (all || []).filter((s) => (s.estado || "A") !== "I");
     },
   });
