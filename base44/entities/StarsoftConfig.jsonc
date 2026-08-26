@@ -106,6 +106,31 @@
         ]
       }
     },
+    "subdiarios_por_planilla": {
+      "type": "array",
+      "description": "Homologaci\u00f3n de subdiarios contables por tipo de planilla. Cada registro vincula un tipo de planilla (Quincenal, Mensual, Adicional, SNP, CTS, Gratificacion) con el c\u00f3digo de subdiario que se asignar\u00e1 al generar los asientos contables. Reemplaza los literales hardcodeados ('07'/'08') en la generaci\u00f3n de asientos. Debe existir exactamente un registro con is_default=true para usar como respaldo cuando un tipo de planilla no tenga entrada expl\u00edcita. Los c\u00f3digos se seleccionan desde la tabla Subdiario (Datos Maestros) y deben estar activos (estado='A').",
+      "items": {
+        "type": "object",
+        "properties": {
+          "payroll_type": {
+            "type": "string",
+            "description": "Tipo de planilla al que aplica el subdiario. Vac\u00edo cuando is_default=true."
+          },
+          "subdiario": {
+            "type": "string",
+            "description": "C\u00f3digo del subdiario contable (ref. Subdiario.codigo)"
+          },
+          "is_default": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si es true, este subdiario se usa como respaldo para tipos de planilla sin entrada expl\u00edcita."
+          }
+        },
+        "required": [
+          "subdiario"
+        ]
+      }
+    },
     "last_test_status": {
       "type": "string",
       "enum": [

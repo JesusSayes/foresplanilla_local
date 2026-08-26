@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CuentasPlanillaSection from "@/components/starsoft/CuentasPlanillaSection";
+import SubdiariosPlanillaSection from "@/components/starsoft/SubdiariosPlanillaSection";
 
 const PROD_DEFAULT = "003";
 const PRUEBA_DEFAULT = "001";
@@ -34,6 +35,9 @@ export default function ConfiguracionStarsoft() {
   // Homologación de cuentas por concepto PLAME (lista flexible).
   // Cada entrada: { codigo_plame, concepto, categoria, cuenta, debe_haber }
   const [cuentasPorConcepto, setCuentasPorConcepto] = useState([]);
+  // Homologación de subdiarios por tipo de planilla.
+  // Cada entrada: { payroll_type, subdiario, is_default }
+  const [subdiariosPorPlanilla, setSubdiariosPorPlanilla] = useState([]);
   const [showSecret, setShowSecret] = useState(false);
   const [configId, setConfigId] = useState(null);
   const [testing, setTesting] = useState(false);
@@ -56,6 +60,16 @@ export default function ConfiguracionStarsoft() {
     },
   });
 
+  // Catálogo de subdiarios (Datos Maestros) para configurar el subdiario por tipo de planilla.
+  // Se cargan todos los subdiarios activos (estado !== 'I').
+  const { data: subdiariosCatalog = [] } = useQuery({
+    queryKey: ["subdiariosStarsoft"],
+    queryFn: async () => {
+      const all = await base44.entities.Subdiario.list("codigo");
+      return (all || []).filter((s) => (s.estado || "A") !== "I");
+    },
+  });
+
   useEffect(() => {
     if (config && config.length > 0) {
       const c = config[0];
@@ -75,6 +89,9 @@ export default function ConfiguracionStarsoft() {
       if (Array.isArray(c.cuentas_por_concepto)) {
         setCuentasPorConcepto(c.cuentas_por_concepto.filter(e => e && e.codigo_plame && e.cuenta && e.debe_haber));
       }
+      if (Array.isArray(c.subdiarios_por_planilla)) {
+        setSubdiariosPorPlanilla(c.subdiarios_por_planilla.filter(e => e && e.subdiario));
+      }
       if (c.last_test_status) {
         setTestResult({
           status: c.last_test_status,
@@ -87,7 +104,7 @@ export default function ConfiguracionStarsoft() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = { ...form, is_active: true, cuentas_por_concepto: cuentasPorConcepto };
+      const payload = { ...form, is_active: true, cuentas_por_concepto: cuentasPorConcepto, subdiarios_por_planilla: subdiariosPorPlanilla };
       if (configId) {
         return entitiesAPI.StarsoftConfig.update(configId, payload);
       }
@@ -148,12 +165,15 @@ export default function ConfiguracionStarsoft() {
         </div>
 
         <Tabs defaultValue="general" className="mb-6">
-          <TabsList className="grid grid-cols-2 w-full max-w-md mb-4">
+          <TabsList className="grid grid-cols-3 w-full max-w-xl mb-4">
             <TabsTrigger value="general" className="gap-1.5">
               <Building2 className="w-3.5 h-3.5" /> Empresa y Conexión
             </TabsTrigger>
             <TabsTrigger value="cuentas" className="gap-1.5">
               <BookOpen className="w-3.5 h-3.5" /> Cuentas por Planilla
+            </TabsTrigger>
+            <TabsTrigger value="subdiarios" className="gap-1.5">
+              <BookOpen className="w-3.5 h-3.5" /> Subdiarios por Planilla
             </TabsTrigger>
           </TabsList>
           <TabsContent value="general">
@@ -432,6 +452,59 @@ export default function ConfiguracionStarsoft() {
                   >
                     {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                     Guardar Cuentas por Concepto
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+          </TabsContent>
+          <TabsContent value="subdiarios">
+        {/* Configuración de subdiarios por tipo de planilla */}
+        <Card className="border-0 shadow-lg">
+          <CardHeader className="border-b bg-slate-50/50">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-indigo-600" />
+              Subdiarios por Tipo de Planilla
+            </CardTitle>
+            <CardDescription>
+              Configure el código de subdiario contable que se asignará al generar los asientos para cada tipo de planilla.
+              Debe existir exactamente un registro marcado como <strong>Default</strong> para usar como respaldo cuando un tipo no tenga entrada explícita.
+              Los códigos se seleccionan desde la tabla Subdiarios (Datos Maestros).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 space-y-5">
+            {subdiariosCatalog.length === 0 ? (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-700">
+                  No hay subdiarios registrados. Registre subdiarios en Datos Maestros → Subdiarios para habilitar esta configuración.
+                </p>
+              </div>
+            ) : (
+              <>
+                <SubdiariosPlanillaSection
+                  value={subdiariosPorPlanilla}
+                  onChange={setSubdiariosPorPlanilla}
+                  subdiarios={subdiariosCatalog}
+                />
+                <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                  <p className="text-sm text-blue-700">
+                    Agregue un registro por cada tipo de planilla con su subdiario correspondiente (ej: SNP→11, Mensual→06).
+                    Marque un registro como <strong>Default</strong> para los tipos de planilla que no tengan entrada explícita.
+                    Al generar los asientos, el subdiario se resuelve por tipo de planilla con validación previa.
+                  </p>
+                </div>
+                <div className="flex justify-end pt-2">
+                  <Button
+                    onClick={() => saveMutation.mutate()}
+                    disabled={saveMutation.isPending}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                    Guardar Subdiarios
                   </Button>
                 </div>
               </>
