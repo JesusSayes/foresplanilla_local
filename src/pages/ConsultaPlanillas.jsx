@@ -116,6 +116,11 @@ export default function ConsultaPlanillas() {
     queryFn: () => base44.entities.TipoAnexo.list("codigo_tipo_anexo"),
   });
 
+  const { data: subdiariosCatalog = [] } = useQuery({
+    queryKey: ["subdiariosConsulta"],
+    queryFn: () => base44.entities.Subdiario.list("codigo"),
+  });
+
   // Devuelve el código de tipo de anexo según su descripción (TRABAJADORES, HONORARIOS, etc.)
   const getTipoAnexoCodigo = (descripcion) => {
     const found = tiposAnexo.find(
@@ -221,11 +226,13 @@ export default function ConsultaPlanillas() {
       // tiene código de empresa, se interrumpe la generación (no se asume "003").
       let codEmpresaActiva = null;
       let cuentasConcepto = [];
+      let subdiariosPorPlanilla = [];
       try {
         const configs = await base44.entities.StarsoftConfig.filter({ is_active: true });
         if (configs && configs.length > 0 && configs[0].cod_empresa) {
           codEmpresaActiva = String(configs[0].cod_empresa);
           cuentasConcepto = Array.isArray(configs[0].cuentas_por_concepto) ? configs[0].cuentas_por_concepto : [];
+          subdiariosPorPlanilla = Array.isArray(configs[0].subdiarios_por_planilla) ? configs[0].subdiarios_por_planilla : [];
         }
       } catch (e) {
         console.warn("No se pudo leer la configuración Starsoft", e);
@@ -240,6 +247,22 @@ export default function ConsultaPlanillas() {
         toast.error("No hay cuentas por concepto configuradas. Configure la homologación en Configuración Starsoft → Cuentas por Planilla antes de generar los asientos.");
         return;
       }
+
+      // Resolver el subdiario por tipo de planilla desde la homologación configurada.
+      // Prioriza la entrada explícita por payroll_type; si no existe, usa el registro is_default.
+      const subdiarioDefault = subdiariosPorPlanilla.find(s => s && s.is_default && s.subdiario) || null;
+      const subdiarioEntry = subdiariosPorPlanilla.find(s => s && !s.is_default && String(s.payroll_type) === String(payrollType) && s.subdiario) || subdiarioDefault;
+      if (!subdiarioEntry || !subdiarioEntry.subdiario) {
+        toast.error(`No hay subdiario configurado para el tipo de planilla "${payrollType}". Configure la homologación en Configuración Starsoft → Subdiarios por Planilla antes de generar los asientos.`);
+        return;
+      }
+      // Validar que el código exista y esté activo en el catálogo Subdiario.
+      const subdiarioCatalogo = subdiariosCatalog.find(s => String(s.codigo) === String(subdiarioEntry.subdiario) && (s.estado || "A") !== "I");
+      if (!subdiarioCatalogo) {
+        toast.error(`El subdiario "${subdiarioEntry.subdiario}" configurado para "${payrollType}" no existe o está inactivo en el catálogo de Subdiarios (Datos Maestros). Regístrelo o actívelo y reintente.`);
+        return;
+      }
+      const subdiarioCodigo = String(subdiarioEntry.subdiario);
 
       // Índices de resolución de la homologación: por código PLAME y por nombre (normalizado).
       const normStr = (s) => String(s || "").toLowerCase().trim();
@@ -300,7 +323,7 @@ export default function ConsultaPlanillas() {
         const empName = `${emp.first_name} ${emp.last_name}`;
         const base = {
           annomes,
-          subdiario: isSNP ? "07" : "08",
+          subdiario: subdiarioCodigo,
           comprobante,
           fecha_doc: fechaDoc,
           fecha_registro: fechaRegistro,
