@@ -79,6 +79,7 @@ import starsoftConfigRoutes from './routes/starsoftConfig.js';
 import tipoCambioRoutes from './routes/tipoCambio.js';
 import tipoCambioConfigRoutes from './routes/tipoCambioConfig.js';
 import { notifyExpiringContracts } from './services/contractNotificationService.js';
+import { obtenerTipoCambioDiario } from './services/tipoCambioService.js';
 
 dotenv.config();
 
@@ -229,6 +230,15 @@ cron.schedule('0 0 * * *', () => {
     .then(result => console.log(`[Cron] Empleados actualizados a Cesado: ${result.updated}`))
     .then(() => generarAsistenciaDiaria({ mode: 'cron' }))
     .catch(err => console.error('[Cron] Error en generación diaria de asistencia:', err.message));
+}, { timezone: CRON_TIMEZONE });
+
+// Cron: obtener el tipo de cambio una vez al día a las 05:00 a. m.
+// El servicio no consulta el API externo cuando el registro del día ya existe.
+cron.schedule('0 5 * * *', () => {
+  console.log('[Cron] Obteniendo tipo de cambio diario...');
+  obtenerTipoCambioDiario()
+    .then(result => console.log(`[Cron] Tipo de cambio: ${result.message}`))
+    .catch(err => console.error('[Cron] Error obteniendo tipo de cambio:', err.message));
 }, { timezone: CRON_TIMEZONE });
 
 // Cron: sincronización de asistencias externas cada hora en minuto 15
