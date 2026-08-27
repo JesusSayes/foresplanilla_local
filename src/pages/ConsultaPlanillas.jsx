@@ -128,7 +128,7 @@ export default function ConsultaPlanillas() {
 
   const { data: tiposCambio = [] } = useQuery({
     queryKey: ["tiposCambioConsulta"],
-    queryFn: () => base44.entities.TipoCambio.list("-fecha", 500),
+    queryFn: () => entitiesAPI.TipoCambio.list("-fecha"),
   });
 
   // Devuelve el código de tipo de anexo según su descripción (TRABAJADORES, HONORARIOS, etc.)
