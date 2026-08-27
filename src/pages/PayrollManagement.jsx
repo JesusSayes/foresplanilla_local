@@ -767,10 +767,9 @@ export default function PayrollManagement() {
             is_recurring: true,
             applies_to_payroll_types: ["Quincenal"],
           },
-          // Incluir solo conceptos de ingreso fijos NO quincenales específicos (actividad, alimento, movilidad)
-          ...employeeFixedConcepts.filter(c => c.applies_to_payroll_types?.includes("Quincenal") && !c.is_dynamic),
-          // Incluir conceptos adicionales manuales del empleado para quincenal (no dinámicos)
-          ...additionalConcepts.filter(c => c.employee_id === emp.id && !c.is_dynamic && c.applies_to_payroll_types?.includes("Quincenal")),
+          // La planilla quincenal es únicamente el adelanto de sueldo.
+          // Costo Actividad, Costo Alimento y Costo Movilidad se pagan en la
+          // planilla mensual, no en la quincenal.
         ];
       } else {
         // Para planillas no quincenales: usar todos los conceptos normales
