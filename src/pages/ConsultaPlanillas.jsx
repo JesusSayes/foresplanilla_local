@@ -475,9 +475,12 @@ export default function ConsultaPlanillas() {
         });
 
         // ── Respaldo de movilidad (ingreso) si no se generó desde el breakdown ─
+        // El chequeo usa generatedNames (nombres completos del breakdown) y no la
+        // glosa_mov, porque esta última se trunca a 40 chars y "movilidad" puede
+        // quedar cortado, lo que causaba una línea duplicada de movilidad.
         const movilidadAmt = safePayrollNumber(p.transport_cost_amount);
         if (movilidadAmt > 0) {
-          const yaGenerada = personLines.some(a => normStr(a.glosa_mov || "").includes("movilidad"));
+          const yaGenerada = [...generatedNames].some(n => n.includes("movilidad"));
           if (!yaGenerada) {
             const homMov =
               (homByName[normStr("Movilidad")] || [])[0] ||
