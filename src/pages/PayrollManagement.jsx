@@ -2355,6 +2355,30 @@ export default function PayrollManagement() {
                                   </div>
                                 </div>
 
+                                {isSelected && (
+                                  <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg flex items-center justify-between gap-3">
+                                    <p className="text-sm font-semibold text-red-800">
+                                      ⚠️ ¿Eliminar esta planilla? ({allGroupPayslips.length} boleta(s))
+                                    </p>
+                                    <div className="flex gap-2 shrink-0">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setSelectedPayrollToDelete(null)}
+                                      >
+                                        Cancelar
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        className="bg-red-600 hover:bg-red-700"
+                                        onClick={handleDeletePayroll}
+                                      >
+                                        Confirmar Eliminación
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+
                                 <div className="space-y-2">
                                   {allGroupPayslips.slice(0, 5).map(p => {
                                     const emp = allEmployees.find(e => e.id === p.employee_id);
@@ -2383,36 +2407,6 @@ export default function PayrollManagement() {
                     );
                   })()}
 
-                  {selectedPayrollToDelete && (
-                    <div className="mt-6 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-bold text-red-900 mb-1">
-                            ⚠️ Planilla seleccionada para eliminar
-                          </p>
-                          <p className="text-sm text-red-700">
-                            {format(new Date(selectedPayrollToDelete.year, selectedPayrollToDelete.month - 1), 'MMMM yyyy', { locale: es })} - {selectedPayrollToDelete.type}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelectedPayrollToDelete(null)}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-red-600 hover:bg-red-700"
-                            onClick={handleDeletePayroll}
-                          >
-                            Confirmar Eliminación
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             </TabsContent>
