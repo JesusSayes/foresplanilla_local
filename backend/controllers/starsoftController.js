@@ -307,6 +307,11 @@ export const migrate = async (req, res, next) => {
         },
         body: JSON.stringify(payload),
       });
+      console.log('[Starsoft] Payload enviado:', JSON.stringify({
+        destination: config.api_url,
+        asiento_ids: asientoIds,
+        payload,
+      }, null, 2));
     } catch (error) {
       const message = `Error de red: ${error.message}`;
       await markAsError(asientoIds, message);
