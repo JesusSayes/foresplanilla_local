@@ -80,6 +80,29 @@ const todayISO = () => new Date().toISOString().split('T')[0];
 
 const sanitizeAnnomes = (value) => String(value || '').replace(/\D/g, '');
 
+export const buildStarsoftPayload = (asientos) => asientos.map(asiento => ({
+  cuenta: asiento.cuenta || '',
+  annomes: sanitizeAnnomes(asiento.annomes),
+  subdiario: asiento.subdiario || '',
+  comprobante: asiento.comprobante || '',
+  fecha_Registro: toISODate(asiento.fecha_registro) || toISODate(asiento.fecha_doc) || todayISO(),
+  fecha_Documento: toISODate(asiento.fecha_doc) || toISODate(asiento.fecha_registro) || todayISO(),
+  tipo_Anexo: asiento.tipo_anexo || '',
+  cod_Anexo: asiento.cod_anexo || '',
+  tipo_Doc: asiento.tipo_doc || '',
+  nro_Doc: asiento.nro_doc || '',
+  fecha_Vencimiento: asiento.fecha_vencimiento ? toISODate(asiento.fecha_vencimiento) : null,
+  importe: asiento.importe ?? 0,
+  conv_Tc: asiento.conversion_tc || 'M',
+  tc: asiento.tc ?? 1,
+  glosa: asiento.glosa || '',
+  glosa_Mov: asiento.glosa_mov || '',
+  anulado: !!asiento.anulado,
+  debe_Haber: asiento.debe_haber || '',
+  centro_Costos: asiento.centro_costos || '',
+  moneda: asiento.moneda === 'USD' ? 'ME' : asiento.moneda === 'PEN' ? 'MN' : (asiento.moneda || ''),
+}));
+
 const getStarsoftErrorMessage = (data, status) => {
   let message = data?.message || data?.error || data?.mensaje || data?.detail || data?.details || '';
   if (!message && data?.datos && !Array.isArray(data.datos) && typeof data.datos === 'object') {
@@ -203,6 +226,27 @@ export const migrate = async (req, res, next) => {
     if (!config) {
       return res.status(400).json({ error: 'No existe una configuración de Starsoft activa.' });
     }
+
+    if (mode === 'preview') {
+      if (asientoIds.length === 0) {
+        return res.status(400).json({ error: 'No se enviaron asientos para generar la vista previa.' });
+      }
+
+      const asientos = await prisma.$queryRaw`
+        SELECT * FROM asiento_contable
+        WHERE id IN (${Prisma.join(asientoIds)})
+      `;
+      const payload = buildStarsoftPayload(asientos);
+
+      return res.json({
+        success: true,
+        preview: true,
+        total: payload.length,
+        destination: config.api_url || null,
+        payload,
+      });
+    }
+
     if (!config.auth_url || !config.api_url) {
       return res.status(400).json({ error: 'Las URLs de autenticación y envío de Starsoft no están configuradas.' });
     }
@@ -250,28 +294,7 @@ export const migrate = async (req, res, next) => {
       SELECT * FROM asiento_contable
       WHERE id IN (${Prisma.join(asientoIds)})
     `;
-    const payload = asientos.map(asiento => ({
-      cuenta: asiento.cuenta || '',
-      annomes: sanitizeAnnomes(asiento.annomes),
-      subdiario: asiento.subdiario || '',
-      comprobante: asiento.comprobante || '',
-      fecha_Registro: toISODate(asiento.fecha_registro) || toISODate(asiento.fecha_doc) || todayISO(),
-      fecha_Documento: toISODate(asiento.fecha_doc) || toISODate(asiento.fecha_registro) || todayISO(),
-      tipo_Anexo: asiento.tipo_anexo || '',
-      cod_Anexo: asiento.cod_anexo || '',
-      tipo_Doc: asiento.tipo_doc || '',
-      nro_Doc: asiento.nro_doc || '',
-      fecha_Vencimiento: asiento.fecha_vencimiento ? toISODate(asiento.fecha_vencimiento) : null,
-      importe: asiento.importe ?? 0,
-      conv_Tc: asiento.conversion_tc || 'M',
-      tc: asiento.tc ?? 1,
-      glosa: asiento.glosa || '',
-      glosa_Mov: asiento.glosa_mov || '',
-      anulado: !!asiento.anulado,
-      debe_Haber: asiento.debe_haber || '',
-      centro_Costos: asiento.centro_costos || '',
-      moneda: asiento.moneda === 'USD' ? 'ME' : asiento.moneda === 'PEN' ? 'MN' : (asiento.moneda || ''),
-    }));
+    const payload = buildStarsoftPayload(asientos);
 
     let sendResponse;
     try {
