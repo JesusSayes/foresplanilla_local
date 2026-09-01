@@ -334,14 +334,12 @@ export default function ConsultaPlanillas() {
         return;
       }
 
-      // Eliminar asientos anteriores de esta planilla para actualizar
+      // Identificar asientos anteriores de esta planilla para reemplazarlos
+      // solo después de persistir correctamente las nuevas líneas.
       const existing = allAsientos.filter(
         a => a.payroll_period === period && a.payroll_type === payrollType &&
           (a.origen === "Planilla" || (isSNP && a.origen === "Otro"))
       );
-      for (const a of existing) {
-        await entitiesAPI.AsientoContable.delete(a.id);
-      }
 
       const asientosToCreate = [];
 
@@ -516,7 +514,15 @@ export default function ConsultaPlanillas() {
         asientosToCreate.push(...personLines);
       }
 
+      if (asientosToCreate.length === 0) {
+        toast.error("No se generaron líneas contables. Revise los empleados, el desglose de las boletas y la homologación de conceptos.");
+        return;
+      }
+
       await entitiesAPI.AsientoContable.bulkCreate(asientosToCreate);
+      for (const a of existing) {
+        await entitiesAPI.AsientoContable.delete(a.id);
+      }
       queryClient.invalidateQueries(["asientosContablesConsulta"]);
       const label = existing.length > 0 ? "Asientos actualizados" : "Asientos generados";
       let msg = `${label}: ${asientosToCreate.length} líneas${isSNP ? ` (${grupo.payslips.length} Recibos de Honorarios)` : ""}`;
