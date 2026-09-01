@@ -258,10 +258,10 @@ export class PayrollCalculator {
       const amount = base * 0.13;
       const rounded = Math.round(amount * 100) / 100;
       return {
-        items: [{ name: "ONP", code: "0602", amount: rounded, detail: `ONP 13% de S/${base.toFixed(2)}` }],
+        items: [{ name: "ONP", code: "0607", amount: rounded, detail: `ONP 13% de S/${base.toFixed(2)}` }],
         totalAmount: rounded,
         name: "ONP",
-        code: "0602",
+        code: "0607",
         detail: `ONP 13% de S/${base.toFixed(2)}`,
       };
     }
@@ -283,7 +283,7 @@ export class PayrollCalculator {
       const aporteAmount = round2(base * (obligatory / 100));
       items.push({
         name: `Aporte Obligatorio AFP ${afp.name}`,
-        code: "0601",
+        code: "0608",
         amount: aporteAmount,
         detail: `Aporte obligatorio ${obligatory}% de S/${base.toFixed(2)}`,
       });
@@ -292,7 +292,7 @@ export class PayrollCalculator {
         const seguroAmount = round2(base * (insurance / 100));
         items.push({
           name: `Prima de Seguro AFP ${afp.name}`,
-          code: "0601",
+          code: "0606",
           amount: seguroAmount,
           detail: `Prima de seguro ${insurance}% de S/${base.toFixed(2)}`,
         });
@@ -318,7 +318,7 @@ export class PayrollCalculator {
         items,
         totalAmount,
         name: `AFP ${afp.name}`,
-        code: "0601",
+        code: items.length === 1 ? items[0].code : "",
         detail: `AFP ${afp.name}: ${parts}`,
       };
     }
