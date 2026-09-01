@@ -410,9 +410,54 @@ export default function ConsultaPlanillas() {
           });
         };
 
+        // Registro de conceptos ya generados desde el breakdown (para evitar duplicados
+        // al inyectar descuentos planos y el respaldo de movilidad desde campos del payslip).
+        const generatedNames = new Set();
+        (cs.breakdown.incomes?.items || []).forEach(i => i.name && generatedNames.add(normStr(i.name)));
+        (cs.breakdown.deductions?.items || []).forEach(i => i.name && generatedNames.add(normStr(i.name)));
+
         processItems(cs.breakdown.incomes?.items, "Ingreso");
         processItems(cs.breakdown.deductions?.items, "Descuento");
         processItems(cs.breakdown.contributions?.items, "Aportación");
+
+        // ── Descuentos planos del payslip (no viven en el breakdown) ──────────
+        // Adelanto quincenal, tardanzas e inasistencias se almacenan como campos
+        // del payslip; se inyectan como líneas HABER resolviendo cuenta por nombre.
+        const flatDiscounts = [
+          { field: "advance_deduction",   label: "Adelanto Quincenal",          glosa: "ADELANTO QUINCENAL" },
+          { field: "tardiness_discount",  label: "Descuento por Tardanzas",     glosa: "DESC. POR TARDANZAS" },
+          { field: "absence_discount",    label: "Descuento por Inasistencias", glosa: "DESC. POR INASISTENCIAS" },
+        ];
+        flatDiscounts.forEach(({ field, label, glosa }) => {
+          const amt = safePayrollNumber(p[field]);
+          if (amt <= 0) return;
+          if (generatedNames.has(normStr(label))) return; // ya vino en el breakdown
+          const hom = homByName[normStr(label)];
+          if (!hom) {
+            missingConcepts.push({ employee: empName, code: "—", name: label });
+            return;
+          }
+          pushLine(base, hom.cuenta, amt, hom.debe_haber, `${empName} - ${glosa}`);
+        });
+
+        // ── Respaldo de movilidad (ingreso) si no se generó desde el breakdown ─
+        const movilidadAmt = safePayrollNumber(p.transport_cost_amount);
+        if (movilidadAmt > 0) {
+          const yaGenerada = asientosToCreate.some(
+            a => a.payslip_id === p.id && normStr(a.glosa_mov || "").includes("movilidad")
+          );
+          if (!yaGenerada) {
+            const homMov =
+              homByName[normStr("Movilidad")] ||
+              homByName[normStr("Bonificación por Movilidad")] ||
+              homByName[normStr("Bonificacion por Movilidad")];
+            if (homMov) {
+              pushLine(base, homMov.cuenta, movilidadAmt, homMov.debe_haber, `${empName} - MOVILIDAD`);
+            } else {
+              missingConcepts.push({ employee: empName, code: "—", name: "Movilidad" });
+            }
+          }
+        }
 
         // Neto a pagar → HABER con la cuenta de categoría "Neto"
         if (netoConfig) {
