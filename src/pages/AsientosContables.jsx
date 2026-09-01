@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +48,7 @@ export default function AsientosContables() {
   const [filterDH, setFilterDH] = useState("all");
   const [filterAnulado, setFilterAnulado] = useState("all");
   const [filterTipoPlanilla, setFilterTipoPlanilla] = useState("all");
+  const [filterCuadre, setFilterCuadre] = useState("all"); // all | cuadrado | descuadrado
 
   // Detail modal
   const [selectedAsiento, setSelectedAsiento] = useState(null);
@@ -111,7 +112,7 @@ export default function AsientosContables() {
       a.cod_anexo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.nro_doc?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       empName.includes(searchTerm.toLowerCase());
-    const matchPeriodo = !filterPeriodo || a.annomes?.startsWith(filterPeriodo.replace("-", ""));
+    const matchPeriodo = !filterPeriodo || a.annomes === filterPeriodo;
     const matchSubdiario = filterSubdiario === "all" || a.subdiario === filterSubdiario;
     const matchOrigen = filterOrigen === "all" || a.origen === filterOrigen;
     const matchMigracion = filterMigracion === "all" || a.estado_migracion === filterMigracion;
@@ -121,15 +122,60 @@ export default function AsientosContables() {
     return matchSearch && matchPeriodo && matchSubdiario && matchOrigen && matchMigracion && matchDH && matchAnulado && matchTipoPlanilla;
   });
 
+  // ── Cálculo de cuadre por trabajador (Debe = Haber) ──────────────────────
+  // Agrupa asientos por (empleado + periodo + tipo planilla + comprobante) y
+  // suma Debe/Haber. Un grupo "descuadrado" tiene |Debe - Haber| > 0.01.
+  const gruposCuadre = useMemo(() => {
+    const map = new Map();
+    for (const a of asientos) {
+      if (a.anulado) continue;
+      const key = `${a.employee_id || ""}|${a.payroll_period || ""}|${a.payroll_type || ""}|${a.comprobante || ""}`;
+      if (!map.has(key)) map.set(key, { key, employee_id: a.employee_id, payroll_period: a.payroll_period, payroll_type: a.payroll_type, comprobante: a.comprobante, annomes: a.annomes, debe: 0, haber: 0, count: 0 });
+      const g = map.get(key);
+      const imp = Number(a.importe) || 0;
+      if (a.debe_haber === "D") g.debe += imp; else g.haber += imp;
+      g.count += 1;
+    }
+    return Array.from(map.values()).map(g => ({ ...g, debe: Math.round(g.debe * 100) / 100, haber: Math.round(g.haber * 100) / 100, diferencia: Math.round((g.debe - g.haber) * 100) / 100, cuadrado: Math.abs(g.debe - g.haber) <= 0.01 }));
+  }, [asientos]);
+
+  // Set de claves de grupos descuadrados, para filtrar asientos
+  const descuadradosKeys = useMemo(() => {
+    const s = new Set();
+    for (const g of gruposCuadre) if (!g.cuadrado) s.add(g.key);
+    return s;
+  }, [gruposCuadre]);
+
+  const asientoKey = (a) => `${a.employee_id || ""}|${a.payroll_period || ""}|${a.payroll_type || ""}|${a.comprobante || ""}`;
+
+  // Aplicar filtro de cuadre sobre el resultado filtrado
+  const filteredFinal = filterCuadre === "all" ? filtered : filteredFinal.filter(a => {
+    const isDescuadrado = descuadradosKeys.has(asientoKey(a));
+    return filterCuadre === "descuadrado" ? isDescuadrado : !isDescuadrado;
+  });
+
+  // Lista de trabajadores descuadrados (para el banner de alerta)
+  const descuadradosResumen = useMemo(() => gruposCuadre.filter(g => !g.cuadrado).map(g => {
+    const emp = employees.find(e => e.id === g.employee_id);
+    return { ...g, employee_name: emp ? `${emp.first_name} ${emp.last_name}` : "—" };
+  }), [gruposCuadre, employees]);
+
+  // Periodos existentes (annomes) ordenados descendentemente
+  const periodosExistentes = useMemo(() => {
+    const set = new Set(asientos.map(a => a.annomes).filter(Boolean));
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [asientos]);
+
   // Estadísticas
   const stats = {
-    total: filtered.length,
-    pendientes: filtered.filter(a => a.estado_migracion === "Pendiente").length,
-    migrados: filtered.filter(a => a.estado_migracion === "Migrado").length,
-    errores: filtered.filter(a => a.estado_migracion === "Error").length,
-    excluidos: filtered.filter(a => a.estado_migracion === "Excluido").length,
-    totalDebe: filtered.filter(a => a.debe_haber === "D" && !a.anulado).reduce((s, a) => s + (Number(a.importe) || 0), 0),
-    totalHaber: filtered.filter(a => a.debe_haber === "H" && !a.anulado).reduce((s, a) => s + (Number(a.importe) || 0), 0),
+    total: filteredFinal.length,
+    pendientes: filteredFinal.filter(a => a.estado_migracion === "Pendiente").length,
+    migrados: filteredFinal.filter(a => a.estado_migracion === "Migrado").length,
+    errores: filteredFinal.filter(a => a.estado_migracion === "Error").length,
+    excluidos: filteredFinal.filter(a => a.estado_migracion === "Excluido").length,
+    totalDebe: filteredFinal.filter(a => a.debe_haber === "D" && !a.anulado).reduce((s, a) => s + (Number(a.importe) || 0), 0),
+    totalHaber: filteredFinal.filter(a => a.debe_haber === "H" && !a.anulado).reduce((s, a) => s + (Number(a.importe) || 0), 0),
+    descuadrados: filteredFinal.filter(a => !a.anulado && descuadradosKeys.has(asientoKey(a))).length,
   };
 
   // Combinar catálogo de subdiarios con los que aparecen en asientos (por si hay sin catálogo aún)
@@ -190,7 +236,7 @@ export default function AsientosContables() {
   };
 
   const handleMigrarStarsoft = async () => {
-    const pendientes = filtered.filter(a => a.estado_migracion === "Pendiente" && !a.anulado);
+    const pendientes = filteredFinal.filter(a => a.estado_migracion === "Pendiente" && !a.anulado);
     if (pendientes.length === 0) {
       toast.info("No hay asientos pendientes para migrar en la selección actual");
       return;
@@ -286,7 +332,7 @@ export default function AsientosContables() {
   // Reiniciar masivamente los asientos con estado "Error" a "Pendiente" para
   // permitir reintentar la migración sobre el lote que falló.
   const handleReiniciarErrores = async () => {
-    const errores = filtered.filter(a => a.estado_migracion === "Error");
+    const errores = filteredFinal.filter(a => a.estado_migracion === "Error");
     if (errores.length === 0) { toast.info("No hay asientos con error en la selección actual"); return; }
     if (!confirm(`¿Reiniciar ${errores.length} asiento(s) con error a estado "Pendiente"?`)) return;
     setReinciandoErrores(true);
@@ -312,7 +358,7 @@ export default function AsientosContables() {
   // Exporta con la cadena de conexión exacta que requiere el sistema contable externo
   const handleExportExcel = () => {
     // Hoja 1: Cadena de conexión del sistema contable (campos exactos requeridos)
-    const dataConexion = filtered.map(a => ({
+    const dataConexion = filteredFinal.map(a => ({
       "empresa":          a.empresa || "003",
       "cuenta":           a.cuenta || "",
       "annomes":          a.annomes || "",
@@ -337,7 +383,7 @@ export default function AsientosContables() {
     }));
 
     // Hoja 2: Detalle interno con información adicional
-    const dataDetalle = filtered.map(a => {
+    const dataDetalle = filteredFinal.map(a => {
       const emp = employees.find(e => e.id === a.employee_id);
       return {
         "Período":          a.annomes,
@@ -460,13 +506,15 @@ export default function AsientosContables() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <Input placeholder="Buscar cuenta, comprobante, glosa, empleado..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9" />
               </div>
-              <Input
-                type="month"
-                value={filterPeriodo}
-                onChange={e => setFilterPeriodo(e.target.value)}
-                className="w-40"
-                title="Filtrar por período"
-              />
+              <Select value={filterPeriodo} onValueChange={setFilterPeriodo}>
+                <SelectTrigger className="w-44"><SelectValue placeholder="Todos los períodos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={null}>Todos los períodos</SelectItem>
+                  {periodosExistentes.map(p => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={filterSubdiario} onValueChange={setFilterSubdiario}>
                 <SelectTrigger className="w-48"><SelectValue placeholder="Subdiario" /></SelectTrigger>
                 <SelectContent>
@@ -528,16 +576,69 @@ export default function AsientosContables() {
                   <SelectItem value="si">Anulados</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={filterCuadre} onValueChange={setFilterCuadre}>
+                <SelectTrigger className="w-40"><SelectValue placeholder="Cuadre" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos (cuadre)</SelectItem>
+                  <SelectItem value="cuadrado">Cuadrados</SelectItem>
+                  <SelectItem value="descuadrado">Descuadrados</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
+
+        {/* Banner de alerta de trabajadores descuadrados */}
+        {descuadradosResumen.length > 0 && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-red-800">
+                  {descuadradosResumen.length} trabajador(es) con asiento descuadrado (Debe ≠ Haber)
+                </h3>
+                <p className="text-xs text-red-600 mt-0.5">
+                  Regenera el asiento desde Consulta de Planillas tras completar la homologación de los conceptos faltantes (cada aporte del empleador necesita entrada DEBE y HABER con el mismo código PLAME).
+                </p>
+                <div className="mt-3 max-h-48 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0">
+                      <tr className="text-left text-red-700 bg-red-100/80 border-b border-red-200">
+                        <th className="py-1.5 px-2 font-semibold">Trabajador</th>
+                        <th className="py-1.5 px-2 font-semibold">Período</th>
+                        <th className="py-1.5 px-2 font-semibold">Tipo</th>
+                        <th className="py-1.5 px-2 font-semibold">Comprobante</th>
+                        <th className="py-1.5 px-2 font-semibold text-right">Debe</th>
+                        <th className="py-1.5 px-2 font-semibold text-right">Haber</th>
+                        <th className="py-1.5 px-2 font-semibold text-right">Diferencia</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {descuadradosResumen.map(g => (
+                        <tr key={g.key} className="border-b border-red-100">
+                          <td className="py-1.5 px-2 text-red-900 font-medium">{g.employee_name}</td>
+                          <td className="py-1.5 px-2 text-red-700 font-mono">{g.payroll_period || g.annomes}</td>
+                          <td className="py-1.5 px-2 text-red-700">{g.payroll_type || "—"}</td>
+                          <td className="py-1.5 px-2 text-red-700 font-mono">{g.comprobante || "—"}</td>
+                          <td className="py-1.5 px-2 text-right text-red-700">{g.debe.toFixed(2)}</td>
+                          <td className="py-1.5 px-2 text-right text-red-700">{g.haber.toFixed(2)}</td>
+                          <td className="py-1.5 px-2 text-right text-red-900 font-bold">{g.diferencia > 0 ? "+" : ""}{g.diferencia.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tabla de asientos */}
         <Card className="border-0 shadow-lg">
           <CardHeader className="border-b bg-slate-50/50 py-4">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Filter className="w-4 h-4 text-slate-500" />
-              {filtered.length} asiento(s) encontrado(s)
+              {filteredFinal.length} asiento(s) encontrado(s)
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -545,7 +646,7 @@ export default function AsientosContables() {
               <div className="flex items-center justify-center py-16">
                 <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
               </div>
-            ) : filtered.length === 0 ? (
+            ) : filteredFinal.length === 0 ? (
               <div className="text-center py-16">
                 <BookOpen className="w-16 h-16 text-slate-200 mx-auto mb-4" />
                 <p className="text-slate-500">No se encontraron asientos con los filtros aplicados</p>
@@ -561,7 +662,7 @@ export default function AsientosContables() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filtered.map(asiento => {
+                    {filteredFinal.map(asiento => {
                      const emp = employees.find(e => e.id === asiento.employee_id);
                      const cuentaInfo = cuentas.find(c => c.cuenta === asiento.cuenta);
                      const estConfig = ESTADO_CONFIG[asiento.estado_migracion] || ESTADO_CONFIG.Pendiente;

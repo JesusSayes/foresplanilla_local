@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   FileText, Users, DollarSign, Eye, Printer, ChevronRight,
   CheckCircle, Search, Calendar, ArrowLeft, Settings, PenTool,
-  Loader2, Download, BookOpen, RefreshCw
+  Loader2, Download, BookOpen, RefreshCw, AlertCircle, X
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -608,6 +608,54 @@ export default function ConsultaPlanillas() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
+          {/* Banner de alerta de descuadres por trabajador */}
+          {balanceAlert && balanceAlert.period === selectedGroup.period && balanceAlert.payrollType === selectedGroup.payroll_type && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-red-800">
+                    {balanceAlert.issues.length} trabajador(es) con asiento descuadrado (Debe ≠ Haber)
+                  </h3>
+                  <p className="text-xs text-red-600 mt-0.5">
+                    Cada concepto del desglose debe estar homologado con su lado (D/H). En particular, cada aporte del empleador necesita una entrada DEBE (gasto 62x) y una HABER (pasivo 40x) con el mismo código PLAME en Configuración Starsoft → Cuentas por Planilla.
+                  </p>
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-left text-red-700 border-b border-red-200">
+                          <th className="py-1.5 pr-3 font-semibold">Trabajador</th>
+                          <th className="py-1.5 pr-3 font-semibold">Documento</th>
+                          <th className="py-1.5 pr-3 font-semibold text-right">Debe</th>
+                          <th className="py-1.5 pr-3 font-semibold text-right">Haber</th>
+                          <th className="py-1.5 pr-3 font-semibold text-right">Diferencia</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {balanceAlert.issues.map((it, idx) => (
+                          <tr key={idx} className="border-b border-red-100">
+                            <td className="py-1.5 pr-3 text-red-900 font-medium">{it.employee}</td>
+                            <td className="py-1.5 pr-3 text-red-700 font-mono">{it.document_number}</td>
+                            <td className="py-1.5 pr-3 text-right text-red-700">{it.debe.toFixed(2)}</td>
+                            <td className="py-1.5 pr-3 text-right text-red-700">{it.haber.toFixed(2)}</td>
+                            <td className="py-1.5 pr-3 text-right text-red-900 font-bold">{it.diferencia > 0 ? "+" : ""}{it.diferencia.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setBalanceAlert(null)}
+                  className="text-red-400 hover:text-red-600 shrink-0"
+                  title="Cerrar alerta"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Header detalle */}
           <div className="flex items-start justify-between mb-8">
             <div className="flex items-start gap-4">
