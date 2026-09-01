@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Search, Download, Upload, RefreshCw, CheckCircle, XCircle,
+  Search, Download, RefreshCw, CheckCircle, XCircle,
   AlertCircle, Clock, BookOpen, Filter, Eye, Loader2, Send
 } from "lucide-react";
 import { format } from "date-fns";
@@ -17,7 +17,6 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
-import { usePermissions } from "../components/hooks/usePermissions";
 
 const ESTADO_CONFIG = {
   Pendiente: { color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: Clock },
@@ -39,7 +38,6 @@ const ORIGEN_COLORS = {
 
 export default function AsientosContables() {
   const queryClient = useQueryClient();
-  const { hasPermission } = usePermissions();
   const { user: currentUser } = useAuth();
   const employee = currentUser?.employee || null;
 
@@ -57,6 +55,7 @@ export default function AsientosContables() {
   const [selectedAsiento, setSelectedAsiento] = useState(null);
   const [migratingIds, setMigratingIds] = useState(new Set());
   const [migrandoStarsoft, setMigrandoStarsoft] = useState(false);
+  const [reinciandoErrores, setReinciandoErrores] = useState(false);
   const [modalMigracion, setModalMigracion] = useState(null);
   const [progresoMigracion, setProgresoMigracion] = useState({ logs: [], total: 0, procesados: 0 });
 
@@ -286,22 +285,30 @@ export default function AsientosContables() {
     setMigrandoStarsoft(false);
   };
 
-  const handleMarcarMigradoLote = async () => {
-    const pendientes = filtered.filter(a => a.estado_migracion === "Pendiente");
-    if (pendientes.length === 0) { toast.info("No hay asientos pendientes en la selección actual"); return; }
-    if (!confirm(`¿Marcar ${pendientes.length} asientos como MIGRADOS?`)) return;
-    for (const a of pendientes) {
-      await updateMutation.mutateAsync({
-        id: a.id,
-        data: {
-          estado_migracion: "Migrado",
-          migrado: true,
-          fecha_migracion: new Date().toISOString(),
-          migrado_por: currentUser?.email || "",
-        }
-      });
+  // Reiniciar masivamente los asientos con estado "Error" a "Pendiente" para
+  // permitir reintentar la migración sobre el lote que falló.
+  const handleReiniciarErrores = async () => {
+    const errores = filtered.filter(a => a.estado_migracion === "Error");
+    if (errores.length === 0) { toast.info("No hay asientos con error en la selección actual"); return; }
+    if (!confirm(`¿Reiniciar ${errores.length} asiento(s) con error a estado "Pendiente"?`)) return;
+    setReinciandoErrores(true);
+    try {
+      for (const a of errores) {
+        await updateMutation.mutateAsync({
+          id: a.id,
+          data: {
+            estado_migracion: "Pendiente",
+            migrado: false,
+            error_migracion: "",
+            fecha_migracion: null,
+            migrado_por: "",
+          }
+        });
+      }
+      toast.success(`${errores.length} asiento(s) reiniciado(s) a Pendiente`);
+    } finally {
+      setReinciandoErrores(false);
     }
-    toast.success(`${pendientes.length} asientos marcados como migrados`);
   };
 
   // Exporta con la cadena de conexión exacta que requiere el sistema contable externo
@@ -404,20 +411,21 @@ export default function AsientosContables() {
             </Button>
             <Button
               variant="outline"
-              onClick={handleMarcarMigradoLote}
+              onClick={handleReiniciarErrores}
+              disabled={reinciandoErrores}
+              title="Reiniciar asientos con error a estado Pendiente"
             >
-              <Upload className="w-4 h-4 mr-2" />Marcar Migrados (lote)
+              {reinciandoErrores ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              Reiniciar Errores
             </Button>
-            {hasPermission("accounting.manage") && (
-              <Button
-                className="bg-indigo-600 hover:bg-indigo-700"
-                onClick={handleMigrarStarsoft}
-                disabled={migrandoStarsoft}
-              >
-                {migrandoStarsoft ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-                Migrar a Starsoft
-              </Button>
-            )}
+            <Button
+              className="bg-indigo-600 hover:bg-indigo-700"
+              onClick={handleMigrarStarsoft}
+              disabled={migrandoStarsoft}
+            >
+              {migrandoStarsoft ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+              Migrar Pendientes
+            </Button>
           </div>
         </div>
 
