@@ -491,20 +491,24 @@ export default function ConsultaPlanillas() {
           }
         }
 
-        // ── Neto a pagar = figura de balanceo (Total Debe − Total Haber) ───────
-        // Garantiza que el asiento cuadre persona por persona. Si todos los
-        // descuentos están homologados, el neto de balanceo coincide con el neto
-        // real de la boleta; si falta alguno, la diferencia se reporta abajo.
-        const netoPlug = roundMoney(totalDebe - totalHaber);
-        if (netoPlug > 0) {
-          pushPersonLine(netoConfig.cuenta, netoPlug, "H", `${empName} - Neto a pagar`);
-        }
+        // ── Neto a pagar = neto EXACTO de la boleta (p.net_pay) ────────────────
+        // El asiento debe reflejar estrictamente la boleta: el neto es el neto
+        // real de la boleta, NO una figura de balanceo. El asiento cuadra
+        // (Debe = Haber) solo si todos los conceptos están homologados con su
+        // lado correcto; en particular, cada aporte del empleador necesita DOS
+        // entradas en la homologación (cuentas_por_concepto): una DEBE gasto
+        // (62x) y una HABER pasivo (40x) con el mismo codigo_plame. Si falta un
+        // lado, el descuadre se reporta abajo para que se complete la homologación.
         const realNeto = safePayrollNumber(p.net_pay);
-        if (Math.abs(netoPlug - realNeto) > 0.01) {
+        if (realNeto > 0) {
+          pushPersonLine(netoConfig.cuenta, realNeto, "H", `${empName} - Neto a pagar`);
+        }
+        const diferencia = roundMoney(totalDebe - totalHaber);
+        if (Math.abs(diferencia) > 0.01) {
           missingConcepts.push({
             employee: empName,
             code: "—",
-            name: `Neto de balanceo (S/ ${netoPlug}) difiere del neto de boleta (S/ ${realNeto}) — revise descuentos sin homologar`,
+            name: `Descuadre de S/ ${Math.abs(diferencia).toFixed(2)} (Debe ${totalDebe.toFixed(2)} vs Haber ${totalHaber.toFixed(2)}) — revise que cada aporte del empleador tenga entrada DEBE (gasto 62x) y HABER (pasivo 40x) en la homologación`,
           });
         }
 
