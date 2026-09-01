@@ -49,7 +49,8 @@ test("ONP 13% sobre totalIncome=2000 => 260.00", () => {
   const res = calc.calculatePensionContribution(2000, { afp: null });
   assert(res.items.length === 1, `Se esperaba 1 ítem ONP, vino ${res.items.length}`);
   assert(res.items[0].name === "ONP", `Nombre esperado "ONP", vino "${res.items[0].name}"`);
-  assert(res.items[0].code === "0602", `Código esperado "0602", vino "${res.items[0].code}"`);
+  assert(res.items[0].code === "0607", `Código esperado "0607", vino "${res.items[0].code}"`);
+  assert(res.code === "0607", `Código general ONP esperado "0607", vino "${res.code}"`);
   assert(res.items[0].amount === 260, `Monto esperado 260.00, vino ${res.items[0].amount}`);
   assert(res.totalAmount === 260, `Total esperado 260.00, vino ${res.totalAmount}`);
 });
@@ -69,7 +70,13 @@ test("AFP con comisión: aporte + seguro + comisión", () => {
   assert(res.items[1].amount === seguro, `Seguro esperado ${seguro}, vino ${res.items[1].amount}`);
   assert(res.items[2].amount === comision, `Comisión esperada ${comision}, vino ${res.items[2].amount}`);
   assert(res.totalAmount === round2(aporte + seguro + comision), `Total esperado ${round2(aporte + seguro + comision)}, vino ${res.totalAmount}`);
-  assert(res.items.every(i => i.code === "0601"), "Todos los ítems AFP deben tener código 0601");
+  // Códigos PLAME individuales (Tabla 22 SUNAT): aporte=0608, seguro=0606, comisión=0601
+  assert(res.items[0].code === "0608", `Aporte obligatorio debe usar "0608", vino "${res.items[0].code}"`);
+  assert(res.items[1].code === "0606", `Prima de seguro debe usar "0606", vino "${res.items[1].code}"`);
+  assert(res.items[2].code === "0601", `Comisión debe usar "0601", vino "${res.items[2].code}"`);
+  assert(!res.items.every(i => i.code === "0601"), "Los componentes AFP no deben compartir el mismo código");
+  // Código general AFP: no fija "0601"; refleja el único ítem o queda vacío si hay varios
+  assert(res.code === "", `Código general AFP con varios ítems debe ser "", vino "${res.code}"`);
 });
 
 // 3. AFP con commission_percentage = 0: aporte + seguro, sin comisión
