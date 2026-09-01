@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   FileText, Users, DollarSign, Eye, Printer, ChevronRight,
   CheckCircle, Search, Calendar, ArrowLeft, Settings,
-  Loader2, BookOpen
+  Loader2, BookOpen, AlertCircle, X
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -65,6 +65,7 @@ export default function ConsultaPlanillas() {
   const [showPlanillaCompleta, setShowPlanillaCompleta] = useState(false);
   const [showConfigFirmantes, setShowConfigFirmantes] = useState(false);
   const [generatingAsiento, setGeneratingAsiento] = useState(null); // payroll_number en proceso
+  const [balanceAlert, setBalanceAlert] = useState(null); // { period, payrollType, issues: [{employee, debe, haber, diferencia}] }
 
   const queryClient = useQueryClient();
 
@@ -344,6 +345,7 @@ export default function ConsultaPlanillas() {
       const asientosToCreate = [];
 
       const missingConcepts = [];
+      const balanceIssues = []; // descuadres por trabajador (Debe != Haber)
       const netoConfigMissing = !netoConfig;
 
       // Resolver el último tipo de cambio registrado hasta la fecha final del
@@ -511,10 +513,12 @@ export default function ConsultaPlanillas() {
         }
         const diferencia = roundMoney(totalDebe - totalHaber);
         if (Math.abs(diferencia) > 0.01) {
-          missingConcepts.push({
+          balanceIssues.push({
             employee: empName,
-            code: "—",
-            name: `Descuadre de S/ ${Math.abs(diferencia).toFixed(2)} (Debe ${totalDebe.toFixed(2)} vs Haber ${totalHaber.toFixed(2)}) — revise que cada aporte del empleador tenga entrada DEBE (gasto 62x) y HABER (pasivo 40x) en la homologación`,
+            document_number: emp.document_number || "",
+            debe: totalDebe,
+            haber: totalHaber,
+            diferencia,
           });
         }
 
@@ -531,16 +535,24 @@ export default function ConsultaPlanillas() {
         await entitiesAPI.AsientoContable.delete(a.id);
       }
       queryClient.invalidateQueries(["asientosContablesConsulta"]);
+      queryClient.invalidateQueries(["asientosContables"]);
+
+      // Banner persistente de descuadres por trabajador (se muestra hasta regenerar)
+      setBalanceAlert(balanceIssues.length > 0 ? { period, payrollType, issues: balanceIssues } : null);
+
       const label = existing.length > 0 ? "Asientos actualizados" : "Asientos generados";
       let msg = `${label}: ${asientosToCreate.length} líneas${isSNP ? ` (${grupo.payslips.length} Recibos de Honorarios)` : ""}`;
       if (missingConcepts.length > 0) {
         const unique = new Set(missingConcepts.map(m => `${m.code}|${m.name}`));
         msg += `. ${missingConcepts.length} concepto(s) sin homologar (${unique.size} únicos).`;
       }
+      if (balanceIssues.length > 0) {
+        msg += `. ⚠ ${balanceIssues.length} trabajador(es) con descuadre (Debe ≠ Haber). Revise el detalle de la alerta.`;
+      }
       if (netoConfigMissing) {
         msg += " Falta configurar la cuenta de Neto a pagar (categoría Neto, H).";
       }
-      if (missingConcepts.length > 0 || netoConfigMissing) {
+      if (missingConcepts.length > 0 || balanceIssues.length > 0 || netoConfigMissing) {
         toast.warning(msg);
       } else {
         toast.success(msg);
@@ -607,6 +619,54 @@ export default function ConsultaPlanillas() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
+          {/* Banner de alerta de descuadres por trabajador */}
+          {balanceAlert && balanceAlert.period === selectedGroup.period && balanceAlert.payrollType === selectedGroup.payroll_type && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-red-800">
+                    {balanceAlert.issues.length} trabajador(es) con asiento descuadrado (Debe ≠ Haber)
+                  </h3>
+                  <p className="text-xs text-red-600 mt-0.5">
+                    Cada concepto del desglose debe estar homologado con su lado (D/H). En particular, cada aporte del empleador necesita una entrada DEBE (gasto 62x) y una HABER (pasivo 40x) con el mismo código PLAME en Configuración Starsoft → Cuentas por Planilla.
+                  </p>
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-left text-red-700 border-b border-red-200">
+                          <th className="py-1.5 pr-3 font-semibold">Trabajador</th>
+                          <th className="py-1.5 pr-3 font-semibold">Documento</th>
+                          <th className="py-1.5 pr-3 font-semibold text-right">Debe</th>
+                          <th className="py-1.5 pr-3 font-semibold text-right">Haber</th>
+                          <th className="py-1.5 pr-3 font-semibold text-right">Diferencia</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {balanceAlert.issues.map((it, idx) => (
+                          <tr key={idx} className="border-b border-red-100">
+                            <td className="py-1.5 pr-3 text-red-900 font-medium">{it.employee}</td>
+                            <td className="py-1.5 pr-3 text-red-700 font-mono">{it.document_number}</td>
+                            <td className="py-1.5 pr-3 text-right text-red-700">{it.debe.toFixed(2)}</td>
+                            <td className="py-1.5 pr-3 text-right text-red-700">{it.haber.toFixed(2)}</td>
+                            <td className="py-1.5 pr-3 text-right text-red-900 font-bold">{it.diferencia > 0 ? "+" : ""}{it.diferencia.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setBalanceAlert(null)}
+                  className="text-red-400 hover:text-red-600 shrink-0"
+                  title="Cerrar alerta"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Header detalle */}
           <div className="flex items-start justify-between mb-8">
             <div className="flex items-start gap-4">
