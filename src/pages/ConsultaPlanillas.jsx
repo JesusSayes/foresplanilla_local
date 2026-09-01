@@ -275,6 +275,8 @@ export default function ConsultaPlanillas() {
       const subdiarioCodigo = String(subdiarioEntry.subdiario);
 
       // Índices de resolución de la homologación: por código PLAME y por nombre (normalizado).
+      // Se admiten MÚLTIPLES entradas por código/nombre (ej: un aporte del empleador que
+      // genera una línea DEBE gasto 62x y otra HABER pasivo 40x con el mismo codigo_plame).
       const normStr = (s) => String(s || "").toLowerCase().trim();
       const homByCode = {};
       const homByName = {};
@@ -282,16 +284,42 @@ export default function ConsultaPlanillas() {
       cuentasConcepto.forEach(c => {
         if (!c || !c.cuenta || !c.debe_haber) return;
         if (c.categoria === "Neto" && c.debe_haber === "H" && !netoConfig) netoConfig = c;
-        if (c.codigo_plame) homByCode[String(c.codigo_plame)] = c;
-        if (c.concepto) homByName[normStr(c.concepto)] = c;
+        if (c.codigo_plame) {
+          const key = String(c.codigo_plame);
+          if (!homByCode[key]) homByCode[key] = [];
+          homByCode[key].push(c);
+        }
+        if (c.concepto) {
+          const key = normStr(c.concepto);
+          if (!homByName[key]) homByName[key] = [];
+          homByName[key].push(c);
+        }
       });
+
+      // El neto a pagar es la figura de balanceo del asiento. Sin cuenta de Neto (H)
+      // configurada no es posible generar un asiento cuadrado → se bloquea la generación.
+      if (!netoConfig) {
+        toast.error("Falta configurar la cuenta de 'Neto a pagar' (categoría Neto, lado H) en Configuración Starsoft → Cuentas por Planilla. Es obligatoria para generar asientos balanceados.");
+        return;
+      }
 
       // Resuelve la cuenta contable y el lado (D/H) de un concepto del calculation_summary.
       // Prioriza coincidencia por código PLAME; si no hay, busca por nombre normalizado.
+      // Devuelve un array (puede haber varias entradas D/H para un mismo código).
       const resolveConcept = (item) => {
-        if (!item) return null;
+        if (!item) return [];
         if (item.concept_code && homByCode[String(item.concept_code)]) return homByCode[String(item.concept_code)];
         if (item.name && homByName[normStr(item.name)]) return homByName[normStr(item.name)];
+        return [];
+      };
+
+      // Búsqueda flexible por palabra clave dentro del nombre del concepto (respaldo
+      // para descuentos planos y movilidad cuando el nombre exacto no coincide).
+      const findHomByKeyword = (keyword) => {
+        const kw = normStr(keyword);
+        for (const [name, entries] of Object.entries(homByName)) {
+          if (name.includes(kw)) return entries[0];
+        }
         return null;
       };
 
@@ -371,22 +399,11 @@ export default function ConsultaPlanillas() {
         return { base, empName };
       };
 
-      const pushLine = (base, cuenta, importe, debeHaber, glosaMov) => {
-        const imp = roundMoney(Math.abs(Number(importe) || 0));
-        if (imp === 0) return;
-        asientosToCreate.push({
-          ...base,
-          cuenta,
-          importe: imp,
-          importe_soles: imp,
-          debe_haber: debeHaber,
-          glosa_mov: String(glosaMov || "").slice(0, 40),
-        });
-      };
-
       // Genera una línea de asiento por concepto por persona, leyendo el
       // calculation_summary de cada boleta y resolviendo la cuenta desde la
-      // homologación (cuentas_por_concepto). Ya no se agrupa por centro de costo.
+      // homologación (cuentas_por_concepto). El neto a pagar se calcula como
+      // figura de balanceo (Total Debe − Total Haber) para garantizar que el
+      // asiento cuadre persona por persona.
       for (const p of grupo.payslips) {
         const emp = allEmployees.find(e => e.id === p.employee_id);
         if (!emp) continue;
@@ -399,14 +416,35 @@ export default function ConsultaPlanillas() {
 
         const { base, empName } = buildBase(emp, p);
 
+        // Acumulador local de líneas y totales por persona (para calcular el neto
+        // de balanceo y verificar que Debe = Haber).
+        const personLines = [];
+        let totalDebe = 0;
+        let totalHaber = 0;
+        const pushPersonLine = (cuenta, importe, debeHaber, glosaMov) => {
+          const imp = roundMoney(Math.abs(Number(importe) || 0));
+          if (imp === 0) return;
+          personLines.push({
+            ...base,
+            cuenta,
+            importe: imp,
+            importe_soles: imp,
+            debe_haber: debeHaber,
+            glosa_mov: String(glosaMov || "").slice(0, 40),
+          });
+          if (debeHaber === "D") totalDebe += imp; else totalHaber += imp;
+        };
+
         const processItems = (items, sectionLabel) => {
           (items || []).forEach(item => {
-            const hom = resolveConcept(item);
-            if (!hom) {
+            const homs = resolveConcept(item);
+            if (homs.length === 0) {
               missingConcepts.push({ employee: empName, code: item.concept_code || "—", name: item.name || "—" });
               return;
             }
-            pushLine(base, hom.cuenta, item.amount, hom.debe_haber, `${empName} - ${item.name || hom.concepto || sectionLabel}`);
+            homs.forEach(hom => {
+              pushPersonLine(hom.cuenta, item.amount, hom.debe_haber, `${empName} - ${item.name || hom.concepto || sectionLabel}`);
+            });
           });
         };
 
@@ -422,47 +460,60 @@ export default function ConsultaPlanillas() {
 
         // ── Descuentos planos del payslip (no viven en el breakdown) ──────────
         // Adelanto quincenal, tardanzas e inasistencias se almacenan como campos
-        // del payslip; se inyectan como líneas HABER resolviendo cuenta por nombre.
+        // del payslip; se inyectan resolviendo cuenta por nombre exacto o por
+        // palabra clave (respaldo flexible) con el lado configurado (H).
         const flatDiscounts = [
-          { field: "advance_deduction",   label: "Adelanto Quincenal",          glosa: "ADELANTO QUINCENAL" },
-          { field: "tardiness_discount",  label: "Descuento por Tardanzas",     glosa: "DESC. POR TARDANZAS" },
-          { field: "absence_discount",    label: "Descuento por Inasistencias", glosa: "DESC. POR INASISTENCIAS" },
+          { field: "advance_deduction",   label: "Adelanto Quincenal",          glosa: "ADELANTO QUINCENAL",      keyword: "adelanto" },
+          { field: "tardiness_discount",  label: "Descuento por Tardanzas",     glosa: "DESC. POR TARDANZAS",     keyword: "tardanza" },
+          { field: "absence_discount",    label: "Descuento por Inasistencias", glosa: "DESC. POR INASISTENCIAS", keyword: "inasistencia" },
         ];
-        flatDiscounts.forEach(({ field, label, glosa }) => {
+        flatDiscounts.forEach(({ field, label, glosa, keyword }) => {
           const amt = safePayrollNumber(p[field]);
           if (amt <= 0) return;
           if (generatedNames.has(normStr(label))) return; // ya vino en el breakdown
-          const hom = homByName[normStr(label)];
+          const hom = (homByName[normStr(label)] || [])[0] || findHomByKeyword(keyword);
           if (!hom) {
             missingConcepts.push({ employee: empName, code: "—", name: label });
             return;
           }
-          pushLine(base, hom.cuenta, amt, hom.debe_haber, `${empName} - ${glosa}`);
+          pushPersonLine(hom.cuenta, amt, hom.debe_haber, `${empName} - ${glosa}`);
         });
 
         // ── Respaldo de movilidad (ingreso) si no se generó desde el breakdown ─
         const movilidadAmt = safePayrollNumber(p.transport_cost_amount);
         if (movilidadAmt > 0) {
-          const yaGenerada = asientosToCreate.some(
-            a => a.payslip_id === p.id && normStr(a.glosa_mov || "").includes("movilidad")
-          );
+          const yaGenerada = personLines.some(a => normStr(a.glosa_mov || "").includes("movilidad"));
           if (!yaGenerada) {
             const homMov =
-              homByName[normStr("Movilidad")] ||
-              homByName[normStr("Bonificación por Movilidad")] ||
-              homByName[normStr("Bonificacion por Movilidad")];
+              (homByName[normStr("Movilidad")] || [])[0] ||
+              (homByName[normStr("Bonificación por Movilidad")] || [])[0] ||
+              findHomByKeyword("movilidad");
             if (homMov) {
-              pushLine(base, homMov.cuenta, movilidadAmt, homMov.debe_haber, `${empName} - MOVILIDAD`);
+              pushPersonLine(homMov.cuenta, movilidadAmt, homMov.debe_haber, `${empName} - MOVILIDAD`);
             } else {
               missingConcepts.push({ employee: empName, code: "—", name: "Movilidad" });
             }
           }
         }
 
-        // Neto a pagar → HABER con la cuenta de categoría "Neto"
-        if (netoConfig) {
-          pushLine(base, netoConfig.cuenta, p.net_pay, "H", `${empName} - Neto a pagar`);
+        // ── Neto a pagar = figura de balanceo (Total Debe − Total Haber) ───────
+        // Garantiza que el asiento cuadre persona por persona. Si todos los
+        // descuentos están homologados, el neto de balanceo coincide con el neto
+        // real de la boleta; si falta alguno, la diferencia se reporta abajo.
+        const netoPlug = roundMoney(totalDebe - totalHaber);
+        if (netoPlug > 0) {
+          pushPersonLine(netoConfig.cuenta, netoPlug, "H", `${empName} - Neto a pagar`);
         }
+        const realNeto = safePayrollNumber(p.net_pay);
+        if (Math.abs(netoPlug - realNeto) > 0.01) {
+          missingConcepts.push({
+            employee: empName,
+            code: "—",
+            name: `Neto de balanceo (S/ ${netoPlug}) difiere del neto de boleta (S/ ${realNeto}) — revise descuentos sin homologar`,
+          });
+        }
+
+        asientosToCreate.push(...personLines);
       }
 
       await entitiesAPI.AsientoContable.bulkCreate(asientosToCreate);
