@@ -63,6 +63,7 @@ export default function ConsultaPlanillas() {
   const [showPlanillaCompleta, setShowPlanillaCompleta] = useState(false);
   const [showConfigFirmantes, setShowConfigFirmantes] = useState(false);
   const [generatingAsiento, setGeneratingAsiento] = useState(null); // payroll_number en proceso
+  const [balanceAlert, setBalanceAlert] = useState(null); // { period, payrollType, issues: [{employee, debe, haber, diferencia}] }
 
   const queryClient = useQueryClient();
 
@@ -341,6 +342,7 @@ export default function ConsultaPlanillas() {
       const asientosToCreate = [];
 
       const missingConcepts = [];
+      const balanceIssues = []; // descuadres por trabajador (Debe != Haber)
       const netoConfigMissing = !netoConfig;
 
       // Resolver el último tipo de cambio registrado hasta la fecha final del
@@ -508,10 +510,12 @@ export default function ConsultaPlanillas() {
         }
         const diferencia = roundMoney(totalDebe - totalHaber);
         if (Math.abs(diferencia) > 0.01) {
-          missingConcepts.push({
+          balanceIssues.push({
             employee: empName,
-            code: "—",
-            name: `Descuadre de S/ ${Math.abs(diferencia).toFixed(2)} (Debe ${totalDebe.toFixed(2)} vs Haber ${totalHaber.toFixed(2)}) — revise que cada aporte del empleador tenga entrada DEBE (gasto 62x) y HABER (pasivo 40x) en la homologación`,
+            document_number: emp.document_number || "",
+            debe: totalDebe,
+            haber: totalHaber,
+            diferencia,
           });
         }
 
@@ -520,16 +524,24 @@ export default function ConsultaPlanillas() {
 
       await base44.entities.AsientoContable.bulkCreate(asientosToCreate);
       queryClient.invalidateQueries(["asientosContablesConsulta"]);
+      queryClient.invalidateQueries(["asientosContables"]);
+
+      // Banner persistente de descuadres por trabajador (se muestra hasta regenerar)
+      setBalanceAlert(balanceIssues.length > 0 ? { period, payrollType, issues: balanceIssues } : null);
+
       const label = existing.length > 0 ? "Asientos actualizados" : "Asientos generados";
       let msg = `${label}: ${asientosToCreate.length} líneas${isSNP ? ` (${grupo.payslips.length} Recibos de Honorarios)` : ""}`;
       if (missingConcepts.length > 0) {
         const unique = new Set(missingConcepts.map(m => `${m.code}|${m.name}`));
         msg += `. ${missingConcepts.length} concepto(s) sin homologar (${unique.size} únicos).`;
       }
+      if (balanceIssues.length > 0) {
+        msg += `. ⚠ ${balanceIssues.length} trabajador(es) con descuadre (Debe ≠ Haber). Revise el detalle de la alerta.`;
+      }
       if (netoConfigMissing) {
         msg += " Falta configurar la cuenta de Neto a pagar (categoría Neto, H).";
       }
-      if (missingConcepts.length > 0 || netoConfigMissing) {
+      if (missingConcepts.length > 0 || balanceIssues.length > 0 || netoConfigMissing) {
         toast.warning(msg);
       } else {
         toast.success(msg);
