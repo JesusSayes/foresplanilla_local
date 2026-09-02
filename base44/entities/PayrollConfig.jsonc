@@ -21,6 +21,11 @@
       "default": 7,
       "description": "D\u00eda l\u00edmite de ingreso para incluir en planilla quincenal (trabajadores que ingresaron hasta este d\u00eda del mes)"
     },
+    "enable_tardiness_compensation": {
+      "type": "boolean",
+      "default": false,
+      "description": "Habilita la compensaci\u00f3n manual de tardanzas con minutos adicionales trabajados despu\u00e9s de la hora programada de salida. Deshabilitado por defecto: si est\u00e1 en false, todo funciona exactamente como actualmente. Cuando est\u00e1 en true, personal autorizado de RRHH puede compensar tardanzas expl\u00edcitamente desde la pantalla de asistencia."
+    },
     "is_active": {
       "type": "boolean",
       "default": true,

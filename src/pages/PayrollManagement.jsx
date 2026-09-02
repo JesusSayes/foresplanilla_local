@@ -257,6 +257,17 @@ export default function PayrollManagement() {
   });
   const { data: payrollConfig } = payrollConfigQuery;
 
+  // Configuración general (incluye flag de compensación de tardanzas)
+  const generalConfigQuery = useQuery({
+    queryKey: ["generalPayrollConfig"],
+    queryFn: async () => {
+      const configs = await withRetry(() => base44.entities.PayrollConfig.filter({ config_type: "General", is_active: true }));
+      return configs.length > 0 ? configs[0] : {};
+    },
+    staleTime: 0,
+  });
+  const enableTardinessCompensation = generalConfigQuery.data?.enable_tardiness_compensation || false;
+
   // Vacaciones aprobadas: se consultan con datos frescos al calcular la planilla
   // para excluir del descuento por tardanzas/inasistencias los días cubiertos por
   // vacaciones aprobadas (incluso si el AttendanceRecord tiene valores residuales).
@@ -709,12 +720,24 @@ export default function PayrollManagement() {
       // Horas extras y nocturnas calculadas desde los registros de asistencia del periodo.
       // horas_nocturnas: los registros de asistencia aún no cuentan con un campo dedicado,
       // por lo que se conserva en 0 hasta que exista una fuente de datos válida para calcularlas.
-      const overtimeHours25 = empAttendance.reduce(
-        (sum, record) => sum + Number(record.overtime_hours_25 || 0), 0
-      );
-      const overtimeHours35 = empAttendance.reduce(
-        (sum, record) => sum + Number(record.overtime_hours_35 || 0), 0
-      );
+      // Horas extras efectivas: si un registro tiene compensación de tardanza activa,
+      // los minutos compensados se descuentan de las HE (primero 25%, luego 35%)
+      // para evitar doble contabilización.
+      const overtimeHours25 = empAttendance.reduce((sum, record) => {
+        const ot25 = Number(record.overtime_hours_25 || 0);
+        if (!enableTardinessCompensation || record.tardiness_compensation_status !== "Activa") return sum + ot25;
+        const compHours = (record.tardiness_compensation_minutes || 0) / 60;
+        return sum + Math.max(0, ot25 - Math.min(ot25, compHours));
+      }, 0);
+      const overtimeHours35 = empAttendance.reduce((sum, record) => {
+        const ot25 = Number(record.overtime_hours_25 || 0);
+        const ot35 = Number(record.overtime_hours_35 || 0);
+        if (!enableTardinessCompensation || record.tardiness_compensation_status !== "Activa") return sum + ot35;
+        const compHours = (record.tardiness_compensation_minutes || 0) / 60;
+        const deduct25 = Math.min(ot25, compHours);
+        const remainingComp = compHours - deduct25;
+        return sum + Math.max(0, ot35 - Math.min(ot35, remainingComp));
+      }, 0);
       const nightHours = empAttendance.reduce(
         (sum, record) => sum + Number(record.horas_nocturnas ?? record.night_hours ?? 0), 0
       );
@@ -855,6 +878,7 @@ export default function PayrollManagement() {
         late_records: lateRecords,
         absent_records: absentRecords,
         afp: allAfps.find(a => a.id === emp.afp_id) || null,
+        enable_tardiness_compensation: enableTardinessCompensation,
       };
 
       const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1130, extraContext);
@@ -866,7 +890,12 @@ export default function PayrollManagement() {
       // Se descuenta únicamente el tiempo de tardanza (en horas) sobre el valor hora,
       // NO un día completo por cada tardanza. Los registros con tardanza ≤ 10 minutos
       // (tolerancia) ya fueron excluidos al construir lateRecords.
-      const totalLateMinutes = lateRecords.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
+      const totalLateMinutes = lateRecords.reduce((sum, r) => {
+        const compMin = enableTardinessCompensation && r.tardiness_compensation_status === "Activa"
+          ? (r.tardiness_compensation_minutes || 0)
+          : 0;
+        return sum + Math.max(0, (r.late_minutes || 0) - compMin);
+      }, 0);
       const hourlyRate = dailyRate > 0 ? roundMoney(dailyRate / 8) : 0;
       const tardinessDiscount = payrollType === "Quincenal" ? 0 : roundMoney(hourlyRate * (totalLateMinutes / 60));
       // Descuento por inasistencias: un día de salario por cada falta completa.

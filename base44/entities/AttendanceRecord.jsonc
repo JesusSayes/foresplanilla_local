@@ -95,7 +95,7 @@
     "late_minutes": {
       "type": "integer",
       "default": 0,
-      "description": "Minutos de tardanza"
+      "description": "Minutos de tardanza original (calculados por el motor de asistencia). No se modifica al aplicar compensaci\u00f3n; la tardanza efectiva se calcula en el punto de consumo."
     },
     "is_absent": {
       "type": "boolean",
@@ -139,6 +139,34 @@
       "type": "string",
       "format": "date-time",
       "description": "Fecha y hora de la \u00faltima modificaci\u00f3n manual aprobada"
+    },
+    "tardiness_compensation_minutes": {
+      "type": "integer",
+      "default": 0,
+      "description": "Minutos compensados de tardanza usando tiempo adicional trabajado despu\u00e9s de la hora programada de salida. No modifica late_minutes; la tardanza efectiva = max(0, late_minutes - tardiness_compensation_minutes) se calcula en el punto de consumo (planillas)."
+    },
+    "tardiness_compensation_authorizer": {
+      "type": "string",
+      "description": "Email del usuario de RRHH que autoriz\u00f3 la compensaci\u00f3n"
+    },
+    "tardiness_compensation_authorized_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora en que se autoriz\u00f3 la compensaci\u00f3n"
+    },
+    "tardiness_compensation_reason": {
+      "type": "string",
+      "description": "Observaci\u00f3n o motivo de la compensaci\u00f3n"
+    },
+    "tardiness_compensation_status": {
+      "type": "string",
+      "enum": [
+        "",
+        "Activa",
+        "Revertida"
+      ],
+      "default": "",
+      "description": "Estado de la compensaci\u00f3n: vac\u00edo = sin compensaci\u00f3n, Activa = compensaci\u00f3n vigente, Revertida = compensaci\u00f3n anulada (restaura tardanza efectiva original)."
     }
   },
   "required": [

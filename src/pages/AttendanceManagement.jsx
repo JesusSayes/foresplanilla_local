@@ -22,7 +22,8 @@ import { createPageUrl } from "@/utils";
 import { todayLima, todayDateLima, parseDateLima, dateToStringLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
-import { calcEffectiveMetrics, toMin as attToMin, getSegmentClockTimes } from "@/lib/attendanceMetrics";
+import { calcEffectiveMetrics, toMin as attToMin, getSegmentClockTimes, getAdditionalMinutes, getEffectiveLateMinutes, getEffectiveOvertime } from "@/lib/attendanceMetrics";
+import TardinessCompensationModal from "../components/attendance/TardinessCompensationModal";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
 import JustifyModal from "../components/attendance/JustifyModal";
@@ -206,6 +207,17 @@ export default function AttendanceManagement() {
     queryKey: ["workSchedules"],
     queryFn: async () => await base44.entities.WorkSchedule.list("-created_date"),
   });
+
+  // Configuración general: flag de compensación de tardanzas (deshabilitado por defecto)
+  const { data: generalConfig } = useQuery({
+    queryKey: ["generalPayrollConfig"],
+    queryFn: async () => {
+      const configs = await base44.entities.PayrollConfig.filter({ config_type: "General", is_active: true });
+      return configs.length > 0 ? configs[0] : {};
+    },
+  });
+  const enableTardinessCompensation = generalConfig?.enable_tardiness_compensation || false;
+  const canCompensateTardiness = enableTardinessCompensation && (hasPermission("attendance.manage") || hasPermission("system.admin"));
 
   // Vacaciones aprobadas que cubren la(s) fecha(s) seleccionada(s)
   const { data: approvedVacations = [] } = useQuery({
@@ -648,6 +660,9 @@ export default function AttendanceManagement() {
   const [incidentDetailData, setIncidentDetailData] = useState(null);
   const [incidentDetailEmployee, setIncidentDetailEmployee] = useState(null);
   const [isApproving, setIsApproving] = useState(false);
+  const [compensationRecord, setCompensationRecord] = useState(null);
+  const [compensationEmployee, setCompensationEmployee] = useState(null);
+  const [showCompensationModal, setShowCompensationModal] = useState(false);
 
   const handleJustifyClick = async (emp, record, overrideDate) => {
     setJustifyingEmployee(emp);
@@ -1110,12 +1125,27 @@ export default function AttendanceManagement() {
       const compAdjEx = getCompensationAdjustments(emp.id, rowDate);
       if (estadoMarcacion !== 'Vacaciones') {
         const totalCompLateEx = compAdjEx.pendingLateMin + compAdjEx.approvedLateMin;
-        excelLate = Math.max(0, excelLate - totalCompLateEx);
+        // Incluir la nueva compensación manual de tardanza
+        const newCompMinEx = enableTardinessCompensation && emp.record?.tardiness_compensation_status === "Activa"
+          ? (emp.record.tardiness_compensation_minutes || 0) : 0;
+        excelLate = Math.max(0, excelLate - totalCompLateEx - newCompMinEx);
       }
 
       // Descontar HE pendientes de compensar (primero 25%, luego 35%)
       let excelHE25 = emp.record?.overtime_hours_25 ?? 0;
       let excelHE35 = emp.record?.overtime_hours_35 ?? 0;
+      // Descontar minutos de la nueva compensación manual de las HE
+      if (estadoMarcacion !== 'Vacaciones' && enableTardinessCompensation && emp.record?.tardiness_compensation_status === "Activa") {
+        const compHoursEx = (emp.record.tardiness_compensation_minutes || 0) / 60;
+        if (compHoursEx > 0 && excelHE25 > 0) {
+          const d = Math.min(excelHE25, compHoursEx);
+          excelHE25 -= d;
+          const rem = compHoursEx - d;
+          if (rem > 0 && excelHE35 > 0) excelHE35 -= Math.min(excelHE35, rem);
+        } else if (compHoursEx > 0 && excelHE35 > 0) {
+          excelHE35 -= Math.min(excelHE35, compHoursEx);
+        }
+      }
       if (estadoMarcacion !== 'Vacaciones' && compAdjEx.pendingOTHours > 0) {
         let remOTEx = compAdjEx.pendingOTHours;
         if (remOTEx > 0 && excelHE25 > 0) {
@@ -1806,26 +1836,34 @@ export default function AttendanceManagement() {
                                 {(() => {
                                   if (vacation) return <span className="text-xs font-bold text-slate-400">0m</span>;
                                   const metrics = getRowMetrics(emp, rowDate);
-                                  const adjustedLate = applyLateTolerance(
-                                    metrics.remainingLateMinutes,
-                                    metrics.toleranceMinutes
-                                  );
-                                  // Descontar compensaciones pendientes y aprobadas
-                                  const totalCompLate = compAdj.pendingLateMin + compAdj.approvedLateMin;
-                                  const netLate = Math.max(0, adjustedLate - totalCompLate);
-                                  const lh = Math.floor(netLate / 60);
-                                  const lm = netLate % 60;
-                                  const lateStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
-                                  return (
-                                    <span className="flex flex-col items-center">
-                                      <span className={`text-xs font-bold ${netLate > 0 ? 'text-orange-600' : 'text-slate-400'}`}>{lateStr}</span>
-                                      {totalCompLate > 0 && (
-                                        <span className="text-[9px] text-indigo-500 whitespace-nowrap" title={`Compensado: ${totalCompLate} min`}>
-                                          ↓{totalCompLate}m
-                                        </span>
-                                      )}
-                                    </span>
-                                  );
+                                   const adjustedLate = applyLateTolerance(
+                                     metrics.remainingLateMinutes,
+                                     metrics.toleranceMinutes
+                                   );
+                                   // Descontar compensaciones pendientes y aprobadas (sistema existente)
+                                   // y la nueva compensación manual de tardanza (tardiness_compensation)
+                                   const newCompMin = enableTardinessCompensation && emp.record?.tardiness_compensation_status === "Activa"
+                                     ? (emp.record.tardiness_compensation_minutes || 0) : 0;
+                                   const totalCompLate = compAdj.pendingLateMin + compAdj.approvedLateMin + newCompMin;
+                                   const netLate = Math.max(0, adjustedLate - totalCompLate);
+                                   const lh = Math.floor(netLate / 60);
+                                   const lm = netLate % 60;
+                                   const lateStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
+                                   return (
+                                     <span className="flex flex-col items-center">
+                                       <span className={`text-xs font-bold ${netLate > 0 ? 'text-orange-600' : 'text-slate-400'}`}>{lateStr}</span>
+                                       {totalCompLate > 0 && (
+                                         <span className="text-[9px] text-indigo-500 whitespace-nowrap" title={`Compensado: ${totalCompLate} min`}>
+                                           ↓{totalCompLate}m
+                                         </span>
+                                       )}
+                                       {newCompMin > 0 && (
+                                         <span className="text-[9px] text-green-600 whitespace-nowrap" title={`Compensación manual: ${newCompMin} min`}>
+                                           ✓{newCompMin}m
+                                         </span>
+                                       )}
+                                     </span>
+                                   );
                                 })()}
                               </td>
                               {/* HE 25% — descontando compensaciones pendientes */}
@@ -1925,9 +1963,31 @@ export default function AttendanceManagement() {
                                   )}
 
                                   <Button size="sm" variant="outline" className="h-7 px-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50 shrink-0" title="Asignar horario"
-                                    onClick={() => { setSchedulingEmployee({ ...emp, _rowDate: rowDate }); setShowScheduleModal(true); }}>
-                                    <CalendarClock className="w-3 h-3" />
-                                  </Button>
+                                     onClick={() => { setSchedulingEmployee({ ...emp, _rowDate: rowDate }); setShowScheduleModal(true); }}>
+                                     <CalendarClock className="w-3 h-3" />
+                                   </Button>
+                                  {canCompensateTardiness && !vacation && emp.record && (emp.record.late_minutes > 0 || emp.record?.tardiness_compensation_status === "Activa") && (() => {
+                                    const addMin = getAdditionalMinutes(emp.record);
+                                    const hasActiveComp = emp.record?.tardiness_compensation_status === "Activa";
+                                    const canShow = hasActiveComp || (addMin > 0 && emp.record.late_minutes > 0);
+                                    if (!canShow) return null;
+                                    return (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className={`h-7 px-2 text-xs shrink-0 whitespace-nowrap ${hasActiveComp ? "text-green-700 border-green-300 hover:bg-green-50" : "text-teal-700 border-teal-300 hover:bg-teal-50"}`}
+                                        title={hasActiveComp ? `Compensación activa: ${emp.record.tardiness_compensation_minutes} min` : "Compensar tardanza con minutos adicionales"}
+                                        onClick={() => {
+                                          setCompensationRecord(emp.record);
+                                          setCompensationEmployee(emp);
+                                          setShowCompensationModal(true);
+                                        }}
+                                      >
+                                        <Clock className="w-3 h-3 mr-1" />
+                                        {hasActiveComp ? `${emp.record.tardiness_compensation_minutes}m` : "Comp."}
+                                      </Button>
+                                    );
+                                  })()}
                                   {!vacation && emp.record && (
                                     <Button size="sm" variant="outline"
                                       className="h-7 px-2 text-xs shrink-0 whitespace-nowrap text-purple-700 border-purple-300 hover:bg-purple-50"
@@ -2363,6 +2423,23 @@ export default function AttendanceManagement() {
             loading={periodLoading}
             onConfirm={(comments) => confirmPeriodAction(comments)}
             onClose={() => { if (!periodLoading) setPeriodAction(null); }}
+          />
+        )}
+
+        {/* Tardiness Compensation Modal */}
+        {showCompensationModal && compensationRecord && (
+          <TardinessCompensationModal
+            record={compensationRecord}
+            employee={compensationEmployee}
+            authorizer={effectiveEmployee}
+            enableCompensation={enableTardinessCompensation}
+            onClose={() => { setShowCompensationModal(false); setCompensationRecord(null); setCompensationEmployee(null); }}
+            onSuccess={() => {
+              setShowCompensationModal(false);
+              setCompensationRecord(null);
+              setCompensationEmployee(null);
+              queryClient.invalidateQueries(["todayAttendance"]);
+            }}
           />
         )}
 
