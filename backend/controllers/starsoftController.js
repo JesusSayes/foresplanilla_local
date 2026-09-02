@@ -53,6 +53,20 @@ const getAsientosByIds = async (asientoIds) => {
   );
 };
 
+const getActiveExchangeRates = async () => {
+  try {
+    return await prisma.$queryRaw`
+      SELECT fecha, valor_venta
+      FROM tipo_cambio
+      WHERE estado = TRUE
+      ORDER BY fecha DESC
+    `;
+  } catch (error) {
+    console.warn('[Starsoft] No se pudieron cargar los tipos de cambio activos:', error.message);
+    return [];
+  }
+};
+
 const updateTestResult = (id, status, message) => prisma.$executeRaw`
   UPDATE starsoft_config
   SET last_test_status = ${status},
@@ -91,7 +105,14 @@ const todayISO = () => new Date().toISOString();
 
 const sanitizeAnnomes = (value) => String(value || '').replace(/\D/g, '');
 
-export const buildStarsoftPayload = (asientos) => {
+export const buildStarsoftPayload = (asientos, tiposCambio = []) => {
+  const tiposCambioOrdenados = tiposCambio
+    .map(tipoCambio => ({
+      fecha: toISODateTime(tipoCambio?.fecha)?.slice(0, 10),
+      valorVenta: Number(tipoCambio?.valor_venta) || 0,
+    }))
+    .filter(tipoCambio => tipoCambio.fecha)
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
   const seenComprobante = new Set();
   const listadoAsientos = asientos.map(asiento => {
     const key = `${asiento.comprobante}|${asiento.subdiario}|${sanitizeAnnomes(asiento.annomes)}`;
@@ -101,13 +122,17 @@ export const buildStarsoftPayload = (asientos) => {
     const isME = asiento.moneda === 'USD' || asiento.moneda === 'ME';
     const cuenta = asiento.cuenta || '';
     const needsAnexo = /^\s*14/.test(cuenta);
+    const fechaDoc = toISODateTime(asiento.fecha_doc) || toISODateTime(asiento.fecha_registro) || todayISO();
+    const tipoCambio = isMainLine
+      ? tiposCambioOrdenados.find(item => item.fecha <= fechaDoc.slice(0, 10))
+      : null;
 
     return {
       Cuenta: cuenta,
       Annomes: sanitizeAnnomes(asiento.annomes),
       Subdiario: asiento.subdiario || '',
       Comprobante: asiento.comprobante || '',
-      Fecha_Doc: toISODateTime(asiento.fecha_doc) || toISODateTime(asiento.fecha_registro) || todayISO(),
+      Fecha_Doc: fechaDoc,
       Tipo_Anexo: needsAnexo ? (asiento.tipo_anexo || '') : '',
       Cod_Anexo: needsAnexo ? (asiento.cod_anexo || '') : '',
       Tipo_Doc: asiento.tipo_doc || '',
@@ -117,7 +142,7 @@ export const buildStarsoftPayload = (asientos) => {
       Importe: Number(asiento.importe) || 0,
       Conversion_Tc: isMainLine ? 'VTA' : '',
       Fecha_Registro: toISODateTime(asiento.fecha_registro) || toISODateTime(asiento.fecha_doc) || todayISO(),
-      Tc: isMainLine ? (isME ? (Number(asiento.tc) || 1) : 1) : 0,
+      Tc: isMainLine ? (tipoCambio?.valorVenta || Number(asiento.tc) || 1) : 0,
       Glosa: asiento.glosa || '',
       Centro_Costos: asiento.centro_costos || '',
       Glosa_Mov: asiento.glosa_mov || '',
@@ -260,7 +285,8 @@ export const migrate = async (req, res, next) => {
       }
 
       const asientos = await getAsientosByIds(asientoIds);
-      const payload = buildStarsoftPayload(asientos);
+      const tiposCambio = await getActiveExchangeRates();
+      const payload = buildStarsoftPayload(asientos, tiposCambio);
 
       return res.json({
         success: true,
@@ -315,7 +341,8 @@ export const migrate = async (req, res, next) => {
     }
 
     const asientos = await getAsientosByIds(asientoIds);
-    const payload = buildStarsoftPayload(asientos);
+    const tiposCambio = await getActiveExchangeRates();
+    const payload = buildStarsoftPayload(asientos, tiposCambio);
 
     let sendResponse;
     try {

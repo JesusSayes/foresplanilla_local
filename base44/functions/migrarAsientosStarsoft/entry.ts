@@ -148,6 +148,23 @@ export default async function (req: Request): Promise<Response> {
       if (companies && companies.length > 0) ruc = companies[0].ruc || "";
     } catch { /* CompanyInfo opcional */ }
 
+    // Cargar tipos de cambio registrados para resolver el TC de cada asiento.
+    // Starsoft valida que el TC enviado coincida con un tipo de cambio registrado
+    // para la fecha del documento. Se toma el valor de venta del último día con
+    // TC registrado <= fecha_doc (si el último día del período no tiene TC, baja
+    // al día anterior, y así sucesivamente hasta encontrar un día con TC).
+    let tiposCambio: any[] = [];
+    try {
+      tiposCambio = await base44.asServiceRole.entities.TipoCambio.filter({ estado: true });
+    } catch { /* TipoCambio opcional */ }
+    const tcLookup = (fechaDoc: string): number => {
+      const fd = String(fechaDoc || "").slice(0, 10);
+      const record = (tiposCambio || [])
+        .filter(t => t && t.fecha && String(t.fecha).slice(0, 10) <= fd)
+        .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))[0];
+      return record ? (Number(record.valor_venta) || 0) : 0;
+    };
+
     // Armar payload agrupando por comprobante (comprobante + subdiario + annomes).
     // Starsoft lee la conversión y el TC de la PRIMERA línea (cuenta principal)
     // de cada comprobante; las líneas de equivalencia no deben llevarlos.
@@ -163,7 +180,12 @@ export default async function (req: Request): Promise<Response> {
 
       const me = isME(a);
       const convTc = isMainLine ? "VTA" : "";
-      const tcVal = isMainLine ? (me ? (Number(a.tc) || 1) : 1) : 0;
+      // TC: valor de venta del último día con TC registrado <= fecha_doc.
+      // Si no hay TC registrado para ese período, se usa el valor almacenado en
+      // el asiento (a.tc) como respaldo.
+      const fechaDocAsiento = toISODateTime(a.fecha_doc) || toISODateTime(a.fecha_registro) || todayISO();
+      const tcLookupVal = isMainLine ? tcLookup(fechaDocAsiento) : 0;
+      const tcVal = isMainLine ? (tcLookupVal || Number(a.tc) || 1) : 0;
 
       const cuenta = a.cuenta || "";
       const hasAnexo = needsAnexo(cuenta);

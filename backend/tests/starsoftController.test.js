@@ -98,3 +98,30 @@ test('conserva seis decimales del TC de la primera línea en moneda extranjera',
   assert.equal(payload[0].Conversion_Tc, 'VTA');
   assert.equal(payload[0].Tc, 3.812345);
 });
+
+test('usa el último tipo de cambio activo anterior o igual a la fecha del documento', () => {
+  const payload = buildStarsoftPayload([{
+    comprobante: '0003',
+    subdiario: '35',
+    annomes: '202608',
+    fecha_doc: '2026-08-31',
+    moneda: 'PEN',
+    tc: 1,
+  }, {
+    comprobante: '0003',
+    subdiario: '35',
+    annomes: '202608',
+    fecha_doc: '2026-08-31',
+    moneda: 'PEN',
+    tc: 1,
+  }], [{
+    fecha: new Date('2026-08-29T00:00:00.000Z'),
+    valor_venta: '3.8123',
+  }, {
+    fecha: new Date('2026-09-01T00:00:00.000Z'),
+    valor_venta: '3.9000',
+  }]);
+
+  assert.equal(payload[0].Tc, 3.8123);
+  assert.equal(payload[1].Tc, 0);
+});
