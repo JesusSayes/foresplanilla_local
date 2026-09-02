@@ -59,6 +59,9 @@ export default function AsientosContables() {
   const [reinciandoErrores, setReinciandoErrores] = useState(false);
   const [modalMigracion, setModalMigracion] = useState(null);
   const [progresoMigracion, setProgresoMigracion] = useState({ logs: [], total: 0, procesados: 0 });
+  const [previewStarsoft, setPreviewStarsoft] = useState(null);
+  const [cargandoPreviewStarsoft, setCargandoPreviewStarsoft] = useState(false);
+  const [previewPendientes, setPreviewPendientes] = useState([]);
 
   useEffect(() => {
     if (currentUser?.employee?.role === "admin" || currentUser?.employee?.role === "super_admin") {
@@ -244,8 +247,39 @@ export default function AsientosContables() {
       toast.info("No hay asientos pendientes para migrar en la selección actual");
       return;
     }
-    if (!confirm(`¿Migrar ${pendientes.length} asiento(s) a Starsoft vía API?\nSe enviarán en lotes y se mostrará el avance por registro.`)) return;
+    setCargandoPreviewStarsoft(true);
+    try {
+      const res = await base44.functions.invoke("migrarAsientosStarsoft", {
+        mode: "preview",
+        asiento_ids: pendientes.map(a => a.id),
+      });
+      const data = res.data;
+      if (data?.success === false || data?.error) {
+        toast.error(data?.error || "No se pudo generar la vista previa de envío a Starsoft");
+        return;
+      }
+      setPreviewStarsoft({
+        total: data?.total ?? 0,
+        destination: data?.destination ?? null,
+        payload: data?.payload ?? [],
+      });
+      setPreviewPendientes(pendientes);
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || "No se pudo generar la vista previa de envío a Starsoft";
+      toast.error(msg);
+    } finally {
+      setCargandoPreviewStarsoft(false);
+    }
+  };
 
+  const handleConfirmarMigracionStarsoft = () => {
+    const pendientes = previewPendientes;
+    setPreviewStarsoft(null);
+    setPreviewPendientes([]);
+    ejecutarMigracionStarsoft(pendientes);
+  };
+
+  const ejecutarMigracionStarsoft = async (pendientes) => {
     setMigrandoStarsoft(true);
     setModalMigracion(null);
     setProgresoMigracion({ logs: [], total: pendientes.length, procesados: 0 });
@@ -467,10 +501,10 @@ export default function AsientosContables() {
             <Button
               className="bg-indigo-600 hover:bg-indigo-700"
               onClick={handleMigrarStarsoft}
-              disabled={migrandoStarsoft}
+              disabled={migrandoStarsoft || cargandoPreviewStarsoft}
             >
-              {migrandoStarsoft ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-              Migrar Pendientes
+              {migrandoStarsoft || cargandoPreviewStarsoft ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+              {cargandoPreviewStarsoft ? "Generando vista previa…" : "Migrar Pendientes"}
             </Button>
           </div>
         </div>
@@ -791,6 +825,44 @@ export default function AsientosContables() {
             tipoAnexos={tipoAnexos}
             onClose={() => setSelectedAsiento(null)}
           />
+        )}
+
+        {/* Modal vista previa de envío a Starsoft */}
+        {previewStarsoft && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col">
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-xl font-bold text-slate-900">Vista previa de envío a Starsoft</h2>
+                <button onClick={() => { setPreviewStarsoft(null); setPreviewPendientes([]); }} className="text-slate-400 hover:text-slate-700 text-xl font-bold">✕</button>
+              </div>
+              <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="text-xs text-slate-500">Total de registros</p>
+                    <p className="text-lg font-bold text-slate-900">{previewStarsoft.total}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="text-xs text-slate-500">URL destino</p>
+                    <p className="text-sm font-mono text-slate-900 break-all">{previewStarsoft.destination || "—"}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Payload</p>
+                  <pre className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs font-mono text-slate-800 overflow-auto max-h-[55vh]">
+{JSON.stringify(previewStarsoft.payload, null, 2)}
+                  </pre>
+                </div>
+              </div>
+              <div className="flex gap-3 p-6 border-t">
+                <Button variant="outline" className="flex-1" onClick={() => { setPreviewStarsoft(null); setPreviewPendientes([]); }}>
+                  Cancelar
+                </Button>
+                <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={handleConfirmarMigracionStarsoft}>
+                  Confirmar y migrar
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Modal de progreso durante la migración a Starsoft */}
