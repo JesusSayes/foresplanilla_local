@@ -59,24 +59,23 @@ const parseResponse = async (response) => {
   }
 };
 
-const toISODate = (value) => {
+const toISODateTime = (value) => {
   if (!value) return null;
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const year = value.getUTCFullYear();
-    const month = String(value.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(value.getUTCDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return value.toISOString().slice(0, 19);
   }
 
-  const date = String(value).split('T')[0];
+  const date = String(value).trim();
+  const dateTimeMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})/);
+  if (dateTimeMatch) return `${dateTimeMatch[1]}-${dateTimeMatch[2]}-${dateTimeMatch[3]}T${dateTimeMatch[4]}`;
   const isoMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoMatch) return date.slice(0, 10);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}T00:00:00`;
   const dmyMatch = date.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-  if (dmyMatch) return `${dmyMatch[3]}-${dmyMatch[2]}-${dmyMatch[1]}`;
+  if (dmyMatch) return `${dmyMatch[3]}-${dmyMatch[2]}-${dmyMatch[1]}T00:00:00`;
   return null;
 };
 
-const todayISO = () => new Date().toISOString().split('T')[0];
+const todayISO = () => new Date().toISOString();
 
 const sanitizeAnnomes = (value) => String(value || '').replace(/\D/g, '');
 
@@ -85,22 +84,23 @@ export const buildStarsoftPayload = (asientos) => asientos.map(asiento => ({
   annomes: sanitizeAnnomes(asiento.annomes),
   subdiario: asiento.subdiario || '',
   comprobante: asiento.comprobante || '',
-  fecha_Registro: toISODate(asiento.fecha_registro) || toISODate(asiento.fecha_doc) || todayISO(),
-  fecha_Documento: toISODate(asiento.fecha_doc) || toISODate(asiento.fecha_registro) || todayISO(),
+  fecha_Registro: toISODateTime(asiento.fecha_registro) || toISODateTime(asiento.fecha_doc) || todayISO(),
+  fecha_Doc: toISODateTime(asiento.fecha_doc) || toISODateTime(asiento.fecha_registro) || todayISO(),
   tipo_Anexo: asiento.tipo_anexo || '',
   cod_Anexo: asiento.cod_anexo || '',
   tipo_Doc: asiento.tipo_doc || '',
   nro_Doc: asiento.nro_doc || '',
-  fecha_Vencimiento: asiento.fecha_vencimiento ? toISODate(asiento.fecha_vencimiento) : null,
+  fecha_Vencimiento: asiento.fecha_vencimiento ? toISODateTime(asiento.fecha_vencimiento) : null,
+  moneda: asiento.moneda === 'USD' ? 'ME' : asiento.moneda === 'PEN' ? 'MN' : (asiento.moneda || ''),
   importe: asiento.importe ?? 0,
-  conv_Tc: asiento.conversion_tc || 'M',
+  conversion_Tc: asiento.conversion_tc || 'M',
   tc: asiento.tc ?? 1,
   glosa: asiento.glosa || '',
+  centro_Costos: asiento.centro_costos || '',
   glosa_Mov: asiento.glosa_mov || '',
   anulado: !!asiento.anulado,
   debe_Haber: asiento.debe_haber || '',
-  centro_Costos: asiento.centro_costos || '',
-  moneda: asiento.moneda === 'USD' ? 'ME' : asiento.moneda === 'PEN' ? 'MN' : (asiento.moneda || ''),
+  medio_Pago: asiento.medio_pago || '',
 }));
 
 const getStarsoftErrorMessage = (data, status) => {
