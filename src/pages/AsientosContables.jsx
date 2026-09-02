@@ -283,11 +283,7 @@ export default function AsientosContables() {
     setModalMigracion(null);
     setProgresoMigracion({ logs: [], total: pendientes.length, procesados: 0 });
 
-    const CHUNK_SIZE = 20;
-    const chunks = [];
-    for (let i = 0; i < pendientes.length; i += CHUNK_SIZE) {
-      chunks.push(pendientes.slice(i, i + CHUNK_SIZE));
-    }
+    const chunks = [pendientes];
 
     let totalMigrados = 0;
     let totalErrores = 0;
