@@ -365,7 +365,7 @@ export default function ConsultaPlanillas() {
           cod_anexo: emp.document_number || "",
           conversion_tc: "",
           moneda: "PEN",
-          tc: tcValue,
+          tc: 1,
           glosa: isSNP ? `SNP ${period}` : `${payrollType} - ${period}`,
           centro_costos: cc?.code || "",
           centro_costos_id: assignment?.cost_center_id || "",
