@@ -41,15 +41,6 @@ const getActiveConfig = async () => {
   return rows[0] || null;
 };
 
-const getActiveCompanyRuc = async () => {
-  const company = await prisma.company_info.findFirst({
-    where: { is_active: true },
-    orderBy: { created_date: 'desc' },
-    select: { ruc: true },
-  });
-  return company?.ruc || '';
-};
-
 const getAsientosByIds = async (asientoIds) => {
   const asientos = await prisma.$queryRaw`
     SELECT * FROM asiento_contable
@@ -100,7 +91,7 @@ const todayISO = () => new Date().toISOString();
 
 const sanitizeAnnomes = (value) => String(value || '').replace(/\D/g, '');
 
-export const buildStarsoftPayload = (asientos, { ruc = '', codEmpresa = '' } = {}) => {
+export const buildStarsoftPayload = (asientos) => {
   const seenComprobante = new Set();
   const listadoAsientos = asientos.map(asiento => {
     const key = `${asiento.comprobante}|${asiento.subdiario}|${sanitizeAnnomes(asiento.annomes)}`;
@@ -136,7 +127,7 @@ export const buildStarsoftPayload = (asientos, { ruc = '', codEmpresa = '' } = {
     };
   });
 
-  return { ruc, codEmpresa, listadoAsientos };
+  return listadoAsientos;
 };
 
 const getStarsoftErrorMessage = (data, status) => {
@@ -269,10 +260,7 @@ export const migrate = async (req, res, next) => {
       }
 
       const asientos = await getAsientosByIds(asientoIds);
-      const payload = buildStarsoftPayload(asientos, {
-        ruc: await getActiveCompanyRuc(),
-        codEmpresa: config.cod_empresa,
-      });
+      const payload = buildStarsoftPayload(asientos);
 
       return res.json({
         success: true,
@@ -327,10 +315,7 @@ export const migrate = async (req, res, next) => {
     }
 
     const asientos = await getAsientosByIds(asientoIds);
-    const payload = buildStarsoftPayload(asientos, {
-      ruc: await getActiveCompanyRuc(),
-      codEmpresa: config.cod_empresa,
-    });
+    const payload = buildStarsoftPayload(asientos);
 
     let sendResponse;
     try {
