@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildStarsoftPayload, getAnexoValidationError } from '../controllers/starsoftController.js';
 
-test('construye el arreglo plano y aplica TC solo a la primera línea del comprobante', () => {
+test('construye el arreglo plano y aplica conversión y TC a todas las líneas del comprobante', () => {
   const payload = buildStarsoftPayload([{
     cuenta: '621101',
     annomes: '2026-08',
@@ -75,9 +75,9 @@ test('construye el arreglo plano y aplica TC solo a la primera línea del compro
       Fecha_Vencimiento: null,
       Moneda: 'MN',
       Importe: 2500.5,
-      Conversion_Tc: '',
+      Conversion_Tc: 'VTA',
       Fecha_Registro: '2026-08-31T00:00:00',
-      Tc: 0,
+      Tc: 1,
       Glosa: '',
       Centro_Costos: '',
       Glosa_Mov: '',
@@ -123,7 +123,8 @@ test('usa el último tipo de cambio activo anterior o igual a la fecha del docum
   }]);
 
   assert.equal(payload[0].Tc, 3.8123);
-  assert.equal(payload[1].Tc, 0);
+  assert.equal(payload[1].Tc, 3.8123);
+  assert.equal(payload[1].Conversion_Tc, 'VTA');
 });
 
 test('rechaza asientos con líneas sin anexo antes de enviarlos a Starsoft', () => {
