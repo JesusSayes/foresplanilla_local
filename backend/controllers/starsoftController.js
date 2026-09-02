@@ -41,6 +41,27 @@ const getActiveConfig = async () => {
   return rows[0] || null;
 };
 
+const getActiveCompanyRuc = async () => {
+  const company = await prisma.company_info.findFirst({
+    where: { is_active: true },
+    orderBy: { created_date: 'desc' },
+    select: { ruc: true },
+  });
+  return company?.ruc || '';
+};
+
+const getAsientosByIds = async (asientoIds) => {
+  const asientos = await prisma.$queryRaw`
+    SELECT * FROM asiento_contable
+    WHERE id IN (${Prisma.join(asientoIds)})
+  `;
+  const requestedOrder = new Map(asientoIds.map((id, index) => [id, index]));
+  return asientos.sort((a, b) =>
+    (requestedOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+    (requestedOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+  );
+};
+
 const updateTestResult = (id, status, message) => prisma.$executeRaw`
   UPDATE starsoft_config
   SET last_test_status = ${status},
@@ -79,29 +100,44 @@ const todayISO = () => new Date().toISOString();
 
 const sanitizeAnnomes = (value) => String(value || '').replace(/\D/g, '');
 
-export const buildStarsoftPayload = (asientos) => asientos.map(asiento => ({
-  cuenta: asiento.cuenta || '',
-  annomes: sanitizeAnnomes(asiento.annomes),
-  subdiario: asiento.subdiario || '',
-  comprobante: asiento.comprobante || '',
-  fecha_Registro: toISODateTime(asiento.fecha_registro) || toISODateTime(asiento.fecha_doc) || todayISO(),
-  fecha_Doc: toISODateTime(asiento.fecha_doc) || toISODateTime(asiento.fecha_registro) || todayISO(),
-  tipo_Anexo: asiento.tipo_anexo || '',
-  cod_Anexo: asiento.cod_anexo || '',
-  tipo_Doc: asiento.tipo_doc || '',
-  nro_Doc: asiento.nro_doc || '',
-  fecha_Vencimiento: asiento.fecha_vencimiento ? toISODateTime(asiento.fecha_vencimiento) : null,
-  moneda: asiento.moneda === 'USD' ? 'ME' : asiento.moneda === 'PEN' ? 'MN' : (asiento.moneda || ''),
-  importe: Number(asiento.importe) || 0,
-  conversion_Tc: (asiento.moneda === 'USD' || asiento.moneda === 'ME') ? (asiento.conversion_tc || 'M') : '',
-  tc: (asiento.moneda === 'USD' || asiento.moneda === 'ME') ? (Number(asiento.tc) || 1) : 1,
-  glosa: asiento.glosa || '',
-  centro_Costos: asiento.centro_costos || '',
-  glosa_Mov: asiento.glosa_mov || '',
-  anulado: !!asiento.anulado,
-  debe_Haber: asiento.debe_haber || '',
-  medio_Pago: asiento.medio_pago || '',
-}));
+export const buildStarsoftPayload = (asientos, { ruc = '', codEmpresa = '' } = {}) => {
+  const seenComprobante = new Set();
+  const listadoAsientos = asientos.map(asiento => {
+    const key = `${asiento.comprobante}|${asiento.subdiario}|${sanitizeAnnomes(asiento.annomes)}`;
+    const isMainLine = !seenComprobante.has(key);
+    seenComprobante.add(key);
+
+    const isME = asiento.moneda === 'USD' || asiento.moneda === 'ME';
+    const cuenta = asiento.cuenta || '';
+    const needsAnexo = /^\s*14/.test(cuenta);
+
+    return {
+      Cuenta: cuenta,
+      Annomes: sanitizeAnnomes(asiento.annomes),
+      Subdiario: asiento.subdiario || '',
+      Comprobante: asiento.comprobante || '',
+      Fecha_Doc: toISODateTime(asiento.fecha_doc) || toISODateTime(asiento.fecha_registro) || todayISO(),
+      Tipo_Anexo: needsAnexo ? (asiento.tipo_anexo || '') : '',
+      Cod_Anexo: needsAnexo ? (asiento.cod_anexo || '') : '',
+      Tipo_Doc: asiento.tipo_doc || '',
+      Nro_Doc: asiento.nro_doc || '',
+      Fecha_Vencimiento: asiento.fecha_vencimiento ? toISODateTime(asiento.fecha_vencimiento) : null,
+      Moneda: isME ? 'ME' : asiento.moneda === 'PEN' ? 'MN' : (asiento.moneda || ''),
+      Importe: Number(asiento.importe) || 0,
+      Conversion_Tc: isMainLine ? 'VTA' : '',
+      Fecha_Registro: toISODateTime(asiento.fecha_registro) || toISODateTime(asiento.fecha_doc) || todayISO(),
+      Tc: isMainLine ? (isME ? (Number(asiento.tc) || 1) : 1) : 0,
+      Glosa: asiento.glosa || '',
+      Centro_Costos: asiento.centro_costos || '',
+      Glosa_Mov: asiento.glosa_mov || '',
+      Anulado: !!asiento.anulado,
+      Debe_Haber: asiento.debe_haber || '',
+      Medio_Pago: asiento.medio_pago || '',
+    };
+  });
+
+  return { ruc, codEmpresa, listadoAsientos };
+};
 
 const getStarsoftErrorMessage = (data, status) => {
   let message = data?.message || data?.error || data?.mensaje || data?.detail || data?.details || '';
@@ -232,16 +268,16 @@ export const migrate = async (req, res, next) => {
         return res.status(400).json({ error: 'No se enviaron asientos para generar la vista previa.' });
       }
 
-      const asientos = await prisma.$queryRaw`
-        SELECT * FROM asiento_contable
-        WHERE id IN (${Prisma.join(asientoIds)})
-      `;
-      const payload = buildStarsoftPayload(asientos);
+      const asientos = await getAsientosByIds(asientoIds);
+      const payload = buildStarsoftPayload(asientos, {
+        ruc: await getActiveCompanyRuc(),
+        codEmpresa: config.cod_empresa,
+      });
 
       return res.json({
         success: true,
         preview: true,
-        total: payload.length,
+        total: asientos.length,
         destination: config.api_url || null,
         payload,
       });
@@ -290,11 +326,11 @@ export const migrate = async (req, res, next) => {
       return res.status(400).json({ error: 'No se enviaron asientos a migrar.' });
     }
 
-    const asientos = await prisma.$queryRaw`
-      SELECT * FROM asiento_contable
-      WHERE id IN (${Prisma.join(asientoIds)})
-    `;
-    const payload = buildStarsoftPayload(asientos);
+    const asientos = await getAsientosByIds(asientoIds);
+    const payload = buildStarsoftPayload(asientos, {
+      ruc: await getActiveCompanyRuc(),
+      codEmpresa: config.cod_empresa,
+    });
 
     let sendResponse;
     try {

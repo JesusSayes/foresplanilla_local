@@ -222,10 +222,9 @@ export default function ConsultaPlanillas() {
       const annomes = `${grupo.year}${String(grupo.month).padStart(2, "0")}`;
       const fechaDoc = format(new Date(grupo.year, grupo.month, 0), "yyyy-MM-dd");
       const fechaRegistro = format(new Date(), "yyyy-MM-dd");
-      // Starsoft limita la columna COMPROBANTE a 4 caracteres en TB_IMPORTAR_STANDARD.
-      // Usar YYMM (4 dígitos) para evitar truncamiento. El subdiario ya distingue
-      // el tipo de planilla, y annomes conserva el período completo.
-      const comprobante = annomes.slice(-4);
+      // Comprobante: correlativo de 4 dígitos por trabajador dentro del período
+      // (0001, 0002, ...). Se reinicia cada período (mes). El subdiario y annomes
+      // conservan el tipo de planilla y el período completo.
 
       // Obtener el código de empresa activo y la homologación de cuentas por concepto
       // desde la configuración Starsoft activa. Si no hay configuración activa o no
@@ -343,7 +342,7 @@ export default function ConsultaPlanillas() {
       const balanceIssues = []; // descuadres por trabajador (Debe != Haber)
       const netoConfigMissing = !netoConfig;
 
-      const buildBase = (emp, p) => {
+      const buildBase = (emp, p, comprobante) => {
         let assignment = costCenterAssignments.find(
           a => a.assignment_type === "Empleado" && a.employee_id === emp.id && a.is_active
         );
@@ -379,7 +378,7 @@ export default function ConsultaPlanillas() {
           estado_migracion: "Pendiente",
           anulado: false,
         };
-        if (isSNP) base.fecha_vencimiento = fechaDoc;
+        base.fecha_vencimiento = fechaDoc;
         return { base, empName };
       };
 
@@ -388,6 +387,7 @@ export default function ConsultaPlanillas() {
       // homologación (cuentas_por_concepto). El neto a pagar se calcula como
       // figura de balanceo (Total Debe − Total Haber) para garantizar que el
       // asiento cuadre persona por persona.
+      let correlativo = 0;
       for (const p of grupo.payslips) {
         const emp = allEmployees.find(e => e.id === p.employee_id);
         if (!emp) continue;
@@ -398,7 +398,9 @@ export default function ConsultaPlanillas() {
           continue;
         }
 
-        const { base, empName } = buildBase(emp, p);
+        correlativo += 1;
+        const comprobante = String(correlativo).padStart(4, "0");
+        const { base, empName } = buildBase(emp, p, comprobante);
 
         // Acumulador local de líneas y totales por persona (para calcular el neto
         // de balanceo y verificar que Debe = Haber).

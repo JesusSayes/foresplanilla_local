@@ -140,32 +140,64 @@ export default async function (req: Request): Promise<Response> {
     // annomes debe ser solo dígitos (AAAAMM), sin guiones ni separadores.
     const sanitizeAnnomes = (a: any): string => String(a || "").replace(/\D/g, "");
 
-    // Armar payload con todos los asientos en un solo envío (batch). Starsoft
-    // espera un array de AsientoStandar en la raíz del body. La empresa no va
-    // en cada item: se define al autenticar (codEmpresa en el token).
-    const payload = asientos.map((a: any) => ({
-      cuenta: a.cuenta || "",
-      annomes: sanitizeAnnomes(a.annomes),
-      subdiario: a.subdiario || "",
-      comprobante: a.comprobante || "",
-      fecha_Registro: toISODateTime(a.fecha_registro) || toISODateTime(a.fecha_doc) || todayISO(),
-      fecha_Doc: toISODateTime(a.fecha_doc) || toISODateTime(a.fecha_registro) || todayISO(),
-      tipo_Anexo: a.tipo_anexo || "",
-      cod_Anexo: a.cod_anexo || "",
-      tipo_Doc: a.tipo_doc || "",
-      nro_Doc: a.nro_doc || "",
-      fecha_Vencimiento: a.fecha_vencimiento ? toISODateTime(a.fecha_vencimiento) : null,
-      moneda: a.moneda === "USD" ? "ME" : a.moneda === "PEN" ? "MN" : (a.moneda || ""),
-      importe: Number(a.importe) || 0,
-      conversion_Tc: (a.moneda === "USD" || a.moneda === "ME") ? (a.conversion_tc || "M") : "",
-      tc: (a.moneda === "USD" || a.moneda === "ME") ? (Number(a.tc) || 1) : 1,
-      glosa: a.glosa || "",
-      centro_Costos: a.centro_costos || "",
-      glosa_Mov: a.glosa_mov || "",
-      anulado: !!a.anulado,
-      debe_Haber: a.debe_haber || "",
-      medio_Pago: a.medio_pago || "",
-    }));
+    // Obtener RUC de la empresa desde CompanyInfo (para el wrapper oficial
+    // AsientosGeneralStandar: { ruc, codEmpresa, listadoAsientos }).
+    let ruc = "";
+    try {
+      const companies = await base44.asServiceRole.entities.CompanyInfo.filter({ is_active: true });
+      if (companies && companies.length > 0) ruc = companies[0].ruc || "";
+    } catch { /* CompanyInfo opcional */ }
+
+    // Armar payload agrupando por comprobante (comprobante + subdiario + annomes).
+    // Starsoft lee la conversión y el TC de la PRIMERA línea (cuenta principal)
+    // de cada comprobante; las líneas de equivalencia no deben llevarlos.
+    // El anexo (Tipo_Anexo/Cod_Anexo) solo se envía en cuentas 14x (cobrar/pagar).
+    const isME = (a: any) => a.moneda === "USD" || a.moneda === "ME";
+    const needsAnexo = (cuenta: string) => /^\s*14/.test(cuenta || "");
+
+    const seenComprobante = new Set<string>();
+    const listadoAsientos = asientos.map((a: any) => {
+      const key = `${a.comprobante}|${a.subdiario}|${sanitizeAnnomes(a.annomes)}`;
+      const isMainLine = !seenComprobante.has(key);
+      seenComprobante.add(key);
+
+      const me = isME(a);
+      const convTc = isMainLine ? "VTA" : "";
+      const tcVal = isMainLine ? (me ? (Number(a.tc) || 1) : 1) : 0;
+
+      const cuenta = a.cuenta || "";
+      const hasAnexo = needsAnexo(cuenta);
+
+      return {
+        Cuenta: cuenta,
+        Annomes: sanitizeAnnomes(a.annomes),
+        Subdiario: a.subdiario || "",
+        Comprobante: a.comprobante || "",
+        Fecha_Doc: toISODateTime(a.fecha_doc) || toISODateTime(a.fecha_registro) || todayISO(),
+        Tipo_Anexo: hasAnexo ? (a.tipo_anexo || "") : "",
+        Cod_Anexo: hasAnexo ? (a.cod_anexo || "") : "",
+        Tipo_Doc: a.tipo_doc || "",
+        Nro_Doc: a.nro_doc || "",
+        Fecha_Vencimiento: a.fecha_vencimiento ? toISODateTime(a.fecha_vencimiento) : null,
+        Moneda: me ? "ME" : a.moneda === "PEN" ? "MN" : (a.moneda || ""),
+        Importe: Number(a.importe) || 0,
+        Conversion_Tc: convTc,
+        Fecha_Registro: toISODateTime(a.fecha_registro) || toISODateTime(a.fecha_doc) || todayISO(),
+        Tc: tcVal,
+        Glosa: a.glosa || "",
+        Centro_Costos: a.centro_costos || "",
+        Glosa_Mov: a.glosa_mov || "",
+        Anulado: !!a.anulado,
+        Debe_Haber: a.debe_haber || "",
+        Medio_Pago: a.medio_pago || "",
+      };
+    });
+
+    const payload = {
+      ruc,
+      codEmpresa: config.cod_empresa,
+      listadoAsientos,
+    };
 
     let sendRes: Response;
     try {

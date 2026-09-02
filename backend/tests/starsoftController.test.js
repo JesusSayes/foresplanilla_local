@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildStarsoftPayload } from '../controllers/starsoftController.js';
 
-test('construye el mismo payload usado para enviar asientos a Starsoft', () => {
+test('construye el wrapper y aplica TC solo a la primera línea del comprobante', () => {
   const payload = buildStarsoftPayload([{
     cuenta: '621101',
     annomes: '2026-08',
@@ -16,8 +16,6 @@ test('construye el mismo payload usado para enviar asientos a Starsoft', () => {
     nro_doc: null,
     fecha_vencimiento: '2026-09-15T14:30:45.000Z',
     importe: '2500.50',
-    conversion_tc: 'VTA',
-    tc: '3.75',
     glosa: 'PLANILLA AGOSTO 2026',
     glosa_mov: 'REMUNERACIÓN',
     anulado: false,
@@ -25,41 +23,82 @@ test('construye el mismo payload usado para enviar asientos a Starsoft', () => {
     centro_costos: 'ADM',
     moneda: 'PEN',
     medio_pago: '001',
-  }]);
-
-  assert.deepEqual(payload, [{
-    cuenta: '621101',
+  }, {
+    cuenta: '141101',
     annomes: '202608',
     subdiario: '35',
     comprobante: '0001',
-    fecha_Registro: '2026-08-31T00:00:00',
-    fecha_Doc: '2026-08-31T00:00:00',
-    tipo_Anexo: 'T',
-    cod_Anexo: '12345678',
-    tipo_Doc: 'PL',
-    nro_Doc: '',
-    fecha_Vencimiento: '2026-09-15T14:30:45',
-    moneda: 'MN',
+    fecha_registro: '2026-08-31',
+    fecha_doc: '2026-08-31',
+    tipo_anexo: 'T',
+    cod_anexo: '12345678',
+    tipo_doc: 'PL',
+    nro_doc: '0001',
     importe: 2500.5,
-    conversion_Tc: '',
-    tc: 1,
-    glosa: 'PLANILLA AGOSTO 2026',
-    centro_Costos: 'ADM',
-    glosa_Mov: 'REMUNERACIÓN',
     anulado: false,
-    debe_Haber: 'D',
-    medio_Pago: '001',
-  }]);
+    debe_haber: 'H',
+    moneda: 'PEN',
+  }], { ruc: '20123456789', codEmpresa: '003' });
+
+  assert.deepEqual(payload, {
+    ruc: '20123456789',
+    codEmpresa: '003',
+    listadoAsientos: [{
+      Cuenta: '621101',
+      Annomes: '202608',
+      Subdiario: '35',
+      Comprobante: '0001',
+      Fecha_Doc: '2026-08-31T00:00:00',
+      Tipo_Anexo: '',
+      Cod_Anexo: '',
+      Tipo_Doc: 'PL',
+      Nro_Doc: '',
+      Fecha_Vencimiento: '2026-09-15T14:30:45',
+      Moneda: 'MN',
+      Importe: 2500.5,
+      Conversion_Tc: 'VTA',
+      Fecha_Registro: '2026-08-31T00:00:00',
+      Tc: 1,
+      Glosa: 'PLANILLA AGOSTO 2026',
+      Centro_Costos: 'ADM',
+      Glosa_Mov: 'REMUNERACIÓN',
+      Anulado: false,
+      Debe_Haber: 'D',
+      Medio_Pago: '001',
+    }, {
+      Cuenta: '141101',
+      Annomes: '202608',
+      Subdiario: '35',
+      Comprobante: '0001',
+      Fecha_Doc: '2026-08-31T00:00:00',
+      Tipo_Anexo: 'T',
+      Cod_Anexo: '12345678',
+      Tipo_Doc: 'PL',
+      Nro_Doc: '0001',
+      Fecha_Vencimiento: null,
+      Moneda: 'MN',
+      Importe: 2500.5,
+      Conversion_Tc: '',
+      Fecha_Registro: '2026-08-31T00:00:00',
+      Tc: 0,
+      Glosa: '',
+      Centro_Costos: '',
+      Glosa_Mov: '',
+      Anulado: false,
+      Debe_Haber: 'H',
+      Medio_Pago: '',
+    }],
+  });
 });
 
-test('conserva el tipo de cambio para asientos en moneda extranjera', () => {
-  const [payload] = buildStarsoftPayload([{
+test('conserva seis decimales del TC de la primera línea en moneda extranjera', () => {
+  const payload = buildStarsoftPayload([{
+    comprobante: '0002',
     moneda: 'USD',
-    conversion_tc: 'VTA',
     tc: '3.812345',
   }]);
 
-  assert.equal(payload.moneda, 'ME');
-  assert.equal(payload.conversion_Tc, 'VTA');
-  assert.equal(payload.tc, 3.812345);
+  assert.equal(payload.listadoAsientos[0].Moneda, 'ME');
+  assert.equal(payload.listadoAsientos[0].Conversion_Tc, 'VTA');
+  assert.equal(payload.listadoAsientos[0].Tc, 3.812345);
 });
