@@ -249,11 +249,10 @@ export default function AsientosContables() {
     }
     setCargandoPreviewStarsoft(true);
     try {
-      const res = await base44.functions.invoke("migrarAsientosStarsoft", {
+      const data = await starsoftAPI.migrate({
         mode: "preview",
         asiento_ids: pendientes.map(a => a.id),
       });
-      const data = res.data;
       if (data?.success === false || data?.error) {
         toast.error(data?.error || "No se pudo generar la vista previa de envío a Starsoft");
         return;
