@@ -167,9 +167,19 @@ export class PayrollCalculator {
 
         case "tardiness_discount": {
           // Descuento por tardanzas: (salario_diario / 8) * minutos_tardanza / 60
-          // Aplica para tardanzas mayores a 10 minutos (tolerancia)
+          // Aplica para tardanzas mayores a 10 minutos (tolerancia).
+          // Usa la tardanza efectiva: si el registro tiene compensación activa
+          // (tardiness_compensation_status="Activa"), descuenta los minutos
+          // compensados de la tardanza original. Si la funcionalidad está
+          // deshabilitada, usa late_minutes original sin cambios.
           const lateRecords = context.late_records || [];
-          const totalLateMinutes = lateRecords.reduce((sum, r) => sum + (r.late_minutes || 0), 0);
+          const enableComp = context.enable_tardiness_compensation || false;
+          const totalLateMinutes = lateRecords.reduce((sum, r) => {
+            const compMin = enableComp && r.tardiness_compensation_status === "Activa"
+              ? (r.tardiness_compensation_minutes || 0)
+              : 0;
+            return sum + Math.max(0, (r.late_minutes || 0) - compMin);
+          }, 0);
           const dailySalary = (context.base_salary || 0) / 30;
           const hourlyRate = dailySalary / 8;
           result = -(hourlyRate * (totalLateMinutes / 60));
@@ -506,6 +516,7 @@ export class PayrollCalculator {
       absent_records: extraContext.absent_records || [],
       loan_installments: extraContext.loan_installments || [],
       afp: extraContext.afp || null,
+      enable_tardiness_compensation: extraContext.enable_tardiness_compensation || false,
     };
   }
 
