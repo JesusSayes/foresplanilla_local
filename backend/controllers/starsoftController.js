@@ -132,18 +132,11 @@ export const buildStarsoftPayload = (asientos, tiposCambio = []) => {
     }))
     .filter(tipoCambio => tipoCambio.fecha)
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
-  const seenComprobante = new Set();
   const listadoAsientos = asientos.map(asiento => {
-    const key = `${asiento.comprobante}|${asiento.subdiario}|${sanitizeAnnomes(asiento.annomes)}`;
-    const isMainLine = !seenComprobante.has(key);
-    seenComprobante.add(key);
-
     const isME = asiento.moneda === 'USD' || asiento.moneda === 'ME';
     const cuenta = asiento.cuenta || '';
     const fechaDoc = toISODateTime(asiento.fecha_doc) || toISODateTime(asiento.fecha_registro) || todayISO();
-    const tipoCambio = isMainLine
-      ? tiposCambioOrdenados.find(item => item.fecha <= fechaDoc.slice(0, 10))
-      : null;
+    const tipoCambio = tiposCambioOrdenados.find(item => item.fecha <= fechaDoc.slice(0, 10));
 
     return {
       Cuenta: cuenta,
@@ -158,9 +151,9 @@ export const buildStarsoftPayload = (asientos, tiposCambio = []) => {
       Fecha_Vencimiento: asiento.fecha_vencimiento ? toISODateTime(asiento.fecha_vencimiento) : null,
       Moneda: isME ? 'ME' : asiento.moneda === 'PEN' ? 'MN' : (asiento.moneda || ''),
       Importe: Number(asiento.importe) || 0,
-      Conversion_Tc: isMainLine ? 'VTA' : '',
+      Conversion_Tc: 'VTA',
       Fecha_Registro: toISODateTime(asiento.fecha_registro) || toISODateTime(asiento.fecha_doc) || todayISO(),
-      Tc: isMainLine ? (tipoCambio?.valorVenta || Number(asiento.tc) || 1) : 0,
+      Tc: tipoCambio?.valorVenta || Number(asiento.tc) || 1,
       Glosa: asiento.glosa || '',
       Centro_Costos: asiento.centro_costos || '',
       Glosa_Mov: asiento.glosa_mov || '',
