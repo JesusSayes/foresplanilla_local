@@ -354,6 +354,67 @@ export const computeScheduledHoursFromSchedule = (schedule, date) => {
   return Math.max(0, hours - breakHours);
 };
 
+/**
+ * Minutos adicionales disponibles después de la hora programada de salida.
+ * Usa la última salida registrada del día (todos los segmentos).
+ * Soporta turnos nocturnos (cruce de medianoche).
+ */
+export const getAdditionalMinutes = (record) => {
+  if (!record) return 0;
+  if (!record.scheduled_end) return 0;
+
+  const clockOuts = [record.clock_out, record.clock_out_2, record.clock_out_3, record.clock_out_4]
+    .filter(Boolean)
+    .map(toMin);
+  if (clockOuts.length === 0) return 0;
+
+  const schedEnd = toMin(record.scheduled_end);
+  const schedStart = toMin(record.scheduled_start);
+  const isNightShift = Boolean(record.scheduled_start) && schedEnd < schedStart;
+  const normalizedEnd = isNightShift ? schedEnd + 1440 : schedEnd;
+  const lastClockOut = Math.max(...clockOuts.map((out) =>
+    isNightShift && out < schedStart ? out + 1440 : out
+  ));
+
+  return Math.max(0, lastClockOut - normalizedEnd);
+};
+
+/**
+ * Tardanza efectiva de un registro, descontando los minutos compensados
+ * cuando la compensación está activa y la funcionalidad está habilitada.
+ * No modifica late_minutes; solo calcula el valor efectivo en el punto de consumo.
+ */
+export const getEffectiveLateMinutes = (record, enableCompensation) => {
+  if (!enableCompensation) return record?.late_minutes || 0;
+  const compMin = record?.tardiness_compensation_status === "Activa"
+    ? (record.tardiness_compensation_minutes || 0)
+    : 0;
+  return Math.max(0, (record?.late_minutes || 0) - compMin);
+};
+
+/**
+ * Horas extras efectivas de un registro, descontando los minutos compensados
+ * (que no deben contabilizarse simultáneamente como HE).
+ * Descuenta primero de HE 25%, luego de HE 35%.
+ */
+export const getEffectiveOvertime = (record, enableCompensation) => {
+  const ot25 = Number(record?.overtime_hours_25 || 0);
+  const ot35 = Number(record?.overtime_hours_35 || 0);
+  if (!enableCompensation) return { overtime_hours_25: ot25, overtime_hours_35: ot35 };
+  const compMin = record?.tardiness_compensation_status === "Activa"
+    ? (record.tardiness_compensation_minutes || 0)
+    : 0;
+  if (compMin <= 0) return { overtime_hours_25: ot25, overtime_hours_35: ot35 };
+  const compHours = compMin / 60;
+  const deduct25 = Math.min(ot25, compHours);
+  const remainingComp = compHours - deduct25;
+  const deduct35 = Math.min(ot35, remainingComp);
+  return {
+    overtime_hours_25: Math.max(0, ot25 - deduct25),
+    overtime_hours_35: Math.max(0, ot35 - deduct35),
+  };
+};
+
 export const computeScheduledHoursForPeriod = (schedule, startDateStr, endDateStr) => {
   if (!schedule) return 0;
   const start = new Date(startDateStr + "T00:00:00");
