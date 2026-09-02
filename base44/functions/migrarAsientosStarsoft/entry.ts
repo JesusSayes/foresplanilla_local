@@ -118,16 +118,25 @@ export default async function (req: Request): Promise<Response> {
     // formato ISO 8601 (YYYY-MM-DD) para convertir a System.DateTime. La
     // entidad ya las guarda en ISO; solo normalizamos y garantizamos un valor
     // válido (nunca string vacío ni null para los campos obligatorios).
-    const toISODate = (d: any): string | null => {
+    // Devuelve ISO 8601 date-time completo (YYYY-MM-DDTHH:mm:ss). Si la fecha
+    // original ya incluye componente de hora, se conserva; si solo tiene
+    // YYYY-MM-DD se le agrega T00:00:00. Starsoft usa System.Text.Json que
+    // espera $date-time para los campos DateTime.
+    const toISODateTime = (d: any): string | null => {
       if (!d) return null;
-      const s = String(d).split("T")[0];
+      const s = String(d).trim();
+      // Ya incluye componente de hora (ISO date-time)
+      const dt = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})/);
+      if (dt) return `${dt[1]}-${dt[2]}-${dt[3]}T${dt[4]}`;
+      // Solo fecha YYYY-MM-DD
       const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (m) return s.slice(0, 10);
+      if (m) return `${m[1]}-${m[2]}-${m[3]}T00:00:00`;
+      // Formato dd/MM/yyyy
       const m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-      if (m2) return `${m2[3]}-${m2[2]}-${m2[1]}`;
+      if (m2) return `${m2[3]}-${m2[2]}-${m2[1]}T00:00:00`;
       return null;
     };
-    const todayISO = () => new Date().toISOString().split("T")[0];
+    const todayISO = () => new Date().toISOString();
     // annomes debe ser solo dígitos (AAAAMM), sin guiones ni separadores.
     const sanitizeAnnomes = (a: any): string => String(a || "").replace(/\D/g, "");
 
@@ -139,22 +148,23 @@ export default async function (req: Request): Promise<Response> {
       annomes: sanitizeAnnomes(a.annomes),
       subdiario: a.subdiario || "",
       comprobante: a.comprobante || "",
-      fecha_Registro: toISODate(a.fecha_registro) || toISODate(a.fecha_doc) || todayISO(),
-      fecha_Documento: toISODate(a.fecha_doc) || toISODate(a.fecha_registro) || todayISO(),
+      fecha_Registro: toISODateTime(a.fecha_registro) || toISODateTime(a.fecha_doc) || todayISO(),
+      fecha_Doc: toISODateTime(a.fecha_doc) || toISODateTime(a.fecha_registro) || todayISO(),
       tipo_Anexo: a.tipo_anexo || "",
       cod_Anexo: a.cod_anexo || "",
       tipo_Doc: a.tipo_doc || "",
       nro_Doc: a.nro_doc || "",
-      fecha_Vencimiento: a.fecha_vencimiento ? toISODate(a.fecha_vencimiento) : null,
+      fecha_Vencimiento: a.fecha_vencimiento ? toISODateTime(a.fecha_vencimiento) : null,
+      moneda: a.moneda === "USD" ? "ME" : a.moneda === "PEN" ? "MN" : (a.moneda || ""),
       importe: a.importe ?? 0,
-      conv_Tc: a.conversion_tc || "M",
+      conversion_Tc: a.conversion_tc || "M",
       tc: a.tc ?? 1,
       glosa: a.glosa || "",
+      centro_Costos: a.centro_costos || "",
       glosa_Mov: a.glosa_mov || "",
       anulado: !!a.anulado,
       debe_Haber: a.debe_haber || "",
-      centro_Costos: a.centro_costos || "",
-      moneda: a.moneda === "USD" ? "ME" : a.moneda === "PEN" ? "MN" : (a.moneda || ""),
+      medio_Pago: a.medio_pago || "",
     }));
 
     let sendRes: Response;
