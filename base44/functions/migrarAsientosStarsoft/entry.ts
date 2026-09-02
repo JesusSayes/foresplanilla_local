@@ -201,13 +201,17 @@ export default async function (req: Request): Promise<Response> {
       seenComprobante.add(key);
 
       const me = isME(a);
-      const convTc = isMainLine ? "VTA" : "";
+      // Conversion_Tc y TC se envían en TODAS las líneas del comprobante.
+      // Starsoft valida cada línea individualmente; si una línea lleva string
+      // vacío en Conversion_Tc, rechaza todo el comprobante con
+      // "El tipo de conversion no existe".
+      const convTc = "VTA";
       // TC: valor de venta del último día con TC registrado <= fecha_doc.
       // Si no hay TC registrado para ese período, se usa el valor almacenado en
       // el asiento (a.tc) como respaldo.
       const fechaDocAsiento = toISODateTime(a.fecha_doc) || toISODateTime(a.fecha_registro) || todayISO();
-      const tcLookupVal = isMainLine ? tcLookup(fechaDocAsiento) : 0;
-      const tcVal = isMainLine ? (tcLookupVal || Number(a.tc) || 1) : 0;
+      const tcLookupVal = tcLookup(fechaDocAsiento);
+      const tcVal = tcLookupVal || Number(a.tc) || 1;
 
       const cuenta = a.cuenta || "";
 
