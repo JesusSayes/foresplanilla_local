@@ -193,11 +193,11 @@ export default async function (req: Request): Promise<Response> {
       };
     });
 
-    const payload = {
-      ruc,
-      codEmpresa: config.cod_empresa,
-      listadoAsientos,
-    };
+    // El endpoint ApiHub configurado (registrarAsientoStandar) espera el body
+    // como un arreglo JSON plano de AsientoStandar, no el wrapper
+    // { ruc, codEmpresa, listadoAsientos }. ruc/codEmpresa están implícitos en
+    // el token (la autenticación envía codEmpresa+codSistema).
+    const payload = listadoAsientos;
 
     let sendRes: Response;
     try {

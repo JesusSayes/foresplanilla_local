@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildStarsoftPayload } from '../controllers/starsoftController.js';
 
-test('construye el wrapper y aplica TC solo a la primera línea del comprobante', () => {
+test('construye el arreglo plano y aplica TC solo a la primera línea del comprobante', () => {
   const payload = buildStarsoftPayload([{
     cuenta: '621101',
     annomes: '2026-08',
@@ -38,12 +38,9 @@ test('construye el wrapper y aplica TC solo a la primera línea del comprobante'
     anulado: false,
     debe_haber: 'H',
     moneda: 'PEN',
-  }], { ruc: '20123456789', codEmpresa: '003' });
+  }]);
 
-  assert.deepEqual(payload, {
-    ruc: '20123456789',
-    codEmpresa: '003',
-    listadoAsientos: [{
+  assert.deepEqual(payload, [{
       Cuenta: '621101',
       Annomes: '202608',
       Subdiario: '35',
@@ -87,8 +84,7 @@ test('construye el wrapper y aplica TC solo a la primera línea del comprobante'
       Anulado: false,
       Debe_Haber: 'H',
       Medio_Pago: '',
-    }],
-  });
+    }]);
 });
 
 test('conserva seis decimales del TC de la primera línea en moneda extranjera', () => {
@@ -98,7 +94,7 @@ test('conserva seis decimales del TC de la primera línea en moneda extranjera',
     tc: '3.812345',
   }]);
 
-  assert.equal(payload.listadoAsientos[0].Moneda, 'ME');
-  assert.equal(payload.listadoAsientos[0].Conversion_Tc, 'VTA');
-  assert.equal(payload.listadoAsientos[0].Tc, 3.812345);
+  assert.equal(payload[0].Moneda, 'ME');
+  assert.equal(payload[0].Conversion_Tc, 'VTA');
+  assert.equal(payload[0].Tc, 3.812345);
 });
