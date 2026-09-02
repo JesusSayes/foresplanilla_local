@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildStarsoftPayload } from '../controllers/starsoftController.js';
+import { buildStarsoftPayload, getAnexoValidationError } from '../controllers/starsoftController.js';
 
 test('construye el arreglo plano y aplica TC solo a la primera línea del comprobante', () => {
   const payload = buildStarsoftPayload([{
@@ -46,8 +46,8 @@ test('construye el arreglo plano y aplica TC solo a la primera línea del compro
       Subdiario: '35',
       Comprobante: '0001',
       Fecha_Doc: '2026-08-31T00:00:00',
-      Tipo_Anexo: '',
-      Cod_Anexo: '',
+      Tipo_Anexo: 'T',
+      Cod_Anexo: '12345678',
       Tipo_Doc: 'PL',
       Nro_Doc: '',
       Fecha_Vencimiento: '2026-09-15T14:30:45',
@@ -124,4 +124,23 @@ test('usa el último tipo de cambio activo anterior o igual a la fecha del docum
 
   assert.equal(payload[0].Tc, 3.8123);
   assert.equal(payload[1].Tc, 0);
+});
+
+test('rechaza asientos con líneas sin anexo antes de enviarlos a Starsoft', () => {
+  const error = getAnexoValidationError([{
+    comprobante: '0004',
+    cuenta: '621101',
+    tipo_anexo: 'T',
+    cod_anexo: '12345678',
+  }, {
+    comprobante: '0004',
+    cuenta: '401101',
+    tipo_anexo: '',
+    cod_anexo: '',
+  }]);
+
+  assert.equal(error.success, false);
+  assert.equal(error.total, 2);
+  assert.equal(error.errores, 1);
+  assert.match(error.error, /0004 \/ 401101/);
 });

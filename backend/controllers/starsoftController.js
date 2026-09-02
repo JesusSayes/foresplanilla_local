@@ -105,6 +105,25 @@ const todayISO = () => new Date().toISOString();
 
 const sanitizeAnnomes = (value) => String(value || '').replace(/\D/g, '');
 
+export const getAnexoValidationError = (asientos) => {
+  const sinAnexo = asientos.filter(asiento => !asiento.tipo_anexo || !asiento.cod_anexo);
+  if (sinAnexo.length === 0) return null;
+
+  const affected = sinAnexo.slice(0, 5)
+    .map(asiento => `${asiento.comprobante || '—'} / ${asiento.cuenta || '—'}`)
+    .join('; ');
+
+  return {
+    success: false,
+    error: `Hay ${sinAnexo.length} línea(s) de asiento sin tipo_anexo o cod_anexo (anexo del trabajador). ` +
+      'Regenere los asientos del período en Consulta de Planillas para que todas las líneas queden con el anexo del trabajador, y reintente la migración. ' +
+      `Primeras afectadas: ${affected}.`,
+    total: asientos.length,
+    migrados: 0,
+    errores: sinAnexo.length,
+  };
+};
+
 export const buildStarsoftPayload = (asientos, tiposCambio = []) => {
   const tiposCambioOrdenados = tiposCambio
     .map(tipoCambio => ({
@@ -121,7 +140,6 @@ export const buildStarsoftPayload = (asientos, tiposCambio = []) => {
 
     const isME = asiento.moneda === 'USD' || asiento.moneda === 'ME';
     const cuenta = asiento.cuenta || '';
-    const needsAnexo = /^\s*14/.test(cuenta);
     const fechaDoc = toISODateTime(asiento.fecha_doc) || toISODateTime(asiento.fecha_registro) || todayISO();
     const tipoCambio = isMainLine
       ? tiposCambioOrdenados.find(item => item.fecha <= fechaDoc.slice(0, 10))
@@ -133,8 +151,8 @@ export const buildStarsoftPayload = (asientos, tiposCambio = []) => {
       Subdiario: asiento.subdiario || '',
       Comprobante: asiento.comprobante || '',
       Fecha_Doc: fechaDoc,
-      Tipo_Anexo: needsAnexo ? (asiento.tipo_anexo || '') : '',
-      Cod_Anexo: needsAnexo ? (asiento.cod_anexo || '') : '',
+      Tipo_Anexo: asiento.tipo_anexo || '',
+      Cod_Anexo: asiento.cod_anexo || '',
       Tipo_Doc: asiento.tipo_doc || '',
       Nro_Doc: asiento.nro_doc || '',
       Fecha_Vencimiento: asiento.fecha_vencimiento ? toISODateTime(asiento.fecha_vencimiento) : null,
@@ -285,6 +303,9 @@ export const migrate = async (req, res, next) => {
       }
 
       const asientos = await getAsientosByIds(asientoIds);
+      const anexoValidationError = getAnexoValidationError(asientos);
+      if (anexoValidationError) return res.status(400).json(anexoValidationError);
+
       const tiposCambio = await getActiveExchangeRates();
       const payload = buildStarsoftPayload(asientos, tiposCambio);
 
@@ -341,6 +362,9 @@ export const migrate = async (req, res, next) => {
     }
 
     const asientos = await getAsientosByIds(asientoIds);
+    const anexoValidationError = getAnexoValidationError(asientos);
+    if (anexoValidationError) return res.status(400).json(anexoValidationError);
+
     const tiposCambio = await getActiveExchangeRates();
     const payload = buildStarsoftPayload(asientos, tiposCambio);
 
