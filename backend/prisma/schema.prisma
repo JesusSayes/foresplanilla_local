@@ -93,6 +93,11 @@ model attendance_record {
   clock_out_4                                                                              String?                   @db.VarChar(10)
   segment_count                                                                            Int?                      @default(1)
   is_split_day                                                                             Boolean?                  @default(false)
+  tardiness_compensation_minutes                                                           Int                       @default(0)
+  tardiness_compensation_authorizer                                                        String?                   @db.VarChar(255)
+  tardiness_compensation_authorized_at                                                     DateTime?                 @db.Timestamp(6)
+  tardiness_compensation_reason                                                            String?
+  tardiness_compensation_status                                                            String                    @default("") @db.VarChar(20)
   attendance_edit_request_attendance_edit_request_attendance_record_idToattendance_record  attendance_edit_request[] @relation("attendance_edit_request_attendance_record_idToattendance_record")
   attendance_edit_request_attendance_record_last_approved_edit_idToattendance_edit_request attendance_edit_request?  @relation("attendance_record_last_approved_edit_idToattendance_edit_request", fields: [last_approved_edit_id], references: [id], onUpdate: NoAction, map: "fk_attendance_record_last_approved_edit")
 
@@ -1162,16 +1167,17 @@ model attendance_record_backup_20260423 {
 }
 
 model payroll_config {
-  id                   String    @id @db.VarChar(255)
-  created_date         DateTime? @default(now()) @db.Timestamp(6)
-  updated_date         DateTime? @default(now()) @db.Timestamp(6)
-  created_by           String?
-  updated_by           String?
-  config_type          String    @default("Quincenal") @db.VarChar(100)
-  quincenal_percentage Decimal?  @default(40) @db.Decimal(10, 2)
-  quincenal_cutoff_day Int?      @default(7)
-  is_active            Boolean?  @default(true)
-  notes                String?
+  id                            String    @id @db.VarChar(255)
+  created_date                  DateTime? @default(now()) @db.Timestamp(6)
+  updated_date                  DateTime? @default(now()) @db.Timestamp(6)
+  created_by                    String?
+  updated_by                    String?
+  config_type                   String    @default("Quincenal") @db.VarChar(100)
+  quincenal_percentage          Decimal?  @default(40) @db.Decimal(10, 2)
+  quincenal_cutoff_day          Int?      @default(7)
+  is_active                     Boolean?  @default(true)
+  notes                         String?
+  enable_tardiness_compensation Boolean   @default(false)
 
   @@index([is_active], map: "idx_payroll_config_active")
   @@index([config_type], map: "idx_payroll_config_type")
