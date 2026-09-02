@@ -168,9 +168,31 @@ export default async function (req: Request): Promise<Response> {
     // Armar payload agrupando por comprobante (comprobante + subdiario + annomes).
     // Starsoft lee la conversión y el TC de la PRIMERA línea (cuenta principal)
     // de cada comprobante; las líneas de equivalencia no deben llevarlos.
-    // El anexo (Tipo_Anexo/Cod_Anexo) solo se envía en cuentas 14x (cobrar/pagar).
+    // El anexo (Tipo_Anexo/Cod_Anexo) se envía SIEMPRE en todas las líneas del
+    // asiento (anexo del trabajador: tipo TRABAJADORES/HONORARIOS + DNI), sin
+    // filtrar por número de cuenta. Esto resuelve el error masivo de Starsoft
+    // "El tipo de anexo no corresponde a la cuenta" en cuentas 417x/421x/40x/62x.
     const isME = (a: any) => a.moneda === "USD" || a.moneda === "ME";
-    const needsAnexo = (cuenta: string) => /^\s*14/.test(cuenta || "");
+
+    // Validación previa: todo asiento a migrar debe tener tipo_anexo y cod_anexo
+    // (anexo del trabajador). Los asientos generados antes de esta corrección no
+    // los tienen en cuentas distintas a 14x; se rechaza la migración con un mensaje
+    // claro para que el usuario regenere los asientos del período.
+    const sinAnexo = asientos.filter((a: any) => !a.tipo_anexo || !a.cod_anexo);
+    if (sinAnexo.length > 0) {
+      const affected = sinAnexo.slice(0, 5).map((a: any) =>
+        `${a.comprobante || "—"} / ${a.cuenta || "—"}`
+      ).join("; ");
+      return Response.json({
+        success: false,
+        error: `Hay ${sinAnexo.length} línea(s) de asiento sin tipo_anexo o cod_anexo (anexo del trabajador). ` +
+          `Regenere los asientos del período en Consulta de Planillas para que todas las líneas queden con el anexo del trabajador, y reintente la migración. ` +
+          `Primeras afectadas: ${affected}.`,
+        total: asientos.length,
+        migrados: 0,
+        errores: sinAnexo.length,
+      }, { status: 400 });
+    }
 
     const seenComprobante = new Set<string>();
     const listadoAsientos = asientos.map((a: any) => {
@@ -188,7 +210,6 @@ export default async function (req: Request): Promise<Response> {
       const tcVal = isMainLine ? (tcLookupVal || Number(a.tc) || 1) : 0;
 
       const cuenta = a.cuenta || "";
-      const hasAnexo = needsAnexo(cuenta);
 
       return {
         Cuenta: cuenta,
@@ -196,8 +217,8 @@ export default async function (req: Request): Promise<Response> {
         Subdiario: a.subdiario || "",
         Comprobante: a.comprobante || "",
         Fecha_Doc: toISODateTime(a.fecha_doc) || toISODateTime(a.fecha_registro) || todayISO(),
-        Tipo_Anexo: hasAnexo ? (a.tipo_anexo || "") : "",
-        Cod_Anexo: hasAnexo ? (a.cod_anexo || "") : "",
+        Tipo_Anexo: a.tipo_anexo || "",
+        Cod_Anexo: a.cod_anexo || "",
         Tipo_Doc: a.tipo_doc || "",
         Nro_Doc: a.nro_doc || "",
         Fecha_Vencimiento: a.fecha_vencimiento ? toISODateTime(a.fecha_vencimiento) : null,
