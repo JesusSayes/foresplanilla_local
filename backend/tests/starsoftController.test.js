@@ -16,7 +16,7 @@ test('construye el mismo payload usado para enviar asientos a Starsoft', () => {
     nro_doc: null,
     fecha_vencimiento: '2026-09-15T14:30:45.000Z',
     importe: '2500.50',
-    conversion_tc: null,
+    conversion_tc: 'VTA',
     tc: '3.75',
     glosa: 'PLANILLA AGOSTO 2026',
     glosa_mov: 'REMUNERACIÓN',
@@ -41,8 +41,8 @@ test('construye el mismo payload usado para enviar asientos a Starsoft', () => {
     fecha_Vencimiento: '2026-09-15T14:30:45',
     moneda: 'MN',
     importe: 2500.5,
-    conversion_Tc: 'M',
-    tc: 3.75,
+    conversion_Tc: '',
+    tc: 1,
     glosa: 'PLANILLA AGOSTO 2026',
     centro_Costos: 'ADM',
     glosa_Mov: 'REMUNERACIÓN',
@@ -50,4 +50,16 @@ test('construye el mismo payload usado para enviar asientos a Starsoft', () => {
     debe_Haber: 'D',
     medio_Pago: '001',
   }]);
+});
+
+test('conserva el tipo de cambio para asientos en moneda extranjera', () => {
+  const [payload] = buildStarsoftPayload([{
+    moneda: 'USD',
+    conversion_tc: 'VTA',
+    tc: '3.812345',
+  }]);
+
+  assert.equal(payload.moneda, 'ME');
+  assert.equal(payload.conversion_Tc, 'VTA');
+  assert.equal(payload.tc, 3.812345);
 });

@@ -127,11 +127,6 @@ export default function ConsultaPlanillas() {
     queryFn: () => entitiesAPI.Subdiario.list("codigo"),
   });
 
-  const { data: tiposCambio = [] } = useQuery({
-    queryKey: ["tiposCambioConsulta"],
-    queryFn: () => entitiesAPI.TipoCambio.list("-fecha"),
-  });
-
   // Devuelve el código de tipo de anexo según su descripción (TRABAJADORES, HONORARIOS, etc.)
   const getTipoAnexoCodigo = (descripcion) => {
     const found = tiposAnexo.find(
@@ -348,17 +343,6 @@ export default function ConsultaPlanillas() {
       const balanceIssues = []; // descuadres por trabajador (Debe != Haber)
       const netoConfigMissing = !netoConfig;
 
-      // Resolver el último tipo de cambio registrado hasta la fecha final del
-      // mes de la planilla (fechaDoc). Se busca el TC con fecha <= fechaDoc
-      // más reciente. Si no existe ninguno, se advierte y se usa 1 como respaldo.
-      const tcRecord = (tiposCambio || [])
-        .filter(t => t && t.fecha && String(t.fecha).slice(0, 10) <= fechaDoc)
-        .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))[0];
-      const tcValue = tcRecord ? safePayrollNumber(tcRecord.valor_venta) : 1;
-      if (!tcRecord) {
-        toast.warning(`No se encontró un tipo de cambio registrado hasta ${fechaDoc}. Se usará TC=1. Registre el TC en Tipo de Cambio (Datos Maestros) y regenere el asiento.`);
-      }
-
       const buildBase = (emp, p) => {
         let assignment = costCenterAssignments.find(
           a => a.assignment_type === "Empleado" && a.employee_id === emp.id && a.is_active
@@ -380,9 +364,9 @@ export default function ConsultaPlanillas() {
           nro_doc: isSNP ? `RH-${annomes}-${emp.document_number}` : comprobante,
           tipo_anexo: tipoAnexoAplicar,
           cod_anexo: emp.document_number || "",
-          conversion_tc: "VTA",
+          conversion_tc: "",
           moneda: "PEN",
-          tc: tcValue,
+          tc: 1,
           glosa: isSNP ? `SNP ${period}` : `${payrollType} - ${period}`,
           centro_costos: cc?.code || "",
           centro_costos_id: assignment?.cost_center_id || "",
