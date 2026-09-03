@@ -136,26 +136,31 @@ model certificate {
 }
 
 model company_info {
-  company_name                       String?
-  ruc                                String?
-  address                            String?
-  phone                              String?
-  email                              String?
-  logo_url                           String?
-  legal_representative               String?
-  legal_representative_dni           String?
-  legal_representative_position      String?
-  website                            String?
-  is_active                          Boolean?
-  id                                 String    @id(map: "companyinfo_pkey") @db.VarChar(255)
-  created_date                       DateTime? @db.Timestamp(6)
-  updated_date                       DateTime? @db.Timestamp(6)
-  created_by_id                      String?
-  created_by                         String?
-  is_sample                          Boolean?
-  legal_representative_signature_url String?
-  firmante_gg                        String?
-  firmante_delegado                  String?
+  company_name                           String?
+  ruc                                    String?
+  address                                String?
+  phone                                  String?
+  email                                  String?
+  logo_url                               String?
+  legal_representative                   String?
+  legal_representative_dni               String?
+  legal_representative_position          String?
+  website                                String?
+  is_active                              Boolean?
+  id                                     String    @id(map: "companyinfo_pkey") @db.VarChar(255)
+  created_date                           DateTime? @db.Timestamp(6)
+  updated_date                           DateTime? @db.Timestamp(6)
+  created_by_id                          String?
+  created_by                             String?
+  is_sample                              Boolean?
+  legal_representative_signature_url     String?
+  firmante_gg                            String?
+  firmante_delegado                      String?
+  enable_delegated_signature             Boolean   @default(false)
+  delegated_representative               String?
+  delegated_representative_dni           String?
+  delegated_representative_position      String?
+  delegated_representative_signature_url String?
 }
 
 model contract {
@@ -570,53 +575,57 @@ model payroll_concept {
 }
 
 model payslip {
-  id                      String    @id @db.VarChar(255)
-  created_date            DateTime? @db.Timestamp(6)
-  updated_date            DateTime? @db.Timestamp(6)
-  created_by              String?
-  employee_id             String?
-  period                  String?
-  month                   Int?
-  year                    Int?
-  payroll_type            String?
-  payroll_number          String?
-  advance_payment_id      String?
-  worked_days             Int?
-  non_worked_days         Int?
-  subsidized_days         Int?
-  regular_hours           Decimal?  @db.Decimal(18, 2)
-  overtime_hours          Decimal?  @db.Decimal(18, 2)
-  base_salary             Decimal?  @db.Decimal(18, 2)
-  family_allowance        Decimal?  @db.Decimal(18, 2)
-  overtime_pay            Decimal?  @db.Decimal(18, 2)
-  bonuses                 Decimal?  @db.Decimal(18, 2)
-  commissions             Decimal?  @db.Decimal(18, 2)
-  other_income            Decimal?  @db.Decimal(18, 2)
-  total_income            Decimal?  @db.Decimal(18, 2)
-  pension_deduction       Decimal?  @db.Decimal(18, 2)
-  health_insurance        Decimal?  @db.Decimal(18, 2)
-  income_tax              Decimal?  @db.Decimal(18, 2)
-  tardiness_discount      Decimal?  @db.Decimal(18, 2)
-  absence_discount        Decimal?  @db.Decimal(18, 2)
-  loan_deduction          Decimal?  @db.Decimal(18, 2)
-  advance_deduction       Decimal?  @db.Decimal(18, 2)
-  other_deductions        Decimal?  @db.Decimal(18, 2)
-  total_deductions        Decimal?  @db.Decimal(18, 2)
-  net_pay                 Decimal?  @db.Decimal(18, 2)
-  payment_date            DateTime? @db.Date
-  pdf_url                 String?
-  status                  String?
-  notes                   String?
-  created_by_id           String?
-  is_sample               Boolean?
-  attendance_period_start DateTime? @db.Date
-  attendance_period_end   DateTime? @db.Date
-  activity_cost_amount    Decimal?  @db.Decimal(18, 2)
-  food_cost_amount        Decimal?  @db.Decimal(18, 2)
-  transport_cost_amount   Decimal?  @db.Decimal(18, 2)
-  calculation_summary     Json?
-  overtime_hours_25       Decimal?  @default(0) @db.Decimal(18, 2)
-  overtime_hours_35       Decimal?  @default(0) @db.Decimal(18, 2)
+  id                         String    @id @db.VarChar(255)
+  created_date               DateTime? @db.Timestamp(6)
+  updated_date               DateTime? @db.Timestamp(6)
+  created_by                 String?
+  employee_id                String?
+  period                     String?
+  month                      Int?
+  year                       Int?
+  payroll_type               String?
+  payroll_number             String?
+  advance_payment_id         String?
+  worked_days                Int?
+  non_worked_days            Int?
+  subsidized_days            Int?
+  regular_hours              Decimal?  @db.Decimal(18, 2)
+  overtime_hours             Decimal?  @db.Decimal(18, 2)
+  base_salary                Decimal?  @db.Decimal(18, 2)
+  family_allowance           Decimal?  @db.Decimal(18, 2)
+  overtime_pay               Decimal?  @db.Decimal(18, 2)
+  bonuses                    Decimal?  @db.Decimal(18, 2)
+  commissions                Decimal?  @db.Decimal(18, 2)
+  other_income               Decimal?  @db.Decimal(18, 2)
+  total_income               Decimal?  @db.Decimal(18, 2)
+  pension_deduction          Decimal?  @db.Decimal(18, 2)
+  health_insurance           Decimal?  @db.Decimal(18, 2)
+  income_tax                 Decimal?  @db.Decimal(18, 2)
+  tardiness_discount         Decimal?  @db.Decimal(18, 2)
+  absence_discount           Decimal?  @db.Decimal(18, 2)
+  loan_deduction             Decimal?  @db.Decimal(18, 2)
+  advance_deduction          Decimal?  @db.Decimal(18, 2)
+  other_deductions           Decimal?  @db.Decimal(18, 2)
+  total_deductions           Decimal?  @db.Decimal(18, 2)
+  net_pay                    Decimal?  @db.Decimal(18, 2)
+  payment_date               DateTime? @db.Date
+  pdf_url                    String?
+  status                     String?
+  notes                      String?
+  created_by_id              String?
+  is_sample                  Boolean?
+  attendance_period_start    DateTime? @db.Date
+  attendance_period_end      DateTime? @db.Date
+  activity_cost_amount       Decimal?  @db.Decimal(18, 2)
+  food_cost_amount           Decimal?  @db.Decimal(18, 2)
+  transport_cost_amount      Decimal?  @db.Decimal(18, 2)
+  calculation_summary        Json?
+  overtime_hours_25          Decimal?  @default(0) @db.Decimal(18, 2)
+  overtime_hours_35          Decimal?  @default(0) @db.Decimal(18, 2)
+  digital_signature_url      String?
+  digital_signature_name     String?
+  digital_signature_position String?
+  digital_signature_date     DateTime? @db.Timestamp(6)
 }
 
 model payslip_template {
