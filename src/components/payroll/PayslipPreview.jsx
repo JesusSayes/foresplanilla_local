@@ -202,7 +202,54 @@ function buildConceptRows(payslip, conceptsMap = []) {
 
 // ── Generador de HTML para impresión (R08 fiel) ──────────────────────────────
 
-function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "", conceptsMap = [] }) {
+// CSS compartido por la impresión individual y la impresión masiva
+export const BOLETA_CSS = `
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: Arial, sans-serif; font-size: 8pt; color: #1e293b; margin: 0; }
+  .boleta { border: 1px solid #94a3b8; padding: 6px; margin-bottom: 6mm; page-break-inside: avoid; }
+  /* Header */
+  .hdr-tbl { width:100%; border-collapse:collapse; margin-bottom:6px; border-bottom:1px solid #94a3b8; padding-bottom:4px; }
+  .hdr-logo { width:50px; vertical-align:middle; padding-right:8px; }
+  .hdr-co { vertical-align:top; }
+  .ruc { font-size:7pt; color:#475569; }
+  .co-name { font-size:10pt; font-weight:700; }
+  .co-sub { font-size:7pt; color:#475569; }
+  .hdr-bp { text-align:right; vertical-align:top; }
+  .bp-title { font-size:11pt; font-weight:700; }
+  .bp-period { font-size:7.5pt; color:#475569; }
+  .bp-type { display:inline-block; background:#4f46e5; color:white; padding:1px 7px; border-radius:8px; font-size:7pt; font-weight:700; margin-top:2px; }
+  .bp-att { font-size:7pt; color:#4338ca; font-weight:600; margin-top:1px; }
+  /* Tables */
+  .tbl { width:100%; border-collapse:collapse; margin-bottom:5px; font-size:7.5pt; }
+  .tbl th, .tbl td { border:1px solid #94a3b8; padding:2px 4px; }
+  .tbl th { background:#f1f5f9; font-size:7pt; text-align:center; }
+  .data-row td { font-weight:600; }
+  /* Concepts cols */
+  .c-code { width:9%; text-align:center; font-family:monospace; }
+  .c-lbl  { width:52%; }
+  .c-ing  { width:14%; text-align:right; color:#15803d; font-weight:600; }
+  .c-des  { width:14%; text-align:right; color:#dc2626; font-weight:600; }
+  .c-net  { width:11%; text-align:right; color:#4338ca; font-weight:600; }
+  .g-row td { background:#f8fafc; font-weight:700; font-size:7pt; color:#475569; padding:2px 4px; }
+  .subtotal-row td { background:#f8fafc; border-top:1px solid #94a3b8; font-size:7.5pt; }
+  .neto-row td { border-top:2px solid #94a3b8; font-size:8.5pt; }
+  /* Footer */
+  .print-footer { text-align:center; font-size:6.5pt; color:#94a3b8; border-top:1px dashed #e2e8f0; padding-top:4px; margin-top:4px; }
+  /* Firmas: empleador (izq) + trabajador (der) */
+  .firmas-row { display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px; padding:0 2px; }
+  .firma-box { display:flex; flex-direction:column; align-items:center; width:42%; }
+  .firma-img { height:38px; object-fit:contain; }
+  .firma-spacer { height:38px; }
+  .firma-line { width:100%; border-top:1px solid #475569; margin-top:3px; margin-bottom:2px; }
+  .firma-name { font-size:7.5pt; font-weight:700; color:#1e293b; text-align:center; }
+  .firma-role { font-size:6.5pt; color:#64748b; text-align:center; }
+  .firma-date { font-size:6pt; color:#94a3b8; margin-top:1px; text-align:center; }
+`;
+
+// Genera el HTML interno de una sola boleta (sin <html>/<head>/<body>).
+// Reutilizado por la impresión individual y la impresión masiva para garantizar
+// que todas las visualizaciones sean estrictamente idénticas.
+export function buildBoletaInner({ payslip, employee, company, afpName = "", conceptsMap = [] }) {
   const ci = company || { company_name: "Empresa", ruc: "00000000000", address: "" };
   const emp = employee || {};
 
@@ -211,13 +258,23 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
   const digSigName = payslip?.digital_signature_name || "";
   const digSigPosition = payslip?.digital_signature_position || "";
   const digSigDate = payslip?.digital_signature_date ? safeDateFmt(payslip.digital_signature_date, "dd/MM/yyyy") : "";
-  const digitalSignatureHTML = digSigUrl ? `
-    <div class="dig-sig">
-      <img src="${digSigUrl}" alt="Firma" class="dig-sig-img" />
-      <div class="dig-sig-line"></div>
-      <div class="dig-sig-name">${digSigName}</div>
-      <div class="dig-sig-role">${digSigPosition}</div>
-      ${digSigDate ? `<div class="dig-sig-date">Firmado: ${digSigDate}</div>` : ""}
+
+  // Sección de firmas: empleador (izquierda) + trabajador (derecha).
+  // Solo se muestra cuando la boleta ha sido firmada digitalmente.
+  const firmasHTML = digSigUrl ? `
+    <div class="firmas-row">
+      <div class="firma-box">
+        <img src="${digSigUrl}" alt="Firma" class="firma-img" />
+        <div class="firma-line"></div>
+        <div class="firma-name">${digSigName}</div>
+        <div class="firma-role">${digSigPosition}</div>
+        ${digSigDate ? `<div class="firma-date">Firmado: ${digSigDate}</div>` : ""}
+      </div>
+      <div class="firma-box">
+        <div class="firma-spacer"></div>
+        <div class="firma-line"></div>
+        <div class="firma-name">Firma del trabajador</div>
+      </div>
     </div>` : "";
 
   const logoHtml = ci.logo_url
@@ -350,11 +407,19 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
     <!-- Sección 3: Aportes empleador (cuadro amarillo) -->
     ${aportEmplHTML}
 
-    <!-- Firma digital estampada (parte inferior izquierda) -->
-    ${digitalSignatureHTML}
+    <!-- Firmas: empleador (izq) + trabajador (der) -->
+    ${firmasHTML}
 
     <div class="print-footer">Generado por el Sistema de Planillas RRHH — Para consultas, contacte al área de Recursos Humanos</div>
   </div>`;
+
+  return oneBoleta;
+}
+
+// Envoltorio de documento completo para impresión individual (1 o 2 copias)
+export function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "", conceptsMap = [] }) {
+  const emp = employee || {};
+  const inner = buildBoletaInner({ payslip, employee, company, afpName, conceptsMap });
 
   const pageStyle = copies === 2
     ? `@page { size: A4 landscape; margin: 6mm; } .wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }`
@@ -365,50 +430,13 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
 <title>Boleta ${emp.first_name || ""} ${emp.last_name || ""} — ${payslip.period || ""}</title>
 <style>
   ${pageStyle}
-  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: Arial, sans-serif; font-size: 8pt; color: #1e293b; margin: 0; }
-  .boleta { border: 1px solid #94a3b8; padding: 6px; margin-bottom: 6mm; page-break-inside: avoid; }
-  /* Header */
-  .hdr-tbl { width:100%; border-collapse:collapse; margin-bottom:6px; border-bottom:1px solid #94a3b8; padding-bottom:4px; }
-  .hdr-logo { width:50px; vertical-align:middle; padding-right:8px; }
-  .hdr-co { vertical-align:top; }
-  .ruc { font-size:7pt; color:#475569; }
-  .co-name { font-size:10pt; font-weight:700; }
-  .co-sub { font-size:7pt; color:#475569; }
-  .hdr-bp { text-align:right; vertical-align:top; }
-  .bp-title { font-size:11pt; font-weight:700; }
-  .bp-period { font-size:7.5pt; color:#475569; }
-  .bp-type { display:inline-block; background:#4f46e5; color:white; padding:1px 7px; border-radius:8px; font-size:7pt; font-weight:700; margin-top:2px; }
-  .bp-att { font-size:7pt; color:#4338ca; font-weight:600; margin-top:1px; }
-  /* Tables */
-  .tbl { width:100%; border-collapse:collapse; margin-bottom:5px; font-size:7.5pt; }
-  .tbl th, .tbl td { border:1px solid #94a3b8; padding:2px 4px; }
-  .tbl th { background:#f1f5f9; font-size:7pt; text-align:center; }
-  .data-row td { font-weight:600; }
-  /* Concepts cols */
-  .c-code { width:9%; text-align:center; font-family:monospace; }
-  .c-lbl  { width:52%; }
-  .c-ing  { width:14%; text-align:right; color:#15803d; font-weight:600; }
-  .c-des  { width:14%; text-align:right; color:#dc2626; font-weight:600; }
-  .c-net  { width:11%; text-align:right; color:#4338ca; font-weight:600; }
-  .g-row td { background:#f8fafc; font-weight:700; font-size:7pt; color:#475569; padding:2px 4px; }
-  .subtotal-row td { background:#f8fafc; border-top:1px solid #94a3b8; font-size:7.5pt; }
-  .neto-row td { border-top:2px solid #94a3b8; font-size:8.5pt; }
-  /* Footer */
-  .print-footer { text-align:center; font-size:6.5pt; color:#94a3b8; border-top:1px dashed #e2e8f0; padding-top:4px; margin-top:4px; }
-  /* Firma digital estampada (inferior izquierda) */
-  .dig-sig { margin-top:6px; display:flex; flex-direction:column; align-items:flex-start; width:200px; }
-  .dig-sig-img { height:36px; object-fit:contain; }
-  .dig-sig-line { width:100%; border-top:1px solid #475569; margin-top:2px; margin-bottom:1px; }
-  .dig-sig-name { font-size:7.5pt; font-weight:700; color:#1e293b; }
-  .dig-sig-role { font-size:6.5pt; color:#64748b; }
-  .dig-sig-date { font-size:6pt; color:#94a3b8; margin-top:1px; }
+  ${BOLETA_CSS}
 </style>
 </head>
 <body>
 <div class="wrapper">
-  ${oneBoleta}
-  ${copies === 2 ? oneBoleta : ""}
+  ${inner}
+  ${copies === 2 ? inner : ""}
 </div>
 <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};</script>
 </body></html>`;
@@ -717,23 +745,30 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
         </div>
       )}
 
-      {/* ── Firma digital estampada (parte inferior izquierda) ── */}
+      {/* ── Firmas: empleador (izq) + trabajador (der) ── */}
       {payslip?.digital_signature_url && (
-        <div className="px-5 py-3 flex justify-start">
-          <div className="flex flex-col items-start" style={{ width: "200px" }}>
+        <div className="px-5 py-4 flex justify-between items-end">
+          {/* Firma del empleador (GG o delegado) */}
+          <div className="flex flex-col items-center" style={{ width: "42%" }}>
             <img
               src={payslip.digital_signature_url}
               alt="Firma digital"
               className="h-10 object-contain"
             />
-            <div className="w-full border-t border-slate-500 mt-1 mb-0.5" />
-            <div className="text-xs font-bold text-slate-900">{payslip.digital_signature_name}</div>
-            <div className="text-[10px] text-slate-500">{payslip.digital_signature_position}</div>
+            <div className="w-full border-t border-slate-500 mt-1.5 mb-1" />
+            <div className="text-xs font-bold text-slate-900 text-center">{payslip.digital_signature_name}</div>
+            <div className="text-[10px] text-slate-500 text-center">{payslip.digital_signature_position}</div>
             {payslip.digital_signature_date && (
-              <div className="text-[9px] text-slate-400 mt-0.5">
+              <div className="text-[9px] text-slate-400 mt-0.5 text-center">
                 Firmado: {safeDateFmt(payslip.digital_signature_date, "dd/MM/yyyy")}
               </div>
             )}
+          </div>
+          {/* Firma del trabajador */}
+          <div className="flex flex-col items-center" style={{ width: "42%" }}>
+            <div className="h-10" />
+            <div className="w-full border-t border-slate-500 mt-1.5 mb-1" />
+            <div className="text-xs font-bold text-slate-900 text-center">Firma del trabajador</div>
           </div>
         </div>
       )}

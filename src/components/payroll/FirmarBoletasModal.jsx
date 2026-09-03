@@ -10,6 +10,8 @@ import { es } from "date-fns/locale";
 export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSuccess }) {
   const [signerType, setSignerType] = useState("gg");
   const [signing, setSigning] = useState(false);
+  const [currentUserDni, setCurrentUserDni] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Firmante GG = representante legal (siempre disponible si tiene firma)
   const ggName = companyInfo?.legal_representative || "";
@@ -21,9 +23,29 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
   const delName = companyInfo?.delegated_representative || "";
   const delPosition = companyInfo?.delegated_representative_position || "Gerente Operativo";
   const delSignature = companyInfo?.delegated_representative_signature_url || "";
+  const delDni = companyInfo?.delegated_representative_dni || "";
 
   const ggAvailable = !!(ggName && ggSignature);
-  const delAvailable = delegatedEnabled && !!(delName && delSignature);
+
+  // La firma delegada solo aparece si está habilitada, tiene firma configurada
+  // Y el DNI del usuario logeado coincide con el DNI del delegado (o es admin).
+  const dniMatchesDelegated = currentUserDni && delDni &&
+    String(currentUserDni).trim() === String(delDni).trim();
+  const delAvailable = delegatedEnabled && !!(delName && delSignature) && (dniMatchesDelegated || isAdmin);
+
+  // Cargar DNI del usuario logeado para validar acceso a firma delegada
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const user = await base44.auth.me();
+        setIsAdmin(user.role === "admin");
+        const emps = await base44.entities.Employee.filter({ work_email: user.email });
+        if (emps?.length > 0) {
+          setCurrentUserDni(emps[0].document_number || "");
+        }
+      } catch (e) { /* noop */ }
+    })();
+  }, []);
 
   // Auto-seleccionar el primero disponible
   React.useEffect(() => {
@@ -134,7 +156,8 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
                 <p className="text-xs text-slate-500">{delPosition}</p>
                 {delSignature && <p className="text-[10px] text-green-600 mt-0.5">✓ Firma registrada</p>}
                 {!delegatedEnabled && <p className="text-[10px] text-slate-400 mt-0.5">Firma delegada no habilitada</p>}
-                {delegatedEnabled && !delAvailable && <p className="text-[10px] text-red-500 mt-0.5">Sin firma configurada</p>}
+                {delegatedEnabled && !delSignature && <p className="text-[10px] text-red-500 mt-0.5">Sin firma configurada</p>}
+                {delegatedEnabled && delSignature && !dniMatchesDelegated && !isAdmin && <p className="text-[10px] text-amber-600 mt-0.5">Su DNI no coincide con el delegado autorizado</p>}
               </div>
               {signerType === "delegado" && <CheckCircle className="w-5 h-5 text-purple-600 shrink-0" />}
             </button>
