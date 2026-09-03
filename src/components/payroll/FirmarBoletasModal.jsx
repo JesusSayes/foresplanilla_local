@@ -13,10 +13,11 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
   const [currentUserDni, setCurrentUserDni] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Firmante GG = representante legal (siempre disponible si tiene firma)
+  // Firmante GG = representante legal
   const ggName = companyInfo?.legal_representative || "";
   const ggPosition = companyInfo?.legal_representative_position || "Gerente General";
   const ggSignature = companyInfo?.legal_representative_signature_url || "";
+  const ggDni = companyInfo?.legal_representative_dni || "";
 
   // Firmante delegado (solo si está habilitado)
   const delegatedEnabled = companyInfo?.enable_delegated_signature || false;
@@ -25,15 +26,19 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
   const delSignature = companyInfo?.delegated_representative_signature_url || "";
   const delDni = companyInfo?.delegated_representative_dni || "";
 
-  const ggAvailable = !!(ggName && ggSignature);
-
-  // La firma delegada solo aparece si está habilitada, tiene firma configurada
-  // Y el DNI del usuario logeado coincide con el DNI del delegado (o es admin).
+  // Coincidencia exacta por DNI: nadie puede firmar a nombre de otra persona.
+  // Incluso el superadmin debe coincidir con uno de los firmantes autorizados.
+  const dniMatchesGG = currentUserDni && ggDni &&
+    String(currentUserDni).trim() === String(ggDni).trim();
   const dniMatchesDelegated = currentUserDni && delDni &&
     String(currentUserDni).trim() === String(delDni).trim();
-  const delAvailable = delegatedEnabled && !!(delName && delSignature) && (dniMatchesDelegated || isAdmin);
 
-  // Cargar DNI del usuario logeado para validar acceso a firma delegada
+  // Cada firmante solo está habilitado si tiene firma configurada Y el usuario
+  // logueado coincide exactamente por DNI con ese firmante.
+  const ggAvailable = !!(ggName && ggSignature) && dniMatchesGG;
+  const delAvailable = delegatedEnabled && !!(delName && delSignature) && dniMatchesDelegated;
+
+  // Cargar DNI del usuario logueado
   React.useEffect(() => {
     (async () => {
       try {
@@ -47,10 +52,10 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
     })();
   }, []);
 
-  // Auto-seleccionar el primero disponible
+  // Pre-seleccionar el firmante que coincide con el usuario logueado
   React.useEffect(() => {
-    if (!ggAvailable && delAvailable) setSignerType("delegado");
-    else if (ggAvailable && !delAvailable) setSignerType("gg");
+    if (ggAvailable) setSignerType("gg");
+    else if (delAvailable) setSignerType("delegado");
   }, [ggAvailable, delAvailable]);
 
   const selectedSigner = signerType === "gg"
@@ -108,6 +113,15 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
             Seleccione el firmante para estampar la firma digital en las <strong>{totalBoletas}</strong> boleta(s) de este período.
           </p>
 
+          {!ggAvailable && !delAvailable && currentUserDni && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-xs text-amber-700">
+                Su DNI no coincide con ninguno de los firmantes autorizados (Gerente General o Delegado).
+                Nadie puede firmar a nombre de otra persona.
+              </p>
+            </div>
+          )}
+
           {/* Opciones de firmante */}
           <div className="space-y-3">
             {/* GG */}
@@ -130,7 +144,9 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
                 </div>
                 <p className="text-xs text-slate-500">{ggPosition}</p>
                 {ggSignature && <p className="text-[10px] text-green-600 mt-0.5">✓ Firma registrada</p>}
-                {!ggAvailable && <p className="text-[10px] text-red-500 mt-0.5">Sin firma configurada</p>}
+                {!ggSignature && <p className="text-[10px] text-red-500 mt-0.5">Sin firma configurada</p>}
+                {ggSignature && !dniMatchesGG && currentUserDni && <p className="text-[10px] text-amber-600 mt-0.5">Su DNI no coincide con el Gerente General</p>}
+                {ggSignature && !currentUserDni && <p className="text-[10px] text-slate-400 mt-0.5">Sin DNI de usuario</p>}
               </div>
               {signerType === "gg" && <CheckCircle className="w-5 h-5 text-indigo-600 shrink-0" />}
             </button>
@@ -157,7 +173,8 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
                 {delSignature && <p className="text-[10px] text-green-600 mt-0.5">✓ Firma registrada</p>}
                 {!delegatedEnabled && <p className="text-[10px] text-slate-400 mt-0.5">Firma delegada no habilitada</p>}
                 {delegatedEnabled && !delSignature && <p className="text-[10px] text-red-500 mt-0.5">Sin firma configurada</p>}
-                {delegatedEnabled && delSignature && !dniMatchesDelegated && !isAdmin && <p className="text-[10px] text-amber-600 mt-0.5">Su DNI no coincide con el delegado autorizado</p>}
+                {delegatedEnabled && delSignature && !dniMatchesDelegated && currentUserDni && <p className="text-[10px] text-amber-600 mt-0.5">Su DNI no coincide con el delegado autorizado</p>}
+                {delegatedEnabled && delSignature && !currentUserDni && <p className="text-[10px] text-slate-400 mt-0.5">Sin DNI de usuario</p>}
               </div>
               {signerType === "delegado" && <CheckCircle className="w-5 h-5 text-purple-600 shrink-0" />}
             </button>
