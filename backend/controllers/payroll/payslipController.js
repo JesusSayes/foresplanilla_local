@@ -277,6 +277,45 @@ export const bulkUpdate = async (req, res) => {
       return res.status(403).json({ error: 'Acceso denegado a una o más boletas' });
     }
 
+    const signatureUpdates = updates.filter(item => item.digital_signature_url);
+    if (signatureUpdates.length > 0) {
+      const [employee, company] = await Promise.all([
+        prisma.employee.findFirst({
+          where: { work_email: req.user.email },
+          select: { document_number: true }
+        }),
+        prisma.company_info.findFirst({ orderBy: { created_date: 'desc' } })
+      ]);
+
+      const userDni = String(employee?.document_number || '').trim();
+      const authorizedSigners = [
+        {
+          enabled: true,
+          dni: company?.legal_representative_dni,
+          name: company?.legal_representative,
+          position: company?.legal_representative_position || 'Gerente General',
+          signatureUrl: company?.legal_representative_signature_url
+        },
+        {
+          enabled: company?.enable_delegated_signature === true,
+          dni: company?.delegated_representative_dni,
+          name: company?.delegated_representative,
+          position: company?.delegated_representative_position || 'Gerente Operativo',
+          signatureUrl: company?.delegated_representative_signature_url
+        }
+      ].filter(signer => signer.enabled && userDni && String(signer.dni || '').trim() === userDni);
+
+      const isAuthorizedSignature = update => authorizedSigners.some(signer =>
+        signer.signatureUrl === update.digital_signature_url &&
+        signer.name === update.digital_signature_name &&
+        signer.position === update.digital_signature_position
+      );
+
+      if (signatureUpdates.some(update => !isAuthorizedSignature(update))) {
+        return res.status(403).json({ error: 'El usuario no corresponde al firmante seleccionado' });
+      }
+    }
+
     const result = await prisma.$transaction(
       updates.map(({ id, ...data }) => prisma.payslip.update({ where: { id }, data }))
     );
