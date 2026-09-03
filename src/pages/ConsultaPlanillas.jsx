@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import PayslipPreview from "../components/payroll/PayslipPreview";
 import PlanillaCompletaView from "../components/payroll/PlanillaCompletaView";
 import ConfigFirmantesModal from "../components/payroll/ConfigFirmantesModal";
+import FirmarBoletasModal from "../components/payroll/FirmarBoletasModal";
 import { safePayrollNumber, formatMoney, roundMoney } from "@/lib/payrollUtils";
 
 const TIPO_COLORS = {
@@ -62,6 +63,7 @@ export default function ConsultaPlanillas() {
   const [previewPayslip, setPreviewPayslip] = useState(null);
   const [showPlanillaCompleta, setShowPlanillaCompleta] = useState(false);
   const [showConfigFirmantes, setShowConfigFirmantes] = useState(false);
+  const [showFirmarModal, setShowFirmarModal] = useState(null); // grupo a firmar
   const [generatingAsiento, setGeneratingAsiento] = useState(null); // payroll_number en proceso
   const [balanceAlert, setBalanceAlert] = useState(null); // { period, payrollType, issues: [{employee, debe, haber, diferencia}] }
 
@@ -902,6 +904,13 @@ export default function ConsultaPlanillas() {
                 <div style="font-size:9pt;font-weight:600;">${p.payment_date || "—"}</div>
               </div>
             </div>
+            ${p.digital_signature_url ? `
+            <div class="dig-sig-mass">
+              <img src="${p.digital_signature_url}" alt="Firma" style="height:36px;object-fit:contain;" />
+              <div style="width:100%;border-top:1px solid #475569;margin-top:2px;margin-bottom:1px;"></div>
+              <div style="font-size:8pt;font-weight:700;color:#1e293b;">${p.digital_signature_name || ""}</div>
+              <div style="font-size:7pt;color:#64748b;">${p.digital_signature_position || ""}</div>
+            </div>` : ""}
             ${(firmanteGG || firmanteD) ? `
             <div class="firmantes">
               ${firmanteGG ? `<div class="firmante">${firmanteGG.signature_url ? `<img src="${firmanteGG.signature_url}" style="height:36px;object-fit:contain;" />` : '<div style="height:36px;"></div>'}<div class="firma-line"></div><div class="firma-name">${firmanteGG.full_name || ""}</div><div class="firma-role">${firmanteGG.position || "Gerente General"}</div></div>` : ""}
@@ -951,6 +960,7 @@ export default function ConsultaPlanillas() {
   .neto-box { background: linear-gradient(135deg,#eef2ff,#dbeafe); border: 1.5px solid #c7d2fe; border-radius: 6px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .neto-label { font-size: 8pt; color: #64748b; }
   .neto-amount { font-size: 18pt; font-weight: 700; color: #4338ca; }
+  .dig-sig-mass { margin-top: 6px; display: flex; flex-direction: column; align-items: flex-start; width: 200px; }
   .firmantes { display: flex; gap: 30px; justify-content: center; margin: 8px 0; }
   .firmante { text-align: center; flex: 1; max-width: 160px; }
   .firma-line { border-top: 1px solid #94a3b8; margin-top: 4px; margin-bottom: 2px; }
@@ -1155,6 +1165,10 @@ export default function ConsultaPlanillas() {
                             onClick={e => { e.stopPropagation(); handlePrintAllBoletas(g); }}>
                             <Printer className="w-3 h-3 mr-1" />Boletas
                           </Button>
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                            onClick={e => { e.stopPropagation(); setShowFirmarModal(g); }}>
+                            <PenTool className="w-3 h-3 mr-1" />Firmar
+                          </Button>
                         </div>
 
                         <div className="bg-slate-100 self-stretch my-3" />
@@ -1236,6 +1250,19 @@ export default function ConsultaPlanillas() {
                 firmante_delegado: JSON.stringify(data.firmante_delegado || {}),
               });
             }
+          }}
+        />
+      )}
+
+      {/* Modal firma masiva de boletas */}
+      {showFirmarModal && (
+        <FirmarBoletasModal
+          grupo={showFirmarModal}
+          companyInfo={companyInfo}
+          onClose={() => setShowFirmarModal(null)}
+          onSuccess={() => {
+            setShowFirmarModal(null);
+            queryClient.invalidateQueries(["allPayslipsConsulta"]);
           }}
         />
       )}

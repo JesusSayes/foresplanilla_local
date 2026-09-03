@@ -206,6 +206,20 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
   const ci = company || { company_name: "Empresa", ruc: "00000000000", address: "" };
   const emp = employee || {};
 
+  // Firma digital estampada en la boleta (parte inferior izquierda)
+  const digSigUrl = payslip?.digital_signature_url || "";
+  const digSigName = payslip?.digital_signature_name || "";
+  const digSigPosition = payslip?.digital_signature_position || "";
+  const digSigDate = payslip?.digital_signature_date ? safeDateFmt(payslip.digital_signature_date, "dd/MM/yyyy") : "";
+  const digitalSignatureHTML = digSigUrl ? `
+    <div class="dig-sig">
+      <img src="${digSigUrl}" alt="Firma" class="dig-sig-img" />
+      <div class="dig-sig-line"></div>
+      <div class="dig-sig-name">${digSigName}</div>
+      <div class="dig-sig-role">${digSigPosition}</div>
+      ${digSigDate ? `<div class="dig-sig-date">Firmado: ${digSigDate}</div>` : ""}
+    </div>` : "";
+
   const logoHtml = ci.logo_url
     ? `<img src="${ci.logo_url}" alt="Logo" style="height:40px;object-fit:contain;" />`
     : "";
@@ -336,6 +350,9 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
     <!-- Sección 3: Aportes empleador (cuadro amarillo) -->
     ${aportEmplHTML}
 
+    <!-- Firma digital estampada (parte inferior izquierda) -->
+    ${digitalSignatureHTML}
+
     <div class="print-footer">Generado por el Sistema de Planillas RRHH — Para consultas, contacte al área de Recursos Humanos</div>
   </div>`;
 
@@ -379,6 +396,13 @@ function buildBoletaHTML({ payslip, employee, company, copies = 1, afpName = "",
   .neto-row td { border-top:2px solid #94a3b8; font-size:8.5pt; }
   /* Footer */
   .print-footer { text-align:center; font-size:6.5pt; color:#94a3b8; border-top:1px dashed #e2e8f0; padding-top:4px; margin-top:4px; }
+  /* Firma digital estampada (inferior izquierda) */
+  .dig-sig { margin-top:6px; display:flex; flex-direction:column; align-items:flex-start; width:200px; }
+  .dig-sig-img { height:36px; object-fit:contain; }
+  .dig-sig-line { width:100%; border-top:1px solid #475569; margin-top:2px; margin-bottom:1px; }
+  .dig-sig-name { font-size:7.5pt; font-weight:700; color:#1e293b; }
+  .dig-sig-role { font-size:6.5pt; color:#64748b; }
+  .dig-sig-date { font-size:6pt; color:#94a3b8; margin-top:1px; }
 </style>
 </head>
 <body>
@@ -690,6 +714,27 @@ export default function PayslipPreview({ payslip, employee, companyInfo, showPri
               </tr>
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── Firma digital estampada (parte inferior izquierda) ── */}
+      {payslip?.digital_signature_url && (
+        <div className="px-5 py-3 flex justify-start">
+          <div className="flex flex-col items-start" style={{ width: "200px" }}>
+            <img
+              src={payslip.digital_signature_url}
+              alt="Firma digital"
+              className="h-10 object-contain"
+            />
+            <div className="w-full border-t border-slate-500 mt-1 mb-0.5" />
+            <div className="text-xs font-bold text-slate-900">{payslip.digital_signature_name}</div>
+            <div className="text-[10px] text-slate-500">{payslip.digital_signature_position}</div>
+            {payslip.digital_signature_date && (
+              <div className="text-[9px] text-slate-400 mt-0.5">
+                Firmado: {safeDateFmt(payslip.digital_signature_date, "dd/MM/yyyy")}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
