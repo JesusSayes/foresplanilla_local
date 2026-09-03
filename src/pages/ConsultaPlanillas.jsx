@@ -19,6 +19,7 @@ import PayslipPreview, { buildBoletaInner, BOLETA_CSS } from "../components/payr
 import PlanillaCompletaView from "../components/payroll/PlanillaCompletaView";
 import ConfigFirmantesModal from "../components/payroll/ConfigFirmantesModal";
 import FirmarBoletasModal from "../components/payroll/FirmarBoletasModal";
+import PrintBoletasModal from "../components/payroll/PrintBoletasModal";
 import { safePayrollNumber, formatMoney, roundMoney } from "@/lib/payrollUtils";
 
 const TIPO_COLORS = {
@@ -64,6 +65,7 @@ export default function ConsultaPlanillas() {
   const [showPlanillaCompleta, setShowPlanillaCompleta] = useState(false);
   const [showConfigFirmantes, setShowConfigFirmantes] = useState(false);
   const [showFirmarModal, setShowFirmarModal] = useState(null); // grupo a firmar
+  const [showPrintBoletasModal, setShowPrintBoletasModal] = useState(null); // grupo a imprimir masivo
   const [generatingAsiento, setGeneratingAsiento] = useState(null); // payroll_number en proceso
   const [balanceAlert, setBalanceAlert] = useState(null); // { period, payrollType, issues: [{employee, debe, haber, diferencia}] }
 
@@ -823,7 +825,7 @@ export default function ConsultaPlanillas() {
   // --- Imprimir todas las boletas de un grupo de un solo golpe ---
   // Usa el mismo generador HTML que la vista individual (PayslipPreview.buildBoletaInner)
   // para garantizar que todas las visualizaciones sean estrictamente idénticas.
-  const handlePrintAllBoletas = (grupo) => {
+  const handlePrintAllBoletas = (grupo, copies = 1) => {
     const ci = companyInfo || { company_name: "Empresa", ruc: "00000000000", address: "" };
 
     // Índice de AFP por id
@@ -843,17 +845,23 @@ export default function ConsultaPlanillas() {
         afpName,
         conceptsMap,
       });
-    }).join("\n");
+    }).filter(Boolean).join("\n");
+
+    const pageStyle = copies === 2
+      ? `@page { size: A4 landscape; margin: 6mm; } .wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }`
+      : `@page { size: A4 portrait; margin: 10mm; } .wrapper {}`;
 
     const html = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"/><title>Boletas ${grupo.period} - ${grupo.payroll_type}</title>
 <style>
-  @page { size: A4 portrait; margin: 10mm; }
+  ${pageStyle}
   ${BOLETA_CSS}
 </style>
 </head>
 <body>
+<div class="wrapper">
 ${boletasHTML}
+</div>
 <script>window.onload=function(){window.print();}</script>
 </body></html>`;
 
@@ -1046,7 +1054,7 @@ ${boletasHTML}
                             <Printer className="w-3 h-3 mr-1" />Imprimir
                           </Button>
                           <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap text-purple-700 border-purple-200 hover:bg-purple-50"
-                            onClick={e => { e.stopPropagation(); handlePrintAllBoletas(g); }}>
+                            onClick={e => { e.stopPropagation(); setShowPrintBoletasModal(g); }}>
                             <Printer className="w-3 h-3 mr-1" />Boletas
                           </Button>
                           <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap text-emerald-700 border-emerald-200 hover:bg-emerald-50"
@@ -1147,6 +1155,18 @@ ${boletasHTML}
           onSuccess={() => {
             setShowFirmarModal(null);
             queryClient.invalidateQueries(["allPayslipsConsulta"]);
+          }}
+        />
+      )}
+
+      {/* Modal de opciones de impresión masiva de boletas */}
+      {showPrintBoletasModal && (
+        <PrintBoletasModal
+          grupo={showPrintBoletasModal}
+          onClose={() => setShowPrintBoletasModal(null)}
+          onPrint={(copies) => {
+            handlePrintAllBoletas(showPrintBoletasModal, copies);
+            setShowPrintBoletasModal(null);
           }}
         />
       )}
