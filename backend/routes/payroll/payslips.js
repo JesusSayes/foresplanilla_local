@@ -23,5 +23,6 @@ router.delete('/:id', requireAnyPermission(...DELETE_PERMISSIONS), attachEmploye
 
 router.post('/filter', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.filter);
 router.post('/bulk', requireAnyPermission(...CREATE_PERMISSIONS), attachEmployeeScope(...CREATE_PERMISSIONS), controller.bulkCreate);
+router.post('/bulk-update', requireAnyPermission(...UPDATE_PERMISSIONS), attachEmployeeScope(...UPDATE_PERMISSIONS), controller.bulkUpdate);
 
 export default router
