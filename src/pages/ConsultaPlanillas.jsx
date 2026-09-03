@@ -960,8 +960,8 @@ ${boletasHTML}
           <div className="overflow-x-auto -mx-4 px-4">
             {/* Cabecera de columnas */}
             <div className="grid items-center mb-1 px-1" style={{
-              minWidth: "980px",
-              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
+              minWidth: "1120px",
+              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 320px 1px 210px 32px"
             }}>
               <div className="px-4 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Período / Tipo</div>
               <div />
@@ -980,7 +980,7 @@ ${boletasHTML}
             </div>
 
 
-            <div className="space-y-2" style={{ minWidth: "980px" }}>
+            <div className="space-y-2" style={{ minWidth: "1120px" }}>
               {filteredGrupos.map(g => {
                 const stats = getGrupoStats(g);
                 const asientoStatus = getGrupoAsientoStatus(g);
@@ -993,7 +993,7 @@ ${boletasHTML}
                     <CardContent className="p-0">
                       {/* Grid dinámico: info crece, botones fijos y sin superposición */}
                       <div className="grid items-center w-full min-h-[76px]" style={{
-                        gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
+                        gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 320px 1px 210px 32px"
                       }}>
 
                         {/* Col 1 — Período + badges */}
@@ -1058,7 +1058,7 @@ ${boletasHTML}
                         <div className="bg-slate-100 self-stretch my-3" />
 
                         {/* Col 6 — Botones Ver / Imprimir / Boletas */}
-                        <div className="flex items-center justify-center gap-2 px-3 py-3" onClick={e => e.stopPropagation()}>
+                        <div className="flex flex-wrap items-center justify-center gap-1.5 px-3 py-2" onClick={e => e.stopPropagation()}>
                           <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap"
                             onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); }}>
                             <Eye className="w-3 h-3 mr-1" />Ver
@@ -1131,8 +1131,8 @@ ${boletasHTML}
 
             {/* Fila de totales dinámicos — al pie del datagrid */}
             <div className="grid items-center mt-2 bg-indigo-600 rounded-xl px-1 py-3" style={{
-              minWidth: "980px",
-              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 260px 1px 190px 32px"
+              minWidth: "1120px",
+              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 320px 1px 210px 32px"
             }}>
               <div className="px-4 text-xs font-bold text-white uppercase tracking-wide">
                 TOTALES — {filteredGrupos.length} planilla(s)
