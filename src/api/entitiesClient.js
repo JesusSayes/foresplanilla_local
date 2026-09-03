@@ -99,6 +99,11 @@ export const entitiesAPI = {
         params: options.replace ? { replace: true } : undefined
       });
       return response.data?.data ?? response.data;
+    },
+
+    bulkUpdate: async (data) => {
+      const response = await localClient.post('/api/payroll/payslips/bulk-update', data);
+      return response.data?.data ?? response.data;
     }
   },
   PayslipTemplate: createEntityAPI('/api/payroll/templates'),

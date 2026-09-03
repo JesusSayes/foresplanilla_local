@@ -250,6 +250,43 @@ export const update = async (req, res) => {
   }
 };
 
+export const bulkUpdate = async (req, res) => {
+  try {
+    const updates = req.body;
+
+    if (!Array.isArray(updates) || updates.length === 0 || updates.some(item => !item?.id)) {
+      return res.status(400).json({ error: 'Se requiere una lista de boletas con id' });
+    }
+
+    const ids = [...new Set(updates.map(item => item.id))];
+    if (ids.length !== updates.length) {
+      return res.status(400).json({ error: 'La lista contiene ids duplicados' });
+    }
+
+    const currentPayslips = await prisma.payslip.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, employee_id: true }
+    });
+
+    if (currentPayslips.length !== ids.length) {
+      return res.status(404).json({ error: 'Una o más boletas no existen' });
+    }
+
+    if (currentPayslips.some(payslip => !canAccessEmployee(req, payslip.employee_id)) ||
+        updates.some(item => item.employee_id && !canAccessEmployee(req, item.employee_id))) {
+      return res.status(403).json({ error: 'Acceso denegado a una o más boletas' });
+    }
+
+    const result = await prisma.$transaction(
+      updates.map(({ id, ...data }) => prisma.payslip.update({ where: { id }, data }))
+    );
+
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const remove = async (req, res) => {
   try {
     const current = await prisma.payslip.findUnique({
@@ -302,6 +339,7 @@ const controller = {
   create,
   bulkCreate,
   update,
+  bulkUpdate,
   delete: remove,
   filter
 }

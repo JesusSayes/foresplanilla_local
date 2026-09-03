@@ -203,6 +203,23 @@
     "calculation_summary": {
       "type": "object",
       "description": "Resumen de c\u00e1lculo del motor (breakdown de ingresos, descuentos y aportes con nombres, c\u00f3digos, montos y categor\u00edas). Permite que el PDF y el Excel de boletas generadas muestren el desglose AFP (aporte obligatorio, prima de seguro, comisi\u00f3n) y dem\u00e1s conceptos."
+    },
+    "digital_signature_url": {
+      "type": "string",
+      "description": "URL de la imagen de firma digital estampada en la boleta (firma del GG o representante delegado)"
+    },
+    "digital_signature_name": {
+      "type": "string",
+      "description": "Nombre de quien firm\u00f3 digitalmente la boleta"
+    },
+    "digital_signature_position": {
+      "type": "string",
+      "description": "Cargo de quien firm\u00f3 digitalmente la boleta (ej: Gerente General, Gerente Operativo)"
+    },
+    "digital_signature_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora en que se estamp\u00f3 la firma digital"
     }
   },
   "required": [

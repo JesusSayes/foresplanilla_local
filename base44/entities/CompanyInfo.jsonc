@@ -42,6 +42,27 @@
       "type": "string",
       "description": "URL de la imagen de firma del representante legal"
     },
+    "enable_delegated_signature": {
+      "type": "boolean",
+      "default": false,
+      "description": "Habilita la firma delegada (Gerente Operativo u otro autorizado). Cuando est\u00e1 activo, la firma delegada aparece como opci\u00f3n en el modal de firma masiva de boletas."
+    },
+    "delegated_representative": {
+      "type": "string",
+      "description": "Nombre del representante delegado (Gerente Operativo u otro autorizado)"
+    },
+    "delegated_representative_dni": {
+      "type": "string",
+      "description": "DNI del representante delegado"
+    },
+    "delegated_representative_position": {
+      "type": "string",
+      "description": "Cargo del representante delegado (ej: Gerente Operativo)"
+    },
+    "delegated_representative_signature_url": {
+      "type": "string",
+      "description": "URL de la imagen de firma del representante delegado"
+    },
     "website": {
       "type": "string",
       "description": "Sitio web de la empresa"

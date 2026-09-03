@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Building2, Save, Upload, Phone, Mail,
-  Globe, User, CreditCard, MapPin, FileText, PenLine, X
+  Globe, User, CreditCard, MapPin, FileText, PenLine, X, UserCheck
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
@@ -22,6 +22,7 @@ export default function CompanySettings() {
   const [logoFile, setLogoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadingSignature, setUploadingSignature] = useState(false);
+  const [uploadingDelegatedSignature, setUploadingDelegatedSignature] = useState(false);
   const [formData, setFormData] = useState({
     company_name: "",
     ruc: "",
@@ -34,6 +35,11 @@ export default function CompanySettings() {
     legal_representative_dni: "",
     legal_representative_position: "",
     legal_representative_signature_url: "",
+    enable_delegated_signature: false,
+    delegated_representative: "",
+    delegated_representative_dni: "",
+    delegated_representative_position: "",
+    delegated_representative_signature_url: "",
   });
 
   const queryClient = useQueryClient();
@@ -70,6 +76,11 @@ export default function CompanySettings() {
         legal_representative_dni: companyInfo.legal_representative_dni || "",
         legal_representative_position: companyInfo.legal_representative_position || "",
         legal_representative_signature_url: companyInfo.legal_representative_signature_url || "",
+        enable_delegated_signature: companyInfo.enable_delegated_signature || false,
+        delegated_representative: companyInfo.delegated_representative || "",
+        delegated_representative_dni: companyInfo.delegated_representative_dni || "",
+        delegated_representative_position: companyInfo.delegated_representative_position || "",
+        delegated_representative_signature_url: companyInfo.delegated_representative_signature_url || "",
       });
     }
   }, [companyInfo]);
@@ -100,7 +111,6 @@ export default function CompanySettings() {
     }
     setUploadingSignature(true);
     try {
-      // const { file_url } = await base44.integrations.Core.UploadFile({ file });
       const { file_url } = await uploadFile(file);
       setFormData(prev => ({ ...prev, legal_representative_signature_url: file_url }));
       toast.success("Firma subida correctamente");
@@ -109,6 +119,26 @@ export default function CompanySettings() {
       console.error(error);
     } finally {
       setUploadingSignature(false);
+    }
+  };
+
+  const handleDelegatedSignatureUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Por favor selecciona una imagen válida");
+      return;
+    }
+    setUploadingDelegatedSignature(true);
+    try {
+      const { file_url } = await uploadFile(file);
+      setFormData(prev => ({ ...prev, delegated_representative_signature_url: file_url }));
+      toast.success("Firma delegada subida correctamente");
+    } catch (error) {
+      toast.error("Error al subir la firma delegada");
+      console.error(error);
+    } finally {
+      setUploadingDelegatedSignature(false);
     }
   };
 
@@ -125,7 +155,6 @@ export default function CompanySettings() {
     setLogoFile(file);
 
     try {
-      // const { file_url } = await base44.integrations.Core.UploadFile({ file });
       const { file_url } = await uploadFile(file);
       setFormData(prev => ({ ...prev, logo_url: file_url }));
       toast.success("Logo subido correctamente");
@@ -409,6 +438,111 @@ export default function CompanySettings() {
                       disabled={uploadingSignature}
                     />
                   </label>
+                )}
+              </div>
+
+              {/* ── Firma Delegada ── */}
+              <div className="pt-4 border-t border-slate-200">
+                <div className="flex items-center justify-between mb-3">
+                  <Label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.enable_delegated_signature}
+                      onChange={(e) => setFormData({...formData, enable_delegated_signature: e.target.checked})}
+                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <UserCheck className="w-4 h-4 text-purple-600" />
+                    <span className="text-sm font-semibold text-slate-700">Habilitar Firma Delegada</span>
+                  </Label>
+                </div>
+                <p className="text-xs text-slate-500 mb-3">
+                  Al habilitar esta opción, la firma del representante delegado (ej: Gerente Operativo) aparecerá como opción en el modal de firma masiva de boletas.
+                </p>
+
+                {formData.enable_delegated_signature && (
+                  <div className="space-y-3 p-4 bg-purple-50/50 rounded-lg border border-purple-200">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Nombre del Delegado</Label>
+                        <Input
+                          value={formData.delegated_representative}
+                          onChange={(e) => setFormData({...formData, delegated_representative: e.target.value})}
+                          placeholder="Ej: Pedro Ramírez Soto"
+                        />
+                      </div>
+                      <div>
+                        <Label>DNI del Delegado</Label>
+                        <div className="relative">
+                          <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                          <Input
+                            value={formData.delegated_representative_dni}
+                            onChange={(e) => setFormData({...formData, delegated_representative_dni: e.target.value})}
+                            placeholder="12345678"
+                            className="pl-10"
+                            maxLength={8}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Cargo del Delegado</Label>
+                      <Input
+                        value={formData.delegated_representative_position}
+                        onChange={(e) => setFormData({...formData, delegated_representative_position: e.target.value})}
+                        placeholder="Gerente Operativo"
+                      />
+                    </div>
+                    {/* Firma digital delegada */}
+                    <div>
+                      <Label className="flex items-center gap-2 mb-2">
+                        <PenLine className="w-4 h-4 text-purple-600" />
+                        Firma Digital del Delegado
+                      </Label>
+                      {formData.delegated_representative_signature_url ? (
+                        <div className="flex items-center gap-4 p-3 border border-green-200 bg-green-50 rounded-lg">
+                          <img
+                            src={getPublicAssetUrl(formData.delegated_representative_signature_url)}
+                            alt="Firma delegada"
+                            className="h-14 object-contain border border-slate-200 bg-white rounded px-2"
+                          />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-green-800">Firma delegada registrada</p>
+                            <p className="text-xs text-green-600">Aparecerá en el modal de firma masiva</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                            onClick={() => setFormData(prev => ({ ...prev, delegated_representative_signature_url: "" }))}
+                          >
+                            <X className="w-4 h-4 mr-1" /> Quitar
+                          </Button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center border-2 border-dashed border-purple-300 rounded-lg p-4 cursor-pointer hover:border-purple-500 hover:bg-purple-50 transition-colors w-full">
+                          {uploadingDelegatedSignature ? (
+                            <div className="flex items-center gap-2 text-sm text-slate-500">
+                              <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                              Subiendo firma...
+                            </div>
+                          ) : (
+                            <>
+                              <PenLine className="w-6 h-6 text-purple-400 mb-1" />
+                              <span className="text-sm font-medium text-slate-700">Subir firma del delegado</span>
+                              <span className="text-xs text-slate-400 mt-1">PNG, JPG — fondo blanco o transparente</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleDelegatedSignatureUpload}
+                            disabled={uploadingDelegatedSignature}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             </CardContent>
