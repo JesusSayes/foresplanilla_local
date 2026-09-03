@@ -1053,10 +1053,22 @@ ${boletasHTML}
                             onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); setTimeout(() => window.print(), 800); }}>
                             <Printer className="w-3 h-3 mr-1" />Imprimir
                           </Button>
-                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap text-purple-700 border-purple-200 hover:bg-purple-50"
-                            onClick={e => { e.stopPropagation(); setShowPrintBoletasModal(g); }}>
-                            <Printer className="w-3 h-3 mr-1" />Boletas
-                          </Button>
+                          {(() => {
+                            const signedCount = g.payslips.filter(p => p.digital_signature_url).length;
+                            const allSigned = signedCount === g.payslips.length && g.payslips.length > 0;
+                            return (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-3 text-xs whitespace-nowrap text-purple-700 border-purple-200 hover:bg-purple-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
+                                disabled={!allSigned}
+                                title={allSigned ? "Imprimir boletas firmadas" : `Faltan firmar ${g.payslips.length - signedCount} de ${g.payslips.length} boleta(s)`}
+                                onClick={e => { e.stopPropagation(); setShowPrintBoletasModal(g); }}
+                              >
+                                <Printer className="w-3 h-3 mr-1" />Boletas
+                              </Button>
+                            );
+                          })()}
                           <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap text-emerald-700 border-emerald-200 hover:bg-emerald-50"
                             onClick={e => { e.stopPropagation(); setShowFirmarModal(g); }}>
                             <PenTool className="w-3 h-3 mr-1" />Firmar
