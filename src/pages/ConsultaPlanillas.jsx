@@ -834,7 +834,7 @@ export default function ConsultaPlanillas() {
 
     const conceptsMap = payrollConcepts || [];
 
-    const boletasHTML = grupo.payslips.map(p => {
+    const buildOne = (p) => {
       const emp = allEmployees.find(e => e.id === p.employee_id);
       if (!emp) return "";
       const afpName = emp.afp_id ? (afpMap[emp.afp_id] || emp.afp_id) : "";
@@ -845,10 +845,24 @@ export default function ConsultaPlanillas() {
         afpName,
         conceptsMap,
       });
+    };
+
+    // copies === 2 → dos copias de la MISMA boleta por hoja (una por columna)
+    const boletasHTML = grupo.payslips.map(p => {
+      const html = buildOne(p);
+      if (!html) return "";
+      if (copies === 2) {
+        // Cada hoja A4 horizontal contiene dos copias del mismo trabajador
+        return `<div class="sheet"><div class="sheet-inner">${html}</div><div class="sheet-inner">${html}</div></div>`;
+      }
+      return html;
     }).filter(Boolean).join("\n");
 
     const pageStyle = copies === 2
-      ? `@page { size: A4 landscape; margin: 6mm; } .wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }`
+      ? `@page { size: A4 landscape; margin: 6mm; }
+         .wrapper {}
+         .sheet { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; page-break-after: always; }
+         .sheet-inner { overflow: hidden; }`
       : `@page { size: A4 portrait; margin: 10mm; } .wrapper {}`;
 
     const html = `<!DOCTYPE html>
