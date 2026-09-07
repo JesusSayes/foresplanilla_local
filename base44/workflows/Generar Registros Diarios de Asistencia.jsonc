@@ -1,0 +1,44 @@
+{
+  "name": "Generar Registros Diarios de Asistencia",
+  "description": "Crea autom\u00e1ticamente los registros de asistencia de todos los empleados activos cada d\u00eda a las 00:05 (medianoche), con el horario programado y marcaciones del Biotime.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "5 5 * * *",
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "generar_registros_diarios_de_asistencia",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "generarRegistrosDiarios",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "generarRegistrosDiarios"
+  }
+}
