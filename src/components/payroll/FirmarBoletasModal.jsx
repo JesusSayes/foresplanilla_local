@@ -12,6 +12,8 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
   const [signing, setSigning] = useState(false);
   const [currentUserDni, setCurrentUserDni] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showOnlyUnsigned, setShowOnlyUnsigned] = useState(false);
+  const [employees, setEmployees] = useState([]);
 
   // Firmante GG = representante legal
   const ggName = companyInfo?.legal_representative || "";
@@ -38,7 +40,7 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
   const ggAvailable = !!(ggName && ggSignature) && dniMatchesGG;
   const delAvailable = delegatedEnabled && !!(delName && delSignature) && dniMatchesDelegated;
 
-  // Cargar DNI del usuario logueado
+  // Cargar DNI del usuario logueado y empleados para mostrar nombres
   React.useEffect(() => {
     (async () => {
       try {
@@ -48,6 +50,9 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
         if (emps?.length > 0) {
           setCurrentUserDni(emps[0].document_number || "");
         }
+        // Cargar empleados para mostrar nombres en la lista de boletas
+        const allEmps = await base44.entities.Employee.list();
+        setEmployees(allEmps);
       } catch (e) { /* noop */ }
     })();
   }, []);
@@ -62,15 +67,42 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
     ? { name: ggName, position: ggPosition, signature_url: ggSignature }
     : { name: delName, position: delPosition, signature_url: delSignature };
 
+  // Boletas firmadas y pendientes
+  const signedPayslips = (grupo.payslips || []).filter(p => p.digital_signature_url);
+  const unsignedPayslips = (grupo.payslips || []).filter(p => !p.digital_signature_url);
+  const totalBoletas = grupo.payslips.length;
+  const pendingCount = unsignedPayslips.length;
+
+  // Lista a mostrar según filtro
+  const displayedPayslips = showOnlyUnsigned ? unsignedPayslips : (grupo.payslips || []);
+
+  // Mapa de empleados para resolver nombres
+  const empMap = React.useMemo(() => {
+    const m = {};
+    employees.forEach(e => { m[e.id] = e; });
+    return m;
+  }, [employees]);
+
+  const getEmpName = (p) => {
+    const e = empMap[p.employee_id];
+    return e ? `${e.first_name} ${e.last_name}` : "Empleado";
+  };
+
   const handleSign = async () => {
     if (!selectedSigner.signature_url) {
       toast.error("El firmante seleccionado no tiene firma configurada");
       return;
     }
+    // Firmar solo las boletas que aún no están firmadas
+    const toSign = unsignedPayslips;
+    if (toSign.length === 0) {
+      toast.info("Todas las boletas ya están firmadas");
+      return;
+    }
     setSigning(true);
     try {
       const now = new Date().toISOString();
-      const updates = grupo.payslips.map(p => ({
+      const updates = toSign.map(p => ({
         id: p.id,
         digital_signature_url: selectedSigner.signature_url,
         digital_signature_name: selectedSigner.name,
@@ -78,7 +110,7 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
         digital_signature_date: now,
       }));
       await base44.entities.Payslip.bulkUpdate(updates);
-      toast.success(`✓ ${grupo.payslips.length} boleta(s) firmada(s) por ${selectedSigner.name}`);
+      toast.success(`✓ ${toSign.length} boleta(s) firmada(s) por ${selectedSigner.name}`);
       onSuccess?.();
     } catch (error) {
       toast.error("Error al firmar las boletas: " + (error.message || ""));
@@ -87,8 +119,6 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
       setSigning(false);
     }
   };
-
-  const totalBoletas = grupo.payslips.length;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -110,8 +140,50 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
           <p className="text-sm text-slate-600">
-            Seleccione el firmante para estampar la firma digital en las <strong>{totalBoletas}</strong> boleta(s) de este período.
+            Seleccione el firmante para estampar la firma digital en las <strong>{pendingCount}</strong> boleta(s) pendiente(s) de un total de {totalBoletas}.
           </p>
+
+          {/* Filtro rápido + lista de boletas */}
+          <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-200">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showOnlyUnsigned}
+                  onChange={(e) => setShowOnlyUnsigned(e.target.checked)}
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-xs font-medium text-slate-700">Ver solo boletas no firmadas</span>
+              </label>
+              <span className="text-[11px] text-slate-500">
+                {pendingCount} pendiente(s) · {signedPayslips.length} firmada(s)
+              </span>
+            </div>
+            <div className="max-h-52 overflow-y-auto divide-y divide-slate-100">
+              {displayedPayslips.length === 0 ? (
+                <p className="text-center text-xs text-slate-400 py-6">No hay boletas para mostrar</p>
+              ) : (
+                displayedPayslips.map(p => {
+                  const isSigned = !!p.digital_signature_url;
+                  return (
+                    <div key={p.id} className="flex items-center justify-between px-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-slate-800 truncate">{getEmpName(p)}</p>
+                        <p className="text-[10px] text-slate-400">
+                          {p.digital_signature_name ? `Firmado por: ${p.digital_signature_name}` : "Pendiente de firma"}
+                        </p>
+                      </div>
+                      {isSigned ? (
+                        <Badge className="text-[10px] bg-green-100 text-green-700 shrink-0">✓ Firmada</Badge>
+                      ) : (
+                        <Badge className="text-[10px] bg-amber-100 text-amber-700 shrink-0">Pendiente</Badge>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
 
           {!ggAvailable && !delAvailable && currentUserDni && (
             <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -204,11 +276,11 @@ export default function FirmarBoletasModal({ grupo, companyInfo, onClose, onSucc
           <Button
             className="flex-1 bg-indigo-600 hover:bg-indigo-700"
             onClick={handleSign}
-            disabled={signing || !selectedSigner.signature_url}
+            disabled={signing || !selectedSigner.signature_url || pendingCount === 0}
           >
             {signing
               ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Firmando...</>
-              : <><PenTool className="w-4 h-4 mr-2" />Firmar {totalBoletas} Boleta(s)</>}
+              : <><PenTool className="w-4 h-4 mr-2" />Firmar {pendingCount} Boleta(s)</>}
           </Button>
         </div>
       </div>

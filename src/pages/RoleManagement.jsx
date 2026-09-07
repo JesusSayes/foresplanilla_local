@@ -274,65 +274,6 @@ export default function RoleManagement() {
     emp.employee_code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const permissionCategories = {
-    "Empleados": [
-      "employees.view", "employees.view_financials", "employees.edit", "employees.create", "employees.delete", 
-      "employees.import", "employees.export", "employees.change_status"
-    ],
-    "Asistencia": [
-      "attendance.view_own", "attendance.view_all", "attendance.view_department", 
-      "attendance.edit", "attendance.approve_edits", "attendance.approve_incidents", "attendance.manage", "attendance.export"
-    ],
-    "Vacaciones": [
-      "vacations.view_own", "vacations.view_all", "vacations.view_department", 
-      "vacations.approve", "vacations.manage", "vacations.calendar"
-    ],
-    "Nómina": [
-      "payroll.view_own", "payroll.view_all", "payroll.edit", "payroll.create", 
-      "payroll.delete", "payroll.calculate", "payroll.approve"
-    ],
-    "Certificados": [
-      "certificates.view_own", "certificates.view_all", "certificates.approve", 
-      "certificates.create", "certificates.request"
-    ],
-    "Horarios": [
-      "schedules.view", "schedules.edit", "schedules.create", "schedules.delete", "schedules.assign"
-    ],
-    "Feriados": [
-      "holidays.view", "holidays.manage", "holidays.create", "holidays.edit", "holidays.delete"
-    ],
-    "Sedes": [
-      "sites.view", "sites.create", "sites.edit", "sites.delete", "sites.manage"
-    ],
-    "Departamentos": [
-      "departments.view", "departments.create", "departments.edit", "departments.delete", "departments.manage"
-    ],
-    "Cargos/Posiciones": [
-      "positions.view", "positions.create", "positions.edit", "positions.delete", "positions.manage"
-    ],
-    "Bancos": [
-      "banks.view", "banks.create", "banks.edit", "banks.delete"
-    ],
-    "Reportes": [
-      "reports.view", "reports.export", "reports.attendance", "reports.payroll", 
-      "reports.vacations", "reports.employees"
-    ],
-    "Centros de Costo": [
-      "cost_centers.view", "cost_centers.create", "cost_centers.edit", "cost_centers.delete",
-      "cost_centers.assign", "cost_centers.view_amounts"
-    ],
-    "Planillas": [
-      "payroll.view_own", "payroll.view_all", "payroll.view_department", "payroll.view_amounts",
-      "payroll.edit", "payroll.create", "payroll.delete", "payroll.calculate", "payroll.approve"
-    ],
-    "Contratos": [
-      "contracts.view", "contracts.view_amounts", "contracts.create", "contracts.edit", "contracts.delete"
-    ],
-    "Administración": [
-      "roles.view", "roles.manage", "roles.assign", "system.admin", "system.settings"
-    ],
-  };
-
   if (!employee || permissionsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
