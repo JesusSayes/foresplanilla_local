@@ -16,6 +16,7 @@ import { createPageUrl } from "../utils";
 import { Link } from "react-router-dom";
 import PermissionGuard from "../components/PermissionGuard";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
+import PayrollCharts from "../components/dashboard/PayrollCharts";
 
 export default function HRDashboard() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -93,6 +94,20 @@ export default function HRDashboard() {
     queryKey: ["allContracts"],
     queryFn: async () => {
       return await base44.entities.Contract.list("-created_date");
+    },
+  });
+
+  const { data: costCenters = [] } = useQuery({
+    queryKey: ["allCostCentersDashboard"],
+    queryFn: async () => {
+      return await base44.entities.CostCenter.list("code");
+    },
+  });
+
+  const { data: costCenterAssignments = [] } = useQuery({
+    queryKey: ["allCostCenterAssignmentsDashboard"],
+    queryFn: async () => {
+      return await base44.entities.CostCenterAssignment.list("-created_date");
     },
   });
 
@@ -338,6 +353,14 @@ export default function HRDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Reportes gráficos de nómina */}
+          <PayrollCharts
+            payslips={payslips}
+            employees={allEmployees}
+            costCenters={costCenters}
+            costCenterAssignments={costCenterAssignments}
+          />
 
           {/* Alertas y pendientes */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
