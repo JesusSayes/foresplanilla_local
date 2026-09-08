@@ -179,10 +179,14 @@ export default function ProcessRenewalModal({
           if (rule.notification_emails?.length > 0) {
             for (const email of rule.notification_emails) {
               try {
-                await base44.integrations.Core.SendEmail({
+                await base44.functions.invoke('enviarAlertaRenovacionContrato', {
                   to: email,
-                  subject: `Alerta: Contrato próximo a vencer - ${empName}`,
-                  body: `El contrato del empleado ${empName} está próximo a vencer.\n\n- Cargo: ${contract.position || ""}\n- Tipo: ${contract.contract_type}\n- Vence: ${format(new Date(contract.end_date), "dd 'de' MMMM 'de' yyyy", { locale: es })}\n- Días restantes: ${daysUntilExpiration}\n\n${rule.auto_create_draft ? "Se ha creado un borrador de renovación automáticamente." : "Por favor, revisa la renovación."}`,
+                  employeeName: empName,
+                  position: contract.position || "",
+                  contractType: contract.contract_type,
+                  endDate: format(new Date(contract.end_date), "dd 'de' MMMM 'de' yyyy", { locale: es }),
+                  daysUntilExpiration,
+                  autoCreateDraft: rule.auto_create_draft,
                 });
                 addLog("success", `✓ Correo enviado a ${email}.`);
               } catch (err) {

@@ -547,36 +547,8 @@ export default function PayrollConcepts() {
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
 
-      const extractedData = await base44.integrations.Core.ExtractDataFromUploadedFile({
-        file_url,
-        json_schema: {
-          type: "object",
-          properties: {
-            concepts: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  document_number: { type: "string" },
-                  concept_type: { type: "string" },
-                  concept_category: { type: "string" },
-                  concept_name: { type: "string" },
-                  concept_code: { type: "string" },
-                  description: { type: "string" },
-                  amount: { type: "number" },
-                  is_dynamic: { type: "boolean" },
-                  calculation_formula: { type: "string" },
-                  system_logic_type: { type: "string" },
-                  is_recurring: { type: "boolean" },
-                  is_mandatory: { type: "boolean" },
-                  applies_to_payroll_types: { type: "string" },
-                  notes: { type: "string" },
-                }
-              }
-            }
-          }
-        }
-      });
+      const response = await base44.functions.invoke('extraerConceptosDeArchivo', { file_url });
+      const extractedData = response.data || response;
 
       if (extractedData.status === "success" && extractedData.output?.concepts) {
         setUploadPreview(extractedData.output.concepts);

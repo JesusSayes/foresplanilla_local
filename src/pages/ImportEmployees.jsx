@@ -155,41 +155,41 @@ export default function ImportEmployees() {
       toast.loading("Extrayendo datos de empleados...", { id: "upload" });
 
       const result = await Promise.race([
-        base44.integrations.Core.ExtractDataFromUploadedFile({
-          file_url: file_url,
-          json_schema: employeeSchema
-        }),
+        base44.functions.invoke('extraerEmpleadosDeArchivo', { file_url }),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error("Timeout: La extracción tardó más de 3 minutos")), 180000)
         )
       ]);
 
-      console.log("📊 PASO 2 COMPLETADO - Resultado:", result);
+      // La respuesta del SDK es { data, status, headers } — el resultado de la función está en data
+      const extractResult = result.data || result;
 
-      if (result.status === "success" && result.output) {
-        if (!Array.isArray(result.output)) {
+      console.log("📊 PASO 2 COMPLETADO - Resultado:", extractResult);
+
+      if (extractResult.status === "success" && extractResult.output) {
+        if (!Array.isArray(extractResult.output)) {
           throw new Error("El formato de respuesta no es válido");
         }
         
-        if (result.output.length === 0) {
+        if (extractResult.output.length === 0) {
           throw new Error("El archivo está vacío o no contiene empleados válidos");
         }
 
-        console.log("✅ Extracción exitosa:", result.output.length, "empleados");
-        console.log("Muestra:", result.output.slice(0, 2));
+        console.log("✅ Extracción exitosa:", extractResult.output.length, "empleados");
+        console.log("Muestra:", extractResult.output.slice(0, 2));
         
-        setPreviewData(result.output);
+        setPreviewData(extractResult.output);
         setUploadProgress("");
-        toast.success(`✓ ${result.output.length} empleados listos para importar`, { id: "upload", duration: 5000 });
+        toast.success(`✓ ${extractResult.output.length} empleados listos para importar`, { id: "upload", duration: 5000 });
       } else {
-        let errorMsg = result.details || result.error || "No se pudo procesar el archivo. Verifica el formato.";
+        let errorMsg = extractResult.details || extractResult.error || "No se pudo procesar el archivo. Verifica el formato.";
         
         // Detectar problema de delimitador
         if (errorMsg.includes("delimiter") || errorMsg.includes("CSV Error") || errorMsg.includes("byte sequence")) {
           errorMsg = "El archivo CSV tiene un formato incorrecto. Por favor, descarga y usa la plantilla proporcionada. Asegúrate de usar comas (,) como separadores, no punto y coma (;).";
         }
         
-        console.error("❌ Error en extracción:", result);
+        console.error("❌ Error en extracción:", extractResult);
         throw new Error(errorMsg);
       }
     } catch (error) {

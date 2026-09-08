@@ -95,24 +95,9 @@ export default function UserManagement() {
         status: "Enviada"
       });
       
-      // Opcionalmente enviar email adicional con información
+      // Opcionalmente enviar email adicional con información (vía backend para proteger créditos)
       try {
-        await base44.integrations.Core.SendEmail({
-          to: email,
-          subject: "Invitación al Sistema de RRHH",
-          body: `
-Hola ${name},
-
-Has sido invitado a unirte al Sistema de Recursos Humanos de la empresa.
-
-Por favor, revisa tu correo electrónico para encontrar el enlace de invitación oficial y configurar tu cuenta.
-
-Tu email de acceso será: ${email}
-
-Saludos,
-Equipo de Recursos Humanos
-          `,
-        });
+        await base44.functions.invoke('enviarInvitacionUsuario', { to: email, name });
       } catch (emailError) {
         console.log("Email adicional no enviado:", emailError);
       }
