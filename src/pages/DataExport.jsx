@@ -114,7 +114,10 @@ const ENTITY_SCHEMAS = {
     overtime_authorized: "BOOLEAN", is_late: "BOOLEAN", late_minutes: "INTEGER",
     is_absent: "BOOLEAN", status: "TEXT", notes: "TEXT",
     manually_protected_fields: "JSON", last_approved_edit_id: "TEXT",
-    manually_modified_by: "TEXT", manually_modified_at: "TIMESTAMP"
+    manually_modified_by: "TEXT", manually_modified_at: "TIMESTAMP",
+    tardiness_compensation_minutes: "INTEGER", tardiness_compensation_authorizer: "TEXT",
+    tardiness_compensation_authorized_at: "TIMESTAMP", tardiness_compensation_reason: "TEXT",
+    tardiness_compensation_status: "TEXT"
   },
   AttendanceEditRequest: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
@@ -213,7 +216,9 @@ const ENTITY_SCHEMAS = {
     advance_deduction: "DECIMAL(18,2)", other_deductions: "DECIMAL(18,2)",
     total_deductions: "DECIMAL(18,2)", net_pay: "DECIMAL(18,2)",
     payment_date: "DATE", pdf_url: "TEXT", status: "TEXT", notes: "TEXT",
-    calculation_summary: "JSON"
+    calculation_summary: "JSON",
+    digital_signature_url: "TEXT", digital_signature_name: "TEXT",
+    digital_signature_position: "TEXT", digital_signature_date: "TIMESTAMP"
   },
   PayrollConcept: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
@@ -276,6 +281,7 @@ const ENTITY_SCHEMAS = {
   PayrollConfig: {
     id: "VARCHAR(255) PRIMARY KEY", created_date: "TIMESTAMP", updated_date: "TIMESTAMP", created_by: "TEXT",
     config_type: "TEXT", quincenal_percentage: "DECIMAL(18,2)", quincenal_cutoff_day: "INTEGER",
+    enable_tardiness_compensation: "BOOLEAN",
     is_active: "BOOLEAN", notes: "TEXT"
   },
   HistorialRemunerativo: {
@@ -355,6 +361,7 @@ const ENTITY_SCHEMAS = {
     debe_haber: "TEXT", centro_costos: "TEXT", centro_costos_id: "TEXT", medio_pago: "TEXT",
     fecha_registro: "DATE", anulado: "BOOLEAN", motivo_anulacion: "TEXT", origen: "TEXT",
     payslip_id: "TEXT", employee_id: "TEXT", payroll_period: "TEXT", payroll_type: "TEXT",
+    empresa: "TEXT",
     migrado: "BOOLEAN", fecha_migracion: "TIMESTAMP", sistema_destino: "TEXT",
     codigo_migracion: "TEXT", migrado_por: "TEXT", error_migracion: "TEXT", estado_migracion: "TEXT"
   },
@@ -374,6 +381,7 @@ const ENTITY_SCHEMAS = {
     is_active: "BOOLEAN",
     cuentas_por_planilla: "JSON",
     cuentas_por_concepto: "JSON",
+    subdiarios_por_planilla: "JSON",
     last_test_status: "TEXT", last_test_date: "TIMESTAMP", last_test_message: "TEXT", notes: "TEXT"
   },
   TipoCambioConfig: {
@@ -390,6 +398,9 @@ const ENTITY_SCHEMAS = {
     company_name: "TEXT", ruc: "TEXT", address: "TEXT", phone: "TEXT", email: "TEXT",
     logo_url: "TEXT", legal_representative: "TEXT", legal_representative_dni: "TEXT",
     legal_representative_position: "TEXT", legal_representative_signature_url: "TEXT",
+    enable_delegated_signature: "BOOLEAN", delegated_representative: "TEXT",
+    delegated_representative_dni: "TEXT", delegated_representative_position: "TEXT",
+    delegated_representative_signature_url: "TEXT",
     website: "TEXT", is_active: "BOOLEAN", firmante_gg: "TEXT", firmante_delegado: "TEXT"
   },
   PayslipTemplate: {

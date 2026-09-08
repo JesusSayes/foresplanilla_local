@@ -955,8 +955,8 @@ ${boletasHTML}
           <div className="overflow-x-auto -mx-4 px-4">
             {/* Cabecera de columnas */}
             <div className="grid items-center mb-1 px-1" style={{
-              minWidth: "1120px",
-              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 320px 1px 210px 32px"
+              minWidth: "1280px",
+              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px minmax(360px,360px) 1px minmax(220px,220px) 32px"
             }}>
               <div className="px-4 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Período / Tipo</div>
               <div />
@@ -974,7 +974,8 @@ ${boletasHTML}
               <div />
             </div>
 
-            <div className="space-y-2" style={{ minWidth: "1120px" }}>
+
+            <div className="space-y-2" style={{ minWidth: "1280px" }}>
               {filteredGrupos.map(g => {
                 const stats = getGrupoStats(g);
                 const asientoStatus = getGrupoAsientoStatus(g);
@@ -985,9 +986,9 @@ ${boletasHTML}
                     onClick={() => setSelectedGroup(g)}
                   >
                     <CardContent className="p-0">
-                      {/* Grid dinámico: info crece, botones fijos y sin superposición */}
-                      <div className="grid items-center w-full min-h-[76px]" style={{
-                        gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 320px 1px 210px 32px"
+                      {/* Grid dinámico: info crece, botones con ancho mínimo fijo para evitar solapamiento */}
+                      <div className="grid items-center w-full min-h-[88px]" style={{
+                        gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px minmax(360px,360px) 1px minmax(220px,220px) 32px"
                       }}>
 
                         {/* Col 1 — Período + badges */}
@@ -1051,13 +1052,15 @@ ${boletasHTML}
 
                         <div className="bg-slate-100 self-stretch my-3" />
 
-                        {/* Col 6 — Botones Ver / Imprimir / Boletas */}
-                        <div className="flex flex-wrap items-center justify-center gap-1.5 px-3 py-2" onClick={e => e.stopPropagation()}>
-                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap"
+                        {/* Col 6 — Botones Ver / Imprimir / Boletas / Firmar
+                            Ancho fijo 360px con flex-wrap: los botones pasan a 2 filas
+                            sin invadir la columna de Contabilidad. */}
+                        <div className="flex flex-wrap items-center justify-center gap-1.5 px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                          <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs whitespace-nowrap"
                             onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); }}>
                             <Eye className="w-3 h-3 mr-1" />Ver
                           </Button>
-                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap"
+                          <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs whitespace-nowrap"
                             onClick={e => { e.stopPropagation(); setSelectedGroup(g); setShowPlanillaCompleta(true); setTimeout(() => window.print(), 800); }}>
                             <Printer className="w-3 h-3 mr-1" />Imprimir
                           </Button>
@@ -1068,7 +1071,7 @@ ${boletasHTML}
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-8 px-3 text-xs whitespace-nowrap text-purple-700 border-purple-200 hover:bg-purple-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
+                                className="h-8 px-2.5 text-xs whitespace-nowrap text-purple-700 border-purple-200 hover:bg-purple-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
                                 disabled={!allSigned}
                                 title={allSigned ? "Imprimir boletas firmadas" : `Faltan firmar ${g.payslips.length - signedCount} de ${g.payslips.length} boleta(s)`}
                                 onClick={e => { e.stopPropagation(); setShowPrintBoletasModal(g); }}
@@ -1077,7 +1080,7 @@ ${boletasHTML}
                               </Button>
                             );
                           })()}
-                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs whitespace-nowrap text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                          <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs whitespace-nowrap text-emerald-700 border-emerald-200 hover:bg-emerald-50"
                             onClick={e => { e.stopPropagation(); setShowFirmarModal(g); }}>
                             <PenTool className="w-3 h-3 mr-1" />Firmar
                           </Button>
@@ -1085,10 +1088,10 @@ ${boletasHTML}
 
                         <div className="bg-slate-100 self-stretch my-3" />
 
-                        {/* Col 7 — Generar Asiento */}
+                        {/* Col 7 — Generar Asiento (ancho fijo 220px) */}
                         <div className="flex items-center justify-center px-3 py-3" onClick={e => e.stopPropagation()}>
                           {g.payroll_type !== "Quincenal" ? (
-                            <div className="flex flex-col items-stretch gap-1 w-full">
+                            <div className="flex flex-col items-stretch gap-1 w-full max-w-[200px]">
                               {asientoStatus && (
                                 <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                                   <CheckCircle className="w-2.5 h-2.5" />Asiento generado
@@ -1125,8 +1128,8 @@ ${boletasHTML}
 
             {/* Fila de totales dinámicos — al pie del datagrid */}
             <div className="grid items-center mt-2 bg-indigo-600 rounded-xl px-1 py-3" style={{
-              minWidth: "1120px",
-              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px 320px 1px 210px 32px"
+              minWidth: "1280px",
+              gridTemplateColumns: "minmax(200px,1.8fr) 1px minmax(60px,0.5fr) 1px minmax(120px,1fr) 1px minmax(120px,1fr) 1px minmax(130px,1fr) 1px minmax(360px,360px) 1px minmax(220px,220px) 32px"
             }}>
               <div className="px-4 text-xs font-bold text-white uppercase tracking-wide">
                 TOTALES — {filteredGrupos.length} planilla(s)
@@ -1170,6 +1173,7 @@ ${boletasHTML}
       {showFirmarModal && (
         <FirmarBoletasModal
           grupo={showFirmarModal}
+          employees={allEmployees}
           companyInfo={companyInfo}
           onClose={() => setShowFirmarModal(null)}
           onSuccess={() => {

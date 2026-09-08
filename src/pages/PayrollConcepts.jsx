@@ -561,6 +561,9 @@ export default function PayrollConcepts() {
     }
   };
 
+  const VALID_CATEGORIES = ["Remuneración Base", "Bonificaciones", "Horas Extras", "Asignaciones", "AFP/ONP", "Impuestos", "Préstamos", "Descuentos Varios", "EsSalud", "SCTR", "Otros"];
+  const VALID_SYSTEM_LOGIC = ["family_allowance", "tardiness_discount", "absence_discount", "salary_advance", "loan_installment", "pension_contribution"];
+
   const bulkCreateMutation = useMutation({
     mutationFn: async (concepts) => {
       const results = { success: 0, errors: 0, errorDetails: [] };
@@ -574,29 +577,48 @@ export default function PayrollConcepts() {
             continue;
           }
 
+          // Validar concept_category
+          let category = concept.concept_category || "Otros";
+          if (!VALID_CATEGORIES.includes(category)) {
+            results.errors++;
+            results.errorDetails.push(`Documento ${concept.document_number}: categoría "${category}" inválida. Use una de: ${VALID_CATEGORIES.join(", ")}`);
+            continue;
+          }
+
+          // Validar y normalizar system_logic_type
+          let systemLogic = (concept.system_logic_type || "").trim();
+          if (systemLogic && !VALID_SYSTEM_LOGIC.includes(systemLogic)) {
+            results.errors++;
+            results.errorDetails.push(`Documento ${concept.document_number}: system_logic_type "${systemLogic}" inválido. Use uno de: ${VALID_SYSTEM_LOGIC.join(", ")}`);
+            continue;
+          }
+
+          const isDynamic = !!systemLogic || String(concept.is_dynamic).trim().toUpperCase() === "TRUE";
+
           // Parsear applies_to_payroll_types (puede venir como string separado por comas)
           let payrollTypes = ["Mensual"];
           if (concept.applies_to_payroll_types) {
             if (typeof concept.applies_to_payroll_types === 'string') {
-              payrollTypes = concept.applies_to_payroll_types.split(',').map(t => t.trim());
+              payrollTypes = concept.applies_to_payroll_types.split(',').map(t => t.trim()).filter(Boolean);
             } else if (Array.isArray(concept.applies_to_payroll_types)) {
               payrollTypes = concept.applies_to_payroll_types;
             }
           }
+          if (payrollTypes.length === 0) payrollTypes = ["Mensual"];
 
           await entitiesAPI.PayrollConcept.create({
             employee_id: emp.id,
             concept_type: concept.concept_type || "Ingreso",
-            concept_category: concept.concept_category || "",
+            concept_category: category,
             concept_name: concept.concept_name,
             concept_code: concept.concept_code || "",
             description: concept.description || "",
-            amount: concept.is_dynamic ? 0 : parseFloat(concept.amount || 0),
-            is_dynamic: concept.is_dynamic || false,
-            calculation_formula: concept.calculation_formula || "",
-            system_logic_type: concept.system_logic_type || "",
-            is_recurring: concept.is_recurring || false,
-            is_mandatory: concept.is_mandatory || false,
+            amount: isDynamic ? 0 : parseFloat(concept.amount || 0),
+            is_dynamic: isDynamic,
+            calculation_formula: systemLogic ? "" : (concept.calculation_formula || ""),
+            system_logic_type: systemLogic,
+            is_recurring: String(concept.is_recurring).trim().toUpperCase() === "TRUE",
+            is_mandatory: String(concept.is_mandatory).trim().toUpperCase() === "TRUE",
             applies_to_payroll_types: payrollTypes,
             month: selectedMonth,
             year: selectedYear,
@@ -632,11 +654,12 @@ export default function PayrollConcepts() {
   });
 
   const downloadBulkTemplate = () => {
-    const template = `document_number,concept_type,concept_category,concept_name,concept_code,description,amount,is_dynamic,calculation_formula,is_recurring,is_mandatory,applies_to_payroll_types,notes
-76549618,Ingreso,Bonificaciones,Bono Productividad,ING001,Bono por metas cumplidas,500,FALSE,,FALSE,FALSE,"Mensual,Quincenal",
-76549618,Descuento,Préstamos,Préstamo Personal,DESC001,Cuota mensual préstamo,200,FALSE,,TRUE,FALSE,Mensual,Cuota 1 de 12
-08123456,Ingreso,Horas Extras,Comisión Ventas,ING002,Comisión 5% sobre ventas,0,TRUE,ventas_mensuales * 0.05,TRUE,FALSE,Mensual,
-08123456,Descuento,Descuentos Varios,Descuento Tardanza,DESC002,Descuento por llegar tarde,50,FALSE,,FALSE,FALSE,Mensual,`;
+    const template = `document_number,concept_type,concept_category,concept_name,concept_code,description,amount,is_dynamic,calculation_formula,system_logic_type,is_recurring,is_mandatory,applies_to_payroll_types,notes
+76549618,Ingreso,Bonificaciones,Bono Productividad,ING001,Bono por metas cumplidas,500,FALSE,,,FALSE,FALSE,"Mensual,Quincenal",
+76549618,Descuento,Préstamos,Préstamo Personal,DESC001,Cuota mensual préstamo,200,FALSE,,,TRUE,FALSE,Mensual,Cuota 1 de 12
+08123456,Ingreso,Horas Extras,Comisión Ventas,ING002,Comisión 5% sobre ventas,0,TRUE,ventas_mensuales * 0.05,,TRUE,FALSE,Mensual,
+08123456,Descuento,Descuentos Varios,Descuento Tardanza,DESC002,Descuento por llegar tarde,50,FALSE,,tardiness_discount,FALSE,FALSE,Mensual,
+08123456,Ingreso,Asignaciones,Asignación Familiar,ING003,Calculada automáticamente,0,TRUE,,family_allowance,FALSE,TRUE,Mensual,`;
 
     const blob = new Blob([template], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -1576,7 +1599,9 @@ export default function PayrollConcepts() {
                   <li>2. Completa los datos de cada concepto usando <strong>número de documento</strong> (preserva ceros iniciales)</li>
                   <li>3. Para <strong>is_dynamic, is_recurring, is_mandatory</strong> usa: TRUE o FALSE</li>
                   <li>4. Para <strong>applies_to_payroll_types</strong> separa con comas: "Mensual,Quincenal"</li>
-                  <li>5. Sube el archivo completado para procesar</li>
+                  <li>5. <strong>system_logic_type</strong> (opcional): family_allowance, tardiness_discount, absence_discount, salary_advance, loan_installment, pension_contribution. Si lo usas, deja calculation_formula vacío.</li>
+                  <li>6. <strong>concept_category</strong> debe ser uno de: Remuneración Base, Bonificaciones, Horas Extras, Asignaciones, AFP/ONP, Impuestos, Préstamos, Descuentos Varios, EsSalud, SCTR, Otros</li>
+                  <li>7. Sube el archivo completado para procesar</li>
                 </ul>
                 <Button
                   onClick={downloadBulkTemplate}
@@ -1641,6 +1666,7 @@ export default function PayrollConcepts() {
                           <th className="text-left p-2 text-xs">Categoría</th>
                           <th className="text-left p-2 text-xs">Concepto</th>
                           <th className="text-left p-2 text-xs">Código</th>
+                          <th className="text-left p-2 text-xs">Lógica Sistema</th>
                           <th className="text-right p-2 text-xs">Monto</th>
                           <th className="text-center p-2 text-xs">Recurrente</th>
                           <th className="text-center p-2 text-xs">Obligatorio</th>
@@ -1672,6 +1698,11 @@ export default function PayrollConcepts() {
                               <td className="p-2 text-xs">{item.concept_category || "-"}</td>
                               <td className="p-2 font-medium text-xs">{item.concept_name}</td>
                               <td className="p-2 text-xs font-mono">{item.concept_code || "-"}</td>
+                              <td className="p-2 text-xs">
+                                {item.system_logic_type ? (
+                                  <Badge className="bg-teal-100 text-teal-700 text-xs">{item.system_logic_type}</Badge>
+                                ) : "-"}
+                              </td>
                               <td className="p-2 text-right text-xs">
                                 {item.system_logic_type ? (
                                   <Badge className="bg-teal-100 text-teal-700 text-xs">⚙ Sistema</Badge>
