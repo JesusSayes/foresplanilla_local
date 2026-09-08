@@ -359,7 +359,8 @@ export default function ContractManagement() {
       c.contract_number?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     const matchesStatus = statusFilter === "all" || c.status === statusFilter;
-    const matchesSign = signatureFilter === "all" || (signatureFilter === "signed" && c.is_digitally_signed) || (signatureFilter === "pending" && !c.is_digitally_signed);
+    const isSigned = !!(c.is_digitally_signed || c.signed_date);
+    const matchesSign = signatureFilter === "all" || (c.status === "Vigente" && (signatureFilter === "signed" ? isSigned : !isSigned));
     // Filtro de sede (selector UI)
     const matchesSite = siteFilterContracts === "all" || emp.site === siteFilterContracts;
 
@@ -382,17 +383,27 @@ export default function ContractManagement() {
       }
     }
 
-    return matchesSearch && matchesStatus && matchesSign && matchesSite && matchesExpiry;
+    return matchesSearch && matchesStatus && matchesSign && matchesSite && matchesExpiry && (expiryFilter === "all" || c.status === "Vigente");
   });
 
   const totalPages = Math.ceil(filteredContracts.length / PAGE_SIZE);
   const paginatedContracts = filteredContracts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
+  // Cálculo de estadísticas — coherente con los filtros disponibles:
+  // Vigentes/Vencidos filtran por status; Por Vencer usa Vigente + end_date ≤ 30 días;
+  // Firmados/Pendiente Firma solo cuentan contratos Vigentes (consistencia con el filtro de firma).
+  const todayForExpiry = parseDateLima(todayLima());
   const stats = {
-    total: contracts.length,
     vigentes: contracts.filter(c => c.status === "Vigente").length,
-    firmados: contracts.filter(c => c.is_digitally_signed || c.signed_date).length,
-    pendienteFirma: contracts.filter(c => !c.is_digitally_signed && !c.signed_date && c.status === "Vigente").length,
+    vencidos: contracts.filter(c => c.status === "Vencido").length,
+    porVencer30: contracts.filter(c => {
+      if (c.status !== "Vigente" || !c.end_date) return false;
+      const endDate = parseDateLima(c.end_date.split("T")[0]);
+      const days = Math.ceil((endDate - todayForExpiry) / (1000 * 60 * 60 * 24));
+      return days > 0 && days <= 30;
+    }).length,
+    firmados: contracts.filter(c => c.status === "Vigente" && (c.is_digitally_signed || c.signed_date)).length,
+    pendienteFirma: contracts.filter(c => c.status === "Vigente" && !c.is_digitally_signed && !c.signed_date).length,
   };
 
   const getStatusConfig = (status) => ({
@@ -437,21 +448,45 @@ export default function ContractManagement() {
           <p className="text-slate-600">Registra, administra y firma digitalmente los contratos laborales</p>
         </div>
 
-        {/* Stats */}
+        {/* Stats — tarjetas interactivas que aplican el filtro correspondiente */}
         <div className="flex flex-wrap gap-3 mb-6">
           {[
-            { label: "Total", value: stats.total, icon: FileText, color: "indigo" },
-            { label: "Vigentes", value: stats.vigentes, icon: CheckCircle, color: "green" },
-            { label: "Firmados", value: stats.firmados, icon: PenLine, color: "blue" },
-            { label: "Pendiente Firma", value: stats.pendienteFirma, icon: AlertCircle, color: "amber" },
-          ].map(({ label, value, icon: StatIcon, color }) => (
-            <div key={label} className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-lg border border-slate-200 shadow-sm">
-              <StatIcon className={`w-5 h-5 text-${color}-600`} />
+            { label: "Vigentes", value: stats.vigentes, icon: CheckCircle,
+              activeCls: "bg-green-50 border-green-400 ring-1 ring-green-300", iconCls: "text-green-600",
+              active: statusFilter === "Vigente",
+              onClick: () => handleFilterChange(setStatusFilter)(statusFilter === "Vigente" ? "all" : "Vigente") },
+            { label: "Vencidos", value: stats.vencidos, icon: XCircle,
+              activeCls: "bg-red-50 border-red-400 ring-1 ring-red-300", iconCls: "text-red-600",
+              active: statusFilter === "Vencido",
+              onClick: () => handleFilterChange(setStatusFilter)(statusFilter === "Vencido" ? "all" : "Vencido") },
+            { label: "Por Vencer (30d)", value: stats.porVencer30, icon: Calendar,
+              activeCls: "bg-amber-50 border-amber-400 ring-1 ring-amber-300", iconCls: "text-amber-600",
+              active: expiryFilter === "30days",
+              onClick: () => handleFilterChange(setExpiryFilter)(expiryFilter === "30days" ? "all" : "30days") },
+            { label: "Firmados", value: stats.firmados, icon: PenLine,
+              activeCls: "bg-blue-50 border-blue-400 ring-1 ring-blue-300", iconCls: "text-blue-600",
+              active: signatureFilter === "signed",
+              onClick: () => handleFilterChange(setSignatureFilter)(signatureFilter === "signed" ? "all" : "signed") },
+            { label: "Pendiente Firma", value: stats.pendienteFirma, icon: AlertCircle,
+              activeCls: "bg-orange-50 border-orange-400 ring-1 ring-orange-300", iconCls: "text-orange-600",
+              active: signatureFilter === "pending",
+              onClick: () => handleFilterChange(setSignatureFilter)(signatureFilter === "pending" ? "all" : "pending") },
+          ].map(({ label, value, icon: StatIcon, activeCls, iconCls, active, onClick }) => (
+            <button
+              key={label}
+              onClick={onClick}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border shadow-sm transition-all ${
+                active
+                  ? activeCls
+                  : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md"
+              }`}
+            >
+              <StatIcon className={`w-5 h-5 ${iconCls}`} />
               <div className="flex items-baseline gap-2">
                 <span className="text-xl font-bold text-slate-900">{value}</span>
                 <span className="text-sm text-slate-600">{label}</span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
 

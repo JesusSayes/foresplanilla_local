@@ -1,0 +1,44 @@
+{
+  "name": "Generaci\u00f3n Diaria de Asistencia",
+  "description": "Genera autom\u00e1ticamente todos los registros de asistencia del personal activo. Para exonerados de marcaci\u00f3n completa clock_in/clock_out; para el resto crea el registro pendiente. Se ejecuta a las 00:01 hora Per\u00fa (05:01 UTC).",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "1 5 * * *",
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "generaci_n_diaria_de_asistencia",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "generarAsistenciaDiaria",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "generarAsistenciaDiaria"
+  }
+}
