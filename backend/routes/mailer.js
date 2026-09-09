@@ -5,7 +5,7 @@ import { loadAccessContext, requireAnyPermission } from '../middleware/authoriza
 
 const router = express.Router();
 
-router.post('/invite-user', authenticateToken, async (req, res) => {
+router.post('/invite-user', authenticateToken, loadAccessContext, requireAnyPermission('system.admin'), async (req, res) => {
   try {
     const { email, name } = req.body;
 
