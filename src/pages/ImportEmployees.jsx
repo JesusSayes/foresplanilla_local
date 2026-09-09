@@ -13,7 +13,7 @@ import {
 import { toast } from "sonner";
 import PermissionGuard from "../components/PermissionGuard";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
-import { uploadFile } from "@/services/uploadService";
+import * as XLSX from "xlsx";
 
 export default function ImportEmployees() {
   const [file, setFile] = useState(null);
@@ -37,60 +37,6 @@ export default function ImportEmployees() {
       });
     }
   }, [currentUser]);
-
-  const employeeSchema = {
-    type: "array",
-    items: {
-      type: "object",
-      properties: {
-        employee_code: { type: "string" },
-        document_type: { type: "string" },
-        document_number: { type: "string" },
-        first_name: { type: "string" },
-        last_name: { type: "string" },
-        birth_date: { type: "string" },
-        gender: { type: "string" },
-        personal_email: { type: "string" },
-        work_email: { type: "string" },
-        mobile: { type: "string" },
-        phone: { type: "string" },
-        address: { type: "string" },
-        district: { type: "string" },
-        province: { type: "string" },
-        department: { type: "string" },
-        company: { type: "string" },
-        position: { type: "string" },
-        position_level: { type: "string" },
-        profession: { type: "string" },
-        department_name: { type: "string" },
-        work_unit: { type: "string" },
-        site: { type: "string" },
-        hire_date: { type: "string" },
-        termination_date: { type: "string" },
-        contract_type: { type: "string" },
-        base_salary: { type: "number" },
-        pension_system: { type: "string" },
-        afp_id: { type: "string" },
-        afp_affiliation_date: { type: "string" },
-        cuspp: { type: "string" },
-        worker_type: { type: "string" },
-        tax_residence: { type: "string" },
-        bank_name: { type: "string" },
-        bank_account: { type: "string" },
-        cci_account: { type: "string" },
-        cts_bank: { type: "string" },
-        cts_account_number: { type: "string" },
-        cts_currency: { type: "string" },
-        status: { type: "string" },
-        role: { type: "string" },
-        supervisor_name: { type: "string" },
-        emergency_contact_name: { type: "string" },
-        emergency_contact_phone: { type: "string" },
-        emergency_contact_relationship: { type: "string" },
-      },
-      required: ["employee_code", "document_number", "first_name", "last_name"]
-    }
-  };
 
   const handleFileChange = async (e) => {
     const selectedFile = e.target.files[0];
@@ -119,46 +65,18 @@ export default function ImportEmployees() {
     let currentStep = "inicio";
 
     try {
-      // Paso 1: Subir archivo
-      currentStep = "subiendo archivo";
-      setUploadProgress("Paso 1/2: Subiendo archivo al servidor...");
-      console.log("PASO 1: Iniciando subida de archivo...");
-      toast.loading("Subiendo archivo al servidor...", { id: "upload" });
-
-      const uploadResult = await Promise.race([
-        // base44.integrations.Core.UploadFile({ file: selectedFile }),
-        uploadFile(selectedFile),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout: La subida tardó más de 2 minutos")), 120000)
-        )
-      ]);
-
-      console.log("PASO 1 COMPLETADO - Archivo subido:", uploadResult);
-
-      if (!uploadResult || !uploadResult.file_url) {
-        throw new Error("Error del servidor: No se recibió la URL del archivo");
-      }
-
-      const { file_url } = uploadResult;
-      console.log("URL del archivo obtenida:", file_url);
-
-      // Paso 2: Extraer datos
       currentStep = "extrayendo datos del archivo";
-      setUploadProgress("Paso 2/2: Extrayendo datos de empleados...");
-      console.log("PASO 2: Iniciando extracción de datos...");
+      setUploadProgress("Extrayendo datos de empleados...");
       toast.loading("Extrayendo datos de empleados...", { id: "upload" });
 
-      const result = await Promise.race([
-        base44.integrations.Core.ExtractDataFromUploadedFile({
-          file_url: file_url,
-          json_schema: employeeSchema
-        }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout: La extracción tardó más de 3 minutos")), 180000)
-        )
-      ]);
+      const workbook = XLSX.read(await selectedFile.arrayBuffer(), { type: "array", cellDates: true, raw: true, dateNF: "yyyy-mm-dd" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!sheet) throw new Error("El archivo está vacío");
+      const result = {
+        status: "success",
+        output: XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false, dateNF: "yyyy-mm-dd" }),
+      };
 
-      console.log("PASO 2 COMPLETADO - Resultado:", result);
 
       if (result.status === "success" && result.output) {
         if (!Array.isArray(result.output)) {
@@ -170,7 +88,6 @@ export default function ImportEmployees() {
         }
 
         console.log("Extracción exitosa:", result.output.length, "empleados");
-        console.log("Muestra:", result.output.slice(0, 2));
 
         setPreviewData(result.output);
         setUploadProgress("");

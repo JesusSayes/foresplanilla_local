@@ -16,6 +16,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/components/hooks/usePermissions";
+import {
+  STANDARD_SECTIONS,
+  FINAL_SECTIONS,
+  DEFAULT_STANDARD_ORDER,
+  DEFAULT_FINAL_ORDER,
+  buildOrderedSections,
+  moveItem,
+} from "@/lib/contractSections";
+import { ArrowUp, ArrowDown, GripVertical } from "lucide-react";
 
 const DEFAULT_TEMPLATE = {
   template_name: "",
@@ -31,30 +40,32 @@ const DEFAULT_TEMPLATE = {
   // Título y encabezado
   contract_title: "CONTRATO DE TRABAJO",
   contract_subtitle: "{contract_type}",
-  // Sección Empleador
-  employer_section_title: "I. DATOS DEL EMPLEADOR:",
+  // Sección Empleador (sin numeral — es bloque de datos)
+  employer_section_title: "DATOS DEL EMPLEADOR:",
   employer_section_text: "Empresa: {company_name}\nRUC: {company_ruc}\nDomicilio: {company_address}\nRepresentante Legal: {company_representative}\nDocumento: {company_representative_doc}",
-  // Sección Trabajador
-  worker_section_title: "II. DATOS DEL TRABAJADOR:",
+  // Sección Trabajador (sin numeral — es bloque de datos)
+  worker_section_title: "DATOS DEL TRABAJADOR:",
   worker_section_text: "Nombres y Apellidos: {employee_name}\n{employee_doc_type}: {employee_doc_number}\nDomicilio: {employee_address}",
   introduction_text: "Conste por el presente documento el Contrato de Trabajo {contract_type}, que celebran al amparo del Texto Único Ordenado del Decreto Legislativo N° 728, Ley de Productividad y Competitividad Laboral, aprobado por Decreto Supremo N° 003-97-TR, y normas complementarias:",
-  section_object_title: "III. OBJETO DEL CONTRATO:",
+  // Cláusulas estándar (numerales automáticos 1-5, orden configurable)
+  section_object_title: "OBJETO DEL CONTRATO:",
   contract_object_text: "Por el presente contrato, EL TRABAJADOR se obliga a prestar sus servicios personales a EL EMPLEADOR, desempeñando el cargo de {position} en el área de {department}, bajo subordinación y dependencia de EL EMPLEADOR.",
-  section_functions_title: "IV. FUNCIONES Y RESPONSABILIDADES:",
+  section_functions_title: "FUNCIONES Y RESPONSABILIDADES:",
   functions_intro_text: "El trabajador desempeñará las siguientes funciones y responsabilidades:",
-  section_duration_title: "V. VIGENCIA DEL CONTRATO:",
+  section_duration_title: "VIGENCIA DEL CONTRATO:",
   duration_indeterminate_text: "El presente contrato tiene carácter de INDETERMINADO, iniciando su vigencia el {start_date}.",
   duration_fixed_text: "El presente contrato tendrá una duración determinada, iniciando el {start_date} y finalizando el {end_date}{renewable_clause}.",
   trial_period_text: "El contrato está sujeto a un período de prueba de {trial_period_days} días calendario, durante el cual cualquiera de las partes puede darlo por terminado sin expresión de causa.",
-  section_salary_title: "VI. REMUNERACIÓN:",
+  section_salary_title: "REMUNERACIÓN:",
   salary_text: "EL EMPLEADOR pagará a EL TRABAJADOR una remuneración mensual de S/ {salary} ({salary_words} SOLES), pagadera mensualmente, sujeta a los descuentos de ley.",
-  section_schedule_title: "VII. JORNADA Y HORARIO DE TRABAJO:",
+  section_schedule_title: "JORNADA Y HORARIO DE TRABAJO:",
   schedule_text: "La jornada laboral será de {weekly_hours} horas semanales, distribuidas de la siguiente manera: {work_schedule}.",
   work_location_text: "EL TRABAJADOR prestará sus servicios en: {work_location}.",
-  section_obligations_title: "VIII. OBLIGACIONES DEL TRABAJADOR:",
-  section_benefits_title: "IX. BENEFICIOS SOCIALES:",
-  section_termination_title: "X. TÉRMINO DEL CONTRATO:",
-  section_domicile_title: "XI. DOMICILIO:",
+  // Textos finales (numerales automáticos continuos, orden configurable)
+  section_obligations_title: "OBLIGACIONES DEL TRABAJADOR:",
+  section_benefits_title: "BENEFICIOS SOCIALES:",
+  section_termination_title: "TÉRMINO DEL CONTRATO:",
+  section_domicile_title: "DOMICILIO:",
   obligations_text: `1. Cumplir con el horario de trabajo establecido y registrar su asistencia.
 2. Desempeñar sus funciones con diligencia, eficiencia y lealtad.
 3. Cumplir con el Reglamento Interno de Trabajo y las políticas de la empresa.
@@ -68,6 +79,9 @@ const DEFAULT_TEMPLATE = {
 - Seguro social de salud (EsSalud)`,
   termination_text: "El presente contrato podrá darse por terminado por las causas previstas en la legislación laboral vigente, especialmente las establecidas en el Decreto Supremo N° 003-97-TR.",
   domicile_text: "Para efectos del presente contrato, las partes señalan como sus domicilios los indicados en la introducción del presente documento.",
+  // Órdenes de cláusulas (numeración automática)
+  standard_clause_order: [...DEFAULT_STANDARD_ORDER],
+  final_text_order: [...DEFAULT_FINAL_ORDER],
 };
 
 const CONTRACT_TYPES = [
@@ -412,6 +426,48 @@ export default function ContractTemplateConfig() {
       setTemplateData({ ...templateData, contract_types: [...types, type] });
     }
   };
+
+  // ── Reordenamiento de cláusulas estándar ──
+  const standardOrder = templateData.standard_clause_order?.length > 0
+    ? templateData.standard_clause_order
+    : [...DEFAULT_STANDARD_ORDER];
+
+  const moveStandardClause = (index, direction) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= standardOrder.length) return;
+    const newOrder = moveItem(standardOrder, index, newIndex);
+    setTemplateData({ ...templateData, standard_clause_order: newOrder });
+  };
+
+  // ── Reordenamiento de textos finales ──
+  const finalOrder = templateData.final_text_order?.length > 0
+    ? templateData.final_text_order
+    : [...DEFAULT_FINAL_ORDER];
+
+  const moveFinalText = (index, direction) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= finalOrder.length) return;
+    const newOrder = moveItem(finalOrder, index, newIndex);
+    setTemplateData({ ...templateData, final_text_order: newOrder });
+  };
+
+  // ── Reordenamiento de cláusulas personalizadas (actualiza `order` en BD) ──
+  const sortedClauses = [...clauses].filter(c => c.is_active).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const moveCustomClause = async (index, direction) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= sortedClauses.length) return;
+    try {
+      const reordered = moveItem(sortedClauses, index, newIndex);
+      await entitiesAPI.ContractClause.reorder(reordered.map(clause => clause.id));
+      queryClient.invalidateQueries(["contractClauses"]);
+    } catch (err) {
+      toast.error("Error al reordenar la cláusula");
+    }
+  };
+
+  // Numeración: las cláusulas estándar empiezan en 1, las personalizadas continúan
+  const customClauseStartNumber = standardOrder.length + 1;
+  const finalTextStartNumber = customClauseStartNumber + sortedClauses.length;
 
   const availableVariables = [
     { key: "{contract_type}", desc: "Tipo de contrato" },
@@ -949,96 +1005,130 @@ export default function ContractTemplateConfig() {
 
                 {/* Cláusulas */}
                 <TabsContent value="clauses" className="space-y-4">
-
-                  {/* Títulos de sección editables */}
-                  <Card className="border-amber-200 bg-amber-50/40">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-semibold text-amber-800">🏷️ Títulos de Sección (labels del PDF)</CardTitle>
-                      <p className="text-xs text-amber-700">Edita el texto que aparece como encabezado de cada sección en el PDF</p>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {[
-                        { field: "section_object_title", label: "Objeto del Contrato", def: "III. OBJETO DEL CONTRATO:" },
-                        { field: "section_functions_title", label: "Funciones y Responsabilidades", def: "IV. FUNCIONES Y RESPONSABILIDADES:" },
-                        { field: "section_duration_title", label: "Vigencia del Contrato", def: "V. VIGENCIA DEL CONTRATO:" },
-                        { field: "section_salary_title", label: "Remuneración", def: "VI. REMUNERACIÓN:" },
-                        { field: "section_schedule_title", label: "Jornada y Horario", def: "VII. JORNADA Y HORARIO DE TRABAJO:" },
-                        { field: "section_obligations_title", label: "Obligaciones del Trabajador", def: "VIII. OBLIGACIONES DEL TRABAJADOR:" },
-                        { field: "section_benefits_title", label: "Beneficios Sociales", def: "IX. BENEFICIOS SOCIALES:" },
-                        { field: "section_termination_title", label: "Término del Contrato", def: "X. TÉRMINO DEL CONTRATO:" },
-                        { field: "section_domicile_title", label: "Domicilio", def: "XI. DOMICILIO:" },
-                      ].map(({ field, label, def }) => (
-                        <div key={field}>
-                          <Label className="text-xs text-slate-600">{label}</Label>
-                          <Input
-                            value={templateData[field] || def}
-                            onChange={(e) => setTemplateData({ ...templateData, [field]: e.target.value })}
-                            className="font-mono text-sm mt-1"
-                            placeholder={def}
-                          />
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-
-                  <div>
-                    <Label>Vigencia - Contrato Indeterminado</Label>
-                    <Textarea
-                      value={templateData.duration_indeterminate_text}
-                      onChange={(e) => setTemplateData({ ...templateData, duration_indeterminate_text: e.target.value })}
-                      rows={2}
-                      className="font-mono text-sm"
-                    />
+                  <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <p className="text-sm text-indigo-900 flex items-center gap-2">
+                      <GripVertical className="w-4 h-4" />
+                      La numeración es <strong>automática</strong>. Usa las flechas <ArrowUp className="w-3 h-3 inline" /> <ArrowDown className="w-3 h-3 inline" /> para reordenar las cláusulas. El número se asigna automáticamente al generar el contrato.
+                    </p>
                   </div>
 
-                  <div>
-                    <Label>Vigencia - Contrato Plazo Fijo</Label>
-                    <Textarea
-                      value={templateData.duration_fixed_text}
-                      onChange={(e) => setTemplateData({ ...templateData, duration_fixed_text: e.target.value })}
-                      rows={2}
-                      className="font-mono text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Período de Prueba</Label>
-                    <Textarea
-                      value={templateData.trial_period_text}
-                      onChange={(e) => setTemplateData({ ...templateData, trial_period_text: e.target.value })}
-                      rows={2}
-                      className="font-mono text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Remuneración</Label>
-                    <Textarea
-                      value={templateData.salary_text}
-                      onChange={(e) => setTemplateData({ ...templateData, salary_text: e.target.value })}
-                      rows={2}
-                      className="font-mono text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Jornada y Horario</Label>
-                    <Textarea
-                      value={templateData.schedule_text}
-                      onChange={(e) => setTemplateData({ ...templateData, schedule_text: e.target.value })}
-                      rows={2}
-                      className="font-mono text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Lugar de Trabajo</Label>
-                    <Input
-                      value={templateData.work_location_text}
-                      onChange={(e) => setTemplateData({ ...templateData, work_location_text: e.target.value })}
-                      className="font-mono text-sm"
-                    />
-                  </div>
+                  {standardOrder.map((sid, index) => {
+                    const sec = STANDARD_SECTIONS.find(s => s.id === sid);
+                    if (!sec) return null;
+                    return (
+                      <Card key={sid} className="border-slate-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex flex-col gap-0.5">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                disabled={index === 0}
+                                onClick={() => moveStandardClause(index, -1)}
+                                title="Subir"
+                              >
+                                <ArrowUp className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                disabled={index === standardOrder.length - 1}
+                                onClick={() => moveStandardClause(index, 1)}
+                                title="Bajar"
+                              >
+                                <ArrowDown className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            <Badge className="bg-indigo-600 text-white text-sm font-bold min-w-[2rem] justify-center">
+                              {index + 1}
+                            </Badge>
+                            <Input
+                              value={templateData[sec.titleField] || sec.defaultTitle}
+                              onChange={(e) => setTemplateData({ ...templateData, [sec.titleField]: e.target.value })}
+                              className="font-mono text-sm flex-1"
+                              placeholder={sec.defaultTitle}
+                            />
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {sid === "object" && (
+                            <Textarea
+                              value={templateData.contract_object_text}
+                              onChange={(e) => setTemplateData({ ...templateData, contract_object_text: e.target.value })}
+                              rows={3}
+                              className="font-mono text-sm"
+                            />
+                          )}
+                          {sid === "functions" && (
+                            <Input
+                              value={templateData.functions_intro_text}
+                              onChange={(e) => setTemplateData({ ...templateData, functions_intro_text: e.target.value })}
+                              className="font-mono text-sm"
+                            />
+                          )}
+                          {sid === "duration" && (
+                            <>
+                              <div>
+                                <Label className="text-xs text-slate-500">Contrato Indeterminado</Label>
+                                <Textarea
+                                  value={templateData.duration_indeterminate_text}
+                                  onChange={(e) => setTemplateData({ ...templateData, duration_indeterminate_text: e.target.value })}
+                                  rows={2}
+                                  className="font-mono text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs text-slate-500">Contrato Plazo Fijo</Label>
+                                <Textarea
+                                  value={templateData.duration_fixed_text}
+                                  onChange={(e) => setTemplateData({ ...templateData, duration_fixed_text: e.target.value })}
+                                  rows={2}
+                                  className="font-mono text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs text-slate-500">Período de Prueba</Label>
+                                <Textarea
+                                  value={templateData.trial_period_text}
+                                  onChange={(e) => setTemplateData({ ...templateData, trial_period_text: e.target.value })}
+                                  rows={2}
+                                  className="font-mono text-sm"
+                                />
+                              </div>
+                            </>
+                          )}
+                          {sid === "salary" && (
+                            <Textarea
+                              value={templateData.salary_text}
+                              onChange={(e) => setTemplateData({ ...templateData, salary_text: e.target.value })}
+                              rows={2}
+                              className="font-mono text-sm"
+                            />
+                          )}
+                          {sid === "schedule" && (
+                            <>
+                              <Textarea
+                                value={templateData.schedule_text}
+                                onChange={(e) => setTemplateData({ ...templateData, schedule_text: e.target.value })}
+                                rows={2}
+                                className="font-mono text-sm"
+                              />
+                              <div>
+                                <Label className="text-xs text-slate-500">Lugar de Trabajo</Label>
+                                <Input
+                                  value={templateData.work_location_text}
+                                  onChange={(e) => setTemplateData({ ...templateData, work_location_text: e.target.value })}
+                                  className="font-mono text-sm"
+                                />
+                              </div>
+                            </>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </TabsContent>
 
                 {/* Cláusulas Personalizadas */}
@@ -1046,7 +1136,10 @@ export default function ContractTemplateConfig() {
                   <div className="flex justify-between items-center mb-4">
                     <div>
                       <h3 className="font-bold text-slate-900">Cláusulas Personalizadas</h3>
-                      <p className="text-sm text-slate-600">Gestiona cláusulas predefinidas para incluir en contratos</p>
+                      <p className="text-sm text-slate-600">
+                        Numeración automática continua: {customClauseStartNumber}, {customClauseStartNumber + 1}...
+                        Usa las flechas para reordenar.
+                      </p>
                     </div>
                     <Button onClick={handleCreateClause} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
                       <Plus className="w-4 h-4 mr-2" />
@@ -1055,26 +1148,53 @@ export default function ContractTemplateConfig() {
                   </div>
 
                   <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {clauses.filter(c => c.is_active).map(clause => (
+                    {sortedClauses.map((clause, index) => (
                       <Card key={clause.id} className="border-slate-200">
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <h4 className="font-semibold text-slate-900">{clause.title}</h4>
-                                <Badge className={clause.type === "obligatoria" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}>
-                                  {clause.type}
+                            <div className="flex-1 flex items-start gap-3">
+                              <div className="flex flex-col gap-0.5 items-center">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6"
+                                  disabled={index === 0}
+                                  onClick={() => moveCustomClause(index, -1)}
+                                  title="Subir"
+                                >
+                                  <ArrowUp className="w-4 h-4" />
+                                </Button>
+                                <Badge className="bg-indigo-600 text-white text-sm font-bold min-w-[2rem] justify-center">
+                                  {customClauseStartNumber + index}
                                 </Badge>
-                                <Badge variant="outline" className="text-xs">{clause.category}</Badge>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6"
+                                  disabled={index === sortedClauses.length - 1}
+                                  onClick={() => moveCustomClause(index, 1)}
+                                  title="Bajar"
+                                >
+                                  <ArrowDown className="w-4 h-4" />
+                                </Button>
                               </div>
-                              <p className="text-sm text-slate-600 mb-2">{clause.content.substring(0, 150)}...</p>
-                              {clause.contract_types?.length > 0 && (
-                                <div className="flex gap-1 flex-wrap">
-                                  {clause.contract_types.map(type => (
-                                    <Badge key={type} variant="outline" className="text-xs">{type}</Badge>
-                                  ))}
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h4 className="font-semibold text-slate-900">{clause.title}</h4>
+                                  <Badge className={clause.type === "obligatoria" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}>
+                                    {clause.type}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-xs">{clause.category}</Badge>
                                 </div>
-                              )}
+                                <p className="text-sm text-slate-600 mb-2">{clause.content.substring(0, 150)}...</p>
+                                {clause.contract_types?.length > 0 && (
+                                  <div className="flex gap-1 flex-wrap">
+                                    {clause.contract_types.map(type => (
+                                      <Badge key={type} variant="outline" className="text-xs">{type}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             <div className="flex gap-2 ml-4">
                               <Button size="sm" variant="outline" onClick={() => handleEditClause(clause)}>
@@ -1093,7 +1213,7 @@ export default function ContractTemplateConfig() {
                         </CardContent>
                       </Card>
                     ))}
-                    {clauses.filter(c => c.is_active).length === 0 && (
+                    {sortedClauses.length === 0 && (
                       <div className="text-center py-8 text-slate-500">
                         No hay cláusulas personalizadas. Crea una nueva.
                       </div>
@@ -1103,45 +1223,70 @@ export default function ContractTemplateConfig() {
 
                 {/* Textos Finales */}
                 <TabsContent value="final" className="space-y-4">
-                  <div>
-                    <Label>Obligaciones del Trabajador</Label>
-                    <Textarea
-                      value={templateData.obligations_text}
-                      onChange={(e) => setTemplateData({ ...templateData, obligations_text: e.target.value })}
-                      rows={6}
-                      className="font-mono text-sm"
-                    />
+                  <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <p className="text-sm text-indigo-900 flex items-center gap-2">
+                      <GripVertical className="w-4 h-4" />
+                      Los textos finales continúan la numeración automáticamente después de las cláusulas personalizadas (inician en {finalTextStartNumber}). Usa las flechas para reordenar.
+                    </p>
                   </div>
 
-                  <div>
-                    <Label>Beneficios Sociales</Label>
-                    <Textarea
-                      value={templateData.benefits_text}
-                      onChange={(e) => setTemplateData({ ...templateData, benefits_text: e.target.value })}
-                      rows={6}
-                      className="font-mono text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Término del Contrato</Label>
-                    <Textarea
-                      value={templateData.termination_text}
-                      onChange={(e) => setTemplateData({ ...templateData, termination_text: e.target.value })}
-                      rows={3}
-                      className="font-mono text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Domicilio</Label>
-                    <Textarea
-                      value={templateData.domicile_text}
-                      onChange={(e) => setTemplateData({ ...templateData, domicile_text: e.target.value })}
-                      rows={2}
-                      className="font-mono text-sm"
-                    />
-                  </div>
+                  {finalOrder.map((fid, index) => {
+                    const sec = FINAL_SECTIONS.find(s => s.id === fid);
+                    if (!sec) return null;
+                    const contentField = {
+                      obligations: "obligations_text",
+                      benefits: "benefits_text",
+                      termination: "termination_text",
+                      domicile: "domicile_text",
+                    }[fid];
+                    return (
+                      <Card key={fid} className="border-slate-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex flex-col gap-0.5">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                disabled={index === 0}
+                                onClick={() => moveFinalText(index, -1)}
+                                title="Subir"
+                              >
+                                <ArrowUp className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                disabled={index === finalOrder.length - 1}
+                                onClick={() => moveFinalText(index, 1)}
+                                title="Bajar"
+                              >
+                                <ArrowDown className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            <Badge className="bg-indigo-600 text-white text-sm font-bold min-w-[2rem] justify-center">
+                              {finalTextStartNumber + index}
+                            </Badge>
+                            <Input
+                              value={templateData[sec.titleField] || sec.defaultTitle}
+                              onChange={(e) => setTemplateData({ ...templateData, [sec.titleField]: e.target.value })}
+                              className="font-mono text-sm flex-1"
+                              placeholder={sec.defaultTitle}
+                            />
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <Textarea
+                            value={templateData[contentField]}
+                            onChange={(e) => setTemplateData({ ...templateData, [contentField]: e.target.value })}
+                            rows={fid === "domicile" ? 2 : fid === "termination" ? 3 : 6}
+                            className="font-mono text-sm"
+                          />
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </TabsContent>
               </Tabs>
 
@@ -1222,6 +1367,30 @@ export default function ContractTemplateConfig() {
                   });
                   return r;
                 };
+                const orderedSections = buildOrderedSections(templateData, sortedClauses);
+                const getSectionContent = (section) => {
+                  if (section.type === "employer") {
+                    return rv(templateData.employer_section_text || "Empresa: {company_name}\nRUC: {company_ruc}\nDomicilio: {company_address}\nRepresentante Legal: {company_representative}\nDocumento: {company_representative_doc}");
+                  }
+                  if (section.type === "worker") {
+                    return rv(templateData.worker_section_text || "Nombres y Apellidos: {employee_name}\n{employee_doc_type}: {employee_doc_number}\nDomicilio: {employee_address}");
+                  }
+                  if (section.type === "custom") {
+                    return rv(section.content);
+                  }
+                  const contentMap = {
+                    object: rv(templateData.contract_object_text),
+                    functions: rv(templateData.functions_intro_text),
+                    duration: rv(templateData.duration_fixed_text) + "\n\n" + rv(templateData.trial_period_text),
+                    salary: rv(templateData.salary_text),
+                    schedule: rv(templateData.schedule_text) + "\n" + rv(templateData.work_location_text),
+                    obligations: rv(templateData.obligations_text),
+                    benefits: rv(templateData.benefits_text),
+                    termination: rv(templateData.termination_text),
+                    domicile: rv(templateData.domicile_text),
+                  };
+                  return contentMap[section.id] || "";
+                };
                 return (
                   <div className="space-y-6 font-serif">
                     {/* Título */}
@@ -1242,97 +1411,29 @@ export default function ContractTemplateConfig() {
                       {rv(templateData.introduction_text)}
                     </p>
 
-                    {/* Empleador */}
-                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                      <p className="font-bold text-slate-900 mb-2">
-                        {rv(templateData.employer_section_title || "I. DATOS DEL EMPLEADOR:")}
-                      </p>
-                      <p className="whitespace-pre-wrap leading-relaxed">
-                        {rv(templateData.employer_section_text || "Empresa: {company_name}\nRUC: {company_ruc}\nDomicilio: {company_address}\nRepresentante Legal: {company_representative}\nDocumento: {company_representative_doc}")}
-                      </p>
-                    </div>
-
-                    {/* Trabajador */}
-                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                      <p className="font-bold text-slate-900 mb-2">
-                        {rv(templateData.worker_section_title || "II. DATOS DEL TRABAJADOR:")}
-                      </p>
-                      <p className="whitespace-pre-wrap leading-relaxed">
-                        {rv(templateData.worker_section_text || "Nombres y Apellidos: {employee_name}\n{employee_doc_type}: {employee_doc_number}\nDomicilio: {employee_address}")}
-                      </p>
-                    </div>
-
-                    {/* Objeto */}
-                    <div>
-                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_object_title || "III. OBJETO DEL CONTRATO:")}</p>
-                      <p className="leading-relaxed">{rv(templateData.contract_object_text)}</p>
-                    </div>
-
-                    {/* Funciones */}
-                    <div>
-                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_functions_title || "IV. FUNCIONES Y RESPONSABILIDADES:")}</p>
-                      <p className="leading-relaxed">{rv(templateData.functions_intro_text)}</p>
-                      <p className="text-slate-400 italic text-xs mt-1">[Se completará con las funciones del contrato]</p>
-                    </div>
-
-                    {/* Vigencia */}
-                    <div>
-                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_duration_title || "V. VIGENCIA DEL CONTRATO:")}</p>
-                      <p className="leading-relaxed">{rv(templateData.duration_fixed_text)}</p>
-                      <p className="leading-relaxed mt-1">{rv(templateData.trial_period_text)}</p>
-                    </div>
-
-                    {/* Remuneración */}
-                    <div>
-                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_salary_title || "VI. REMUNERACIÓN:")}</p>
-                      <p className="leading-relaxed">{rv(templateData.salary_text)}</p>
-                    </div>
-
-                    {/* Jornada */}
-                    <div>
-                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_schedule_title || "VII. JORNADA Y HORARIO DE TRABAJO:")}</p>
-                      <p className="leading-relaxed">{rv(templateData.schedule_text)}</p>
-                      <p className="leading-relaxed">{rv(templateData.work_location_text)}</p>
-                    </div>
-
-                    {/* Obligaciones */}
-                    <div>
-                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_obligations_title || "VIII. OBLIGACIONES DEL TRABAJADOR:")}</p>
-                      <p className="whitespace-pre-wrap leading-relaxed">{rv(templateData.obligations_text)}</p>
-                    </div>
-
-                    {/* Beneficios Sociales */}
-                    <div>
-                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_benefits_title || "IX. BENEFICIOS SOCIALES:")}</p>
-                      <p className="whitespace-pre-wrap leading-relaxed">{rv(templateData.benefits_text)}</p>
-                    </div>
-
-                    {/* Término */}
-                    <div>
-                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_termination_title || "X. TÉRMINO DEL CONTRATO:")}</p>
-                      <p className="leading-relaxed">{rv(templateData.termination_text)}</p>
-                    </div>
-
-                    {/* Domicilio */}
-                    <div>
-                      <p className="font-bold text-slate-900 mb-1">{rv(templateData.section_domicile_title || "XI. DOMICILIO:")}</p>
-                      <p className="leading-relaxed">{rv(templateData.domicile_text)}</p>
-                    </div>
-
-                    {/* Cláusulas personalizadas */}
-                    {clauses.filter(c => c.is_active).length > 0 && (
-                      <div className="space-y-4">
-                        <p className="font-bold text-slate-900">CLÁUSULAS ADICIONALES:</p>
-                        {clauses.filter(c => c.is_active).map((clause, idx) => (
-                          <div key={clause.id}>
-                            <p className="font-semibold text-slate-800 mb-1">
-                              {String.fromCharCode(65 + idx)}. {clause.title.toUpperCase()}:
-                            </p>
-                            <p className="whitespace-pre-wrap leading-relaxed text-slate-600">{rv(clause.content)}</p>
+                    {/* Secciones auto-numeradas (empleador, trabajador, cláusulas, personalizadas, finales) */}
+                    {orderedSections.map((section) => {
+                      const content = getSectionContent(section);
+                      if (section.type === "employer" || section.type === "worker") {
+                        return (
+                          <div key={section.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <p className="font-bold text-slate-900 mb-2">{rv(section.title)}</p>
+                            <p className="whitespace-pre-wrap leading-relaxed">{content}</p>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        );
+                      }
+                      return (
+                        <div key={section.id}>
+                          <p className="font-bold text-slate-900 mb-1">
+                            {section.number}. {rv(section.title)}
+                          </p>
+                          <p className="whitespace-pre-wrap leading-relaxed">{content}</p>
+                          {section.id === "functions" && (
+                            <p className="text-slate-400 italic text-xs mt-1">[Se completará con las funciones del contrato]</p>
+                          )}
+                        </div>
+                      );
+                    })}
 
                     {/* Firmas */}
                     <div className="grid grid-cols-2 gap-8 pt-12 mt-8 border-t border-slate-300">
@@ -1428,13 +1529,10 @@ export default function ContractTemplateConfig() {
                 </div>
               </div>
 
-              <div>
-                <Label>Orden de Aparición</Label>
-                <Input
-                  type="number"
-                  value={clauseData.order}
-                  onChange={(e) => setClauseData({ ...clauseData, order: parseInt(e.target.value) })}
-                />
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <p className="text-xs text-indigo-800">
+                  ℹ️ El orden de aparición se ajusta automáticamente con los botones de flechas (↑ ↓) en la lista de cláusulas. La numeración es automática y continua.
+                </p>
               </div>
 
               <div>

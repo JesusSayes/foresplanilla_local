@@ -57,7 +57,7 @@
     },
     "employer_section_title": {
       "type": "string",
-      "description": "T\u00edtulo secci\u00f3n empleador"
+      "description": "T\u00edtulo secci\u00f3n empleador (sin numeral, se auto-numera al renderizar)"
     },
     "employer_section_text": {
       "type": "string",
@@ -65,7 +65,7 @@
     },
     "worker_section_title": {
       "type": "string",
-      "description": "T\u00edtulo secci\u00f3n trabajador"
+      "description": "T\u00edtulo secci\u00f3n trabajador (sin numeral, se auto-numera al renderizar)"
     },
     "worker_section_text": {
       "type": "string",
@@ -77,7 +77,7 @@
     },
     "section_object_title": {
       "type": "string",
-      "description": "T\u00edtulo secci\u00f3n Objeto del Contrato"
+      "description": "T\u00edtulo secci\u00f3n Objeto del Contrato (sin numeral, se auto-numera)"
     },
     "contract_object_text": {
       "type": "string",
@@ -85,7 +85,7 @@
     },
     "section_functions_title": {
       "type": "string",
-      "description": "T\u00edtulo secci\u00f3n Funciones y Responsabilidades"
+      "description": "T\u00edtulo secci\u00f3n Funciones y Responsabilidades (sin numeral, se auto-numera)"
     },
     "functions_intro_text": {
       "type": "string",
@@ -93,7 +93,7 @@
     },
     "section_duration_title": {
       "type": "string",
-      "description": "T\u00edtulo secci\u00f3n Vigencia del Contrato"
+      "description": "T\u00edtulo secci\u00f3n Vigencia del Contrato (sin numeral, se auto-numera)"
     },
     "duration_indeterminate_text": {
       "type": "string",
@@ -109,7 +109,7 @@
     },
     "section_salary_title": {
       "type": "string",
-      "description": "T\u00edtulo secci\u00f3n Remuneraci\u00f3n"
+      "description": "T\u00edtulo secci\u00f3n Remuneraci\u00f3n (sin numeral, se auto-numera)"
     },
     "salary_text": {
       "type": "string",
@@ -117,7 +117,7 @@
     },
     "section_schedule_title": {
       "type": "string",
-      "description": "T\u00edtulo secci\u00f3n Jornada y Horario"
+      "description": "T\u00edtulo secci\u00f3n Jornada y Horario (sin numeral, se auto-numera)"
     },
     "schedule_text": {
       "type": "string",
@@ -129,7 +129,7 @@
     },
     "section_obligations_title": {
       "type": "string",
-      "description": "T\u00edtulo secci\u00f3n Obligaciones del Trabajador"
+      "description": "T\u00edtulo secci\u00f3n Obligaciones del Trabajador (sin numeral, se auto-numera)"
     },
     "obligations_text": {
       "type": "string",
@@ -137,7 +137,7 @@
     },
     "section_benefits_title": {
       "type": "string",
-      "description": "T\u00edtulo secci\u00f3n Beneficios Sociales"
+      "description": "T\u00edtulo secci\u00f3n Beneficios Sociales (sin numeral, se auto-numera)"
     },
     "benefits_text": {
       "type": "string",
@@ -145,7 +145,7 @@
     },
     "section_termination_title": {
       "type": "string",
-      "description": "T\u00edtulo secci\u00f3n T\u00e9rmino del Contrato"
+      "description": "T\u00edtulo secci\u00f3n T\u00e9rmino del Contrato (sin numeral, se auto-numera)"
     },
     "termination_text": {
       "type": "string",
@@ -153,11 +153,25 @@
     },
     "section_domicile_title": {
       "type": "string",
-      "description": "T\u00edtulo secci\u00f3n Domicilio"
+      "description": "T\u00edtulo secci\u00f3n Domicilio (sin numeral, se auto-numera)"
     },
     "domicile_text": {
       "type": "string",
       "description": "Texto de domicilio"
+    },
+    "standard_clause_order": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Orden de las cl\u00e1usulas est\u00e1ndar (IDs: object, functions, duration, salary, schedule). Define el orden de aparici\u00f3n y la numeraci\u00f3n autom\u00e1tica."
+    },
+    "final_text_order": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Orden de los textos finales (IDs: obligations, benefits, termination, domicile). Define el orden de aparici\u00f3n y la numeraci\u00f3n autom\u00e1tica continua despu\u00e9s de las cl\u00e1usulas personalizadas."
     }
   },
   "required": [

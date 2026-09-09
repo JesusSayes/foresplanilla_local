@@ -58,7 +58,12 @@ export const entitiesAPI = {
   EmployeeChangeLog: createEntityAPI('/api/employees/changelog'),
   Contract: createEntityAPI('/api/contracts'),
   ContractTemplate: createEntityAPI('/api/contracts/templates'),
-  ContractClause: createEntityAPI('/api/contracts/clauses'),
+  ContractClause: {
+    ...createEntityAPI('/api/contracts/clauses'),
+    reorder: async (ids) => {
+      await localClient.post('/api/contracts/clauses/reorder', { ids });
+    },
+  },
   ContractRenewalRule: createEntityAPI('/api/contracts/renewal-rules'),
   AttendanceRecord: createEntityAPI('/api/attendance/records'),
   AttendanceIncident: createEntityAPI('/api/attendance/incidents'),
@@ -127,6 +132,7 @@ export const entitiesAPI = {
   AccountingAccount: createEntityAPI('/api/master-data/accountingaccounts'),
   RMV: createEntityAPI('/api/master-data/rmvs'),
   User: createEntityAPI('/api/users'),
+  ReportConfiguration: createEntityAPI('/api/report-configurations'),
   LoanType: createEntityAPI('/api/payroll/loan-types'),
   Loan: createEntityAPI('/api/payroll/loans'),
   LoanInstallment: createEntityAPI('/api/payroll/loan-installments'),

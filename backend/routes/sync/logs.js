@@ -1,9 +1,10 @@
 import express from 'express';
 const router = express.Router();
 import controller from '../../controllers/sync/logController.js';
+import { loadAccessContext, requireAnyPermission } from '../../middleware/authorization.js';
 import { authenticateToken } from '../../middleware/auth.js';
 
-router.use(authenticateToken);
+router.use(authenticateToken, loadAccessContext, requireAnyPermission('system.admin'));
 
 router.get('/', controller.getAll);
 router.get('/:id', controller.getById);
