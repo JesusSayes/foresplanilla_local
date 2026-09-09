@@ -1021,10 +1021,22 @@ model loantype {
 }
 
 model reportconfiguration {
-  id           String    @id @db.VarChar(255)
-  created_date DateTime? @db.Timestamp(6)
-  updated_date DateTime? @db.Timestamp(6)
-  created_by   String?
+  id            String    @id @db.VarChar(255)
+  created_date  DateTime? @db.Timestamp(6)
+  updated_date  DateTime? @db.Timestamp(6)
+  created_by    String?
+  report_name   String?
+  report_type   String?
+  description   String?
+  filters       Json?     @default("{}")
+  columns       Json?     @default("[]")
+  sort_by       String?   @default("")
+  sort_order    String?   @default("asc")
+  is_shared     Boolean?  @default(false)
+  is_favorite   Boolean?  @default(false)
+  created_by_id String?
+
+  @@index([created_by_id], map: "reportconfiguration_owner_id_idx")
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
