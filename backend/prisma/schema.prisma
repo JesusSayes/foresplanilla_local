@@ -266,6 +266,23 @@ model contract_template {
   created_by_id               String?
   created_by                  String?
   is_sample                   Boolean?
+  contract_title              String?
+  contract_subtitle           String?
+  employer_section_title      String?
+  employer_section_text       String?
+  worker_section_title        String?
+  worker_section_text         String?
+  section_object_title        String?
+  section_functions_title     String?
+  section_duration_title      String?
+  section_salary_title        String?
+  section_schedule_title      String?
+  section_obligations_title   String?
+  section_benefits_title      String?
+  section_termination_title   String?
+  section_domicile_title      String?
+  standard_clause_order       Json?
+  final_text_order            Json?
 }
 
 model cost_center {

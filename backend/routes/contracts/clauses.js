@@ -1,10 +1,11 @@
 import express from 'express';
 const router = express.Router();
-import controller from '../../controllers/contracts/clauseController.js';
+import controller, { reorder } from '../../controllers/contracts/clauseController.js';
 import { authenticateToken } from '../../middleware/auth.js';
 
 router.use(authenticateToken);
 
+router.post('/reorder', reorder);
 router.get('/', controller.getAll);
 router.get('/:id', controller.getById);
 router.post('/', controller.create);
