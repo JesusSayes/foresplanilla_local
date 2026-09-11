@@ -254,12 +254,20 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
           "El contrato está sujeto a un período de prueba de {trial_period_days} días calendario, durante el cual cualquiera de las partes puede darlo por terminado sin expresión de causa."));
       }
     } else if (section.id === "salary") {
-      addText(replaceVariables(template?.salary_text ||
-        "EL EMPLEADOR pagará a EL TRABAJADOR una remuneración mensual de S/ {salary} ({salary_words} SOLES), pagadera mensualmente, sujeta a los descuentos de ley."));
-      if (contract.activity_cost > 0) addText(`Costo de Actividad: S/ ${(contract.activity_cost || 0).toFixed(2)}`);
-      if (contract.food_cost > 0) addText(`Costo de Alimento: S/ ${(contract.food_cost || 0).toFixed(2)}`);
-      if (contract.transport_cost > 0) addText(`Costo de Movilidad: S/ ${(contract.transport_cost || 0).toFixed(2)}`);
-      if (contract.benefits) addText(`Beneficios adicionales: ${contract.benefits}`);
+      const salaryText = template?.salary_text ||
+        "EL EMPLEADOR pagará a EL TRABAJADOR una remuneración mensual de S/ {salary} ({salary_words} SOLES), pagadera mensualmente, sujeta a los descuentos de ley.";
+      addText(replaceVariables(salaryText));
+      // Los costos se muestran vía variables {activity_cost}/{food_cost}/{transport_cost} en el salary_text.
+      // Fallback: solo si el template NO las incluye y el contrato tiene valores > 0.
+      if (contract.activity_cost > 0 && !salaryText.includes("{activity_cost}")) {
+        addText(`Costo de Actividad: S/ ${(contract.activity_cost || 0).toFixed(2)}`);
+      }
+      if (contract.food_cost > 0 && !salaryText.includes("{food_cost}")) {
+        addText(`Costo de Alimento: S/ ${(contract.food_cost || 0).toFixed(2)}`);
+      }
+      if (contract.transport_cost > 0 && !salaryText.includes("{transport_cost}")) {
+        addText(`Costo de Movilidad: S/ ${(contract.transport_cost || 0).toFixed(2)}`);
+      }
     } else if (section.id === "schedule") {
       addText(replaceVariables(template?.schedule_text ||
         "La jornada laboral será de {weekly_hours} horas semanales, distribuidas de la siguiente manera: {work_schedule}."));
@@ -269,8 +277,14 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
       addText(replaceVariables(template?.obligations_text ||
         `1. Cumplir con el horario de trabajo establecido y registrar su asistencia.\n2. Desempeñar sus funciones con diligencia, eficiencia y lealtad.\n3. Cumplir con el Reglamento Interno de Trabajo y las políticas de la empresa.\n4. Guardar confidencialidad sobre la información de la empresa.\n5. Cuidar los bienes y recursos de la empresa.`));
     } else if (section.id === "benefits") {
-      addText(replaceVariables(template?.benefits_text ||
-        `EL TRABAJADOR tiene derecho a los siguientes beneficios de acuerdo a la legislación laboral peruana:\n- Gratificaciones legales (Fiestas Patrias y Navidad)\n- Compensación por Tiempo de Servicios (CTS)\n- Vacaciones (30 días calendario por año de servicios)\n- Asignación familiar (si corresponde)\n- Seguro social de salud (EsSalud)`));
+      const benefitsText = template?.benefits_text ||
+        `EL TRABAJADOR tiene derecho a los siguientes beneficios de acuerdo a la legislación laboral peruana:\n- Gratificaciones legales (Fiestas Patrias y Navidad)\n- Compensación por Tiempo de Servicios (CTS)\n- Vacaciones (30 días calendario por año de servicios)\n- Asignación familiar (si corresponde)\n- Seguro social de salud (EsSalud)`;
+      addText(replaceVariables(benefitsText));
+      // Beneficios adicionales del contrato: se muestran vía {benefits_additional} en el benefits_text.
+      // Fallback: solo si el template NO los incluye y el contrato tiene beneficios específicos.
+      if (contract.benefits && !benefitsText.includes("{benefits_additional}") && !benefitsText.includes("{benefits}")) {
+        addText(`Beneficios adicionales: ${contract.benefits}`);
+      }
     } else if (section.id === "termination") {
       addText(replaceVariables(template?.termination_text ||
         "El presente contrato podrá darse por terminado por las causas previstas en la legislación laboral vigente, especialmente las establecidas en el Decreto Supremo N° 003-97-TR."));
