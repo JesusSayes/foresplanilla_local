@@ -7,6 +7,7 @@ import { buildOrderedSections } from "@/lib/contractSections";
 
 export const generateContractPDF = async (employee, contract, companyData = {}, templateData = null) => {
   const doc = new jsPDF();
+  doc.setFont("times");
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
@@ -130,7 +131,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
 
   const addText = (text, fontSize = 10, isBold = false) => {
     doc.setFontSize(fontSize);
-    doc.setFont(undefined, isBold ? 'bold' : 'normal');
+    doc.setFont("times", isBold ? 'bold' : 'normal');
     const maxWidth = pageWidth - 2 * margin;
     const paragraphs = String(text).split(/\n/);
     paragraphs.forEach((para, pIdx) => {
@@ -175,7 +176,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
 
   // ── TÍTULO ──
   doc.setFontSize(14);
-  doc.setFont(undefined, 'bold');
+  doc.setFont("times", 'bold');
   const contractTitle = replaceVariables(template?.contract_title || "CONTRATO DE TRABAJO");
   const titleLines = contractTitle.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
   titleLines.forEach(line => {
@@ -189,7 +190,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   y += 8;
 
   doc.setFontSize(10);
-  doc.setFont(undefined, 'normal');
+  doc.setFont("times", 'normal');
   doc.text(`Contrato N° ${contract.contract_number || "S/N"}`, pageWidth / 2, y, { align: "center" });
   y += 4;
   doc.text(`Fecha de Firma: ${format(new Date(contract.signed_date || contract.start_date), "dd/MM/yyyy")}`, pageWidth / 2, y, { align: "center" });
@@ -311,7 +312,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   }
 
   doc.setFontSize(10);
-  doc.setFont(undefined, 'normal');
+  doc.setFont("times", 'normal');
   doc.text(
     `Lima, ${format(new Date(contract.signed_date || contract.start_date), "dd 'de' MMMM 'de' yyyy", { locale: es })}`,
     pageWidth / 2,
