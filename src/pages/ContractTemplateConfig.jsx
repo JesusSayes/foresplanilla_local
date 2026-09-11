@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,6 +79,7 @@ const DEFAULT_TEMPLATE = {
   termination_text: "El presente contrato podrá darse por terminado por las causas previstas en la legislación laboral vigente, especialmente las establecidas en el Decreto Supremo N° 003-97-TR.",
   domicile_text: "Para efectos del presente contrato, las partes señalan como sus domicilios los indicados en la introducción del presente documento.",
   // Órdenes de cláusulas (numeración automática)
+  unified_clause_order: [...DEFAULT_STANDARD_ORDER],
   standard_clause_order: [...DEFAULT_STANDARD_ORDER],
   final_text_order: [...DEFAULT_FINAL_ORDER],
 };
@@ -448,17 +449,49 @@ export default function ContractTemplateConfig() {
     }
   };
 
-  // ── Reordenamiento de cláusulas estándar ──
-  const standardOrder = templateData.standard_clause_order?.length > 0
-    ? templateData.standard_clause_order
-    : [...DEFAULT_STANDARD_ORDER];
+  // ── Orden unificado de cláusulas (estándar + personalizadas en una sola lista) ──
+  const activeClauses = useMemo(
+    () => (clauses || []).filter(c => c.is_active),
+    [clauses]
+  );
+  const customClauseIds = useMemo(
+    () => activeClauses.map(c => c.id),
+    [activeClauses]
+  );
 
-  const moveStandardClause = (index, direction) => {
+  const unifiedOrder = useMemo(() => {
+    const existing = templateData.unified_clause_order || [];
+    if (existing.length > 0) {
+      // Filtrar IDs válidos (estándar existentes + custom existentes)
+      let order = existing.filter(
+        id => STANDARD_SECTIONS.some(s => s.id === id) || customClauseIds.includes(id)
+      );
+      // Agregar IDs estándar faltantes (backward compat)
+      for (const sid of DEFAULT_STANDARD_ORDER) {
+        if (!order.includes(sid)) order.push(sid);
+      }
+      // Agregar custom nuevos al final
+      for (const cid of customClauseIds) {
+        if (!order.includes(cid)) order.push(cid);
+      }
+      return order;
+    }
+    // Fallback: estándar + custom
+    return [...DEFAULT_STANDARD_ORDER, ...customClauseIds];
+  }, [templateData.unified_clause_order, customClauseIds]);
+
+  const moveUnifiedClause = (index, direction) => {
     const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= standardOrder.length) return;
-    const newOrder = moveItem(standardOrder, index, newIndex);
-    setTemplateData({ ...templateData, standard_clause_order: newOrder });
+    if (newIndex < 0 || newIndex >= unifiedOrder.length) return;
+    const newOrder = moveItem(unifiedOrder, index, newIndex);
+    setTemplateData({ ...templateData, unified_clause_order: newOrder });
   };
+
+  // Cláusulas personalizadas activas ordenadas según el orden unificado
+  const sortedClauses = useMemo(
+    () => activeClauses,
+    [activeClauses]
+  );
 
   // ── Reordenamiento de textos finales ──
   const finalOrder = templateData.final_text_order?.length > 0
@@ -472,26 +505,8 @@ export default function ContractTemplateConfig() {
     setTemplateData({ ...templateData, final_text_order: newOrder });
   };
 
-  // ── Reordenamiento de cláusulas personalizadas (actualiza `order` en BD) ──
-  const sortedClauses = [...clauses].filter(c => c.is_active).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const moveCustomClause = async (index, direction) => {
-    const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= sortedClauses.length) return;
-    const a = sortedClauses[index];
-    const b = sortedClauses[newIndex];
-    // Intercambiar los valores de `order`
-    try {
-      await base44.entities.ContractClause.update(a.id, { order: b.order ?? newIndex });
-      await base44.entities.ContractClause.update(b.id, { order: a.order ?? index });
-      queryClient.invalidateQueries(["contractClauses"]);
-    } catch (err) {
-      toast.error("Error al reordenar la cláusula");
-    }
-  };
-
-  // Numeración: las cláusulas estándar empiezan en 1, las personalizadas continúan
-  const customClauseStartNumber = standardOrder.length + 1;
-  const finalTextStartNumber = customClauseStartNumber + sortedClauses.length;
+  // Numeración: textos finales empiezan después de todas las cláusulas unificadas
+  const finalTextStartNumber = unifiedOrder.length + 1;
 
   const availableVariables = [
     { key: "{contract_type}", desc: "Tipo de contrato" },
@@ -743,11 +758,10 @@ export default function ContractTemplateConfig() {
             </CardHeader>
             <CardContent className="p-6 max-h-[70vh] overflow-y-auto">
               <Tabs defaultValue="config" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="config">Configuración</TabsTrigger>
                   <TabsTrigger value="intro">Introducción</TabsTrigger>
                   <TabsTrigger value="clauses">Cláusulas</TabsTrigger>
-                  <TabsTrigger value="custom-clauses">Cláusulas Personalizadas</TabsTrigger>
                   <TabsTrigger value="final">Textos Finales</TabsTrigger>
                 </TabsList>
 
@@ -1027,21 +1041,27 @@ export default function ContractTemplateConfig() {
                   </div>
                 </TabsContent>
 
-                {/* Cláusulas */}
+                {/* Cláusulas (unificadas: estándar + personalizadas en una sola lista) */}
                 <TabsContent value="clauses" className="space-y-4">
                   <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                     <p className="text-sm text-indigo-900 flex items-center gap-2">
                       <GripVertical className="w-4 h-4" />
-                      La numeración es <strong>automática</strong>. Usa las flechas <ArrowUp className="w-3 h-3 inline" /> <ArrowDown className="w-3 h-3 inline" /> para reordenar las cláusulas. El número se asigna automáticamente al generar el contrato.
+                      La numeración es <strong>automática</strong>. Usa las flechas <ArrowUp className="w-3 h-3 inline" /> <ArrowDown className="w-3 h-3 inline" /> para reordenar. Puedes insertar cláusulas personalizadas en cualquier posición, incluso antes de las estándar.
                     </p>
                   </div>
 
-                  {/* Cláusulas estándar */}
-                  {standardOrder.map((sid, index) => {
-                    const sec = STANDARD_SECTIONS.find(s => s.id === sid);
-                    if (!sec) return null;
+                  <div className="flex justify-end">
+                    <Button onClick={handleCreateClause} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Nueva Cláusula
+                    </Button>
+                  </div>
+
+                  {unifiedOrder.map((clauseId, index) => {
+                    const stdSec = STANDARD_SECTIONS.find(s => s.id === clauseId);
+                    const customClause = !stdSec ? activeClauses.find(c => c.id === clauseId) : null;
                     return (
-                      <Card key={sid} className="border-slate-200">
+                      <Card key={clauseId} className={stdSec ? "border-slate-200" : "border-indigo-200 bg-indigo-50/30"}>
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
                             <div className="flex flex-col gap-0.5">
@@ -1050,7 +1070,7 @@ export default function ContractTemplateConfig() {
                                 variant="ghost"
                                 className="h-6 w-6"
                                 disabled={index === 0}
-                                onClick={() => moveStandardClause(index, -1)}
+                                onClick={() => moveUnifiedClause(index, -1)}
                                 title="Subir"
                               >
                                 <ArrowUp className="w-4 h-4" />
@@ -1059,8 +1079,8 @@ export default function ContractTemplateConfig() {
                                 size="icon"
                                 variant="ghost"
                                 className="h-6 w-6"
-                                disabled={index === standardOrder.length - 1}
-                                onClick={() => moveStandardClause(index, 1)}
+                                disabled={index === unifiedOrder.length - 1}
+                                onClick={() => moveUnifiedClause(index, 1)}
                                 title="Bajar"
                               >
                                 <ArrowDown className="w-4 h-4" />
@@ -1069,148 +1089,25 @@ export default function ContractTemplateConfig() {
                             <Badge className="bg-indigo-600 text-white text-sm font-bold min-w-[2rem] justify-center">
                               {index + 1}
                             </Badge>
-                            <Input
-                              value={templateData[sec.titleField] || sec.defaultTitle}
-                              onChange={(e) => setTemplateData({ ...templateData, [sec.titleField]: e.target.value })}
-                              className="font-mono text-sm flex-1"
-                              placeholder={sec.defaultTitle}
-                            />
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          {sid === "object" && (
-                            <Textarea
-                              value={templateData.contract_object_text}
-                              onChange={(e) => setTemplateData({ ...templateData, contract_object_text: e.target.value })}
-                              rows={3}
-                              className="font-mono text-sm"
-                            />
-                          )}
-                          {sid === "functions" && (
-                            <Input
-                              value={templateData.functions_intro_text}
-                              onChange={(e) => setTemplateData({ ...templateData, functions_intro_text: e.target.value })}
-                              className="font-mono text-sm"
-                            />
-                          )}
-                          {sid === "duration" && (
-                            <>
-                              <div>
-                                <Label className="text-xs text-slate-500">Contrato Indeterminado</Label>
-                                <Textarea
-                                  value={templateData.duration_indeterminate_text}
-                                  onChange={(e) => setTemplateData({ ...templateData, duration_indeterminate_text: e.target.value })}
-                                  rows={2}
-                                  className="font-mono text-sm"
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs text-slate-500">Contrato Plazo Fijo</Label>
-                                <Textarea
-                                  value={templateData.duration_fixed_text}
-                                  onChange={(e) => setTemplateData({ ...templateData, duration_fixed_text: e.target.value })}
-                                  rows={2}
-                                  className="font-mono text-sm"
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs text-slate-500">Período de Prueba</Label>
-                                <Textarea
-                                  value={templateData.trial_period_text}
-                                  onChange={(e) => setTemplateData({ ...templateData, trial_period_text: e.target.value })}
-                                  rows={2}
-                                  className="font-mono text-sm"
-                                />
-                              </div>
-                            </>
-                          )}
-                          {sid === "salary" && (
-                            <Textarea
-                              value={templateData.salary_text}
-                              onChange={(e) => setTemplateData({ ...templateData, salary_text: e.target.value })}
-                              rows={2}
-                              className="font-mono text-sm"
-                            />
-                          )}
-                          {sid === "schedule" && (
-                            <>
-                              <Textarea
-                                value={templateData.schedule_text}
-                                onChange={(e) => setTemplateData({ ...templateData, schedule_text: e.target.value })}
-                                rows={2}
-                                className="font-mono text-sm"
+                            {stdSec ? (
+                              <Input
+                                value={templateData[stdSec.titleField] || stdSec.defaultTitle}
+                                onChange={(e) => setTemplateData({ ...templateData, [stdSec.titleField]: e.target.value })}
+                                className="font-mono text-sm flex-1"
+                                placeholder={stdSec.defaultTitle}
                               />
-                              <div>
-                                <Label className="text-xs text-slate-500">Lugar de Trabajo</Label>
+                            ) : (
+                              <>
                                 <Input
-                                  value={templateData.work_location_text}
-                                  onChange={(e) => setTemplateData({ ...templateData, work_location_text: e.target.value })}
-                                  className="font-mono text-sm"
-                                />
-                              </div>
-                            </>
-                          )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-
-                  {/* Cláusulas adicionales (rubros personalizados) */}
-                  <div className="pt-4 mt-4 border-t-2 border-dashed border-slate-300">
-                    <div className="flex justify-between items-center mb-3">
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-sm">Cláusulas Adicionales</h3>
-                        <p className="text-xs text-slate-500">
-                          Numeración automática continua: {customClauseStartNumber}, {customClauseStartNumber + 1}...
-                        </p>
-                      </div>
-                      <Button onClick={handleCreateClause} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Nueva Cláusula
-                      </Button>
-                    </div>
-
-                    <div className="space-y-3">
-                      {sortedClauses.map((clause, index) => {
-                        const clauseNumber = customClauseStartNumber + index;
-                        return (
-                          <Card key={clause.id} className="border-slate-200">
-                            <CardHeader className="pb-3">
-                              <div className="flex items-center gap-3">
-                                <div className="flex flex-col gap-0.5">
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-6 w-6"
-                                    disabled={index === 0}
-                                    onClick={() => moveCustomClause(index, -1)}
-                                    title="Subir"
-                                  >
-                                    <ArrowUp className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-6 w-6"
-                                    disabled={index === sortedClauses.length - 1}
-                                    onClick={() => moveCustomClause(index, 1)}
-                                    title="Bajar"
-                                  >
-                                    <ArrowDown className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                                <Badge className="bg-indigo-600 text-white text-sm font-bold min-w-[2rem] justify-center">
-                                  {clauseNumber}
-                                </Badge>
-                                <Input
-                                  value={clause.title}
+                                  value={customClause?.title || ""}
                                   readOnly
                                   className="font-mono text-sm flex-1 bg-slate-50 cursor-default"
                                 />
+                                <Badge variant="outline" className="text-xs text-indigo-600 border-indigo-300 whitespace-nowrap">Personalizada</Badge>
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleEditClause(clause)}
+                                  onClick={() => handleEditClause(customClause)}
                                   title="Editar"
                                 >
                                   <Edit className="w-4 h-4" />
@@ -1219,128 +1116,103 @@ export default function ContractTemplateConfig() {
                                   size="sm"
                                   variant="outline"
                                   className="text-red-600"
-                                  onClick={() => handleDeleteClause(clause.id)}
+                                  onClick={() => handleDeleteClause(customClause.id)}
                                   title="Eliminar"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
-                              </div>
-                            </CardHeader>
-                            <CardContent>
-                              <Textarea
-                                value={clause.content}
-                                readOnly
-                                rows={3}
-                                className="font-mono text-sm bg-slate-50 cursor-default"
-                              />
-                              {clause.contract_types?.length > 0 && (
-                                <div className="flex gap-1 flex-wrap mt-2">
-                                  {clause.contract_types.map(type => (
-                                    <Badge key={type} variant="outline" className="text-xs">{type}</Badge>
-                                  ))}
-                                </div>
-                              )}
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                      {sortedClauses.length === 0 && (
-                        <div className="text-center py-6 text-slate-400 text-sm border border-dashed border-slate-200 rounded-lg">
-                          No hay cláusulas adicionales. Haz clic en "Nueva Cláusula" para agregar un rubro.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* Cláusulas Personalizadas */}
-                <TabsContent value="custom-clauses" className="space-y-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <div>
-                      <h3 className="font-bold text-slate-900">Cláusulas Personalizadas</h3>
-                      <p className="text-sm text-slate-600">
-                        Numeración automática continua: {customClauseStartNumber}, {customClauseStartNumber + 1}...
-                        Usa las flechas para reordenar.
-                      </p>
-                    </div>
-                    <Button onClick={handleCreateClause} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Nueva Cláusula
-                    </Button>
-                  </div>
-
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {sortedClauses.map((clause, index) => (
-                      <Card key={clause.id} className="border-slate-200">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1 flex items-start gap-3">
-                              <div className="flex flex-col gap-0.5 items-center">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6"
-                                  disabled={index === 0}
-                                  onClick={() => moveCustomClause(index, -1)}
-                                  title="Subir"
-                                >
-                                  <ArrowUp className="w-4 h-4" />
-                                </Button>
-                                <Badge className="bg-indigo-600 text-white text-sm font-bold min-w-[2rem] justify-center">
-                                  {customClauseStartNumber + index}
-                                </Badge>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6"
-                                  disabled={index === sortedClauses.length - 1}
-                                  onClick={() => moveCustomClause(index, 1)}
-                                  title="Bajar"
-                                >
-                                  <ArrowDown className="w-4 h-4" />
-                                </Button>
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <h4 className="font-semibold text-slate-900">{clause.title}</h4>
-                                  <Badge className={clause.type === "obligatoria" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}>
-                                    {clause.type}
-                                  </Badge>
-                                  <Badge variant="outline" className="text-xs">{clause.category}</Badge>
-                                </div>
-                                <p className="text-sm text-slate-600 mb-2">{clause.content.substring(0, 150)}...</p>
-                                {clause.contract_types?.length > 0 && (
-                                  <div className="flex gap-1 flex-wrap">
-                                    {clause.contract_types.map(type => (
-                                      <Badge key={type} variant="outline" className="text-xs">{type}</Badge>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex gap-2 ml-4">
-                              <Button size="sm" variant="outline" onClick={() => handleEditClause(clause)}>
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600"
-                                onClick={() => handleDeleteClause(clause.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
+                              </>
+                            )}
                           </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {stdSec ? (
+                            <>
+                              {clauseId === "object" && (
+                                <Textarea
+                                  value={templateData.contract_object_text}
+                                  onChange={(e) => setTemplateData({ ...templateData, contract_object_text: e.target.value })}
+                                  rows={3}
+                                  className="font-mono text-sm"
+                                />
+                              )}
+                              {clauseId === "functions" && (
+                                <Input
+                                  value={templateData.functions_intro_text}
+                                  onChange={(e) => setTemplateData({ ...templateData, functions_intro_text: e.target.value })}
+                                  className="font-mono text-sm"
+                                />
+                              )}
+                              {clauseId === "duration" && (
+                                <>
+                                  <div>
+                                    <Label className="text-xs text-slate-500">Contrato Indeterminado</Label>
+                                    <Textarea
+                                      value={templateData.duration_indeterminate_text}
+                                      onChange={(e) => setTemplateData({ ...templateData, duration_indeterminate_text: e.target.value })}
+                                      rows={2}
+                                      className="font-mono text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs text-slate-500">Contrato Plazo Fijo</Label>
+                                    <Textarea
+                                      value={templateData.duration_fixed_text}
+                                      onChange={(e) => setTemplateData({ ...templateData, duration_fixed_text: e.target.value })}
+                                      rows={2}
+                                      className="font-mono text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs text-slate-500">Período de Prueba</Label>
+                                    <Textarea
+                                      value={templateData.trial_period_text}
+                                      onChange={(e) => setTemplateData({ ...templateData, trial_period_text: e.target.value })}
+                                      rows={2}
+                                      className="font-mono text-sm"
+                                    />
+                                  </div>
+                                </>
+                              )}
+                              {clauseId === "salary" && (
+                                <Textarea
+                                  value={templateData.salary_text}
+                                  onChange={(e) => setTemplateData({ ...templateData, salary_text: e.target.value })}
+                                  rows={2}
+                                  className="font-mono text-sm"
+                                />
+                              )}
+                              {clauseId === "schedule" && (
+                                <>
+                                  <Textarea
+                                    value={templateData.schedule_text}
+                                    onChange={(e) => setTemplateData({ ...templateData, schedule_text: e.target.value })}
+                                    rows={2}
+                                    className="font-mono text-sm"
+                                  />
+                                  <div>
+                                    <Label className="text-xs text-slate-500">Lugar de Trabajo</Label>
+                                    <Input
+                                      value={templateData.work_location_text}
+                                      onChange={(e) => setTemplateData({ ...templateData, work_location_text: e.target.value })}
+                                      className="font-mono text-sm"
+                                    />
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            <Textarea
+                              value={customClause?.content || ""}
+                              readOnly
+                              rows={3}
+                              className="font-mono text-sm bg-slate-50 cursor-default"
+                            />
+                          )}
                         </CardContent>
                       </Card>
-                    ))}
-                    {sortedClauses.length === 0 && (
-                      <div className="text-center py-8 text-slate-500">
-                        No hay cláusulas personalizadas. Crea una nueva.
-                      </div>
-                    )}
-                  </div>
+                    );
+                  })}
                 </TabsContent>
 
                 {/* Textos Finales */}
@@ -1348,7 +1220,7 @@ export default function ContractTemplateConfig() {
                   <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                     <p className="text-sm text-indigo-900 flex items-center gap-2">
                       <GripVertical className="w-4 h-4" />
-                      Los textos finales continúan la numeración automáticamente después de las cláusulas personalizadas (inician en {finalTextStartNumber}). Usa las flechas para reordenar.
+                      Los textos finales continúan la numeración automáticamente después de todas las cláusulas (inician en {finalTextStartNumber}). Usa las flechas para reordenar.
                     </p>
                   </div>
 
