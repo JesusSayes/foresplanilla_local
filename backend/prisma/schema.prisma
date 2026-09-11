@@ -283,6 +283,7 @@ model contract_template {
   section_domicile_title      String?
   standard_clause_order       Json?
   final_text_order            Json?
+  unified_clause_order        Json?
 }
 
 model cost_center {
@@ -961,6 +962,9 @@ model overtime_alert {
   overtime_hours       Decimal   @db.Decimal(5, 2)
   status               String?   @default("Pendiente") @db.VarChar(50)
   notes                String?
+  resolved_by          String?
+  resolution_date      DateTime? @db.Date
+  resolution_notes     String?
 }
 
 model segurovidaley {
