@@ -1036,6 +1036,7 @@ export default function ContractTemplateConfig() {
                     </p>
                   </div>
 
+                  {/* Cláusulas estándar */}
                   {standardOrder.map((sid, index) => {
                     const sec = STANDARD_SECTIONS.find(s => s.id === sid);
                     if (!sec) return null;
@@ -1153,6 +1154,103 @@ export default function ContractTemplateConfig() {
                       </Card>
                     );
                   })}
+
+                  {/* Cláusulas adicionales (rubros personalizados) */}
+                  <div className="pt-4 mt-4 border-t-2 border-dashed border-slate-300">
+                    <div className="flex justify-between items-center mb-3">
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-sm">Cláusulas Adicionales</h3>
+                        <p className="text-xs text-slate-500">
+                          Numeración automática continua: {customClauseStartNumber}, {customClauseStartNumber + 1}...
+                        </p>
+                      </div>
+                      <Button onClick={handleCreateClause} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Nueva Cláusula
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {sortedClauses.map((clause, index) => {
+                        const clauseNumber = customClauseStartNumber + index;
+                        return (
+                          <Card key={clause.id} className="border-slate-200">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="flex flex-col gap-0.5">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6"
+                                    disabled={index === 0}
+                                    onClick={() => moveCustomClause(index, -1)}
+                                    title="Subir"
+                                  >
+                                    <ArrowUp className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6"
+                                    disabled={index === sortedClauses.length - 1}
+                                    onClick={() => moveCustomClause(index, 1)}
+                                    title="Bajar"
+                                  >
+                                    <ArrowDown className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                                <Badge className="bg-indigo-600 text-white text-sm font-bold min-w-[2rem] justify-center">
+                                  {clauseNumber}
+                                </Badge>
+                                <Input
+                                  value={clause.title}
+                                  readOnly
+                                  className="font-mono text-sm flex-1 bg-slate-50 cursor-default"
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEditClause(clause)}
+                                  title="Editar"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600"
+                                  onClick={() => handleDeleteClause(clause.id)}
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <Textarea
+                                value={clause.content}
+                                readOnly
+                                rows={3}
+                                className="font-mono text-sm bg-slate-50 cursor-default"
+                              />
+                              {clause.contract_types?.length > 0 && (
+                                <div className="flex gap-1 flex-wrap mt-2">
+                                  {clause.contract_types.map(type => (
+                                    <Badge key={type} variant="outline" className="text-xs">{type}</Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                      {sortedClauses.length === 0 && (
+                        <div className="text-center py-6 text-slate-400 text-sm border border-dashed border-slate-200 rounded-lg">
+                          No hay cláusulas adicionales. Haz clic en "Nueva Cláusula" para agregar un rubro.
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </TabsContent>
 
                 {/* Cláusulas Personalizadas */}
