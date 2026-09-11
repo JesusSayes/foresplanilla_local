@@ -35,20 +35,25 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
           template = templates[0];
         }
       }
-
-      // Cargar cláusulas personalizadas
-      const clauses = await entitiesAPI.ContractClause.list("order")
-      if (clauses && clauses.length > 0) {
-        customClauses = clauses.filter(c =>
-          c.is_active &&
-          (c.type === "obligatoria" ||
-           !c.contract_types?.length ||
-           c.contract_types.includes(contract.contract_type))
-        );
-      }
     } catch (error) {
       console.log("No se encontró plantilla personalizada, usando valores por defecto");
     }
+  }
+
+  // Cargar cláusulas personalizadas siempre (independientemente de si la
+  // plantilla fue pasada o resuelta internamente), filtradas por tipo de contrato.
+  try {
+    const clauses = await entitiesAPI.ContractClause.list("order");
+    if (clauses && clauses.length > 0) {
+      customClauses = clauses.filter(c =>
+        c.is_active &&
+        (c.type === "obligatoria" ||
+         !c.contract_types?.length ||
+         c.contract_types.includes(contract.contract_type))
+      );
+    }
+  } catch (error) {
+    console.log("No se pudieron cargar cláusulas personalizadas");
   }
 
   // Cargar datos ACTUALES de la empresa desde CompanyInfo SIEMPRE
