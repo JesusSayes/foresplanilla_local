@@ -950,11 +950,12 @@ export default function ContractTemplateConfig() {
                       </div>
                       <div>
                         <Label>Subtítulo <span className="text-xs text-slate-400">(puede usar variables)</span></Label>
-                        <Input
+                        <Textarea
                           value={templateData.contract_subtitle || "{contract_type}"}
                           onChange={(e) => setTemplateData({ ...templateData, contract_subtitle: e.target.value })}
                           className="font-mono text-sm"
                           placeholder="{contract_type}"
+                          rows={2}
                         />
                       </div>
                     </CardContent>
@@ -968,10 +969,11 @@ export default function ContractTemplateConfig() {
                     <CardContent className="space-y-3">
                       <div>
                         <Label>Título de la sección</Label>
-                        <Input
+                        <Textarea
                           value={templateData.employer_section_title || "I. DATOS DEL EMPLEADOR:"}
                           onChange={(e) => setTemplateData({ ...templateData, employer_section_title: e.target.value })}
                           className="font-mono text-sm"
+                          rows={2}
                         />
                       </div>
                       <div>
@@ -994,10 +996,11 @@ export default function ContractTemplateConfig() {
                     <CardContent className="space-y-3">
                       <div>
                         <Label>Título de la sección</Label>
-                        <Input
+                        <Textarea
                           value={templateData.worker_section_title || "II. DATOS DEL TRABAJADOR:"}
                           onChange={(e) => setTemplateData({ ...templateData, worker_section_title: e.target.value })}
                           className="font-mono text-sm"
+                          rows={2}
                         />
                       </div>
                       <div>
@@ -1034,10 +1037,11 @@ export default function ContractTemplateConfig() {
 
                   <div>
                     <Label>Introducción a Funciones</Label>
-                    <Input
+                    <Textarea
                       value={templateData.functions_intro_text}
                       onChange={(e) => setTemplateData({ ...templateData, functions_intro_text: e.target.value })}
                       className="font-mono text-sm"
+                      rows={2}
                     />
                   </div>
                 </TabsContent>
@@ -1091,18 +1095,20 @@ export default function ContractTemplateConfig() {
                               {index + 1}
                             </Badge>
                             {stdSec ? (
-                              <Input
+                              <Textarea
                                 value={templateData[stdSec.titleField] || stdSec.defaultTitle}
                                 onChange={(e) => setTemplateData({ ...templateData, [stdSec.titleField]: e.target.value })}
                                 className="font-mono text-sm flex-1"
                                 placeholder={stdSec.defaultTitle}
+                                rows={2}
                               />
                             ) : (
                               <>
-                                <Input
+                                <Textarea
                                   value={customClause?.title || ""}
                                   readOnly
                                   className="font-mono text-sm flex-1 bg-slate-50 cursor-default"
+                                  rows={2}
                                 />
                                 <Badge variant="outline" className="text-xs text-indigo-600 border-indigo-300 whitespace-nowrap">Personalizada</Badge>
                                 <Button
@@ -1138,10 +1144,11 @@ export default function ContractTemplateConfig() {
                                 />
                               )}
                               {clauseId === "functions" && (
-                                <Input
+                                <Textarea
                                   value={templateData.functions_intro_text}
                                   onChange={(e) => setTemplateData({ ...templateData, functions_intro_text: e.target.value })}
                                   className="font-mono text-sm"
+                                  rows={2}
                                 />
                               )}
                               {clauseId === "duration" && (
@@ -1193,10 +1200,11 @@ export default function ContractTemplateConfig() {
                                   />
                                   <div>
                                     <Label className="text-xs text-slate-500">Lugar de Trabajo</Label>
-                                    <Input
+                                    <Textarea
                                       value={templateData.work_location_text}
                                       onChange={(e) => setTemplateData({ ...templateData, work_location_text: e.target.value })}
                                       className="font-mono text-sm"
+                                      rows={2}
                                     />
                                   </div>
                                 </>
@@ -1263,11 +1271,12 @@ export default function ContractTemplateConfig() {
                             <Badge className="bg-indigo-600 text-white text-sm font-bold min-w-[2rem] justify-center">
                               {finalTextStartNumber + index}
                             </Badge>
-                            <Input
+                            <Textarea
                               value={templateData[sec.titleField] || sec.defaultTitle}
                               onChange={(e) => setTemplateData({ ...templateData, [sec.titleField]: e.target.value })}
                               className="font-mono text-sm flex-1"
                               placeholder={sec.defaultTitle}
+                              rows={2}
                             />
                           </div>
                         </CardHeader>
