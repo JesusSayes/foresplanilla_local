@@ -1431,7 +1431,7 @@ export default function ContractTemplateConfig() {
                     </div>
 
                     {/* Introducción */}
-                    <p className="leading-relaxed whitespace-pre-wrap">
+                    <p className="leading-relaxed whitespace-pre-wrap text-justify">
                       {rv(templateData.introduction_text)}
                     </p>
 
@@ -1442,7 +1442,7 @@ export default function ContractTemplateConfig() {
                         return (
                           <div key={section.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                             <p className="font-bold text-slate-900 mb-2">{rv(section.title)}</p>
-                            <p className="whitespace-pre-wrap leading-relaxed">{content}</p>
+                            <p className="whitespace-pre-wrap leading-relaxed text-justify">{content}</p>
                           </div>
                         );
                       }
@@ -1451,7 +1451,7 @@ export default function ContractTemplateConfig() {
                           <p className="font-bold text-slate-900 mb-1">
                             {section.number}. {rv(section.title)}
                           </p>
-                          <p className="whitespace-pre-wrap leading-relaxed">{content}</p>
+                          <p className="whitespace-pre-wrap leading-relaxed text-justify">{content}</p>
                           {section.id === "functions" && (
                             <p className="text-slate-400 italic text-xs mt-1">[Se completará con las funciones del contrato]</p>
                           )}

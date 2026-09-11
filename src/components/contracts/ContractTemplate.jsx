@@ -127,14 +127,44 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   const addText = (text, fontSize = 10, isBold = false) => {
     doc.setFontSize(fontSize);
     doc.setFont(undefined, isBold ? 'bold' : 'normal');
-    const lines = doc.splitTextToSize(text, pageWidth - 2 * margin);
-    lines.forEach(line => {
-      if (y > pageHeight - 30) {
-        doc.addPage();
-        y = 20;
+    const maxWidth = pageWidth - 2 * margin;
+    const paragraphs = String(text).split(/\n/);
+    paragraphs.forEach((para, pIdx) => {
+      if (para.trim() === "") {
+        y += fontSize * 0.4;
+        return;
       }
-      doc.text(line, margin, y);
-      y += fontSize * 0.5;
+      const lines = doc.splitTextToSize(para, maxWidth);
+      lines.forEach((line, lIdx) => {
+        if (y > pageHeight - 30) {
+          doc.addPage();
+          y = 20;
+        }
+        const isLastLineOfPara = lIdx === lines.length - 1;
+        if (isLastLineOfPara) {
+          // Última línea: alineación izquierda normal
+          doc.text(line, margin, y);
+        } else {
+          // Justificar: distribuir espacios entre palabras para llenar el ancho
+          const words = line.trim().split(/\s+/);
+          if (words.length <= 1) {
+            doc.text(line, margin, y);
+          } else {
+            const wordsWidth = words.reduce((sum, w) => sum + doc.getTextWidth(w), 0);
+            const totalSpaces = words.length - 1;
+            const spaceWidth = (maxWidth - wordsWidth) / totalSpaces;
+            let x = margin;
+            words.forEach((w, wi) => {
+              doc.text(w, x, y);
+              x += doc.getTextWidth(w) + spaceWidth;
+            });
+          }
+        }
+        y += fontSize * 0.5;
+      });
+      if (pIdx < paragraphs.length - 1) {
+        y += fontSize * 0.4;
+      }
     });
     y += 2;
   };
