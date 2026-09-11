@@ -487,11 +487,18 @@ export default function ContractTemplateConfig() {
     setTemplateData({ ...templateData, unified_clause_order: newOrder });
   };
 
-  // Cláusulas personalizadas activas ordenadas según el orden unificado
-  const sortedClauses = useMemo(
-    () => activeClauses,
-    [activeClauses]
-  );
+  // Cláusulas personalizadas activas filtradas por tipo de contrato (igual que el PDF)
+  // y ordenadas según el orden unificado. Para la vista previa se usa el primer tipo
+  // de contrato de la plantilla, o todas si la plantilla aplica a todos los tipos.
+  const sortedClauses = useMemo(() => {
+    const templateTypes = templateData.contract_types || [];
+    const filterType = templateTypes.length > 0 ? templateTypes[0] : null;
+    return activeClauses.filter(c =>
+      c.type === "obligatoria" ||
+      !c.contract_types?.length ||
+      (filterType && c.contract_types.includes(filterType))
+    );
+  }, [activeClauses, templateData.contract_types]);
 
   // ── Reordenamiento de textos finales ──
   const finalOrder = templateData.final_text_order?.length > 0
@@ -1397,7 +1404,7 @@ export default function ContractTemplateConfig() {
                   return contentMap[section.id] || "";
                 };
                 return (
-                  <div className="space-y-6 font-serif">
+                  <div className="space-y-6" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                     {/* Título */}
                     <div className="text-center border-b pb-6">
                       <div className="text-xl font-bold text-slate-900 mb-1">
