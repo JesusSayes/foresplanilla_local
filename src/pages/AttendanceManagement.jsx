@@ -2096,18 +2096,20 @@ export default function AttendanceManagement() {
                                 variant="outline"
                                 className="flex-1 text-blue-700 border-blue-300 hover:bg-blue-50"
                                 onClick={async () => {
-                                  // 1. Marcar overtime_authorized=true en el registro del día
-                                  if (record) {
-                                    await base44.entities.AttendanceRecord.update(record.id, {
-                                      overtime_authorized: true,
-                                      notes: (record.notes ? record.notes + " | " : "") + `HE aceptadas: ${alert.overtime_hours.toFixed(2)}h (${alert.alert_date})`
-                                    });
-                                  }
-                                  // 2. Marcar alerta como aprobada
-                                  await base44.entities.OvertimeAlert.update(alert.id, {
-                                    status: "Aprobado",
-                                    notes: `HE aceptadas solo para el día ${alert.alert_date}`
-                                  });
+                                   // 1. Marcar overtime_authorized=true en el registro del día
+                                   if (record) {
+                                     await base44.entities.AttendanceRecord.update(record.id, {
+                                       overtime_authorized: true,
+                                       notes: (record.notes ? record.notes + " | " : "") + `HE aceptadas: ${alert.overtime_hours.toFixed(2)}h (${alert.alert_date})`
+                                     });
+                                   }
+                                   // 2. Marcar alerta como autorizada (status válido del enum OvertimeAlert)
+                                   await base44.entities.OvertimeAlert.update(alert.id, {
+                                     status: "Autorizado",
+                                     resolved_by: currentUser?.email || "",
+                                     resolution_date: todayLima(),
+                                     resolution_notes: `HE aceptadas solo para el día ${alert.alert_date}`
+                                   });
                                   // 3. Recalcular asistencia del día (tardanza + HE 25% + HE 35%)
                                   await base44.functions.invoke("recalcularAsistencia", {
                                     employee_id: alert.employee_id,
