@@ -34,15 +34,13 @@ export const numberedTitle = (number, title) => {
 };
 
 // Construye la lista ordenada completa de secciones con numeración automática continua.
-// Orden: Empleador (sin número) → Trabajador (sin número) → Cláusulas estándar (1..N) →
-// Cláusulas personalizadas (N+1..) → Textos finales (continúa).
+// Orden: Empleador (sin número) → Trabajador (sin número) → Cláusulas unificadas
+// (estándar + personalizadas intercaladas, 1..N) → Textos finales (continúa).
 export const buildOrderedSections = (template, customClauses = []) => {
-  // Conserva todas las secciones incluso en plantillas históricas incompletas.
   const normalizeOrder = (order, defaults) => [...new Set([
     ...(Array.isArray(order) ? order.filter(id => defaults.includes(id)) : []),
     ...defaults,
   ])];
-  const standardOrder = normalizeOrder(template?.standard_clause_order, DEFAULT_STANDARD_ORDER);
   const finalOrder = normalizeOrder(template?.final_text_order, DEFAULT_FINAL_ORDER);
 
   const sections = [];
@@ -62,28 +60,52 @@ export const buildOrderedSections = (template, customClauses = []) => {
     number: null,
   });
 
-  // Cláusulas estándar (numeradas desde 1, ordenadas)
-  for (const sid of standardOrder) {
-    const sec = STANDARD_SECTIONS.find((s) => s.id === sid);
-    if (sec) {
-      sections.push({
-        type: "standard",
-        id: sec.id,
-        title: stripNumeral(template?.[sec.titleField] || sec.defaultTitle),
-        number: num++,
-      });
+  // Determinar el orden de las cláusulas (unificado: estándar + personalizadas intercaladas)
+  const unifiedOrder = template?.unified_clause_order;
+  const customIds = customClauses.map((c) => c.id);
+
+  let clauseIds = [];
+  if (Array.isArray(unifiedOrder) && unifiedOrder.length > 0) {
+    // Usar el orden unificado: filtrar IDs válidos (estándar existentes + custom existentes)
+    clauseIds = unifiedOrder.filter(
+      (id) => STANDARD_SECTIONS.some((s) => s.id === id) || customIds.includes(id)
+    );
+    // Agregar IDs estándar faltantes (backward compat)
+    for (const sid of DEFAULT_STANDARD_ORDER) {
+      if (!clauseIds.includes(sid)) clauseIds.push(sid);
     }
+    // Agregar custom nuevos no presentes en el orden guardado
+    for (const cid of customIds) {
+      if (!clauseIds.includes(cid)) clauseIds.push(cid);
+    }
+  } else {
+    // Fallback legacy: usar standard_clause_order + custom al final
+    const legacyStandardOrder = normalizeOrder(template?.standard_clause_order, DEFAULT_STANDARD_ORDER);
+    clauseIds = [...legacyStandardOrder, ...customIds];
   }
 
-  // Cláusulas personalizadas (continúan la numeración)
-  for (const clause of customClauses) {
-    sections.push({
-      type: "custom",
-      id: clause.id,
-      title: clause.title,
-      content: clause.content,
-      number: num++,
-    });
+  // Renderizar cláusulas en orden unificado
+  for (const id of new Set(clauseIds)) {
+    const stdSec = STANDARD_SECTIONS.find((s) => s.id === id);
+    if (stdSec) {
+      sections.push({
+        type: "standard",
+        id: stdSec.id,
+        title: stripNumeral(template?.[stdSec.titleField] || stdSec.defaultTitle),
+        number: num++,
+      });
+    } else {
+      const custom = customClauses.find((c) => c.id === id);
+      if (custom) {
+        sections.push({
+          type: "custom",
+          id: custom.id,
+          title: custom.title,
+          content: custom.content,
+          number: num++,
+        });
+      }
+    }
   }
 
   // Textos finales (continúan la numeración)

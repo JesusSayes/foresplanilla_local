@@ -93,3 +93,56 @@ test('secciones históricas incompletas no omiten ni duplican contenido', () => 
   assert.deepEqual(sections.filter(s => s.number).map(s => s.number), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   assert.equal(sections[2].id, 'salary');
 });
+
+test('orden unificado intercala cláusulas sin duplicar ni omitir secciones', () => {
+  const sections = buildOrderedSections({
+    unified_clause_order: ['extra', 'salary', 'extra', 'deleted'],
+    final_text_order: ['domicile', 'domicile'],
+  }, [{ id: 'extra', title: 'Extra', content: 'Texto' }, { id: 'new', title: 'Nueva' }]);
+  assert.deepEqual(sections.slice(2, 4).map(s => s.id), ['extra', 'salary']);
+  assert.equal(sections.filter(s => s.id === 'extra').length, 1);
+  assert.equal(sections.filter(s => s.type === 'standard').length, 5);
+  assert.equal(sections.filter(s => s.type === 'final').length, 4);
+  assert.ok(sections.some(s => s.id === 'new'));
+  assert.deepEqual(sections.filter(s => s.number).map(s => s.number), Array.from({ length: 11 }, (_, i) => i + 1));
+});
+
+test('API persiste orden unificado y rechaza IDs repetidos o inválidos', async t => {
+  const db = t.mock.method(pool, 'query', async (sql, values) => {
+    assert.match(sql, /"unified_clause_order" = \$1/);
+    assert.equal(values[0], '["extra","salary"]');
+    return { rows: [{ id: 'abc123', unified_clause_order: ['extra', 'salary'] }] };
+  });
+  assert.equal((await call(templates.update, { unified_clause_order: ['extra', 'salary'] })).statusCode, 200);
+  for (const order of [['extra', 'extra'], [42], 'salary', ['']]) {
+    assert.equal((await call(templates.update, { unified_clause_order: order })).statusCode, 400);
+  }
+  assert.equal(db.mock.callCount(), 1);
+});
+
+test('autorizar HE guarda estado y resolución en una transacción sin campos nuevos en Prisma', async t => {
+  const { update } = await import('../controllers/attendance/overtimeAlertController.js');
+  const original = prisma.overtime_alert.findUnique;
+  t.after(() => { prisma.overtime_alert.findUnique = original; });
+  prisma.overtime_alert.findUnique = async () => ({ id: 'alert1', employee_id: 'emp1' });
+  let saved = false;
+  t.mock.method(prisma, '$transaction', async callback => callback({
+    overtime_alert: { update: async ({ data }) => {
+      assert.equal(data.status, 'Autorizado');
+      assert.equal(data.resolution_date, undefined);
+      return { id: 'alert1', ...data };
+    } },
+    $queryRawUnsafe: async (sql, ...values) => {
+      assert.match(sql, /"resolution_date" = \$2::date/);
+      assert.deepEqual(values, ['admin@example.test', '2026-09-11', 'Aceptadas', 'alert1']);
+      saved = true;
+      return [{ id: 'alert1', status: 'Autorizado', resolution_notes: 'Aceptadas' }];
+    },
+  }));
+  const res = { status(code) { this.code = code; return this; }, json(body) { this.body = body; } };
+  await update({ params: { id: 'alert1' }, accessibleEmployeeIds: ['emp1'], body: {
+    status: 'Autorizado', resolved_by: 'admin@example.test', resolution_date: '2026-09-11', resolution_notes: 'Aceptadas',
+  } }, res);
+  assert.equal(saved, true);
+  assert.equal(res.body.resolution_notes, 'Aceptadas');
+});

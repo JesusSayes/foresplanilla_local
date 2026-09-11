@@ -51,9 +51,18 @@
   ],
   "rls": {
     "create": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_attendance": true
+          }
+        }
+      ]
     },
     "read": {
       "$or": [
@@ -63,19 +72,42 @@
           }
         },
         {
+          "user_condition": {
+            "data.can_view_all_attendance": true
+          }
+        },
+        {
           "data.employee_id": "{{user.data.employee_id}}"
         }
       ]
     },
     "update": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_attendance": true
+          }
+        }
+      ]
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_attendance": true
+          }
+        }
+      ]
     }
   }
 }

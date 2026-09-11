@@ -159,19 +159,26 @@
       "type": "string",
       "description": "Texto de domicilio"
     },
+    "unified_clause_order": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Orden unificado de TODAS las cl\u00e1usulas (est\u00e1ndar y personalizadas) en una sola lista. Contiene IDs est\u00e1ndar (object, functions, duration, salary, schedule) mezclados con IDs de cl\u00e1usulas personalizadas (ContractClause.id). Define el orden de aparici\u00f3n y la numeraci\u00f3n autom\u00e1tica continua. Permite insertar cl\u00e1usulas personalizadas en cualquier posici\u00f3n, incluso antes de las cl\u00e1usulas est\u00e1ndar."
+    },
     "standard_clause_order": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "description": "Orden de las cl\u00e1usulas est\u00e1ndar (IDs: object, functions, duration, salary, schedule). Define el orden de aparici\u00f3n y la numeraci\u00f3n autom\u00e1tica."
+      "description": "[DEPRECATED] Orden legacy de las cl\u00e1usulas est\u00e1ndar. Reemplazado por 'unified_clause_order'. Se conserva solo para compatibilidad de lectura durante la transici\u00f3n."
     },
     "final_text_order": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "description": "Orden de los textos finales (IDs: obligations, benefits, termination, domicile). Define el orden de aparici\u00f3n y la numeraci\u00f3n autom\u00e1tica continua despu\u00e9s de las cl\u00e1usulas personalizadas."
+      "description": "Orden de los textos finales (IDs: obligations, benefits, termination, domicile). Define el orden de aparici\u00f3n y la numeraci\u00f3n autom\u00e1tica continua despu\u00e9s de las cl\u00e1usulas (est\u00e1ndar + personalizadas)."
     }
   },
   "required": [
