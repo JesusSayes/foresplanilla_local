@@ -240,7 +240,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     } else if (section.id === "functions") {
       const functionsIntro = template?.functions_intro_text || "El trabajador desempeñará las siguientes funciones y responsabilidades:";
       if (functionsIntro) addText(replaceVariables(functionsIntro));
-      if (contract.functions) addText(replaceVariables(contract.functions));
+      if (contract.functions && !functionsIntro.includes("{functions}")) addText(replaceVariables(contract.functions));
     } else if (section.id === "duration") {
       if (contract.contract_type === "Indeterminado") {
         addText(replaceVariables(template?.duration_indeterminate_text ||
