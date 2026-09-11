@@ -134,7 +134,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     return result;
   };
 
-  const addText = (text, fontSize = 10, isBold = false) => {
+  const addText = (text, fontSize = 10, isBold = false, { tightParagraphs = false } = {}) => {
     doc.setFontSize(fontSize);
     doc.setFont("times", isBold ? 'bold' : 'normal');
     const maxWidth = pageWidth - 2 * margin;
@@ -172,21 +172,27 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
         }
         y += fontSize * 0.5;
       });
-      if (pIdx < paragraphs.length - 1) {
+      if (!tightParagraphs && pIdx < paragraphs.length - 1) {
         y += fontSize * 0.4;
       }
     });
     y += 2;
   };
 
-  // ── TÍTULO ──
-  doc.setFontSize(14);
-  doc.setFont("times", 'bold');
+  // ── TÍTULO ── (auto-ajustado al ancho disponible, centrado, respeta saltos de línea)
+  const titleMaxWidth = pageWidth - 2 * margin;
   const contractTitle = replaceVariables(template?.contract_title || "CONTRATO DE TRABAJO");
   const titleLines = contractTitle.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  let titleFontSize = 14;
+  doc.setFont("times", 'bold');
+  doc.setFontSize(titleFontSize);
+  while (titleFontSize > 8 && titleLines.some(line => doc.getTextWidth(line.toUpperCase()) > titleMaxWidth)) {
+    titleFontSize -= 0.5;
+    doc.setFontSize(titleFontSize);
+  }
   titleLines.forEach(line => {
     doc.text(line.toUpperCase(), pageWidth / 2, y, { align: "center" });
-    y += 7;
+    y += titleFontSize * 0.5 + 2;
   });
 
   doc.setFontSize(12);
@@ -217,7 +223,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     if (section.type === "employer") {
       addText(replaceVariables(sectionTitle), 11, true);
       addText(replaceVariables(template?.employer_section_text ||
-        "Empresa: {company_name}\nRUC: {company_ruc}\nDomicilio: {company_address}\nRepresentante Legal: {company_representative}\nDocumento: {company_representative_doc}"));
+        "Empresa: {company_name}\nRUC: {company_ruc}\nDomicilio: {company_address}\nRepresentante Legal: {company_representative}\nDocumento: {company_representative_doc}"), 10, false, { tightParagraphs: true });
       y += 3;
       continue;
     }
@@ -225,7 +231,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     if (section.type === "worker") {
       addText(replaceVariables(sectionTitle), 11, true);
       addText(replaceVariables(template?.worker_section_text ||
-        "Nombres y Apellidos: {employee_name}\n{employee_doc_type}: {employee_doc_number}\nDomicilio: {employee_address}"));
+        "Nombres y Apellidos: {employee_name}\n{employee_doc_type}: {employee_doc_number}\nDomicilio: {employee_address}"), 10, false, { tightParagraphs: true });
       y += 3;
       continue;
     }
