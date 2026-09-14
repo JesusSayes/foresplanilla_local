@@ -92,8 +92,7 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
   let siteRecord = null;
   if (employee.site) {
     try {
-      const { base44 } = await import("@/api/base44Client");
-      const sites = await base44.entities.Site?.list();
+      const sites = await entitiesAPI.Site.list();
       if (sites && sites.length > 0) {
         siteRecord = sites.find(s => s.name === employee.site && s.is_active !== false) || null;
       }
