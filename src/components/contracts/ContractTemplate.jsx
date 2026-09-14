@@ -90,11 +90,18 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
 
   // Cargar el registro de la sede del empleado desde la entidad Site
   let siteRecord = null;
-  if (employee.site) {
+  const siteKey = (employee.site || contract.work_location || "").trim().toLowerCase();
+  if (siteKey) {
     try {
       const sites = await entitiesAPI.Site.list();
       if (sites && sites.length > 0) {
-        siteRecord = sites.find(s => s.name === employee.site && s.is_active !== false) || null;
+        // Búsqueda robusta: coincidir por nombre o código (case-insensitive, trim)
+        siteRecord = sites.find(s =>
+          s.is_active !== false && (
+            (s.name || "").trim().toLowerCase() === siteKey ||
+            (s.code || "").trim().toLowerCase() === siteKey
+          )
+        ) || null;
       }
     } catch (error) {
       console.log("No se pudo cargar el registro de la sede");
@@ -115,6 +122,8 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     "{department}": contract.area_trabajo || contract.department || employee.department_name || "",
     "{start_date}": format(new Date(contract.start_date), "dd 'de' MMMM 'de' yyyy", { locale: es }),
     "{end_date}": contract.end_date ? format(new Date(contract.end_date), "dd 'de' MMMM 'de' yyyy", { locale: es }) : "",
+    "{mes_inicio}": format(new Date(contract.start_date), "MMMM 'de' yyyy", { locale: es }),
+    "{mes_final}": contract.end_date ? format(new Date(contract.end_date), "MMMM 'de' yyyy", { locale: es }) : "",
     "{salary}": contract.salary.toFixed(2),
     "{salary_words}": numberToWords(contract.salary),
     "{weekly_hours}": (contract.weekly_hours || 48).toString(),

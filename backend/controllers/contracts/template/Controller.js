@@ -1,8 +1,8 @@
 import pool from '../../../config/database.js';
 import { generate24HexId } from '../../../utils/idGenerator.js';
 
-const FIELDS = ['template_name', 'description', 'is_default', 'is_active', 'contract_types', 'company_name', 'company_ruc', 'company_address', 'company_representative', 'company_representative_doc', 'contract_title', 'contract_subtitle', 'employer_section_title', 'employer_section_text', 'worker_section_title', 'worker_section_text', 'introduction_text', 'section_object_title', 'contract_object_text', 'section_functions_title', 'functions_intro_text', 'section_duration_title', 'duration_indeterminate_text', 'duration_fixed_text', 'trial_period_text', 'section_salary_title', 'salary_text', 'section_schedule_title', 'schedule_text', 'work_location_text', 'section_obligations_title', 'obligations_text', 'section_benefits_title', 'benefits_text', 'section_termination_title', 'termination_text', 'section_domicile_title', 'domicile_text', 'standard_clause_order', 'final_text_order', 'unified_clause_order'];
-const ARRAYS = ['contract_types', 'standard_clause_order', 'final_text_order', 'unified_clause_order'];
+const FIELDS = ['template_name', 'description', 'is_default', 'is_active', 'contract_types', 'company_name', 'company_ruc', 'company_address', 'company_representative', 'company_representative_doc', 'contract_title', 'contract_subtitle', 'employer_section_title', 'employer_section_text', 'worker_section_title', 'worker_section_text', 'introduction_text', 'section_object_title', 'contract_object_text', 'section_functions_title', 'functions_intro_text', 'section_duration_title', 'duration_indeterminate_text', 'duration_fixed_text', 'trial_period_text', 'section_salary_title', 'salary_text', 'section_schedule_title', 'schedule_text', 'work_location_text', 'section_obligations_title', 'obligations_text', 'section_benefits_title', 'benefits_text', 'section_termination_title', 'termination_text', 'section_domicile_title', 'domicile_text', 'standard_clause_order', 'final_text_order', 'unified_clause_order', 'excluded_clauses'];
+const ARRAYS = ['contract_types', 'standard_clause_order', 'final_text_order', 'unified_clause_order', 'excluded_clauses'];
 const ORDERS = {
   standard_clause_order: ['object', 'functions', 'duration', 'salary', 'schedule'],
   final_text_order: ['obligations', 'benefits', 'termination', 'domicile'],
@@ -17,6 +17,7 @@ const validate = body => {
     if (value !== null) {
       if (ARRAYS.includes(field)) {
         if (!Array.isArray(value) || value.some(item => typeof item !== 'string')) throw badRequest(`Lista no válida: ${field}`);
+        if (field === 'excluded_clauses' && (new Set(value).size !== value.length || value.some(id => !Object.values(ORDERS).flat().includes(id)))) throw badRequest('Cláusulas excluidas no válidas');
         if (field === 'unified_clause_order' && (value.some(id => !id.trim()) || new Set(value).size !== value.length)) throw badRequest('Orden unificado no válido');
         if (ORDERS[field] && value.length && (value.length !== ORDERS[field].length || new Set(value).size !== value.length || value.some(id => !ORDERS[field].includes(id)))) throw badRequest(`Orden incompleto o no válido: ${field}`);
       } else if (typeof value !== (field.startsWith('is_') ? 'boolean' : 'string')) throw badRequest(`Tipo no válido: ${field}`);

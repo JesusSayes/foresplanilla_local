@@ -83,6 +83,7 @@ const DEFAULT_TEMPLATE = {
   unified_clause_order: [],
   standard_clause_order: [...DEFAULT_STANDARD_ORDER],
   final_text_order: [...DEFAULT_FINAL_ORDER],
+  excluded_clauses: [],
 };
 
 const CONTRACT_TYPES = [
@@ -434,6 +435,11 @@ export default function ContractTemplateConfig() {
     [clauses]
   );
 
+  const excludedClauses = useMemo(
+    () => templateData.excluded_clauses || [],
+    [templateData.excluded_clauses]
+  );
+
   const unifiedOrder = useMemo(() => {
     return buildOrderedSections(templateData, activeClauses)
       .filter(section => section.type === "standard" || section.type === "custom")
@@ -461,16 +467,70 @@ export default function ContractTemplateConfig() {
   }, [activeClauses, templateData.contract_types]);
 
   // ── Reordenamiento de textos finales ──
-  const finalOrder = templateData.final_text_order?.length > 0
-    ? templateData.final_text_order
-    : [...DEFAULT_FINAL_ORDER];
+  const completeFinalOrder = buildOrderedSections({ ...templateData, excluded_clauses: [] })
+    .filter(section => section.type === "final")
+    .map(section => section.id);
+  const finalOrder = completeFinalOrder.filter(id => !excludedClauses.includes(id));
 
   const moveFinalText = (index, direction) => {
     const newIndex = index + direction;
     if (newIndex < 0 || newIndex >= finalOrder.length) return;
     const newOrder = moveItem(finalOrder, index, newIndex);
-    setTemplateData({ ...templateData, final_text_order: newOrder });
+    setTemplateData({ ...templateData, final_text_order: [...newOrder, ...completeFinalOrder.filter(id => excludedClauses.includes(id))] });
   };
+
+  // ── Eliminar / restaurar cláusulas estándar y textos finales ──
+  const handleDeleteStandardClause = (clauseId) => {
+    if (!confirm("¿Eliminar esta cláusula de la plantilla? Podrás restaurarla luego desde la sección de cláusulas eliminadas.")) return;
+    const newExcluded = [...new Set([...excludedClauses, clauseId])];
+    const newUnified = (templateData.unified_clause_order || []).filter(id => id !== clauseId);
+    setTemplateData({
+      ...templateData,
+      excluded_clauses: newExcluded,
+      unified_clause_order: newUnified,
+    });
+  };
+
+  const handleDeleteFinalSection = (sectionId) => {
+    if (!confirm("¿Eliminar esta sección de la plantilla? Podrás restaurarla luego desde la sección de cláusulas eliminadas.")) return;
+    const newExcluded = [...new Set([...excludedClauses, sectionId])];
+    setTemplateData({
+      ...templateData,
+      excluded_clauses: newExcluded,
+      final_text_order: completeFinalOrder,
+    });
+  };
+
+  const handleRestoreClause = (clauseId) => {
+    const newExcluded = excludedClauses.filter(id => id !== clauseId);
+    const isStandard = STANDARD_SECTIONS.some(s => s.id === clauseId);
+    const isFinal = FINAL_SECTIONS.some(s => s.id === clauseId);
+    if (isStandard) {
+      const newUnified = [...(templateData.unified_clause_order || [])];
+      if (!newUnified.includes(clauseId)) newUnified.push(clauseId);
+      setTemplateData({
+        ...templateData,
+        excluded_clauses: newExcluded,
+        unified_clause_order: newUnified,
+      });
+    } else if (isFinal) {
+      setTemplateData({
+        ...templateData,
+        excluded_clauses: newExcluded,
+        final_text_order: completeFinalOrder,
+      });
+    }
+  };
+
+  // Cláusulas estándar y finales eliminadas (para restauración)
+  const deletedStandardClauses = useMemo(
+    () => STANDARD_SECTIONS.filter(s => excludedClauses.includes(s.id)),
+    [excludedClauses]
+  );
+  const deletedFinalSections = useMemo(
+    () => FINAL_SECTIONS.filter(s => excludedClauses.includes(s.id)),
+    [excludedClauses]
+  );
 
   // Numeración: textos finales empiezan después de todas las cláusulas unificadas
   const finalTextStartNumber = unifiedOrder.length + 1;
@@ -482,8 +542,11 @@ export default function ContractTemplateConfig() {
     { key: "{employee_doc_number}", desc: "Número de documento del empleado" },
     { key: "{position}", desc: "Cargo" },
     { key: "{department}", desc: "Departamento/Área" },
+    { key: "{unidad_trabajo}", desc: "Unidad de trabajo" },
     { key: "{start_date}", desc: "Fecha de inicio" },
     { key: "{end_date}", desc: "Fecha de fin" },
+    { key: "{mes_inicio}", desc: "Mes de inicio (ej: enero de 2026)" },
+    { key: "{mes_final}", desc: "Mes de final (ej: diciembre de 2026)" },
     { key: "{salary}", desc: "Remuneración (numérica)" },
     { key: "{salary_words}", desc: "Remuneración en palabras" },
     { key: "{weekly_hours}", desc: "Horas semanales" },
@@ -1063,13 +1126,25 @@ export default function ContractTemplateConfig() {
                               {index + 1}
                             </Badge>
                             {stdSec ? (
-                              <Textarea
-                                value={templateData[stdSec.titleField] || stdSec.defaultTitle}
-                                onChange={(e) => setTemplateData({ ...templateData, [stdSec.titleField]: e.target.value })}
-                                className="font-mono text-sm flex-1"
-                                placeholder={stdSec.defaultTitle}
-                                rows={2}
-                              />
+                              <>
+                                <Textarea
+                                  value={templateData[stdSec.titleField] || stdSec.defaultTitle}
+                                  onChange={(e) => setTemplateData({ ...templateData, [stdSec.titleField]: e.target.value })}
+                                  className="font-mono text-sm flex-1"
+                                  placeholder={stdSec.defaultTitle}
+                                  rows={2}
+                                />
+                                <Badge variant="outline" className="text-xs text-slate-500 border-slate-300 whitespace-nowrap">Estándar</Badge>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600"
+                                  onClick={() => handleDeleteStandardClause(clauseId)}
+                                  title="Eliminar cláusula"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
                             ) : (
                               <>
                                 <Textarea
@@ -1190,6 +1265,32 @@ export default function ContractTemplateConfig() {
                       </Card>
                     );
                   })}
+
+                  {/* Cláusulas eliminadas (restauración) */}
+                  {(deletedStandardClauses.length > 0 || deletedFinalSections.length > 0) && (
+                    <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-sm font-semibold text-amber-900 mb-3 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" />
+                        Cláusulas eliminadas ({deletedStandardClauses.length + deletedFinalSections.length})
+                      </p>
+                      <p className="text-xs text-amber-800 mb-3">Haz clic en una cláusula para restaurarla en la plantilla.</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[...deletedStandardClauses, ...deletedFinalSections].map(sec => (
+                          <Button
+                            key={sec.id}
+                            size="sm"
+                            variant="outline"
+                            className="bg-white"
+                            onClick={() => handleRestoreClause(sec.id)}
+                            title="Restaurar cláusula"
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            {sec.defaultTitle.replace(/:$/, "")}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </TabsContent>
 
                 {/* Textos Finales */}
@@ -1246,6 +1347,15 @@ export default function ContractTemplateConfig() {
                               placeholder={sec.defaultTitle}
                               rows={2}
                             />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() => handleDeleteFinalSection(fid)}
+                              title="Eliminar sección"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -1259,6 +1369,31 @@ export default function ContractTemplateConfig() {
                       </Card>
                     );
                   })}
+
+                  {/* Cláusulas eliminadas (restauración) */}
+                  {(deletedStandardClauses.length > 0 || deletedFinalSections.length > 0) && (
+                    <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-sm font-semibold text-amber-900 mb-3 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" />
+                        Cláusulas eliminadas ({deletedStandardClauses.length + deletedFinalSections.length})
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {[...deletedStandardClauses, ...deletedFinalSections].map(sec => (
+                          <Button
+                            key={sec.id}
+                            size="sm"
+                            variant="outline"
+                            className="bg-white"
+                            onClick={() => handleRestoreClause(sec.id)}
+                            title="Restaurar cláusula"
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            {sec.defaultTitle.replace(/:$/, "")}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </TabsContent>
               </Tabs>
 
@@ -1308,8 +1443,11 @@ export default function ContractTemplateConfig() {
                   "{employee_address}": "Av. Los Jardines 123, Miraflores, Lima",
                   "{position}": "Analista de Sistemas",
                   "{department}": "Tecnología",
+                  "{unidad_trabajo}": "Unidad de Sistemas",
                   "{start_date}": "01 de enero de 2026",
                   "{end_date}": "31 de diciembre de 2026",
+                  "{mes_inicio}": "enero de 2026",
+                  "{mes_final}": "diciembre de 2026",
                   "{salary}": "3,500.00",
                   "{salary_words}": "TRES MIL QUINIENTOS",
                   "{weekly_hours}": "48",

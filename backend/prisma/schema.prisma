@@ -284,6 +284,7 @@ model contract_template {
   standard_clause_order       Json?
   final_text_order            Json?
   unified_clause_order        Json?
+  excluded_clauses            Json?     @default("[]")
 }
 
 model cost_center {
