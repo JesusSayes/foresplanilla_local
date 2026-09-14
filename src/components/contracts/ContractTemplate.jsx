@@ -89,12 +89,17 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
 
   // Cargar el registro de la sede del empleado desde la entidad Site
   let siteRecord = null;
-  if (employee.site) {
+  const siteKey = (employee.site || contract.work_location || "").trim().toLowerCase();
+  if (siteKey) {
     try {
       const { base44 } = await import("@/api/base44Client");
       const sites = await base44.entities.Site?.list();
       if (sites && sites.length > 0) {
-        siteRecord = sites.find(s => s.name === employee.site && s.is_active !== false) || null;
+        // Búsqueda robusta: coincidir por nombre o código (case-insensitive, trim)
+        siteRecord = sites.find(s =>
+          (s.name || "").trim().toLowerCase() === siteKey ||
+          (s.code || "").trim().toLowerCase() === siteKey
+        ) || null;
       }
     } catch (error) {
       console.log("No se pudo cargar el registro de la sede");
