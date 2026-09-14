@@ -87,6 +87,20 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     representativeDoc: freshCompanyData.representativeDoc,
   };
 
+  // Cargar el registro de la sede del empleado desde la entidad Site
+  let siteRecord = null;
+  if (employee.site) {
+    try {
+      const { base44 } = await import("@/api/base44Client");
+      const sites = await base44.entities.Site?.list();
+      if (sites && sites.length > 0) {
+        siteRecord = sites.find(s => s.name === employee.site && s.is_active !== false) || null;
+      }
+    } catch (error) {
+      console.log("No se pudo cargar el registro de la sede");
+    }
+  }
+
   // Variables dinámicas para reemplazo
   const variables = {
     "{contract_type}": contract.contract_type,
@@ -106,7 +120,8 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     "{weekly_hours}": (contract.weekly_hours || 48).toString(),
     "{work_schedule}": contract.work_schedule || "Lunes a Viernes de 9:00 AM a 6:00 PM",
     "{work_location}": contract.work_location || employee.site || company.address,
-    "{sede}": employee.site || "",
+    "{sede}": siteRecord?.address || employee.site || "",
+    "{sede_name}": siteRecord?.name || employee.site || "",
     "{trial_period_days}": (contract.trial_period_days || 90).toString(),
     "{functions}": contract.functions || "",
     "{benefits}": contract.benefits || "",
