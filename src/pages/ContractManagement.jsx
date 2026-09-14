@@ -704,11 +704,21 @@ export default function ContractManagement() {
                           <Button size="sm" variant="outline" onClick={() => handleGeneratePDF(contract)} title="Generar PDF">
                             <Download className="w-4 h-4" />
                           </Button>
-                          {canManage && (
-                            <Button size="sm" variant="outline" onClick={() => handleEdit(contract)} title="Editar">
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                          )}
+                          {canManage && (() => {
+                            const isSigned = contract.is_digitally_signed || contract.signed_date;
+                            return (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isSigned}
+                                onClick={() => !isSigned && handleEdit(contract)}
+                                title={isSigned ? "Contrato firmado, no se puede editar" : "Editar"}
+                                className={isSigned ? "opacity-40 cursor-not-allowed" : ""}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            );
+                          })()}
                           {canSign && !contract.is_digitally_signed && (
                             <Button
                               size="sm"
