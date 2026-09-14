@@ -37,6 +37,7 @@ export const numberedTitle = (number, title) => {
 // Orden: Empleador (sin número) → Trabajador (sin número) → Cláusulas unificadas
 // (estándar + personalizadas intercaladas, 1..N) → Textos finales (continúa).
 export const buildOrderedSections = (template, customClauses = []) => {
+  const excluded = Array.isArray(template?.excluded_clauses) ? template.excluded_clauses : [];
   const normalizeOrder = (order, defaults) => [...new Set([
     ...(Array.isArray(order) ? order.filter(id => defaults.includes(id)) : []),
     ...defaults,
@@ -70,9 +71,9 @@ export const buildOrderedSections = (template, customClauses = []) => {
     clauseIds = unifiedOrder.filter(
       (id) => STANDARD_SECTIONS.some((s) => s.id === id) || customIds.includes(id)
     );
-    // Agregar IDs estándar faltantes (backward compat)
+    // Agregar IDs estándar faltantes (backward compat), excepto los excluidos
     for (const sid of DEFAULT_STANDARD_ORDER) {
-      if (!clauseIds.includes(sid)) clauseIds.push(sid);
+      if (!clauseIds.includes(sid) && !excluded.includes(sid)) clauseIds.push(sid);
     }
     // Agregar custom nuevos no presentes en el orden guardado
     for (const cid of customIds) {
@@ -86,6 +87,7 @@ export const buildOrderedSections = (template, customClauses = []) => {
 
   // Renderizar cláusulas en orden unificado
   for (const id of new Set(clauseIds)) {
+    if (excluded.includes(id)) continue;
     const stdSec = STANDARD_SECTIONS.find((s) => s.id === id);
     if (stdSec) {
       sections.push({
@@ -108,8 +110,9 @@ export const buildOrderedSections = (template, customClauses = []) => {
     }
   }
 
-  // Textos finales (continúan la numeración)
+  // Textos finales (continúan la numeración), excluyendo los eliminados
   for (const fid of finalOrder) {
+    if (excluded.includes(fid)) continue;
     const sec = FINAL_SECTIONS.find((s) => s.id === fid);
     if (sec) {
       sections.push({

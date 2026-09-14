@@ -146,3 +146,30 @@ test('autorizar HE guarda estado y resolución en una transacción sin campos nu
   assert.equal(saved, true);
   assert.equal(res.body.resolution_notes, 'Aceptadas');
 });
+
+test('exclusiones omiten secciones sin perder orden ni numeración al restaurarlas', () => {
+  for (const order of [{}, { unified_clause_order: ['salary', 'object', 'salary'] }]) {
+    const template = { ...order, final_text_order: ['domicile'], excluded_clauses: ['salary', 'domicile'] };
+    const sections = buildOrderedSections(template);
+    assert.ok(!sections.some(s => ['salary', 'domicile'].includes(s.id)));
+    assert.deepEqual(sections.filter(s => s.number).map(s => s.number), [1, 2, 3, 4, 5, 6, 7]);
+    const restored = buildOrderedSections({ ...template, excluded_clauses: [] });
+    assert.equal(restored.filter(s => s.id === 'salary').length, 1);
+    assert.equal(restored.filter(s => s.id === 'domicile').length, 1);
+  }
+});
+
+test('API guarda y restaura exclusiones y rechaza valores inválidos sin escribir', async t => {
+  const db = t.mock.method(pool, 'query', async (sql, values) => {
+    assert.match(sql, /"excluded_clauses"/);
+    assert.ok(values.includes('["salary","domicile"]') || values.includes('[]'));
+    return { rows: [{ id: 'abc123', excluded_clauses: values.includes('[]') ? [] : ['salary', 'domicile'] }] };
+  });
+  assert.equal((await call(templates.update, { excluded_clauses: ['salary', 'domicile'] })).statusCode, 200);
+  assert.deepEqual((await call(templates.update, { excluded_clauses: [] })).body.excluded_clauses, []);
+  assert.equal((await call(templates.create, { excluded_clauses: ['salary', 'domicile'], template_name: 'Nueva' })).statusCode, 201);
+  for (const value of ['salary', [42], ['unknown'], ['salary', 'salary'], ['']]) {
+    assert.equal((await call(templates.update, { excluded_clauses: value })).statusCode, 400);
+  }
+  assert.equal(db.mock.callCount(), 3);
+});
