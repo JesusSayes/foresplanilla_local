@@ -179,6 +179,13 @@
         "type": "string"
       },
       "description": "Orden de los textos finales (IDs: obligations, benefits, termination, domicile). Define el orden de aparici\u00f3n y la numeraci\u00f3n autom\u00e1tica continua despu\u00e9s de las cl\u00e1usulas (est\u00e1ndar + personalizadas)."
+    },
+    "excluded_clauses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de cl\u00e1usulas est\u00e1ndar (object, functions, duration, salary, schedule) y textos finales (obligations, benefits, termination, domicile) excluidos de la plantilla. Estas cl\u00e1usulas no aparecen en la vista previa ni en el PDF generado, pero sus textos se conservan para restauraci\u00f3n posterior."
     }
   },
   "required": [
