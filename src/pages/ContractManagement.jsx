@@ -359,8 +359,8 @@ export default function ContractManagement() {
       c.contract_number?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     const matchesStatus = statusFilter === "all" || c.status === statusFilter;
-    const isSigned = !!(c.is_digitally_signed || c.signed_date);
-    const matchesSign = signatureFilter === "all" || (c.status === "Vigente" && (signatureFilter === "signed" ? isSigned : !isSigned));
+    const isSigned = !!c.is_digitally_signed;
+    const matchesSign = signatureFilter === "all" || (signatureFilter === "signed" ? isSigned : !isSigned);
     // Filtro de sede (selector UI)
     const matchesSite = siteFilterContracts === "all" || emp.site === siteFilterContracts;
 
@@ -389,21 +389,28 @@ export default function ContractManagement() {
   const totalPages = Math.ceil(filteredContracts.length / PAGE_SIZE);
   const paginatedContracts = filteredContracts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  // Cálculo de estadísticas — coherente con los filtros disponibles:
-  // Vigentes/Vencidos filtran por status; Por Vencer usa Vigente + end_date ≤ 30 días;
-  // Firmados/Pendiente Firma solo cuentan contratos Vigentes (consistencia con el filtro de firma).
+  // Cálculo de estadísticas — sobre el universo filtrado por sede accesible
+  // (sin filtros transitorios), usando los mismos criterios que los badges de la tabla:
+  // firmados = is_digitally_signed; pendienteFirma = !is_digitally_signed (sin importar status).
   const todayForExpiry = parseDateLima(todayLima());
+  const scopedContracts = contracts.filter(c => {
+    const emp = allEmployees.find(e => e.id === c.employee_id);
+    if (!emp) return false;
+    if (accessibleSites === undefined) return false;
+    if (isSiteRestricted && !accessibleSites.includes(emp.site)) return false;
+    return true;
+  });
   const stats = {
-    vigentes: contracts.filter(c => c.status === "Vigente").length,
-    vencidos: contracts.filter(c => c.status === "Vencido").length,
-    porVencer30: contracts.filter(c => {
+    vigentes: scopedContracts.filter(c => c.status === "Vigente").length,
+    vencidos: scopedContracts.filter(c => c.status === "Vencido").length,
+    porVencer30: scopedContracts.filter(c => {
       if (c.status !== "Vigente" || !c.end_date) return false;
       const endDate = parseDateLima(c.end_date.split("T")[0]);
       const days = Math.ceil((endDate - todayForExpiry) / (1000 * 60 * 60 * 24));
       return days > 0 && days <= 30;
     }).length,
-    firmados: contracts.filter(c => c.status === "Vigente" && (c.is_digitally_signed || c.signed_date)).length,
-    pendienteFirma: contracts.filter(c => c.status === "Vigente" && !c.is_digitally_signed && !c.signed_date).length,
+    firmados: scopedContracts.filter(c => c.is_digitally_signed).length,
+    pendienteFirma: scopedContracts.filter(c => !c.is_digitally_signed).length,
   };
 
   const getStatusConfig = (status) => ({
