@@ -705,14 +705,14 @@ export default function ContractManagement() {
                             <Download className="w-4 h-4" />
                           </Button>
                           {canManage && (() => {
-                            const isSigned = contract.is_digitally_signed || contract.signed_date;
+                            const isSigned = !!contract.is_digitally_signed;
                             return (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 disabled={isSigned}
                                 onClick={() => !isSigned && handleEdit(contract)}
-                                title={isSigned ? "Contrato firmado, no se puede editar" : "Editar"}
+                                title={isSigned ? "Contrato firmado digitalmente, no se puede editar" : "Editar"}
                                 className={isSigned ? "opacity-40 cursor-not-allowed" : ""}
                               >
                                 <Edit className="w-4 h-4" />
