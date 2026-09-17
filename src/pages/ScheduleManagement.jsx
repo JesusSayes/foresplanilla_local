@@ -99,14 +99,19 @@ export default function ScheduleManagement() {
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["scheduleAccessibleEmployees", currentUser?.employee?.id],
     queryFn: async () => {
-      const employees = await entitiesAPI.Employee.accessible([
+      // Usar el mismo alcance de lectura que GET /api/attendance/schedules.
+      return await entitiesAPI.Employee.accessible([
         "schedules.view",
         "schedules.create",
         "schedules.edit",
         "schedules.assign",
         "schedules.delete",
+        "attendance.view_all",
+        "attendance.view_department",
+        "attendance.manage",
+        "attendance.approve_edits",
+        "attendance.approve_incidents",
       ]);
-      return employees.filter(employee => employee.status === "Activo");
     },
   });
 
@@ -394,14 +399,15 @@ export default function ScheduleManagement() {
     setShowAssignForm(false);
   };
 
-  const departments = [...new Set(allEmployees.map(e => e.department_name))].filter(Boolean);
+  const activeEmployees = allEmployees.filter(employee => employee.status === "Activo");
+  const departments = [...new Set(activeEmployees.map(e => e.department_name))].filter(Boolean);
 
   const individualAssignments = assignments.filter(s => s.employee_id);
   const departmentAssignments = assignments.filter(s => (s.departments?.length > 0 || s.department_name) && !s.employee_id);
 
   // Empleados con y sin horario asignado
   const employeesWithSchedule = individualAssignments.map(s => s.employee_id);
-  const employeesWithoutSchedule = allEmployees.filter(emp => !employeesWithSchedule.includes(emp.id));
+  const employeesWithoutSchedule = activeEmployees.filter(emp => !employeesWithSchedule.includes(emp.id));
 
   // Departamentos con y sin horario asignado
   const assignedDepartments = [...new Set(
@@ -456,7 +462,9 @@ export default function ScheduleManagement() {
   });
 
   // En modo edición mostrar todos los empleados; en creación solo los sin horario
-  const employeePoolForAssign = editingAssignment ? allEmployees : employeesWithoutSchedule;
+  const employeePoolForAssign = editingAssignment
+    ? allEmployees.filter(emp => emp.status === "Activo" || emp.id === editingAssignment.employee_id)
+    : employeesWithoutSchedule;
   const filteredEmployeesWithoutSchedule = employeePoolForAssign.filter(emp => {
     const searchLower = employeeSearch.toLowerCase();
     return emp.first_name.toLowerCase().includes(searchLower) ||
@@ -955,7 +963,7 @@ export default function ScheduleManagement() {
                               ) : (
                               <div className="space-y-3">
                               {filtered.map(dept => {
-                              const empCount = allEmployees.filter(e => e.department_name === dept).length;
+                              const empCount = activeEmployees.filter(e => e.department_name === dept).length;
                               return (
                               <div key={dept} className="p-4 border border-amber-200 bg-amber-50/30 rounded-lg hover:shadow-md transition-all">
                               <div className="flex items-center justify-between">
