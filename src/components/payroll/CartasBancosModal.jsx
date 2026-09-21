@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Building2, Printer, FileSpreadsheet, X, Users, DollarSign } from "lucide-react";
+import { Building2, Printer, FileSpreadsheet, X, Users, DollarSign, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import * as XLSX from "xlsx";
@@ -56,8 +56,8 @@ export default function CartasBancosModal({ grupo, allEmployees, companyInfo, ba
       </tr>
     `).join("");
 
-    const html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"/><title>Carta ${bankGroup.bankName} - ${grupo.period}</title>
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset="UTF-8"/><title>Carta ${bankGroup.bankName} - ${grupo.period}</title>
 <style>
   @page { size: A4 portrait; margin: 25mm 20mm; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; line-height: 1.6; }
@@ -123,17 +123,17 @@ export default function CartasBancosModal({ grupo, allEmployees, companyInfo, ba
     <strong>Total a cargar:</strong> S/ ${bankGroup.total.toFixed(2)} (${bankGroup.items.length} trabajador(es))
   </div>
 
-  <script>window.onload=function(){window.print();}</script>
 </body></html>`;
 
-    const win = window.open("", "_blank");
-    if (!win) {
-      alert("Permita las ventanas emergentes para imprimir.");
-      setPrinting(null);
-      return;
-    }
-    win.document.write(html);
-    win.document.close();
+    const blob = new Blob(["\ufeff" + html], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Carta_${bankGroup.bankName.replace(/\s+/g, "_")}_${grupo.period.replace(/\s+/g, "_")}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     setPrinting(null);
   };
 
@@ -227,8 +227,8 @@ export default function CartasBancosModal({ grupo, allEmployees, companyInfo, ba
                             disabled={printing === bg.bankName}
                             onClick={() => handlePrintCarta(bg)}
                           >
-                            <Printer className="w-3.5 h-3.5 mr-1" />
-                            {printing === bg.bankName ? "Generando..." : "Carta + Anexo"}
+                            <FileText className="w-3.5 h-3.5 mr-1" />
+                            {printing === bg.bankName ? "Generando..." : "Carta Word"}
                           </Button>
                           <Button
                             size="sm"
