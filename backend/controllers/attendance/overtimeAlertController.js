@@ -136,6 +136,8 @@ export const filter = async (req, res) => {
       where.employee_id = filters.employee_id
     }
 
+    if (filters.attendance_record_id) where.attendance_record_id = filters.attendance_record_id
+
     if (filters.status)
       where.status = filters.status
 

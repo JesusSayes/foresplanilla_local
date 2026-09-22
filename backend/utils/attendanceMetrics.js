@@ -23,20 +23,35 @@ export const getSegmentClockTimes = (record) => {
     ["clock_in_3", "clock_out_3"],
     ["clock_in_4", "clock_out_4"],
   ];
-  const clockIns = [];
-  const clockOuts = [];
+  const start = toMin(record.scheduled_start);
+  const end = toMin(record.scheduled_end);
+  const nightShift = Boolean(record.scheduled_start && record.scheduled_end) && end < start;
+  const chronological = value => {
+    const minutes = toMin(value);
+    return nightShift && minutes < (start + end) / 2 ? minutes + 1440 : minutes;
+  };
+  let firstClockInMin = null;
+  let lastClockOutMin = null;
   for (const [inField, outField] of segFields) {
     const ci = record[inField] ? String(record[inField]).slice(0, 5) : null;
     const co = record[outField] ? String(record[outField]).slice(0, 5) : null;
-    if (ci) clockIns.push(ci);
-    if (co) clockOuts.push(co);
+    if (ci) {
+      const inMin = chronological(ci);
+      if (firstClockInMin === null || inMin < firstClockInMin) firstClockInMin = inMin;
+    }
+    if (co) {
+      let outMin = chronological(co);
+      // If clock_out < clock_in of the same segment, it crosses midnight
+      if (ci) {
+        const inMin = chronological(ci);
+        if (outMin < inMin) outMin += 1440;
+      }
+      if (lastClockOutMin === null || outMin > lastClockOutMin) lastClockOutMin = outMin;
+    }
   }
-  clockIns.sort((a, b) => toMin(a) - toMin(b));
-  clockOuts.sort((a, b) => toMin(a) - toMin(b));
-  return {
-    firstClockIn: clockIns[0] || null,
-    lastClockOut: clockOuts[clockOuts.length - 1] || null,
-  };
+  const firstClockIn = firstClockInMin !== null ? fromMin(firstClockInMin % 1440) : null;
+  const lastClockOut = lastClockOutMin !== null ? fromMin(lastClockOutMin % 1440) : null;
+  return { firstClockIn, lastClockOut };
 };
 
 export function calcEffectiveMetrics({
@@ -60,7 +75,9 @@ export function calcEffectiveMetrics({
 
   const norm = (t) => {
     if (!isNightShift) return t;
-    return (t - schedStartMin + 1440) % 1440;
+    return t < (schedStartMin + schedEndMin) / 2
+      ? t + 1440 - schedStartMin
+      : t - schedStartMin;
   };
 
   const normSchedStart = isNightShift ? 0 : schedStartMin;
@@ -82,93 +99,142 @@ export function calcEffectiveMetrics({
   }
   const fullDayMins = Math.max(0, fullJornada - effectiveBreakMin);
 
+  // ── Build intervals in normalized space ─────────────────────────────────
+  // Clock intervals: real marked time (all segments). NOT clipped to schedule
+  // — pre-shift and post-shift time is preserved for additional-time calc.
+  // Justified intervals: approved incidents (within schedule).
+  // Kept separate so raw worked hours reflect only real presence and
+  // justified hours are reported independently (per requirement).
   const segFields = [
     ["clock_in", "clock_out"],
     ["clock_in_2", "clock_out_2"],
     ["clock_in_3", "clock_out_3"],
     ["clock_in_4", "clock_out_4"],
   ];
-  const rawIntervals = [];
+  const clockIntervals = [];
   for (const [inField, outField] of segFields) {
-    const ci = record?.[inField] ? String(record[inField]).slice(0, 5) : null;
+    const ci = record?.[inField]  ? String(record[inField]).slice(0, 5)  : null;
     const co = record?.[outField] ? String(record[outField]).slice(0, 5) : null;
     if (ci && co) {
-      let nIn = norm(toMin(ci));
+      let nIn  = norm(toMin(ci));
       let nOut = norm(toMin(co));
-      if (isNightShift && nIn > fullJornada) nIn = 0;
-      if (nOut >= nIn) rawIntervals.push([nIn, nOut]);
-    } else if (ci) {
-      let nIn = norm(toMin(ci));
-      if (isNightShift && nIn > fullJornada) nIn = 0;
-      rawIntervals.push([nIn, normSchedEnd]);
-    }
-  }
 
+      // Midnight-crossing segment (even for diurnal shifts):
+      // if clock_out < clock_in, the end is the next day.
+      if (nOut < nIn) nOut += 1440;
+      if (nOut >= nIn) clockIntervals.push([nIn, nOut]);
+    }
+    // Marcaciones incompletas (solo entrada, sin salida): NO se inventa una
+    // salida. El segmento no contribuye a horas trabajadas ni a cobertura.
+    // La tardanza sí se calcula desde la entrada (ver sección de tardanza).
+  }
+  const justifiedIntervals = [];
   for (const inc of approvedIncidents) {
     if (inc.full_day_justification) {
-      rawIntervals.push([normSchedStart, normSchedEnd]);
+      justifiedIntervals.push([normSchedStart, normSchedEnd]);
     } else {
       let jStart = norm(toMin(inc.justified_time_start || schedStart));
-      let jEnd = norm(toMin(inc.justified_time_end || schedEnd));
-      if (isNightShift && jStart > fullJornada) jStart = 0;
-      if (jEnd > jStart) rawIntervals.push([jStart, jEnd]);
+      let jEnd   = norm(toMin(inc.justified_time_end   || schedEnd));
+
+      if (jEnd > jStart) justifiedIntervals.push([jStart, jEnd]);
     }
   }
 
-  const clipped = rawIntervals
-    .map(([s, e]) => [Math.max(s, normSchedStart), Math.min(e, normSchedEnd)])
-    .filter(([s, e]) => e > s);
-  clipped.sort((a, b) => a[0] - b[0]);
-
-  const merged = [];
-  for (const [s, e] of clipped) {
-    if (merged.length === 0 || s > merged[merged.length - 1][1]) {
-      merged.push([s, e]);
-    } else {
-      merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], e);
+  // ── Pure helpers for interval math (reusable, documented) ───────────────
+  /** Union-merge a list of [start, end] intervals (removes overlaps). */
+  const mergeIntervals = (intervals) => {
+    const sorted = [...intervals].filter(([s, e]) => e > s).sort((a, b) => a[0] - b[0]);
+    const out = [];
+    for (const [s, e] of sorted) {
+      if (out.length === 0 || s > out[out.length - 1][1]) out.push([s, e]);
+      else out[out.length - 1][1] = Math.max(out[out.length - 1][1], e);
     }
+    return out;
+  };
+  /** Total duration (minutes) of merged intervals. */
+  const unionDuration = (merged) => merged.reduce((sum, [s, e]) => sum + (e - s), 0);
+  /** Minutes of break that overlap the given merged intervals. */
+  const breakOverlapWith = (merged) => {
+    if (normBreakStartVal === null || breakMinutes <= 0) return 0;
+    const bEnd = normBreakStartVal + breakMinutes;
+    let ov = 0;
+    for (const [s, e] of merged) {
+      const oS = Math.max(s, normBreakStartVal);
+      const oE = Math.min(e, bEnd);
+      if (oE > oS) ov += (oE - oS);
+    }
+    return ov;
+  };
+  /** Duration (minutes) of merged intervals within [lo, hi]. */
+  const intersectionDuration = (merged, lo, hi) => {
+    let total = 0;
+    for (const [s, e] of merged) {
+      const iS = Math.max(s, lo);
+      const iE = Math.min(e, hi);
+      if (iE > iS) total += (iE - iS);
+    }
+    return total;
+  };
+  /** Duration (minutes) of merged intervals outside [lo, hi] (before + after). */
+  const outsideDuration = (merged, lo, hi) => {
+    let total = 0;
+    for (const [s, e] of merged) {
+      if (s < lo) total += Math.min(e, lo) - s;
+      if (e > hi) total += e - Math.max(s, hi);
+    }
+    return Math.max(0, total);
+  };
+
+  // ── Merge clock intervals (real marked time, no duplication) ────────────
+  const mergedClock = mergeIntervals(clockIntervals);
+
+  // ── Break deduction for raw clock time (applied once) ───────────────────
+  // When breakStart is known: deduct only the overlap with clock intervals.
+  // When breakStart is null: deduct the flat break amount (once).
+  let rawBreakMin;
+  if (normBreakStartVal !== null && breakMinutes > 0) {
+    rawBreakMin = breakOverlapWith(mergedClock);
+  } else if (breakMinutes > 0) {
+    rawBreakMin = effectiveBreakMin;
+  } else {
+    rawBreakMin = 0;
   }
 
-  let coverageMins = 0;
-  for (const [s, e] of merged) {
-    let segMins = e - s;
-    if (normBreakStartVal !== null && breakMinutes > 0) {
-      const overlapStart = Math.max(s, normBreakStartVal);
-      const overlapEnd = Math.min(e, normBreakStartVal + breakMinutes);
-      if (overlapEnd > overlapStart) segMins -= (overlapEnd - overlapStart);
-    }
-    coverageMins += Math.max(0, segMins);
-  }
+  // ── Raw worked hours: union of clock segments minus break (once) ────────
+  // NOT capped at fullDayMins — reflects total real presence time.
+  const rawWorkedMin = Math.max(0, unionDuration(mergedClock) - rawBreakMin);
 
+  // ── Ordinary hours: marked time within schedule, minus break ────────────
+  const rawOrdinaryMin = Math.max(0,
+    intersectionDuration(mergedClock, normSchedStart, normSchedEnd) - rawBreakMin
+  );
+
+  // ── Additional minutes: marked time outside schedule (before + after) ──
+  // Separated from authorized HE. Authorization does NOT alter this value.
+  const additionalMin = outsideDuration(mergedClock, normSchedStart, normSchedEnd);
+
+  // ── Coverage: clock + justified (union), clipped to schedule ────────────
+  // Used for payroll worked-hours (ordinary + justified within jornada).
+  const mergedCoverage = mergeIntervals([...clockIntervals, ...justifiedIntervals]);
+  const mergedCoverageClipped = mergeIntervals(
+    mergedCoverage.map(([s, e]) => [Math.max(s, normSchedStart), Math.min(e, normSchedEnd)])
+  );
+  let coverageMins = Math.max(0, unionDuration(mergedCoverageClipped) - breakOverlapWith(mergedCoverageClipped));
   if (normBreakStartVal === null && breakMinutes > 0 && coverageMins > fullJornada / 2) {
     coverageMins = Math.max(0, coverageMins - effectiveBreakMin);
   }
-
-  const totalWorkedMins = Math.min(coverageMins, fullDayMins);
+  const totalWorkedMins  = Math.min(coverageMins, fullDayMins);
   const totalWorkedHours = totalWorkedMins / 60;
 
-  let rawWorkedMin = 0;
-  for (const [inField, outField] of segFields) {
-    const ci = record?.[inField] ? String(record[inField]).slice(0, 5) : null;
-    const co = record?.[outField] ? String(record[outField]).slice(0, 5) : null;
-    if (ci && co) {
-      let nIn = norm(toMin(ci));
-      let nOut = norm(toMin(co));
-      if (isNightShift && nIn > fullJornada) nIn = 0;
-      rawWorkedMin += Math.max(0, nOut >= nIn ? nOut - nIn : 0);
-    }
-  }
-  rawWorkedMin = Math.max(0, rawWorkedMin - effectiveBreakMin);
-  rawWorkedMin = Math.min(rawWorkedMin, fullDayMins);
-
-  const justifiedHours = Math.max(0, totalWorkedHours - rawWorkedMin / 60);
+  // ── Justified hours: ordinary coverage not coming from real marks ──────
+  const justifiedHours = Math.max(0, totalWorkedHours - rawOrdinaryMin / 60);
 
   let earliestClockInNorm = null;
   for (const [inField] of segFields) {
     const ci = record?.[inField] ? String(record[inField]).slice(0, 5) : null;
     if (!ci) continue;
     let nIn = norm(toMin(ci));
-    if (isNightShift && nIn > fullJornada) nIn = 0;
+
     if (earliestClockInNorm === null || nIn < earliestClockInNorm) {
       earliestClockInNorm = nIn;
     }
@@ -187,7 +253,7 @@ export function calcEffectiveMetrics({
       break;
     }
     let jStart = norm(toMin(inc.justified_time_start || schedStart));
-    if (isNightShift && jStart > fullJornada) jStart = 0;
+
     if (effectiveStartMin === null || jStart < effectiveStartMin) {
       effectiveStartMin = jStart;
     }
@@ -200,6 +266,8 @@ export function calcEffectiveMetrics({
 
   return {
     rawWorkedHours: rawWorkedMin / 60,
+    ordinaryHours: rawOrdinaryMin / 60,
+    additionalMinutes: additionalMin,
     justifiedHours,
     totalWorkedHours,
     fullDayHours: fullDayMins / 60,
@@ -207,9 +275,52 @@ export function calcEffectiveMetrics({
     remainingLateMinutes,
     lateMinutesJustified: Math.max(0, baseLateMin - remainingLateMinutes),
     coverageMinutes: totalWorkedMins,
-    intervals: merged,
+    intervals: mergedCoverageClipped,
   };
 }
+
+export const getAdditionalMinutes = (record) => {
+  if (!record || !record.scheduled_end) return 0;
+  const schedStartMin = toMin(record.scheduled_start || "00:00");
+  const schedEndMin   = toMin(record.scheduled_end);
+  const isNightShift  = schedEndMin < schedStartMin;
+  const fullJornada   = isNightShift
+    ? (schedEndMin - schedStartMin + 1440)
+    : Math.max(0, schedEndMin - schedStartMin);
+  const norm = (t) => isNightShift
+    ? (t < (schedStartMin + schedEndMin) / 2 ? t + 1440 : t) - schedStartMin
+    : t;
+  const normSchedEnd = isNightShift ? fullJornada : schedEndMin;
+
+  const segFields = [
+    ["clock_in", "clock_out"],
+    ["clock_in_2", "clock_out_2"],
+    ["clock_in_3", "clock_out_3"],
+    ["clock_in_4", "clock_out_4"],
+  ];
+  const intervals = [];
+  for (const [inField, outField] of segFields) {
+    const ci = record[inField]  ? String(record[inField]).slice(0, 5)  : null;
+    const co = record[outField] ? String(record[outField]).slice(0, 5) : null;
+    if (!ci || !co) continue;
+    let nIn  = norm(toMin(ci));
+    let nOut = norm(toMin(co));
+
+    if (nOut < nIn) nOut += 1440; // midnight crossing
+    if (nOut > normSchedEnd) {
+      intervals.push([Math.max(nIn, normSchedEnd), nOut]);
+    }
+  }
+  // Merge overlapping intervals (no duplication)
+  intervals.sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const [s, e] of intervals) {
+    if (merged.length === 0 || s > merged[merged.length - 1][1]) merged.push([s, e]);
+    else merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], e);
+  }
+  return merged.reduce((sum, [s, e]) => sum + (e - s), 0);
+};
+
 
 export function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
   const targetDate = toDateString(dateStr);
@@ -303,29 +414,14 @@ export function calcularMetricas(record, schedule, dateStr, overtimeAuthorized, 
   let overtimeHours25 = 0;
   let overtimeHours35 = 0;
 
-  if (effective.rawWorkedHours > 0) {
-    const scheduledStartMin = toMin(scheduledStart);
-    const scheduledEndMin = toMin(scheduledEnd);
-    const isNightShift = scheduledEndMin < scheduledStartMin;
-    const fullJornada = isNightShift
-      ? (scheduledEndMin - scheduledStartMin + 1440)
-      : Math.max(0, scheduledEndMin - scheduledStartMin);
-    const norm = (minutes) => isNightShift
-      ? (minutes - scheduledStartMin + 1440) % 1440
-      : minutes;
-    const normSchedStart = isNightShift ? 0 : scheduledStartMin;
-    const normSchedEnd = isNightShift ? fullJornada : scheduledEndMin;
-    const normIn = norm(toMin(firstClockIn));
-    const effectiveNormIn = (isNightShift && normIn > fullJornada) ? 0 : normIn;
-    const effectiveBreakMinutes = fullJornada < 360 ? 0 : breakMinutes;
-
-    const effectiveStart = Math.max(effectiveNormIn, normSchedStart);
-    const regularMinutesMax = Math.max(0, normSchedEnd - effectiveStart - effectiveBreakMinutes);
-    const extraHours = Math.max(0, effective.rawWorkedHours - regularMinutesMax / 60);
-    if (overtimeAuthorized) {
-      overtimeHours25 = Math.min(extraHours, 2);
-      overtimeHours35 = Math.max(0, extraHours - 2);
-    }
+  if (overtimeAuthorized) {
+    const extraHours = getAdditionalMinutes({
+      ...record,
+      scheduled_start: scheduledStart,
+      scheduled_end: scheduledEnd,
+    }) / 60;
+    overtimeHours25 = Math.min(extraHours, 2);
+    overtimeHours35 = Math.max(0, extraHours - 2);
   }
 
   const workedHours = regularHours + overtimeHours25 + overtimeHours35;

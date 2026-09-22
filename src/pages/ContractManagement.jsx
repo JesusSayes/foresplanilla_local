@@ -232,6 +232,14 @@ export default function ContractManagement() {
       toast.error("Completa los campos obligatorios");
       return;
     }
+    if (contractTemplates.length > 0 && !formData.template_id) {
+      toast.error("Selecciona una plantilla de contrato");
+      return;
+    }
+    if (formData.contract_type !== "Indeterminado" && !formData.end_date) {
+      toast.error("La fecha de fin es obligatoria para contratos a plazo fijo");
+      return;
+    }
     const dataToSave = {
       ...formData,
       salary: parseFloat(formData.salary) || 0,
@@ -841,7 +849,7 @@ export default function ContractManagement() {
                     {contractTemplates.length > 0 && (
                       <div>
                         <Label className="flex items-center gap-1">
-                          <FileText className="w-4 h-4" />Plantilla
+                          <FileText className="w-4 h-4" />Plantilla *
                         </Label>
                         <Select
                           value={formData.template_id}
@@ -864,7 +872,7 @@ export default function ContractManagement() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div><Label>Fecha de Inicio *</Label><Input type="date" value={formData.start_date} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} /></div>
                     {formData.contract_type !== "Indeterminado" && (
-                      <div><Label>Fecha de Fin</Label><Input type="date" value={formData.end_date} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} /></div>
+                      <div><Label>Fecha de Fin *</Label><Input type="date" value={formData.end_date} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} /></div>
                     )}
                     <div><Label>Fecha de Firma</Label><Input type="date" value={formData.signed_date} onChange={(e) => setFormData({ ...formData, signed_date: e.target.value })} /></div>
                   </div>

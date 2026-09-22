@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { calcEffectiveMetrics, getSegmentClockTimes, getAdditionalMinutes } from "@/lib/attendanceMetrics";
 import { isEmploymentDateValid } from "@/lib/employmentDate";
+import { syncOvertimeAlert, syncOvertimeAlertsBatch } from "@/lib/overtimeAlertSync";
 import TardinessCompensationModal from "../components/attendance/TardinessCompensationModal";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
@@ -143,7 +144,7 @@ export default function AttendanceManagement() {
     },
   });
 
-  const { data: todayRecords = [] } = useQuery({
+  const { data: todayRecords = [], refetch: refetchTodayRecords } = useQuery({
     queryKey: ["todayAttendance", selectedDate, dateFrom, dateTo, isRangeMode],
     queryFn: async () => {
       if (isRangeMode && dateFrom && dateTo) {
@@ -417,8 +418,10 @@ export default function AttendanceManagement() {
 
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  // Calcular preview de métricas en tiempo real para el modal de edición
-  // Soporta turnos nocturnos (schedEnd < schedStart)
+  // Vista previa de métricas para el modal de edición.
+  // Usa las mismas funciones que la tabla (calcEffectiveMetrics + getAdditionalMinutes)
+  // para garantizar consistencia. Solo edita segmento 1; conserva segmentos 2-4
+  // del registro original. No inventa salida si falta clock_out.
   const calcEditPreview = (clockIn, clockOut, recordDate, employeeId) => {
     if (!clockIn) return null;
     const schedule = getEmployeeScheduleForDate(employeeId, recordDate);
@@ -429,46 +432,43 @@ export default function AttendanceManagement() {
     const scheduledEnd    = schedule ? (schedule[dayEndMap[dow]]   || "18:00") : "18:00";
     const breakMinutes    = schedule?.break_duration_minutes ?? 60;
     const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
-    const overtimeAuthorized = schedule?.overtime_authorized ?? false;
+    const overtimeAuthorized = editingRecord?.overtime_authorized ?? schedule?.overtime_authorized ?? false;
 
-    const toM = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-    const inTotal       = toM(clockIn);
-    const schedTotal    = toM(scheduledStart);
-    const schedEndTotal = toM(scheduledEnd);
+    // Registro temporal: segmento 1 editado + segmentos 2-4 preservados
+    const tempRecord = {
+      ...editingRecord,
+      clock_in: clockIn,
+      clock_out: clockOut || null,
+      scheduled_start: scheduledStart,
+      scheduled_end: scheduledEnd,
+    };
 
-    const isNightShift = schedEndTotal < schedTotal;
-    const fullJornada = isNightShift ? (schedEndTotal - schedTotal + 1440) : Math.max(0, schedEndTotal - schedTotal);
-    const effectiveBreakMinutes = fullJornada < 360 ? 0 : breakMinutes;
-    const norm = (t) => isNightShift ? (t - schedTotal + 1440) % 1440 : t;
-    const normSchedStart = isNightShift ? 0 : schedTotal;
-    const normSchedEnd   = isNightShift ? fullJornada : schedEndTotal;
+    const metrics = calcEffectiveMetrics({
+      record: tempRecord,
+      approvedIncidents: [],
+      schedStart: scheduledStart,
+      schedEnd: scheduledEnd,
+      breakMinutes,
+      breakStart: schedule?.break_start || null,
+      isUnscheduledDay: false,
+    });
 
-    const normIn = norm(inTotal);
-    const rawLate = (normIn <= fullJornada) ? Math.max(0, normIn - normSchedStart) : 0;
-    const lateMinutes = rawLate > toleranceMinutes ? rawLate : 0;
+    const lateMinutes = applyLateTolerance(metrics.remainingLateMinutes, toleranceMinutes);
+    const workedHours = metrics.rawWorkedHours;
+    const regularHours = metrics.ordinaryHours;
 
-    let workedHours = 0, regularHours = 0, overtimeHours25 = 0, overtimeHours35 = 0;
-    if (clockOut) {
-      const outTotal = toM(clockOut);
-      const normOut = norm(outTotal);
-      const effectiveNormIn = (isNightShift && normIn > fullJornada) ? 0 : normIn;
-
-      const totalMinutes = (normOut >= effectiveNormIn ? normOut - effectiveNormIn : 0) - effectiveBreakMinutes;
-      workedHours = Math.max(0, totalMinutes / 60);
-      const effectiveStart = Math.max(effectiveNormIn, normSchedStart);
-      const regularMinutes = Math.max(0, normSchedEnd - effectiveStart - effectiveBreakMinutes);
-      const normalHoursMax = regularMinutes / 60;
-      if (workedHours <= normalHoursMax) {
-        regularHours = workedHours;
-      } else {
-        regularHours = normalHoursMax;
-        const extraHours = workedHours - normalHoursMax;
-        if (overtimeAuthorized) {
-          overtimeHours25 = Math.min(extraHours, 2);
-          overtimeHours35 = Math.max(0, extraHours - 2);
-        }
+    // HE: solo si hay clock_out (segmento completo) y autorización.
+    // Usa getAdditionalMinutes (post-jornada, todos los segmentos, medianoche).
+    let overtimeHours25 = 0, overtimeHours35 = 0;
+    if (clockOut && overtimeAuthorized) {
+      const addMin = getAdditionalMinutes(tempRecord);
+      const extraHours = addMin / 60;
+      if (extraHours > 0) {
+        overtimeHours25 = Math.min(extraHours, 2);
+        overtimeHours35 = Math.max(0, extraHours - 2);
       }
     }
+
     return { scheduledStart, scheduledEnd, lateMinutes, isLate: lateMinutes > 0, workedHours, regularHours, overtimeHours25, overtimeHours35, overtimeAuthorized };
   };
 
@@ -490,81 +490,24 @@ export default function AttendanceManagement() {
         is_absent: editingRecord.status === "Ausente",
       });
 
-      // 2. Si hay entrada Y salida, verificar si existen HE sin autorización
-      if (clockIn && clockOut) {
-        const schedule = getEmployeeScheduleForDate(editingRecord.employee_id, recordDate);
-        if (schedule) {
-          const dow = new Date(recordDate + "T00:00:00").getDay();
-          const dayEndMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-          const schedStart = (() => {
-            const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
-            return schedule[dayStartMap[dow]] || "09:00";
-          })();
-          const schedEnd   = schedule[dayEndMap[dow]] || "18:00";
-          const breakMin   = schedule.break_duration_minutes ?? 60;
+      // 2. Recalcular con el backend (tardanzas, HE, estado).
+      await recalcularAsistenciaService.invoke(editingRecord.employee_id, recordDate, recordDate);
 
-          const [inH, inM]   = clockIn.split(":").map(Number);
-          const [outH, outM] = clockOut.split(":").map(Number);
-          const [endH, endM] = schedEnd.split(":").map(Number);
-          const [stH, stM]   = schedStart.split(":").map(Number);
-
-          const inTotal    = inH * 60 + inM;
-          const outTotal   = outH * 60 + outM;
-          const schedEndMin = endH * 60 + endM;
-          const schedStartMin = stH * 60 + stM;
-          let scheduledMinutes = schedEndMin - schedStartMin;
-          if (scheduledMinutes < 0) scheduledMinutes += 1440;
-          const effectiveBreakMin = scheduledMinutes < 360 ? 0 : breakMin;
-
-          const workedMin  = outTotal - inTotal - effectiveBreakMin;
-          const workedHrs  = Math.max(0, workedMin / 60);
-          // Horas normales = desde cuando empezó (o desde su hora programada si llegó tarde) hasta fin de jornada, menos break
-          const normalHrs  = Math.max(0, (schedEndMin - Math.max(inTotal, schedStartMin) - effectiveBreakMin) / 60);
-          const extraHrs   = Math.max(0, workedHrs - normalHrs);
-
-          // overtime_authorized: usa el valor actual del registro (ya persistido) o el del horario
-          const overtimeAuth = editingRecord.overtime_authorized ?? schedule.overtime_authorized ?? false;
-
-          // Buscar alertas pendientes para este registro
-          const existingAlerts = await entitiesAPI.OvertimeAlert.filter({
-            attendance_record_id: editingRecord.id,
-            status: "Pendiente",
-          });
-
-          if (extraHrs > 0 && !overtimeAuth) {
-            if (!existingAlerts || existingAlerts.length === 0) {
-              // Crear nueva alerta
-              await entitiesAPI.OvertimeAlert.create({
-                employee_id:          editingRecord.employee_id,
-                attendance_record_id: editingRecord.id,
-                alert_date:           recordDate,
-                overtime_hours:       extraHrs,
-                status:               "Pendiente",
-              });
-              toast.warning(`⚠️ ${extraHrs.toFixed(2)}h extras sin autorización — se generó alerta de aprobación.`);
-            } else {
-              // Actualizar la alerta existente con las nuevas horas
-              await entitiesAPI.OvertimeAlert.update(existingAlerts[0].id, {
-                overtime_hours: extraHrs,
-              });
-              toast.warning(`⚠️ ${extraHrs.toFixed(2)}h extras — alerta de aprobación pendiente.`);
-            }
-          } else if (extraHrs === 0 && existingAlerts && existingAlerts.length > 0) {
-            // La marcación corregida ya no genera extras → cancelar alerta pendiente
-            await entitiesAPI.OvertimeAlert.update(existingAlerts[0].id, { status: "Descartado" });
-          }
+      // 3. Re-fetch del registro actualizado y sincronizar alerta de HE
+      //    usando el mismo cálculo que la tabla (getAdditionalMinutes:
+      //    todos los segmentos, soporta cruce de medianoche). No usa HE
+      //    pagables para detectar excesos (pueden estar en 0 por falta
+      //    de autorización). No modifica overtime_authorized.
+      const updatedRecord = await entitiesAPI.AttendanceRecord.get(editingRecord.id);
+      if (updatedRecord) {
+        const pendingAlerts = await entitiesAPI.OvertimeAlert.filter({ status: "Pendiente" });
+        const syncResult = await syncOvertimeAlert(updatedRecord, pendingAlerts, currentUser);
+        if (syncResult === "created") {
+          toast.warning(`⚠️ ${(getAdditionalMinutes(updatedRecord) / 60).toFixed(2)}h adicionales sin autorización — alerta generada.`);
+        } else if (syncResult === "discarded") {
+          toast.info("Alerta de HE descartada — la corrección eliminó el exceso.");
         }
       }
-
-      // 3. Recalcular con el backend.
-      //    El backend respeta overtime_authorized del registro:
-      //    - Si es false (o no hay alerta aprobada), HE quedan en 0.
-      //    - Si es true (alerta aprobada), calcula HE 25% y 35%.
-      await recalcularAsistenciaService.invoke(
-        editingRecord.employee_id,
-        recordDate,
-        recordDate,
-      );
 
       queryClient.invalidateQueries(["todayAttendance"]);
       queryClient.invalidateQueries(["overtimeAlerts"]);
@@ -984,17 +927,37 @@ export default function AttendanceManagement() {
     const empList = allEmployees.filter(e => e.status === "Activo");
     setRecalcProgress({ done: 0, total: empList.length });
     let done = 0;
-    for (const emp of empList) {
-      await recalcularAsistenciaService.invoke(
-        emp.id,
-        "2020-01-01",
-        format(new Date(), "yyyy-MM-dd"),
-      );
-      done++;
-      setRecalcProgress({ done, total: empList.length });
+    try {
+      for (const emp of empList) {
+        await recalcularAsistenciaService.invoke(
+          emp.id,
+          "2020-01-01",
+          format(new Date(), "yyyy-MM-dd"),
+        );
+        done++;
+        setRecalcProgress({ done, total: empList.length });
+      }
+    } catch (error) {
+      toast.error(`Recálculo interrumpido después de ${done} empleados: ${error.message}`);
+      return;
+    } finally {
+      setRecalculandoTodo(false);
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
     }
-    setRecalculandoTodo(false);
+
+    // Sincronizar alertas de HE para los registros visibles usando el mismo
+    // cálculo que la tabla (getAdditionalMinutes: todos los segmentos, cruce
+    // de medianoche). Los registros fuera del rango visible no se sincronizan
+    // desde aquí — queda pendiente si se necesita sincronizar todo el historial.
+    try {
+      const pendingAlerts = await entitiesAPI.OvertimeAlert.filter({ status: "Pendiente" });
+      const { data: updatedRecords, error } = await refetchTodayRecords();
+      if (error) throw error;
+      await syncOvertimeAlertsBatch(updatedRecords || [], pendingAlerts, currentUser);
+    } catch (e) { console.error("Error sincronizando alertas HE:", e); }
+
     queryClient.invalidateQueries(["todayAttendance"]);
+    queryClient.invalidateQueries(["overtimeAlerts"]);
     toast.success(`✓ Recálculo completado para ${done} empleados`);
   };
 
@@ -1241,9 +1204,7 @@ export default function AttendanceManagement() {
         'Entrada': entradaExcel,
         'Salida': salidaExcel,
         'Horas Marcadas': hoursDecimalToExcelFraction(
-          (isUnscheduledDayEx && estadoMarcacion !== 'Vacaciones')
-            ? excelRawHours
-            : (emp.record?.regular_hours ?? emp.record?.worked_hours ?? 0)
+          estadoMarcacion === 'Vacaciones' ? 0 : excelRawHours
         ),
         'Horas Efectivas (marcadas+justificadas)': hoursDecimalToExcelFraction(excelHours),
         'Tardanza Efectiva (min)': excelLate,
@@ -1302,7 +1263,7 @@ export default function AttendanceManagement() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) { toast.error('Por favor, permite las ventanas emergentes para imprimir'); return; }
     const filterText = attendanceFilter === "all" ? "Todos los empleados" : attendanceFilter === "sin_entrada" ? "Sin marcar entrada" : attendanceFilter === "sin_salida" ? "Sin marcar salida" : "Con tardanza";
-    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>DNI</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; const { firstClockIn, lastClockOut } = getSegmentClockTimes(emp.record); const hasLate = (emp.record?.late_minutes ?? 0) > 0; return `<tr><td>${emp.document_number}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${firstClockIn || '--:--'}</td><td>${lastClockOut || '--:--'}</td><td>${wh.toFixed(2)}h</td><td class="${hasLate ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h</td><td>${(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
+    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>DNI</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const rowDate = emp.displayDate || format(selectedDate, 'yyyy-MM-dd'); const ct = getSegmentClockTimes(emp.record); const pm = getRowMetrics(emp, rowDate); const pwh = Math.round(pm.totalWorkedHours * 60) / 60; const paLate = applyLateTolerance(pm.remainingLateMinutes, pm.toleranceMinutes); const pca = getCompensationAdjustments(emp.id, rowDate); const pnc = enableTardinessCompensation && emp.record?.tardiness_compensation_status === 'Activa' ? (emp.record.tardiness_compensation_minutes || 0) : 0; const pLate = Math.max(0, paLate - pca.pendingLateMin - pca.approvedLateMin - pnc); let pOT = pca.pendingOTHours; let p25 = emp.record?.overtime_hours_25 ?? 0; let p35 = emp.record?.overtime_hours_35 ?? 0; if (pOT > 0 && p25 > 0) { const d = Math.min(p25, pOT); p25 -= d; pOT -= d; } if (pOT > 0 && p35 > 0) { const d = Math.min(p35, pOT); p35 -= d; pOT -= d; } return `<tr><td>${emp.document_number}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${ct.firstClockIn || '--:--'}</td><td>${ct.lastClockOut || '--:--'}</td><td>${pwh.toFixed(2)}h</td><td class="${pLate > 0 ? 'late' : ''}">${pLate} min</td><td>${p25.toFixed(2)}h</td><td>${p35.toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
     printWindow.document.write(printContent);
     printWindow.document.close();
   };
@@ -2133,7 +2094,7 @@ export default function AttendanceManagement() {
                                </div>
                                <p className="text-sm text-slate-600 mb-2">{emp?.position} • {emp?.department_name}</p>
                                <p className="text-sm text-slate-700">📅 {format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}</p>
-                               {record && <p className="text-sm text-slate-600 mt-1">Marcación: {record.clock_in} - {record.clock_out} ({record.worked_hours?.toFixed(2)}h trabajadas)</p>}
+                               {record && (() => { const seg = getSegmentClockTimes(record); return <p className="text-sm text-slate-600 mt-1">Marcación: {seg.firstClockIn || "—"} - {seg.lastClockOut || "—"} ({record.worked_hours?.toFixed(2)}h trabajadas)</p>; })()}
                                {alertSched && (
                                  <p className="text-sm text-slate-600 mt-1">
                                    🗓️ Horario: <span className="font-medium">{schedName}</span>
@@ -2252,6 +2213,7 @@ export default function AttendanceManagement() {
                 allEmployees={allEmployees}
                 reviewer={effectiveEmployee}
                 canApprove={canApproveEdits}
+                onAfterRecalc={() => queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] })}
               />
             </TabsContent>
           </Tabs>

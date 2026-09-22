@@ -1,3 +1,4 @@
+import { syncOvertimeAlert } from "../../services/overtimeAlertSync.js";
 import prisma from "../../config/prisma.js";
 import { canAccessEmployee, hasPermission } from "../../middleware/authorization.js";
 import { calcularAsistenciaDesdeLogs } from "../../scripts/calcularAsistenciaDesdeLogs.js";
@@ -244,12 +245,13 @@ export const approve = async (req, res) => {
         date: result.attendance_date.toISOString().slice(0, 10),
         force: true,
       });
+      await syncOvertimeAlert(result.attendance_record_id, req.user?.email);
       res.json(result);
     } catch (recalculationError) {
       console.error("Solicitud aprobada, pero falló el recálculo de asistencia:", recalculationError);
       res.json({
         ...result,
-        warning: "La edición fue aprobada, pero no se pudieron recalcular las métricas de asistencia",
+        warning: "La edición fue aprobada, pero no se pudieron completar el recálculo y la sincronización de alertas",
       });
     }
   } catch (error) {

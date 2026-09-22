@@ -1,4 +1,4 @@
-import { entitiesAPI } from '@/api/entitiesClient';
+import localClient from '@/api/localClient';
 // Fuente oficial: backend/utils/attendanceMetrics.js
 
 function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
@@ -186,164 +186,13 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
 
 const recalcularAsistenciaService = {
   invoke: async (employee_id, date_from, date_to) => {
-    try {
-      if (!employee_id || !date_from || !date_to) {
-        throw new Error(
-          'employee_id, date_from y date_to son requeridos'
-        );
-      }
-
-      const [
-        employee,
-        allSchedules,
-        allRecords,
-        allIncidents,
-        allOvertimeAlerts,
-      ] = await Promise.all([
-        entitiesAPI.Employee.filter({ id: employee_id }),
-        entitiesAPI.WorkSchedule.list("-effective_from"),
-        entitiesAPI.AttendanceRecord.filter({ employee_id }),
-        entitiesAPI.AttendanceIncident.filter({ employee_id }),
-        entitiesAPI.OvertimeAlert.filter({ employee_id }),
-      ]);
-
-      const emp = employee?.[0];
-
-      if (!emp) {
-        throw new Error('Empleado no encontrado');
-      }
-
-      const recordsInRange = allRecords.filter(
-        r => r.date >= date_from && r.date <= date_to
-      );
-
-      // Incidentes aprobados
-      const approvedIncidentsByDate = {};
-
-      allIncidents.forEach(i => {
-        if (i.status === "Aprobada") {
-          approvedIncidentsByDate[i.incident_date] = i;
-        }
-      });
-
-      // Alertas HE pendientes
-      const pendingOvertimeRecordIds = new Set(
-        allOvertimeAlerts
-          .filter(a => a.status === "Pendiente")
-          .map(a => a.attendance_record_id)
-          .filter(Boolean)
-      );
-
-      let updated = 0;
-
-      for (const record of recordsInRange) {
-        if (record.status === "Permiso sin goce") {
-          continue;
-        }
-
-        const schedule = getScheduleForDate(
-          employee_id,
-          emp.department_name,
-          allSchedules,
-          record.date
-        );
-
-        // HE autorizadas:
-        // - overtime_authorized del registro
-        // - overtime_authorized del horario
-        // - NO debe existir alerta pendiente
-        const hasScheduleAuth =
-          schedule?.overtime_authorized ?? false;
-
-        const overtimeAuth =
-          (
-            record.overtime_authorized === true ||
-            hasScheduleAuth
-          ) &&
-          !pendingOvertimeRecordIds.has(record.id);
-
-        const metrics = calcularMetricas(
-          record,
-          schedule,
-          record.date,
-          overtimeAuth
-        );
-
-        const hasApprovedIncident =
-          !!approvedIncidentsByDate[record.date];
-
-        let status;
-
-        // Preservar vacaciones.
-        if (record.status === "Vacaciones") {
-          status = "Vacaciones";
-        }
-        else if (
-          hasApprovedIncident ||
-          record.status === "Justificado"
-        ) {
-          status = "Justificado";
-        }
-        else if (
-          record.clock_in &&
-          record.clock_out
-        ) {
-          status = "Completo";
-        }
-        else if (
-          record.clock_in &&
-          !record.clock_out
-        ) {
-          status = "Incompleto";
-        }
-        else {
-          status = "Ausente";
-        }
-
-        await entitiesAPI.AttendanceRecord.update(
-          record.id,
-          {
-            worked_hours: metrics.worked_hours,
-            regular_hours: metrics.regular_hours,
-            overtime_hours_25: metrics.overtime_hours_25,
-            overtime_hours_35: metrics.overtime_hours_35,
-            is_late: metrics.is_late,
-            late_minutes: metrics.late_minutes,
-            is_absent: status === "Ausente",
-            scheduled_start:
-              metrics.scheduled_start ||
-              record.scheduled_start,
-            scheduled_end:
-              metrics.scheduled_end ||
-              record.scheduled_end,
-            status,
-          }
-        );
-
-        updated++;
-      }
-
-      return {
-        success: true,
-        updated,
-        range: {
-          date_from,
-          date_to,
-        },
-        employee_id,
-      };
-
-    } catch (error) {
-      console.error(
-        'Error en recalcularAsistenciaService.invoke:',
-        error
-      );
-
-      throw new Error(
-        error.message ||
-        'Error recalculando asistencia'
-      );
+    if (!employee_id || !date_from || !date_to) {
+      throw new Error('employee_id, date_from y date_to son requeridos');
     }
+    const { data } = await localClient.post('/api/attendance/recalcular', {
+      employee_id, date_from, date_to,
+    });
+    return data;
   },
 
   recalculate: async (
