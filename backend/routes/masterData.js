@@ -4,7 +4,7 @@ import {
   listPositions, createPosition, updatePosition, deletePosition,
   listDepartments, createDepartment, updateDepartment, deleteDepartment,
   listAreaUnidadCargos, createAreaUnidadCargo, updateAreaUnidadCargo, deleteAreaUnidadCargo,
-  listBanks, createBank,
+  listBanks, createBank, updateBank,
   listSites, createSite,
   listAFPs, createAFP,
   listProfessions, createProfession,
@@ -38,6 +38,7 @@ router.delete('/area-unidad-cargos/:id', deleteAreaUnidadCargo);
 
 router.get('/banks', listBanks);
 router.post('/banks', createBank);
+router.put('/banks/:id', updateBank);
 
 router.get('/sites', listSites);
 router.post('/sites', createSite);

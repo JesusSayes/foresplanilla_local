@@ -10,6 +10,10 @@
       "type": "string",
       "description": "C\u00f3digo del banco"
     },
+    "company_account_number": {
+      "type": "string",
+      "description": "N\u00famero de cuenta de la empresa en este banco (moneda nacional). Se usa en las cartas a bancos para solicitar el cargo a esta cuenta."
+    },
     "is_active": {
       "type": "boolean",
       "default": true,

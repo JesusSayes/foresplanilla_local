@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   FileText, Users, DollarSign, Eye, Printer, ChevronRight,
   CheckCircle, Search, Calendar, ArrowLeft, Settings,
-  Loader2, BookOpen, AlertCircle, X, PenTool
+  Loader2, BookOpen, AlertCircle, X, PenTool, Building2
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -20,6 +20,7 @@ import PlanillaCompletaView from "../components/payroll/PlanillaCompletaView";
 import ConfigFirmantesModal from "../components/payroll/ConfigFirmantesModal";
 import FirmarBoletasModal from "../components/payroll/FirmarBoletasModal";
 import PrintBoletasModal from "../components/payroll/PrintBoletasModal";
+import CartasBancosModal from "../components/payroll/CartasBancosModal";
 import { safePayrollNumber, formatMoney, roundMoney } from "@/lib/payrollUtils";
 import { parseDateLima } from "@/lib/dateUtils";
 
@@ -68,6 +69,7 @@ export default function ConsultaPlanillas() {
   const [showConfigFirmantes, setShowConfigFirmantes] = useState(false);
   const [showFirmarModal, setShowFirmarModal] = useState(null); // grupo a firmar
   const [showPrintBoletasModal, setShowPrintBoletasModal] = useState(null); // grupo a imprimir masivo
+  const [showCartasBancosModal, setShowCartasBancosModal] = useState(null); // grupo para cartas a bancos
   const [generatingAsiento, setGeneratingAsiento] = useState(null); // payroll_number en proceso
   const [balanceAlert, setBalanceAlert] = useState(null); // { period, payrollType, issues: [{employee, debe, haber, diferencia}] }
 
@@ -129,6 +131,11 @@ export default function ConsultaPlanillas() {
   const { data: subdiariosCatalog = [] } = useQuery({
     queryKey: ["subdiariosConsulta"],
     queryFn: () => entitiesAPI.Subdiario.list("codigo"),
+  });
+
+  const { data: banks = [] } = useQuery({
+    queryKey: ["banksConsulta"],
+    queryFn: () => entitiesAPI.Bank.list(),
   });
 
   // AFP y conceptos necesarios para generar el HTML fiel de cada boleta
@@ -1068,16 +1075,28 @@ ${boletasHTML}
                             const signedCount = g.payslips.filter(p => p.digital_signature_url).length;
                             const allSigned = signedCount === g.payslips.length && g.payslips.length > 0;
                             return (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 px-2.5 text-xs whitespace-nowrap text-purple-700 border-purple-200 hover:bg-purple-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
-                                disabled={!allSigned}
-                                title={allSigned ? "Imprimir boletas firmadas" : `Faltan firmar ${g.payslips.length - signedCount} de ${g.payslips.length} boleta(s)`}
-                                onClick={e => { e.stopPropagation(); setShowPrintBoletasModal(g); }}
-                              >
-                                <Printer className="w-3 h-3 mr-1" />Boletas
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-2.5 text-xs whitespace-nowrap text-purple-700 border-purple-200 hover:bg-purple-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
+                                  disabled={!allSigned}
+                                  title={allSigned ? "Imprimir boletas firmadas" : `Faltan firmar ${g.payslips.length - signedCount} de ${g.payslips.length} boleta(s)`}
+                                  onClick={e => { e.stopPropagation(); setShowPrintBoletasModal(g); }}
+                                >
+                                  <Printer className="w-3 h-3 mr-1" />Boletas
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-2.5 text-xs whitespace-nowrap text-blue-700 border-blue-200 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
+                                  disabled={!allSigned}
+                                  title={allSigned ? "Generar cartas y listas para bancos" : `Faltan firmar ${g.payslips.length - signedCount} de ${g.payslips.length} boleta(s)`}
+                                  onClick={e => { e.stopPropagation(); setShowCartasBancosModal(g); }}
+                                >
+                                  <Building2 className="w-3 h-3 mr-1" />Bancos
+                                </Button>
+                              </>
                             );
                           })()}
                           <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs whitespace-nowrap text-emerald-700 border-emerald-200 hover:bg-emerald-50"
@@ -1192,6 +1211,17 @@ ${boletasHTML}
             handlePrintAllBoletas(showPrintBoletasModal, copies);
             setShowPrintBoletasModal(null);
           }}
+        />
+      )}
+
+      {/* Modal de cartas a bancos */}
+      {showCartasBancosModal && (
+        <CartasBancosModal
+          grupo={showCartasBancosModal}
+          allEmployees={allEmployees}
+          companyInfo={companyInfo}
+          banks={banks}
+          onClose={() => setShowCartasBancosModal(null)}
         />
       )}
     </div>

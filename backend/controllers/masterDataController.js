@@ -273,6 +273,17 @@ export const createBank = async (req, res) => {
   }
 };
 
+export const updateBank = async (req, res) => {
+  try {
+    const data = await updateMasterData('bank', req.params.id, req.body);
+    if (!data) return res.status(404).json({ error: 'Banco no encontrado' });
+    res.json(data);
+  } catch (error) {
+    console.error('Error updating bank:', error);
+    res.status(500).json({ error: 'Error al actualizar banco' });
+  }
+};
+
 export const createSite = async (req, res) => {
   try {
     const data = await createMasterData('site', req.body, req.user.id, req.user.email);

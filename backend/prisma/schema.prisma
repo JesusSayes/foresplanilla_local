@@ -108,15 +108,16 @@ model attendance_record {
 }
 
 model bank {
-  name          String?
-  code          String?
-  is_active     Boolean?
-  id            String    @id @db.VarChar(255)
-  created_date  DateTime? @db.Timestamp(6)
-  updated_date  DateTime? @db.Timestamp(6)
-  created_by_id String?
-  created_by    String?
-  is_sample     Boolean?
+  name                   String?
+  code                   String?
+  is_active              Boolean?
+  id                     String    @id @db.VarChar(255)
+  created_date           DateTime? @db.Timestamp(6)
+  updated_date           DateTime? @db.Timestamp(6)
+  created_by_id          String?
+  created_by             String?
+  is_sample              Boolean?
+  company_account_number String?
 }
 
 model certificate {
