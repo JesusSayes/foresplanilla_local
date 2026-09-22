@@ -298,6 +298,38 @@ Deno.serve(async (req) => {
         scheduled_end: metrics.scheduled_end || record.scheduled_end,
         status: finalStatus,
       });
+
+      // ── Gestión automática de alertas de HE no autorizadas ──────────────
+      // Detecta HE potenciales (calculando con auth=true) y crea/actualiza
+      // una alerta Pendiente para que aparezca en "Alertas HE" y se apruebe.
+      // Si ya no hay HE, descarta la alerta pendiente existente.
+      const hasScheduleAuthOT = schedule?.overtime_authorized ?? false;
+      const isRecordAuthorizedOT = record.overtime_authorized === true || hasScheduleAuthOT;
+      if (!isRecordAuthorizedOT) {
+        const metricsWithAuth = calcularMetricas(record, schedule, record.date, true);
+        const potentialExtra = (metricsWithAuth.overtime_hours_25 || 0) + (metricsWithAuth.overtime_hours_35 || 0);
+        const existingAlert = allOvertimeAlerts.find(a =>
+          a.attendance_record_id === record.id && a.status === "Pendiente"
+        );
+        if (potentialExtra > 0) {
+          if (!existingAlert) {
+            await base44.entities.OvertimeAlert.create({
+              employee_id: employee_id,
+              attendance_record_id: record.id,
+              alert_date: record.date,
+              overtime_hours: potentialExtra,
+              status: "Pendiente",
+            });
+          } else if (Math.abs((existingAlert.overtime_hours || 0) - potentialExtra) > 0.01) {
+            await base44.entities.OvertimeAlert.update(existingAlert.id, {
+              overtime_hours: potentialExtra,
+            });
+          }
+        } else if (existingAlert) {
+          await base44.entities.OvertimeAlert.update(existingAlert.id, { status: "Descartado" });
+        }
+      }
+
       updated++;
     }
 
