@@ -36,7 +36,15 @@ export const calcDuration = (startMin, endMin) => {
 /**
  * Obtiene la primera entrada y la última salida registradas del día,
  * considerando todos los segmentos de marcación disponibles (1-4).
- * Devuelve { firstClockIn, lastClockOut } en formato "HH:mm" o null.
+ * Calcula por orden cronológico, no por orden de segmento.
+ * Si un segmento termina a una hora menor que su entrada, interpreta
+ * la salida como del día siguiente (cruce de medianoche).
+ *
+ * Entradas: record con clock_in/clock_out (1-4 segmentos).
+ * Resultado: { firstClockIn, lastClockOut } en formato "HH:mm" o null.
+ * Reglas: firstClockIn = mínima entrada; lastClockOut = máxima salida
+ * (con +1440 min si el segmento cruza medianoche). Conserva las
+ * marcaciones originales (devuelve HH:mm sin modificar valores).
  */
 export const getSegmentClockTimes = (record) => {
   if (!record) return { firstClockIn: null, lastClockOut: null };
@@ -46,14 +54,27 @@ export const getSegmentClockTimes = (record) => {
     ["clock_in_3", "clock_out_3"],
     ["clock_in_4", "clock_out_4"],
   ];
-  let firstClockIn = null;
-  let lastClockOut = null;
+  let firstClockInMin = null;
+  let lastClockOutMin = null;
   for (const [inField, outField] of segFields) {
     const ci = record[inField] ? String(record[inField]).slice(0, 5) : null;
     const co = record[outField] ? String(record[outField]).slice(0, 5) : null;
-    if (ci && firstClockIn === null) firstClockIn = ci;
-    if (co) lastClockOut = co;
+    if (ci) {
+      const inMin = toMin(ci);
+      if (firstClockInMin === null || inMin < firstClockInMin) firstClockInMin = inMin;
+    }
+    if (co) {
+      let outMin = toMin(co);
+      // If clock_out < clock_in of the same segment, it crosses midnight
+      if (ci) {
+        const inMin = toMin(ci);
+        if (outMin < inMin) outMin += 1440;
+      }
+      if (lastClockOutMin === null || outMin > lastClockOutMin) lastClockOutMin = outMin;
+    }
   }
+  const firstClockIn = firstClockInMin !== null ? fromMin(firstClockInMin % 1440) : null;
+  const lastClockOut = lastClockOutMin !== null ? fromMin(lastClockOutMin % 1440) : null;
   return { firstClockIn, lastClockOut };
 };
 
@@ -185,6 +206,9 @@ export function calcEffectiveMetrics({
       let nIn  = norm(toMin(ci));
       let nOut = norm(toMin(co));
       if (isNightShift && nIn > fullJornada) nIn = 0; // pre-shift arrival
+      // Midnight-crossing segment (even for diurnal shifts):
+      // if clock_out < clock_in, the end is the next day.
+      if (nOut < nIn) nOut += 1440;
       if (nOut >= nIn) clockIntervals.push([nIn, nOut]);
     } else if (ci) {
       let nIn = norm(toMin(ci));
@@ -393,22 +417,54 @@ export const computeScheduledHoursFromSchedule = (schedule, date) => {
 };
 
 /**
- * Minutos adicionales disponibles después de la hora programada de salida.
- * Usa la última salida registrada del día (todos los segmentos).
- * Soporta turnos nocturnos (cruce de medianoche).
+ * Minutos trabajados realmente después de la hora programada de salida.
+ * Usa la unión de intervalos de todos los segmentos (no cuenta huecos
+ * entre segmentos ni duplica tiempos superpuestos).
+ * Soporta turnos nocturnos y segmentos que cruzan medianoche.
  *
  * Entradas: record con clock_in/clock_out (1-4 segmentos) y scheduled_end.
  * Resultado: minutos trabajados después de scheduled_end (≥ 0).
- * Reglas: solo considera tiempo POSTERIOR al horario (para compensación de tardanza).
+ * Reglas: solo considera tiempo POSTERIOR al horario realmente marcado
+ * (para compensación de tardanza). No cuenta el hueco entre segmentos.
  */
 export const getAdditionalMinutes = (record) => {
-  if (!record) return 0;
-  const { lastClockOut } = getSegmentClockTimes(record);
-  if (!lastClockOut || !record.scheduled_end) return 0;
-  const out = toMin(lastClockOut);
-  const schedEnd = toMin(record.scheduled_end);
-  if (out < schedEnd) return Math.max(0, out + 1440 - schedEnd);
-  return Math.max(0, out - schedEnd);
+  if (!record || !record.scheduled_end) return 0;
+  const schedStartMin = toMin(record.scheduled_start || "00:00");
+  const schedEndMin   = toMin(record.scheduled_end);
+  const isNightShift  = schedEndMin < schedStartMin;
+  const fullJornada   = isNightShift
+    ? (schedEndMin - schedStartMin + 1440)
+    : Math.max(0, schedEndMin - schedStartMin);
+  const norm = (t) => isNightShift ? (t - schedStartMin + 1440) % 1440 : t;
+  const normSchedEnd = isNightShift ? fullJornada : schedEndMin;
+
+  const segFields = [
+    ["clock_in", "clock_out"],
+    ["clock_in_2", "clock_out_2"],
+    ["clock_in_3", "clock_out_3"],
+    ["clock_in_4", "clock_out_4"],
+  ];
+  const intervals = [];
+  for (const [inField, outField] of segFields) {
+    const ci = record[inField]  ? String(record[inField]).slice(0, 5)  : null;
+    const co = record[outField] ? String(record[outField]).slice(0, 5) : null;
+    if (!ci || !co) continue;
+    let nIn  = norm(toMin(ci));
+    let nOut = norm(toMin(co));
+    if (isNightShift && nIn > fullJornada) nIn = 0;
+    if (nOut < nIn) nOut += 1440; // midnight crossing
+    if (nOut > normSchedEnd) {
+      intervals.push([Math.max(nIn, normSchedEnd), nOut]);
+    }
+  }
+  // Merge overlapping intervals (no duplication)
+  intervals.sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const [s, e] of intervals) {
+    if (merged.length === 0 || s > merged[merged.length - 1][1]) merged.push([s, e]);
+    else merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], e);
+  }
+  return merged.reduce((sum, [s, e]) => sum + (e - s), 0);
 };
 
 /**

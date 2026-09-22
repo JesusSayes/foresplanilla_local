@@ -399,7 +399,9 @@ export default function AttendanceManagement() {
       const normOut = norm(outTotal);
       const effectiveNormIn = (isNightShift && normIn > fullJornada) ? 0 : normIn;
 
-      const totalMinutes = (normOut >= effectiveNormIn ? normOut - effectiveNormIn : 0) - breakMinutes;
+      // Midnight-crossing: if clock_out < clock_in, end is next day
+      const adjNormOut = normOut < effectiveNormIn ? normOut + 1440 : normOut;
+      const totalMinutes = (adjNormOut - effectiveNormIn) - breakMinutes;
       workedHours = Math.max(0, totalMinutes / 60);
       const effectiveStart = Math.max(effectiveNormIn, normSchedStart);
       const regularMinutes = Math.max(0, normSchedEnd - effectiveStart - breakMinutes);
