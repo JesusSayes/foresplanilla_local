@@ -31,7 +31,7 @@ const STATUS_BADGE = {
   Cancelada: "bg-slate-100 text-slate-600 border-slate-300",
 };
 
-function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRejected, onCancelled }) {
+function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRejected, onCancelled, onAfterRecalc }) {
   const [rejectComment, setRejectComment] = useState("");
   const [showReject, setShowReject] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -74,6 +74,13 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
         date_from: req.attendance_date,
         date_to: req.attendance_date,
       });
+
+      // Sincronizar alerta de HE con el registro actualizado (mismo cálculo
+      // que la tabla: getAdditionalMinutes, todos los segmentos, medianoche).
+      if (onAfterRecalc) {
+        try { await onAfterRecalc(req.attendance_record_id); }
+        catch (e) { console.error("Error sincronizando alerta HE:", e); }
+      }
 
       toast.success("Solicitud aprobada, cambios aplicados y métricas recalculadas");
       onApproved?.();
@@ -231,7 +238,7 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
 
 const EDIT_PAGE_SIZE = 20;
 
-export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, canApprove }) {
+export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, canApprove, onAfterRecalc }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [editPage, setEditPage] = useState(1);
@@ -399,6 +406,7 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
                           onApproved={refresh}
                           onRejected={refresh}
                           onCancelled={refresh}
+                          onAfterRecalc={onAfterRecalc}
                         />
                       ))}
                     </div>
