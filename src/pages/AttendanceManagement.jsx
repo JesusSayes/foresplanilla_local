@@ -365,8 +365,10 @@ export default function AttendanceManagement() {
 
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  // Calcular preview de métricas en tiempo real para el modal de edición
-  // Soporta turnos nocturnos (schedEnd < schedStart)
+  // Vista previa de métricas para el modal de edición.
+  // Usa las mismas funciones que la tabla (calcEffectiveMetrics + getAdditionalMinutes)
+  // para garantizar consistencia. Solo edita segmento 1; conserva segmentos 2-4
+  // del registro original. No inventa salida si falta clock_out.
   const calcEditPreview = (clockIn, clockOut, recordDate, employeeId) => {
     if (!clockIn) return null;
     const schedule = getEmployeeScheduleForDate(employeeId, recordDate);
@@ -379,45 +381,41 @@ export default function AttendanceManagement() {
     const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
     const overtimeAuthorized = schedule?.overtime_authorized ?? false;
 
-    const toM = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-    const inTotal       = toM(clockIn);
-    const schedTotal    = toM(scheduledStart);
-    const schedEndTotal = toM(scheduledEnd);
+    // Registro temporal: segmento 1 editado + segmentos 2-4 preservados
+    const tempRecord = {
+      ...editingRecord,
+      clock_in: clockIn,
+      clock_out: clockOut || null,
+      scheduled_start: scheduledStart,
+      scheduled_end: scheduledEnd,
+    };
 
-    const isNightShift = schedEndTotal < schedTotal;
-    const fullJornada = isNightShift ? (schedEndTotal - schedTotal + 1440) : Math.max(0, schedEndTotal - schedTotal);
-    const norm = (t) => isNightShift ? (t - schedTotal + 1440) % 1440 : t;
-    const normSchedStart = isNightShift ? 0 : schedTotal;
-    const normSchedEnd   = isNightShift ? fullJornada : schedEndTotal;
+    const metrics = calcEffectiveMetrics({
+      record: tempRecord,
+      approvedIncidents: [],
+      schedStart: scheduledStart,
+      schedEnd: scheduledEnd,
+      breakMinutes,
+      breakStart: schedule?.break_start || null,
+      isUnscheduledDay: false,
+    });
 
-    const normIn = norm(inTotal);
-    const rawLate = (normIn <= fullJornada) ? Math.max(0, normIn - normSchedStart) : 0;
-    const lateMinutes = rawLate > toleranceMinutes ? rawLate : 0;
+    const lateMinutes = applyLateTolerance(metrics.remainingLateMinutes, toleranceMinutes);
+    const workedHours = metrics.rawWorkedHours;
+    const regularHours = metrics.ordinaryHours;
 
-    let workedHours = 0, regularHours = 0, overtimeHours25 = 0, overtimeHours35 = 0;
-    if (clockOut) {
-      const outTotal = toM(clockOut);
-      const normOut = norm(outTotal);
-      const effectiveNormIn = (isNightShift && normIn > fullJornada) ? 0 : normIn;
-
-      // Midnight-crossing: if clock_out < clock_in, end is next day
-      const adjNormOut = normOut < effectiveNormIn ? normOut + 1440 : normOut;
-      const totalMinutes = (adjNormOut - effectiveNormIn) - breakMinutes;
-      workedHours = Math.max(0, totalMinutes / 60);
-      const effectiveStart = Math.max(effectiveNormIn, normSchedStart);
-      const regularMinutes = Math.max(0, normSchedEnd - effectiveStart - breakMinutes);
-      const normalHoursMax = regularMinutes / 60;
-      if (workedHours <= normalHoursMax) {
-        regularHours = workedHours;
-      } else {
-        regularHours = normalHoursMax;
-        const extraHours = workedHours - normalHoursMax;
-        if (overtimeAuthorized) {
-          overtimeHours25 = Math.min(extraHours, 2);
-          overtimeHours35 = Math.max(0, extraHours - 2);
-        }
+    // HE: solo si hay clock_out (segmento completo) y autorización.
+    // Usa getAdditionalMinutes (post-jornada, todos los segmentos, medianoche).
+    let overtimeHours25 = 0, overtimeHours35 = 0;
+    if (clockOut && overtimeAuthorized) {
+      const addMin = getAdditionalMinutes(tempRecord);
+      const extraHours = addMin / 60;
+      if (extraHours > 0) {
+        overtimeHours25 = Math.min(extraHours, 2);
+        overtimeHours35 = Math.max(0, extraHours - 2);
       }
     }
+
     return { scheduledStart, scheduledEnd, lateMinutes, isLate: lateMinutes > 0, workedHours, regularHours, overtimeHours25, overtimeHours35, overtimeAuthorized };
   };
 
@@ -1166,9 +1164,7 @@ export default function AttendanceManagement() {
         'Entrada': entradaExcel,
         'Salida': salidaExcel,
         'Horas Marcadas': hoursDecimalToExcelFraction(
-          (isUnscheduledDayEx && estadoMarcacion !== 'Vacaciones')
-            ? excelRawHours
-            : (emp.record?.regular_hours ?? emp.record?.worked_hours ?? 0)
+          estadoMarcacion === 'Vacaciones' ? 0 : excelRawHours
         ),
         'Horas Efectivas (marcadas+justificadas)': hoursDecimalToExcelFraction(excelHours),
         'Tardanza Efectiva (min)': excelLate,
@@ -1227,7 +1223,7 @@ export default function AttendanceManagement() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) { toast.error('Por favor, permite las ventanas emergentes para imprimir'); return; }
     const filterText = attendanceFilter === "all" ? "Todos los empleados" : attendanceFilter === "sin_entrada" ? "Sin marcar entrada" : attendanceFilter === "sin_salida" ? "Sin marcar salida" : "Con tardanza";
-    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>DNI</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const wh = emp.record?.worked_hours || 0; const ct = getSegmentClockTimes(emp.record); return `<tr><td>${emp.document_number}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${ct.firstClockIn || '--:--'}</td><td>${ct.lastClockOut || '--:--'}</td><td>${wh.toFixed(2)}h</td><td class="${(emp.record?.late_minutes ?? 0) > 0 ? 'late' : ''}">${emp.record?.late_minutes || 0} min</td><td>${(emp.record?.overtime_hours_25 ?? 0).toFixed(2)}h</td><td>${(emp.record?.overtime_hours_35 ?? 0).toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
+    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>DNI</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const rowDate = emp.displayDate || format(selectedDate, 'yyyy-MM-dd'); const ct = getSegmentClockTimes(emp.record); const pm = getRowMetrics(emp, rowDate); const pwh = Math.round(pm.totalWorkedHours * 60) / 60; const paLate = applyLateTolerance(pm.remainingLateMinutes, pm.toleranceMinutes); const pca = getCompensationAdjustments(emp.id, rowDate); const pnc = enableTardinessCompensation && emp.record?.tardiness_compensation_status === 'Activa' ? (emp.record.tardiness_compensation_minutes || 0) : 0; const pLate = Math.max(0, paLate - pca.pendingLateMin - pca.approvedLateMin - pnc); let pOT = pca.pendingOTHours; let p25 = emp.record?.overtime_hours_25 ?? 0; let p35 = emp.record?.overtime_hours_35 ?? 0; if (pOT > 0 && p25 > 0) { const d = Math.min(p25, pOT); p25 -= d; pOT -= d; } if (pOT > 0 && p35 > 0) { const d = Math.min(p35, pOT); p35 -= d; pOT -= d; } return `<tr><td>${emp.document_number}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${ct.firstClockIn || '--:--'}</td><td>${ct.lastClockOut || '--:--'}</td><td>${pwh.toFixed(2)}h</td><td class="${pLate > 0 ? 'late' : ''}">${pLate} min</td><td>${p25.toFixed(2)}h</td><td>${p35.toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
     printWindow.document.write(printContent);
     printWindow.document.close();
   };

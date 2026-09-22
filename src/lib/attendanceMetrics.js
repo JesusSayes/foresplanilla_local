@@ -210,11 +210,10 @@ export function calcEffectiveMetrics({
       // if clock_out < clock_in, the end is the next day.
       if (nOut < nIn) nOut += 1440;
       if (nOut >= nIn) clockIntervals.push([nIn, nOut]);
-    } else if (ci) {
-      let nIn = norm(toMin(ci));
-      if (isNightShift && nIn > fullJornada) nIn = 0;
-      clockIntervals.push([nIn, normSchedEnd]);
     }
+    // Marcaciones incompletas (solo entrada, sin salida): NO se inventa una
+    // salida. El segmento no contribuye a horas trabajadas ni a cobertura.
+    // La tardanza sí se calcula desde la entrada (ver sección de tardanza).
   }
   const justifiedIntervals = [];
   for (const inc of approvedIncidents) {
