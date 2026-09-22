@@ -1639,6 +1639,14 @@ export default function MasterDataManagement() {
                         placeholder="Ej: BCP"
                       />
                     </div>
+                    <div>
+                      <Label>N° Cuenta Empresa</Label>
+                      <Input
+                        value={formData.company_account_number || ""}
+                        onChange={(e) => setFormData({ ...formData, company_account_number: e.target.value })}
+                        placeholder="Cuenta de cargo en moneda nacional"
+                      />
+                    </div>
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
