@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  CheckCircle, XCircle, Clock, Search, ArrowRight, X, AlertCircle, Ban, Download
+  CheckCircle, XCircle, Clock, Search, ArrowRight, AlertCircle, Ban, Download
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { toast } from "sonner";
@@ -31,7 +31,7 @@ const STATUS_BADGE = {
   Cancelada: "bg-slate-100 text-slate-600 border-slate-300",
 };
 
-function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRejected, onCancelled }) {
+function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRejected, onCancelled, onAfterRecalc }) {
   const [rejectComment, setRejectComment] = useState("");
   const [showReject, setShowReject] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -52,6 +52,10 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
         toast.warning(result.warning);
       } else {
         toast.success("Solicitud aprobada, cambios aplicados y métricas recalculadas");
+      }
+      if (!result.warning && onAfterRecalc) {
+        try { await onAfterRecalc(req.attendance_record_id); }
+        catch (e) { toast.warning("Edición aprobada, pero no se pudo actualizar la vista de alertas"); }
       }
       onApproved?.();
     } catch (e) {
@@ -199,7 +203,7 @@ function RequestCard({ req, allEmployees, reviewer, canApprove, onApproved, onRe
 
 const EDIT_PAGE_SIZE = 20;
 
-export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, canApprove }) {
+export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, canApprove, onAfterRecalc }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [editPage, setEditPage] = useState(1);
@@ -367,6 +371,7 @@ export default function AttendanceEditRequestsPanel({ allEmployees, reviewer, ca
                           onApproved={refresh}
                           onRejected={refresh}
                           onCancelled={refresh}
+                          onAfterRecalc={onAfterRecalc}
                         />
                       ))}
                     </div>

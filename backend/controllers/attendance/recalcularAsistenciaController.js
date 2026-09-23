@@ -85,6 +85,11 @@ const recalcularAsistencia = async (req, res) => {
       }
     });
 
+    const pendingAlerts = await prisma.overtime_alert.findMany({
+      where: { employee_id, status: "Pendiente" },
+      select: { attendance_record_id: true },
+    });
+    const pendingRecordIds = new Set(pendingAlerts.map(alert => alert.attendance_record_id));
     let updated = 0;
 
     for (const record of recordsInRange) {
@@ -98,14 +103,17 @@ const recalcularAsistencia = async (req, res) => {
       if (!dateStr) continue;
 
       const schedule = getScheduleForDate(employee_id, employee.department_name, allSchedules, dateStr);
-      const overtimeAuth = record.overtime_authorized ?? schedule?.overtime_authorized ?? false;
+      const overtimeAuth = (record.overtime_authorized === true || schedule?.overtime_authorized === true) &&
+        !pendingRecordIds.has(record.id);
       const approvedIncidents = approvedIncidentsByDate[dateStr] || [];
       const metrics = calcularMetricas(record, schedule, dateStr, overtimeAuth, approvedIncidents);
       const protectedFields = getProtectedFields(record);
       const approvedCompensations = approvedCompensationsByDate[dateStr] || [];
 
       let status = record.status;
-      if (approvedIncidents.length > 0 || record.status === "Justificado") {
+      if (record.status === "Vacaciones") {
+        status = "Vacaciones";
+      } else if (approvedIncidents.length > 0 || record.status === "Justificado") {
         status = "Justificado";
       } else if (record.clock_in && record.clock_out) {
         status = "Completo";
