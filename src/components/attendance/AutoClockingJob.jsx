@@ -10,9 +10,9 @@ export const generateAutoClockings = async (targetDate = new Date()) => {
   try {
     const dateStr = format(targetDate, "yyyy-MM-dd");
 
-    // Obtener todos los horarios activos exonerados de marcación
+    // Obtener todos los horarios activos (sin filtrar por exoneración aún)
     const schedules = await entitiesAPI.WorkSchedule.list();
-    const exemptSchedules = schedules.filter(s => s.is_active && s.exempt_from_clocking);
+    const activeSchedules = schedules.filter(s => s.is_active);
 
     // Obtener todos los empleados activos
     const employees = await entitiesAPI.Employee.filter({ status: "Activo" });
@@ -25,6 +25,55 @@ export const generateAutoClockings = async (targetDate = new Date()) => {
     const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
     const dayName = dayNames[dayOfWeek];
 
+    // Validar vigencia del horario contra la fecha objetivo (límites inclusivos)
+    const targetDateObj = new Date(dateStr + "T00:00:00");
+    const isScheduleEffective = (s) => {
+      if (s.effective_from) {
+        const from = new Date(s.effective_from + "T00:00:00");
+        if (targetDateObj < from) return false;
+      }
+      if (s.effective_to) {
+        const to = new Date(s.effective_to + "T00:00:00");
+        if (targetDateObj > to) return false;
+      }
+      return true;
+    };
+
+    // Ordenar por inicio de vigencia más reciente (effective_from descendente)
+    const byMostRecent = (a, b) => {
+      const aFrom = a.effective_from ? new Date(a.effective_from + "T00:00:00").getTime() : 0;
+      const bFrom = b.effective_from ? new Date(b.effective_from + "T00:00:00").getTime() : 0;
+      return bFrom - aFrom;
+    };
+
+    // Seleccionar horario aplicable: individual vigente primero, luego departamental vigente
+    const selectScheduleForEmployee = (employee) => {
+      const vigentes = activeSchedules.filter(isScheduleEffective);
+
+      // 1. Horario individual vigente (employee_id coincide)
+      const individual = vigentes
+        .filter(s => s.employee_id === employee.id)
+        .sort(byMostRecent);
+      if (individual.length > 0) return individual[0];
+
+      // 2. Horario departamental vigente (sin employee_id, departamento coincidente)
+      const empDept = employee.department_name;
+      if (empDept) {
+        const departamental = vigentes
+          .filter(s => !s.employee_id)
+          .filter(s => {
+            const depts = s.departments || [];
+            const hasDept = depts.includes(empDept);
+            const sameDeptName = s.department_name === empDept;
+            return hasDept || sameDeptName;
+          })
+          .sort(byMostRecent);
+        if (departamental.length > 0) return departamental[0];
+      }
+
+      return null;
+    };
+
     let recordsCreated = 0;
 
     for (const employee of employees) {
@@ -35,18 +84,13 @@ export const generateAutoClockings = async (targetDate = new Date()) => {
       const hasRecord = existingRecords.some(r => r.employee_id === employee.id);
       if (hasRecord) continue;
 
-      // Buscar horario aplicable
-      let schedule = exemptSchedules.find(s => s.employee_id === employee.id);
-
-      if (!schedule) {
-        // Buscar por departamento
-        schedule = exemptSchedules.find(s =>
-          s.departments?.includes(employee.department_name) ||
-          s.department_name === employee.department_name
-        );
-      }
+      // Seleccionar horario aplicable (individual primero, luego departamental)
+      const schedule = selectScheduleForEmployee(employee);
 
       if (!schedule) continue;
+
+      // Solo generar marcaciones si el horario seleccionado está exonerado
+      if (!schedule.exempt_from_clocking) continue;
 
       // Obtener horarios del día
       const startTime = schedule[`${dayName}_start`];
