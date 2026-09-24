@@ -495,16 +495,15 @@ export default function CompensationModal({
             <div className="flex items-start gap-2">
               <ArrowRightLeft className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
               <div className="text-xs text-indigo-800">
-                <p className="font-semibold mb-1">Compensación bidireccional</p>
+                <p className="font-semibold mb-1">Compensación mensual (hasta 15 días después)</p>
                 <p>
-                  Seleccione cualquier fecha del período (incluyendo días sin
-                  registro) para compensar. Use horas en exceso para{" "}
-                  <span className="font-medium">reducir tardanzas</span> (↓
-                  naranja) o asigne minutos a compensar en{" "}
-                  <span className="font-medium">
-                    fechas donde no trabajó
-                  </span>{" "}
-                  (↓ azul).
+                  Las tardanzas de un día pueden compensarse con tiempo
+                  compensable (horas en exceso) del mismo día o de hasta{" "}
+                  <span className="font-medium">15 días calendario después</span>,
+                  dentro del mismo mes. Use "Auto" para que el sistema asigne
+                  automáticamente el tiempo compensable más cercano, o
+                  "Seleccionar días con compensación" para compensar todas las
+                  tardanzas del mes.
                 </p>
               </div>
             </div>
