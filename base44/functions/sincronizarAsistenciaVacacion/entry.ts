@@ -54,18 +54,70 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ success: true, updated: 0, message: "Sin registros de asistencia en el rango" });
     }
 
-    // Sobrescribir valores residuales: vacaciones no generan tardanza, falta ni horas extra
-    const updates = covered.map((r: any) => ({
-      id: r.id,
-      is_late: false,
-      late_minutes: 0,
-      is_absent: false,
-      overtime_hours_25: 0,
-      overtime_hours_35: 0,
-      worked_hours: 0,
-      regular_hours: 0,
-      status: "Vacaciones",
-    }));
+    // Cargar empleado, horarios y feriados para determinar días no laborables
+    const empRaw = await base44.asServiceRole.entities.Employee.filter({ id: employeeId });
+    const employee = Array.isArray(empRaw) ? empRaw[0] : null;
+    const departmentName = employee?.department_name || "";
+
+    const schedulesRaw = await base44.asServiceRole.entities.WorkSchedule.list();
+    const activeSchedules = (Array.isArray(schedulesRaw) ? schedulesRaw : []).filter((s: any) => s.is_active);
+
+    const holidaysRaw = await base44.asServiceRole.entities.Holiday.list();
+    const holidayDates = new Set((Array.isArray(holidaysRaw) ? holidaysRaw : []).map((h: any) => (h.date || "").slice(0, 10)));
+
+    const DAY_NAMES = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+
+    function getScheduleForVacationDate(dateStr: string) {
+      const candidates = activeSchedules.filter((s: any) => {
+        const isForEmployee = s.employee_id === employeeId;
+        const isForDept = !s.employee_id && departmentName &&
+          (s.departments?.includes(departmentName) || s.department_name === departmentName);
+        return isForEmployee || isForDept;
+      });
+      const findBest = (list: any[]) => {
+        const valid = list.filter((s: any) => {
+          const from = s.effective_from || "0000-01-01";
+          const to = s.effective_to || "9999-12-31";
+          return from <= dateStr && to >= dateStr;
+        });
+        valid.sort((a: any, b: any) => (b.effective_from || "0000-01-01").localeCompare(a.effective_from || "0000-01-01"));
+        return valid[0] || null;
+      };
+      return findBest(candidates.filter((s: any) => s.employee_id === employeeId))
+        || findBest(candidates.filter((s: any) => !s.employee_id))
+        || null;
+    }
+
+    function isNonWorkingDay(dateStr: string): boolean {
+      if (holidayDates.has(dateStr)) return true;
+      const schedule = getScheduleForVacationDate(dateStr);
+      if (!schedule) return true;
+      const dow = new Date(dateStr + "T00:00:00").getDay();
+      const day = DAY_NAMES[dow];
+      const startT = schedule[`${day}_start`];
+      const endT = schedule[`${day}_end`];
+      return !startT || !endT || startT.trim() === "" || endT.trim() === "";
+    }
+
+    // Sobrescribir valores residuales: vacaciones no generan tardanza, falta ni horas extra.
+    // En días no laborables (sábados, domingos, feriados o sin horario programado),
+    // limpiar scheduled_start/scheduled_end para evitar horarios ficticios.
+    const updates = covered.map((r: any) => {
+      const d = String(r.date || "").split("T")[0];
+      const nonWorking = isNonWorkingDay(d);
+      return {
+        id: r.id,
+        is_late: false,
+        late_minutes: 0,
+        is_absent: false,
+        overtime_hours_25: 0,
+        overtime_hours_35: 0,
+        worked_hours: 0,
+        regular_hours: 0,
+        status: "Vacaciones",
+        ...(nonWorking ? { scheduled_start: "", scheduled_end: "" } : {}),
+      };
+    });
     await base44.asServiceRole.entities.AttendanceRecord.bulkUpdate(updates);
 
     return Response.json({ success: true, updated: updates.length, range: { startDate, endDate } });
