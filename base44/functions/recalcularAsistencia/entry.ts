@@ -57,8 +57,29 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
   const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
   const dayEndMap   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
 
-  const scheduledStart  = schedule ? (schedule[dayStartMap[dow]] || "09:00") : "09:00";
-  const scheduledEnd    = schedule ? (schedule[dayEndMap[dow]]   || "18:00") : "18:00";
+  const dayStart = schedule ? schedule[dayStartMap[dow]] : null;
+  const dayEnd   = schedule ? schedule[dayEndMap[dow]]   : null;
+
+  // Si el día no tiene jornada programada (start/end vacíos), no asignar horario
+  // por defecto. Evita que sábados, domingos y días sin horario real reciban
+  // horarios ficticios (09:00-18:00) que podrían interpretarse como tardanzas
+  // u horas extras en recálculos posteriores.
+  if (!dayStart || !dayEnd) {
+    return {
+      worked_hours: 0,
+      regular_hours: 0,
+      overtime_hours_25: 0,
+      overtime_hours_35: 0,
+      is_late: false,
+      late_minutes: 0,
+      is_absent: false,
+      scheduled_start: null,
+      scheduled_end: null,
+    };
+  }
+
+  const scheduledStart  = dayStart;
+  const scheduledEnd    = dayEnd;
   const breakMinutes    = schedule?.break_duration_minutes ?? 60;
   const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
 
@@ -326,8 +347,8 @@ Deno.serve(async (req) => {
         is_late: finalIsLate,
         late_minutes: finalLate,
         is_absent: finalStatus === "Ausente",
-        scheduled_start: metrics.scheduled_start || record.scheduled_start,
-        scheduled_end: metrics.scheduled_end || record.scheduled_end,
+        scheduled_start: metrics.scheduled_start || "",
+        scheduled_end: metrics.scheduled_end || "",
         status: finalStatus,
       });
       updated++;

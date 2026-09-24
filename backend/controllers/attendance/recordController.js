@@ -1,3 +1,4 @@
+import { normalizeVacationAttendance } from "../../services/vacationAttendance.js";
 import prisma from "../../config/prisma.js";
 
 import crypto from 'crypto';
@@ -57,13 +58,14 @@ export const create = async (req, res) => {
   try {
     console.log('AttendanceRecord.create body:', req.body);
 
-    const data = req.body || {};
+    const data = { ...req.body };
     if (!canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     const employee = await prisma.employee.findUnique({ where: { id: data.employee_id } });
     if (!employee) return res.status(404).json({ error: 'Empleado no encontrado' });
     if (!isEmploymentDateValid(employee, data.date)) {
       return res.status(409).json({ error: 'No se puede crear asistencia fuera del período laboral del empleado' });
     }
+    Object.assign(data, await normalizeVacationAttendance(prisma, data));
     const now = new Date();
 
     const shouldProtectInitialValues = data.status === "Justificado" ||
@@ -137,6 +139,7 @@ export const update = async (req, res) => {
       delete data.date;
     }
 
+    Object.assign(data, await normalizeVacationAttendance(prisma, { ...existing, ...data }));
     const changedFields = changedAutoCalculatedFields(existing, data);
     if (changedFields.length > 0) {
       data.manually_protected_fields = mergeProtectedFields(existing, changedFields);

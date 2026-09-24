@@ -401,8 +401,15 @@ export function calcularMetricas(record, schedule, dateStr, overtimeAuthorized, 
     "saturday_end",
   ];
 
-  const scheduledStart = schedule?.[dayStartMap[dow]] || "09:00";
-  const scheduledEnd = schedule?.[dayEndMap[dow]] || "18:00";
+  const scheduledStart = schedule?.[dayStartMap[dow]]?.trim() || null;
+  const scheduledEnd = schedule?.[dayEndMap[dow]]?.trim() || null;
+  if (!scheduledStart || !scheduledEnd) {
+    return {
+      worked_hours: 0, regular_hours: 0, overtime_hours_25: 0, overtime_hours_35: 0,
+      is_late: false, late_minutes: 0, is_absent: false,
+      scheduled_start: null, scheduled_end: null,
+    };
+  }
   const breakMinutes = schedule?.break_duration_minutes ?? 60;
   const breakStart = schedule?.break_start ?? null;
   const toleranceMinutes = schedule?.tolerance_minutes ?? 10;

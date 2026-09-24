@@ -167,13 +167,12 @@ export default function CompensationPanel({
     return map;
   }, [workSchedules, allEmployees]);
 
-  // Minutos de horas extras ya utilizados en compensaciones APROBADAS (por empleado)
-  const approvedOvertimeByEmployee = useMemo(() => {
+  // Minutos de tardanza ya compensados (aprobados) por empleado
+  const approvedLateCompensatedByEmployee = useMemo(() => {
     const map = new Map();
     for (const c of existingCompensations) {
       if (c.status === "Aprobada") {
-        const mins = Math.round((c.hours_to_adjust || 0) * 60);
-        map.set(c.employee_id, (map.get(c.employee_id) || 0) + mins);
+        map.set(c.employee_id, (map.get(c.employee_id) || 0) + (c.late_minutes_to_adjust || 0));
       }
     }
     return map;
@@ -194,7 +193,8 @@ export default function CompensationPanel({
         totalScheduledHours: 0,
         totalRegularHours: 0,
         totalOvertimeHours: 0,
-        usedOvertimeMinutes: approvedOvertimeByEmployee.get(emp.id) || 0,
+        usedOvertimeMinutes: 0, // El backend local ya descontó las HE aprobadas.
+        compensatedLateMinutes: approvedLateCompensatedByEmployee.get(emp.id) || 0,
         totalLateMinutes: 0,
         lateDays: 0,
         overtimeDays: 0,
@@ -238,7 +238,7 @@ export default function CompensationPanel({
     }
 
     return Array.from(map.values());
-  }, [periodRecords, allEmployees, accessibleEmployeeIds, scheduleByEmployee, periodStart, periodEnd, approvedOvertimeByEmployee]);
+  }, [periodRecords, allEmployees, accessibleEmployeeIds, scheduleByEmployee, periodStart, periodEnd, approvedLateCompensatedByEmployee]);
 
   const filteredStats = useMemo(() => {
     return employeeStats.filter((stat) => {
@@ -311,6 +311,7 @@ export default function CompensationPanel({
   const handleSubmitCompensation = async (selectedList, reason, authorizer) => {
     setSubmitting(true);
     try {
+      const codigoSolicitud = `COMP-${selectedEmployee.id}-${Date.now()}`;
       const incidentsToCreate = selectedList.map((item) => ({
         employee_id: selectedEmployee.id,
         attendance_record_id: item.recordId,
@@ -324,6 +325,7 @@ export default function CompensationPanel({
         justified_time_end: item.record?.clock_out || null,
         authorizer_id: authorizer.id,
         authorizer_name: `${authorizer.first_name} ${authorizer.last_name}`,
+        codigo_solicitud: codigoSolicitud,
         status: "Pendiente",
       }));
 
@@ -373,6 +375,7 @@ export default function CompensationPanel({
         await entitiesAPI.AttendanceIncident.delete(comp.id);
       }
 
+      const codigoSolicitud = `COMP-${selectedEmployee.id}-${Date.now()}`;
       const incidentsToCreate = selectedList.map((item) => ({
         employee_id: selectedEmployee.id,
         attendance_record_id: item.recordId,
@@ -386,6 +389,7 @@ export default function CompensationPanel({
         justified_time_end: item.record?.clock_out || null,
         authorizer_id: authorizer.id,
         authorizer_name: `${authorizer.first_name} ${authorizer.last_name}`,
+        codigo_solicitud: codigoSolicitud,
         status: "Pendiente",
       }));
 
@@ -868,6 +872,11 @@ export default function CompensationPanel({
                           {stat.lateDays > 0 && (
                             <span className="block text-[9px] text-orange-400">
                               {stat.lateDays} día(s)
+                            </span>
+                          )}
+                          {stat.compensatedLateMinutes > 0 && (
+                            <span className="block text-[9px] text-green-500">
+                              comp. {stat.compensatedLateMinutes} min
                             </span>
                           )}
                         </td>
