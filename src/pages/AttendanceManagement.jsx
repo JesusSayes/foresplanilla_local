@@ -22,7 +22,7 @@ import { createPageUrl } from "@/utils";
 import { todayLima, todayDateLima, parseDateLima, dateToStringLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
-import { calcEffectiveMetrics, toMin as attToMin, getSegmentClockTimes, getAdditionalMinutes, getEffectiveLateMinutes, getEffectiveOvertime } from "@/lib/attendanceMetrics";
+import { calcEffectiveMetrics, toMin as attToMin, getSegmentClockTimes, getAdditionalMinutes, getPreShiftMinutes, getEffectiveLateMinutes, getEffectiveOvertime } from "@/lib/attendanceMetrics";
 import { syncOvertimeAlert, syncOvertimeAlertsBatch } from "@/lib/overtimeAlertSync";
 import TardinessCompensationModal from "../components/attendance/TardinessCompensationModal";
 import IncidentHistory from "../components/attendance/IncidentHistory";
@@ -453,11 +453,16 @@ export default function AttendanceManagement() {
       const updatedRecord = updatedRaw?.[0];
       if (updatedRecord) {
         const pendingAlerts = await base44.entities.OvertimeAlert.filter({ status: "Pendiente" });
-        const syncResult = await syncOvertimeAlert(updatedRecord, pendingAlerts, currentUser);
-        if (syncResult === "created") {
-          toast.warning(`⚠️ ${(getAdditionalMinutes(updatedRecord) / 60).toFixed(2)}h adicionales sin autorización — alerta generada.`);
-        } else if (syncResult === "discarded") {
-          toast.info("Alerta de HE descartada — la corrección eliminó el exceso.");
+        const schedule = getEmployeeScheduleForDate(editingRecord.employee_id, recordDate);
+        const syncResult = await syncOvertimeAlert(updatedRecord, pendingAlerts, currentUser, !!schedule);
+        if (syncResult?.postShift === "created") {
+          toast.warning(`⚠️ ${(getAdditionalMinutes(updatedRecord) / 60).toFixed(2)}h después del horario — alerta generada.`);
+        }
+        if (syncResult?.preShift === "created") {
+          toast.warning(`⚠️ ${(getPreShiftMinutes(updatedRecord) / 60).toFixed(2)}h antes del horario — alerta generada.`);
+        }
+        if (syncResult?.postShift === "discarded" || syncResult?.preShift === "discarded") {
+          toast.info("Alerta descartada — la corrección eliminó el exceso.");
         }
       }
 
@@ -909,7 +914,7 @@ export default function AttendanceManagement() {
     // desde aquí — queda pendiente si se necesita sincronizar todo el historial.
     try {
       const pendingAlerts = await base44.entities.OvertimeAlert.filter({ status: "Pendiente" });
-      await syncOvertimeAlertsBatch(todayRecords, pendingAlerts, currentUser);
+      await syncOvertimeAlertsBatch(todayRecords, pendingAlerts, currentUser, (r) => !!getEmployeeScheduleForDate(r.employee_id, r.date));
     } catch (e) { console.error("Error sincronizando alertas HE:", e); }
 
     queryClient.invalidateQueries(["todayAttendance"]);
@@ -2028,7 +2033,9 @@ export default function AttendanceManagement() {
                              <div className="flex-1">
                                <div className="flex items-center gap-3 mb-2">
                                  <h4 className="font-bold text-slate-900">{emp ? `${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                 <Badge className="bg-red-600 text-white">{alert.overtime_hours.toFixed(2)}h extras</Badge>
+                                 <Badge className={alert.overtime_hours < 0 ? "bg-amber-600 text-white" : "bg-red-600 text-white"}>
+                                   {alert.overtime_hours < 0 ? "Ingreso anticipado" : "Salida posterior"}: {Math.abs(alert.overtime_hours).toFixed(2)}h
+                                 </Badge>
                                </div>
                                <p className="text-sm text-slate-600 mb-2">{emp?.position} • {emp?.department_name}</p>
                                <p className="text-sm text-slate-700">📅 {format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}</p>
@@ -2042,7 +2049,10 @@ export default function AttendanceManagement() {
                              </div>
                            </div>
                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
-                             <p className="text-sm text-yellow-900">⚠️ Este empleado <strong>no está autorizado</strong> para realizar horas extras de forma permanente. Puede corregir la marcación, descartar la alerta o <strong>aceptar las HE únicamente para este día</strong> sin modificar su autorización general.</p>
+                             <p className="text-sm text-yellow-900">⚠️ {alert.overtime_hours < 0
+                               ? <>Este empleado <strong>ingresó antes</strong> de la hora programada. Puede corregir la marcación, descartar la alerta o <strong>autorizar el tiempo adicional solo para este día</strong>.</>
+                               : <>Este empleado <strong>no está autorizado</strong> para realizar horas extras de forma permanente. Puede corregir la marcación, descartar la alerta o <strong>aceptar las HE únicamente para este día</strong> sin modificar su autorización general.</>
+                             }</p>
                            </div>
                            <div className="flex gap-2 flex-wrap">
                               <Button size="sm" variant="outline" className="flex-1" onClick={() => {
@@ -2083,7 +2093,7 @@ export default function AttendanceManagement() {
                                   toast.success(`HE aceptadas y recalculadas para el ${format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}: HE25% y HE35% actualizadas`);
                                 }}
                               >
-                                <CheckCircle className="w-4 h-4 mr-2" />Aceptar HE (solo este día)
+                                <CheckCircle className="w-4 h-4 mr-2" />{alert.overtime_hours < 0 ? "Autorizar anticipado (solo este día)" : "Aceptar HE (solo este día)"}
                               </Button>
                               <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
                                 await base44.entities.OvertimeAlert.update(alert.id, { status: "Descartado" });
