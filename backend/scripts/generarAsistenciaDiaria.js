@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import defaultPrisma from '../config/prisma.js';
 import { generate24HexId } from '../utils/idGenerator.js';
 import { employmentEndDate, isEmploymentDateValid } from '../utils/employmentDate.js';
 
-const prisma = new PrismaClient();
 
 const DAY_NAMES = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
 
@@ -56,8 +55,7 @@ function dateRange(startStr, endStr) {
   return dates;
 }
 
-function todayInPeru() {
-  const now    = new Date();
+export function todayInPeru(now = new Date()) {
   const peruMs = now.getTime() + now.getTimezoneOffset() * 60000 + (-5 * 60 * 60000);
   const d      = new Date(peruMs);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -76,14 +74,14 @@ function todayInPeru() {
  *   employee_batch → cuántos empleados procesar por llamada (default: 200 en cron, 5 en backfill)
  *   skip_employees → saltar los primeros N empleados (para paginación de backfill)
  */
-export async function generarAsistenciaDiaria({ date_from = null, employee_id = null, employee_batch = null, cursor_employee = null } = {}) {
+export async function generarAsistenciaDiaria({ date_from = null, employee_id = null, employee_batch = null, cursor_employee = null } = {}, { prisma = defaultPrisma, now = new Date() } = {}) {
   const forcedDateFrom   = date_from;
   const filterEmployeeId = employee_id;
   const isBackfill       = !!forcedDateFrom;
   const defaultBatch     = isBackfill ? 5 : 200;
   const rawBatch         = parseInt(employee_batch, 10) || defaultBatch;
   const employeeBatch    = Math.min(Math.max(1, rawBatch), 200);
-  const todayStr         = todayInPeru();
+  const todayStr         = todayInPeru(now);
 
   const [schedulesRaw, holidaysRaw, contractsRaw] = await Promise.all([
     prisma.work_schedule.findMany({ where: { is_active: true }, orderBy: { id: 'asc' } }),
@@ -221,8 +219,8 @@ export async function generarAsistenciaDiaria({ date_from = null, employee_id = 
       }
 
       if (recordsToCreate.length > 0) {
-        await prisma.attendance_record.createMany({ data: recordsToCreate, skipDuplicates: true });
-        totalCreated += recordsToCreate.length;
+        const created = await prisma.attendance_record.createMany({ data: recordsToCreate, skipDuplicates: true });
+        totalCreated += created.count;
       }
 
     } catch (empError) {
@@ -256,5 +254,5 @@ if (process.argv[1].endsWith('generarAsistenciaDiaria.js')) {
   generarAsistenciaDiaria(args)
     .then(r => { console.log(JSON.stringify(r, null, 2)); process.exit(0); })
     .catch(e => { console.error(e); process.exit(1); })
-    .finally(() => prisma.$disconnect());
+    .finally(() => defaultPrisma.$disconnect());
 }

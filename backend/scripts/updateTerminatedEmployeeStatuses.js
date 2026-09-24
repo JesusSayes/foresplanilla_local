@@ -1,6 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "../config/prisma.js";
 
 export async function updateTerminatedEmployeeStatuses({ date = new Date() } = {}) {
   const todayInLima = date.toLocaleDateString("sv-SE", { timeZone: "America/Lima" });

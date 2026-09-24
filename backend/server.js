@@ -64,7 +64,8 @@ import mailerRoutes from './routes/mailer.js';
 import { syncBiotimeAttendance } from './controllers/sync/biotimeSyncController.js';
 import uploadRoutes from "./routes/uploadRoutes.js";
 import derechohabientesRoutes from './routes/derechohabientes.js';
-import { generarAsistenciaDiaria } from './scripts/generarAsistenciaDiaria.js';
+import { generarAsistenciaDiaria, todayInPeru } from './scripts/generarAsistenciaDiaria.js';
+import { createDailyAttendanceJob } from './services/dailyAttendanceJob.js';
 import { updateTerminatedEmployeeStatuses } from './scripts/updateTerminatedEmployeeStatuses.js';
 import { calcularAsistenciaDesdeLogs } from './scripts/calcularAsistenciaDesdeLogs.js';
 import { syncExternalAttendance } from './services/externalAttendanceSync.js';
@@ -225,14 +226,13 @@ cron.schedule('0 * * * *', () => {
   // calcularAsistenciaDesdeLogs().catch(err => console.error('[Cron] Error en calcularAsistenciaDesdeLogs:', err.message));
 // }, { timezone: CRON_TIMEZONE });
 
-// Cron: generar asistencia diaria a las 00:00 (medianoche hora local)
-cron.schedule('0 0 * * *', () => {
-  console.log('[Cron] Ejecutando generarAsistenciaDiaria...');
-  updateTerminatedEmployeeStatuses()
-    .then(result => console.log(`[Cron] Empleados actualizados a Cesado: ${result.updated}`))
-    .then(() => generarAsistenciaDiaria({ mode: 'cron' }))
-    .catch(err => console.error('[Cron] Error en generación diaria de asistencia:', err.message));
-}, { timezone: CRON_TIMEZONE });
+const runDailyAttendance = createDailyAttendanceJob({
+  generate: generarAsistenciaDiaria,
+  getDate: todayInPeru,
+  updateStatuses: updateTerminatedEmployeeStatuses,
+});
+// Generar a las 00:05; reintentar cada hora solo si el día no terminó sin errores.
+cron.schedule('5 * * * *', runDailyAttendance, { timezone: CRON_TIMEZONE });
 
 // Cron: obtener el tipo de cambio una vez al día a las 05:00 a. m.
 // El servicio no consulta el API externo cuando el registro del día ya existe.
@@ -295,7 +295,8 @@ app.listen(PORT, () => {
   console.log('[Cron] Timezone configurado: ' + CRON_TIMEZONE);
   console.log('[Cron] Sync biotime programado cada hora (0 * * * *)');
   console.log('[Cron] Calcular asistencia desde logs programado cada hora en minuto 10 (10 * * * *)');
-  console.log('[Cron] Generar asistencia diaria programado a las 00:00 (0 0 * * *)');
+  console.log('[Cron] Generar asistencia al iniciar y 00:05; reintentar en minuto 5 hasta completar el día');
+  void runDailyAttendance();
   console.log('[Cron] Sync asistencias externas programado cada hora en minuto 15 (15 * * * *)');
 });
 app.use("/uploads", (req, res, next) => {
