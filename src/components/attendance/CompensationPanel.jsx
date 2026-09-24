@@ -183,6 +183,7 @@ export default function CompensationPanel({
         totalRegularHours: 0,
         totalOvertimeHours: 0,
         usedOvertimeMinutes: approvedOvertimeByEmployee.get(emp.id) || 0,
+        compensatedLateMinutes: approvedLateCompensatedByEmployee.get(emp.id) || 0,
         totalLateMinutes: 0,
         lateDays: 0,
         overtimeDays: 0,
@@ -293,6 +294,17 @@ export default function CompensationPanel({
     return map;
   }, [existingCompensations]);
 
+  // Minutos de tardanza ya compensados (aprobados) por empleado
+  const approvedLateCompensatedByEmployee = useMemo(() => {
+    const map = new Map();
+    for (const c of existingCompensations) {
+      if (c.status === "Aprobada") {
+        map.set(c.employee_id, (map.get(c.employee_id) || 0) + (c.late_minutes_to_adjust || 0));
+      }
+    }
+    return map;
+  }, [existingCompensations]);
+
   const handleOpenModal = (stat) => {
     setSelectedEmployee(stat.employee);
     setEditMode(false);
@@ -311,6 +323,7 @@ export default function CompensationPanel({
   const handleSubmitCompensation = async (selectedList, reason, authorizer) => {
     setSubmitting(true);
     try {
+      const codigoSolicitud = `COMP-${selectedEmployee.id}-${Date.now()}`;
       const incidentsToCreate = selectedList.map((item) => ({
         employee_id: selectedEmployee.id,
         attendance_record_id: item.recordId,
@@ -324,6 +337,7 @@ export default function CompensationPanel({
         justified_time_end: item.record?.clock_out || null,
         authorizer_id: authorizer.id,
         authorizer_name: `${authorizer.first_name} ${authorizer.last_name}`,
+        codigo_solicitud: codigoSolicitud,
         status: "Pendiente",
       }));
 
@@ -369,6 +383,7 @@ export default function CompensationPanel({
         await base44.entities.AttendanceIncident.delete(comp.id);
       }
 
+      const codigoSolicitud = `COMP-${selectedEmployee.id}-${Date.now()}`;
       const incidentsToCreate = selectedList.map((item) => ({
         employee_id: selectedEmployee.id,
         attendance_record_id: item.recordId,
@@ -382,6 +397,7 @@ export default function CompensationPanel({
         justified_time_end: item.record?.clock_out || null,
         authorizer_id: authorizer.id,
         authorizer_name: `${authorizer.first_name} ${authorizer.last_name}`,
+        codigo_solicitud: codigoSolicitud,
         status: "Pendiente",
       }));
 
@@ -860,6 +876,11 @@ export default function CompensationPanel({
                           {stat.lateDays > 0 && (
                             <span className="block text-[9px] text-orange-400">
                               {stat.lateDays} día(s)
+                            </span>
+                          )}
+                          {stat.compensatedLateMinutes > 0 && (
+                            <span className="block text-[9px] text-green-500">
+                              comp. {stat.compensatedLateMinutes} min
                             </span>
                           )}
                         </td>
