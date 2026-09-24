@@ -279,6 +279,17 @@ export function calcEffectiveMetrics({
   };
 }
 
+export const getPreShiftMinutes = (record) => {
+  if (!record) return 0;
+  const { firstClockIn } = getSegmentClockTimes(record);
+  if (!firstClockIn || !record.scheduled_start) return 0;
+  const start = toMin(record.scheduled_start);
+  const end = toMin(record.scheduled_end);
+  let first = toMin(firstClockIn);
+  if (record.scheduled_end && end < start && first < (start + end) / 2) first += 1440;
+  return Math.max(0, start - first);
+};
+
 export const getAdditionalMinutes = (record) => {
   if (!record || !record.scheduled_end) return 0;
   const schedStartMin = toMin(record.scheduled_start || "00:00");
@@ -390,8 +401,15 @@ export function calcularMetricas(record, schedule, dateStr, overtimeAuthorized, 
     "saturday_end",
   ];
 
-  const scheduledStart = schedule?.[dayStartMap[dow]] || "09:00";
-  const scheduledEnd = schedule?.[dayEndMap[dow]] || "18:00";
+  const scheduledStart = schedule?.[dayStartMap[dow]]?.trim() || null;
+  const scheduledEnd = schedule?.[dayEndMap[dow]]?.trim() || null;
+  if (!scheduledStart || !scheduledEnd) {
+    return {
+      worked_hours: 0, regular_hours: 0, overtime_hours_25: 0, overtime_hours_35: 0,
+      is_late: false, late_minutes: 0, is_absent: false,
+      scheduled_start: null, scheduled_end: null,
+    };
+  }
   const breakMinutes = schedule?.break_duration_minutes ?? 60;
   const breakStart = schedule?.break_start ?? null;
   const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
@@ -415,11 +433,7 @@ export function calcularMetricas(record, schedule, dateStr, overtimeAuthorized, 
   let overtimeHours35 = 0;
 
   if (overtimeAuthorized) {
-    const extraHours = getAdditionalMinutes({
-      ...record,
-      scheduled_start: scheduledStart,
-      scheduled_end: scheduledEnd,
-    }) / 60;
+    const extraHours = effective.additionalMinutes / 60;
     overtimeHours25 = Math.min(extraHours, 2);
     overtimeHours35 = Math.max(0, extraHours - 2);
   }

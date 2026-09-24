@@ -23,7 +23,7 @@ import { createPageUrl } from "@/utils";
 import { todayLima, todayDateLima, parseDateLima, dateToStringLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
-import { calcEffectiveMetrics, getSegmentClockTimes, getAdditionalMinutes } from "@/lib/attendanceMetrics";
+import { calcEffectiveMetrics, getSegmentClockTimes, getAdditionalMinutes, getPreShiftMinutes } from "@/lib/attendanceMetrics";
 import { isEmploymentDateValid } from "@/lib/employmentDate";
 import { syncOvertimeAlert, syncOvertimeAlertsBatch } from "@/lib/overtimeAlertSync";
 import TardinessCompensationModal from "../components/attendance/TardinessCompensationModal";
@@ -371,6 +371,12 @@ export default function AttendanceManagement() {
   };
 
   // Compatibilidad: sin fecha usa la fecha seleccionada
+  const hasScheduledDay = (empId, dateStr) => {
+    const schedule = getEmployeeScheduleForDate(empId, dateStr);
+    const day = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][parseDateLima(dateStr).getDay()];
+    return !!(schedule?.[`${day}_start`] && schedule?.[`${day}_end`]);
+  };
+
   const getEmployeeSchedule = (empId) => getEmployeeScheduleForDate(empId, dateToStringLima(selectedDate));
   const isOvertimeAuthorized = (empId) => getEmployeeSchedule(empId)?.overtime_authorized || false;
 
@@ -501,11 +507,15 @@ export default function AttendanceManagement() {
       const updatedRecord = await entitiesAPI.AttendanceRecord.get(editingRecord.id);
       if (updatedRecord) {
         const pendingAlerts = await entitiesAPI.OvertimeAlert.filter({ status: "Pendiente" });
-        const syncResult = await syncOvertimeAlert(updatedRecord, pendingAlerts, currentUser);
-        if (syncResult === "created") {
-          toast.warning(`⚠️ ${(getAdditionalMinutes(updatedRecord) / 60).toFixed(2)}h adicionales sin autorización — alerta generada.`);
-        } else if (syncResult === "discarded") {
-          toast.info("Alerta de HE descartada — la corrección eliminó el exceso.");
+        const syncResult = await syncOvertimeAlert(updatedRecord, pendingAlerts, currentUser, hasScheduledDay(editingRecord.employee_id, recordDate));
+        if (syncResult?.postShift === "created") {
+          toast.warning(`⚠️ ${(getAdditionalMinutes(updatedRecord) / 60).toFixed(2)}h después del horario — alerta generada.`);
+        }
+        if (syncResult?.preShift === "created") {
+          toast.warning(`⚠️ ${(getPreShiftMinutes(updatedRecord) / 60).toFixed(2)}h antes del horario — alerta generada.`);
+        }
+        if (syncResult?.postShift === "discarded" || syncResult?.preShift === "discarded") {
+          toast.info("Alerta descartada — la corrección eliminó el exceso.");
         }
       }
 
@@ -953,7 +963,7 @@ export default function AttendanceManagement() {
       const pendingAlerts = await entitiesAPI.OvertimeAlert.filter({ status: "Pendiente" });
       const { data: updatedRecords, error } = await refetchTodayRecords();
       if (error) throw error;
-      await syncOvertimeAlertsBatch(updatedRecords || [], pendingAlerts, currentUser);
+      await syncOvertimeAlertsBatch(updatedRecords || [], pendingAlerts, currentUser, (r) => hasScheduledDay(r.employee_id, r.date));
     } catch (e) { console.error("Error sincronizando alertas HE:", e); }
 
     queryClient.invalidateQueries(["todayAttendance"]);
@@ -1263,7 +1273,7 @@ export default function AttendanceManagement() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) { toast.error('Por favor, permite las ventanas emergentes para imprimir'); return; }
     const filterText = attendanceFilter === "all" ? "Todos los empleados" : attendanceFilter === "sin_entrada" ? "Sin marcar entrada" : attendanceFilter === "sin_salida" ? "Sin marcar salida" : "Con tardanza";
-    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>DNI</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const rowDate = emp.displayDate || format(selectedDate, 'yyyy-MM-dd'); const ct = getSegmentClockTimes(emp.record); const pm = getRowMetrics(emp, rowDate); const pwh = Math.round(pm.totalWorkedHours * 60) / 60; const paLate = applyLateTolerance(pm.remainingLateMinutes, pm.toleranceMinutes); const pca = getCompensationAdjustments(emp.id, rowDate); const pnc = enableTardinessCompensation && emp.record?.tardiness_compensation_status === 'Activa' ? (emp.record.tardiness_compensation_minutes || 0) : 0; const pLate = Math.max(0, paLate - pca.pendingLateMin - pca.approvedLateMin - pnc); let pOT = pca.pendingOTHours; let p25 = emp.record?.overtime_hours_25 ?? 0; let p35 = emp.record?.overtime_hours_35 ?? 0; if (pOT > 0 && p25 > 0) { const d = Math.min(p25, pOT); p25 -= d; pOT -= d; } if (pOT > 0 && p35 > 0) { const d = Math.min(p35, pOT); p35 -= d; pOT -= d; } return `<tr><td>${emp.document_number}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${ct.firstClockIn || '--:--'}</td><td>${ct.lastClockOut || '--:--'}</td><td>${pwh.toFixed(2)}h</td><td class="${pLate > 0 ? 'late' : ''}">${pLate} min</td><td>${p25.toFixed(2)}h</td><td>${p35.toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
+    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>DNI</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const rowDate = emp.displayDate || format(selectedDate, 'yyyy-MM-dd'); const ct = getSegmentClockTimes(emp.record); const pm = getRowMetrics(emp, rowDate); const pwh = Math.round(pm.rawWorkedHours * 60) / 60; const paLate = applyLateTolerance(pm.remainingLateMinutes, pm.toleranceMinutes); const pca = getCompensationAdjustments(emp.id, rowDate); const pnc = enableTardinessCompensation && emp.record?.tardiness_compensation_status === 'Activa' ? (emp.record.tardiness_compensation_minutes || 0) : 0; const pLate = Math.max(0, paLate - pca.pendingLateMin - pca.approvedLateMin - pnc); let pOT = pca.pendingOTHours; let p25 = emp.record?.overtime_hours_25 ?? 0; let p35 = emp.record?.overtime_hours_35 ?? 0; if (pOT > 0 && p25 > 0) { const d = Math.min(p25, pOT); p25 -= d; pOT -= d; } if (pOT > 0 && p35 > 0) { const d = Math.min(p35, pOT); p35 -= d; pOT -= d; } return `<tr><td>${emp.document_number}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${ct.firstClockIn || '--:--'}</td><td>${ct.lastClockOut || '--:--'}</td><td>${pwh.toFixed(2)}h</td><td class="${pLate > 0 ? 'late' : ''}">${pLate} min</td><td>${p25.toFixed(2)}h</td><td>${p35.toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
     printWindow.document.write(printContent);
     printWindow.document.close();
   };
@@ -1763,7 +1773,7 @@ export default function AttendanceManagement() {
                                     return <span className="text-sm font-bold text-slate-900">8h 0m</span>;
                                   }
                                   const metrics = getRowMetrics(emp, rowDate);
-                                  const totalMin = Math.round(metrics.totalWorkedHours * 60);
+                                  const totalMin = Math.round(metrics.rawWorkedHours * 60);
                                   const hh = Math.floor(totalMin / 60);
                                   const mm = totalMin % 60;
                                   const hasJust = metrics.justifiedHours > 0;
@@ -2090,7 +2100,9 @@ export default function AttendanceManagement() {
                              <div className="flex-1">
                                <div className="flex items-center gap-3 mb-2">
                                  <h4 className="font-bold text-slate-900">{emp ? `${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                 <Badge className="bg-red-600 text-white">{Number(alert.overtime_hours || 0).toFixed(2)}h extras</Badge>
+                                 <Badge className={alert.overtime_hours < 0 ? "bg-amber-600 text-white" : "bg-red-600 text-white"}>
+                                   {alert.overtime_hours < 0 ? "Ingreso anticipado" : "Salida posterior"}: {Math.abs(alert.overtime_hours).toFixed(2)}h
+                                 </Badge>
                                </div>
                                <p className="text-sm text-slate-600 mb-2">{emp?.position} • {emp?.department_name}</p>
                                <p className="text-sm text-slate-700">📅 {format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}</p>
@@ -2104,7 +2116,10 @@ export default function AttendanceManagement() {
                              </div>
                            </div>
                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
-                             <p className="text-sm text-yellow-900">⚠️ Este empleado <strong>no está autorizado</strong> para realizar horas extras de forma permanente. Puede corregir la marcación, descartar la alerta o <strong>aceptar las HE únicamente para este día</strong> sin modificar su autorización general.</p>
+                             <p className="text-sm text-yellow-900">⚠️ {alert.overtime_hours < 0
+                               ? <>Este empleado <strong>ingresó antes</strong> de la hora programada. Puede corregir la marcación, descartar la alerta o <strong>autorizar el tiempo adicional solo para este día</strong>.</>
+                               : <>Este empleado <strong>no está autorizado</strong> para realizar horas extras de forma permanente. Puede corregir la marcación, descartar la alerta o <strong>aceptar las HE únicamente para este día</strong> sin modificar su autorización general.</>
+                             }</p>
                            </div>
                            {canEditAttendance && <div className="flex gap-2 flex-wrap">
                               <Button size="sm" variant="outline" className="flex-1" onClick={() => record && handleEditRecord(record)}>
@@ -2142,7 +2157,7 @@ export default function AttendanceManagement() {
                                   toast.success(`HE aceptadas y recalculadas para el ${format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}: HE25% y HE35% actualizadas`);
                                 }}
                               >
-                                <CheckCircle className="w-4 h-4 mr-2" />Aceptar HE (solo este día)
+                                <CheckCircle className="w-4 h-4 mr-2" />{alert.overtime_hours < 0 ? "Autorizar anticipado (solo este día)" : "Aceptar HE (solo este día)"}
                               </Button>
                               <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
                                 await entitiesAPI.OvertimeAlert.update(alert.id, { status: "Descartado" });

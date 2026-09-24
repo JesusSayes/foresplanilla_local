@@ -18,6 +18,7 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-f
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { parseDateLima, todayLima } from "@/lib/dateUtils";
+import { calcEffectiveMetrics } from "@/lib/attendanceMetrics";
 import ClockInOutWidget from "../components/attendance/ClockInOutWidget";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
@@ -158,7 +159,6 @@ export default function Attendance() {
 
     setUploadingFile(true);
     try {
-      // const { file_url } = await base44.integrations.Core.UploadFile({ file });
       const { file_url } = await uploadFile(file);
       setJustificationForm({ ...justificationForm, supporting_document_url: file_url });
       toast.success("Archivo cargado exitosamente");
@@ -250,12 +250,44 @@ export default function Attendance() {
     return totalMinutes / 60;
   };
 
+  // Obtiene todos los segmentos de marcación válidos del registro (1-4)
+  const getSegments = (record) => {
+    if (!record) return [];
+    const segs = [
+      { in: record.clock_in, out: record.clock_out },
+      { in: record.clock_in_2, out: record.clock_out_2 },
+      { in: record.clock_in_3, out: record.clock_out_3 },
+      { in: record.clock_in_4, out: record.clock_out_4 },
+    ];
+    return segs.filter(s => s.in || s.out);
+  };
+
+  // Calcula métricas efectivas (todos los segmentos, unión sin duplicar, refrigerio una vez)
+  const calcRecordMetrics = (record) => {
+    if (!record) return { rawWorkedHours: 0 };
+    const dow = parseDateLima(record.date).getDay();
+    const dayStartMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+    const dayEndMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+    const schedStart = workSchedule?.[dayStartMap[dow]] || null;
+    const schedEnd = workSchedule?.[dayEndMap[dow]] || null;
+    const isUnscheduledDay = !schedStart || !schedEnd;
+    return calcEffectiveMetrics({
+      record,
+      approvedIncidents: [],
+      schedStart: schedStart || "09:00",
+      schedEnd: schedEnd || "18:00",
+      breakMinutes: workSchedule?.break_duration_minutes ?? 60,
+      breakStart: workSchedule?.break_start || null,
+      isUnscheduledDay,
+    });
+  };
+
   const calculateStats = () => {
     const totalDays = attendanceRecords.length;
     const presentDays = attendanceRecords.filter(r => !r.is_absent).length;
     const lateDays = attendanceRecords.filter(r => r.is_late).length;
     const absentDays = attendanceRecords.filter(r => r.is_absent).length;
-    const totalHours = attendanceRecords.reduce((sum, r) => sum + (r.worked_hours || 0), 0);
+    const totalHours = attendanceRecords.reduce((sum, r) => sum + (calcRecordMetrics(r).rawWorkedHours || 0), 0);
     const avgHours = totalDays > 0 ? totalHours / totalDays : 0;
 
     return { totalDays, presentDays, lateDays, absentDays, totalHours, avgHours };
@@ -472,9 +504,19 @@ export default function Attendance() {
                                 </div>
                                 <div>
                                   <span className="text-slate-500 text-xs">Registrado:</span>
-                                  <p className={`font-medium ${record.clock_in && record.clock_out ? 'text-slate-900' : 'text-red-600'}`}>
-                                    {record.clock_in || "- -"} - {record.clock_out || "- -"}
-                                  </p>
+                                  {(() => {
+                                    const segs = getSegments(record);
+                                    if (segs.length === 0) return <p className="font-medium text-red-600">- -</p>;
+                                    return (
+                                      <div className="flex flex-col gap-0.5">
+                                        {segs.map((seg, i) => (
+                                          <p key={i} className={`font-medium text-xs ${seg.in && seg.out ? 'text-slate-900' : 'text-orange-600'}`}>
+                                            {seg.in || "--:--"} - {seg.out || "--:--"}
+                                          </p>
+                                        ))}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -488,9 +530,7 @@ export default function Attendance() {
                             <div>
                               <span className="text-slate-600 text-xs">Horas trabajadas</span>
                               <p className="font-semibold text-slate-900">
-                                {record.worked_hours != null
-                                  ? `${Number(record.worked_hours).toFixed(2)}h`
-                                  : "0h"}
+                                {(() => { const m = calcRecordMetrics(record); return `${m.rawWorkedHours.toFixed(2)}h`; })()}
                               </p>
                             </div>
                             <div>

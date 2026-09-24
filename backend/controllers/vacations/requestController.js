@@ -1,3 +1,4 @@
+import { syncVacationAttendance } from "../../services/vacationAttendance.js";
 import prisma from "../../config/prisma.js";
 import { canAccessEmployee, employeeScopeWhere, requireEmployeeAccess } from "../../middleware/authorization.js";
 
@@ -56,41 +57,44 @@ export const create = async (req, res) => {
       return res.status(400).json({ error: 'Fechas inválidas (start_date / end_date)' });
     }
 
-    const request = await MODEL.create({
-      data: {
-        id: generate24HexId(),
+    const request = await prisma.$transaction(async tx => {
+      const saved = await tx.vacation_request.create({
+        data: {
+          id: generate24HexId(),
 
-        ...pick(data, [
-          'employee_id',
-          'request_type',
-          'total_days',
-          'business_days',
-          'is_full_day',
-          'hours_requested',
-          'time_start',
-          'time_end',
-          'reason',
-          'supporting_document_url',
-          'comments',
-          'status',
-          'approved_by',
-          'rejection_reason',
-          'is_sample'
-        ]),
+          ...pick(data, [
+            'employee_id',
+            'request_type',
+            'total_days',
+            'business_days',
+            'is_full_day',
+            'hours_requested',
+            'time_start',
+            'time_end',
+            'reason',
+            'supporting_document_url',
+            'comments',
+            'status',
+            'approved_by',
+            'rejection_reason',
+            'is_sample'
+          ]),
 
-        start_date: parsedStart,
-        end_date: parsedEnd,
-        approved_date: parsedApproved,
+          start_date: parsedStart,
+          end_date: parsedEnd,
+          approved_date: parsedApproved,
 
-        status: data.status ?? 'Pendiente',
+          status: data.status ?? 'Pendiente',
 
-        created_date: new Date(),
-        updated_date: new Date(),
-        created_by: userEmail,
-        created_by_id: req.user?.id,
-      },
+          created_date: new Date(),
+          updated_date: new Date(),
+          created_by: userEmail,
+          created_by_id: req.user?.id,
+        },
+      });
+      await syncVacationAttendance(tx, saved);
+      return saved;
     });
-
     res.status(201).json(request);
 
   } catch (error) {
@@ -141,35 +145,38 @@ export const update = async (req, res) => {
       // }
     // }
 
-    const request = await MODEL.update({
-      where: { id: req.params.id },
-      data: {
-        ...pick(data, [
-          'employee_id',
-          'request_type',
-          'total_days',
-          'business_days',
-          'is_full_day',
-          'hours_requested',
-          'time_start',
-          'time_end',
-          'reason',
-          'supporting_document_url',
-          'comments',
-          'status',
-          'approved_by',
-          'rejection_reason',
-          'is_sample'
-        ]),
+    const request = await prisma.$transaction(async tx => {
+      const saved = await tx.vacation_request.update({
+        where: { id: req.params.id },
+        data: {
+          ...pick(data, [
+            'employee_id',
+            'request_type',
+            'total_days',
+            'business_days',
+            'is_full_day',
+            'hours_requested',
+            'time_start',
+            'time_end',
+            'reason',
+            'supporting_document_url',
+            'comments',
+            'status',
+            'approved_by',
+            'rejection_reason',
+            'is_sample'
+          ]),
 
-        ...(parsedStart && { start_date: parsedStart }),
-        ...(parsedEnd && { end_date: parsedEnd }),
-        ...(approved_date !== undefined && { approved_date: parsedApproved }),
+          ...(parsedStart && { start_date: parsedStart }),
+          ...(parsedEnd && { end_date: parsedEnd }),
+          ...(approved_date !== undefined && { approved_date: parsedApproved }),
 
-        updated_date: new Date(),
-      },
+          updated_date: new Date(),
+        },
+      });
+      await syncVacationAttendance(tx, saved);
+      return saved;
     });
-
     res.json(request);
 
   } catch (error) {

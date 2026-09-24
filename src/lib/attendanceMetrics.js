@@ -106,16 +106,23 @@ export function calcEffectiveMetrics({
       ["clock_in_3", "clock_out_3"],
       ["clock_in_4", "clock_out_4"],
     ];
-    let rawMins = 0;
+    const clockIntervals = [];
     for (const [inField, outField] of segFields) {
       const ci = record?.[inField] ? String(record[inField]).slice(0, 5) : null;
       const co = record?.[outField] ? String(record[outField]).slice(0, 5) : null;
       if (ci && co) {
         let d = toMin(co) - toMin(ci);
         if (d < 0) d += 1440; // cruce de medianoche
-        rawMins += Math.max(0, d);
+        clockIntervals.push([toMin(ci), toMin(ci) + Math.max(0, d)]);
       }
     }
+    clockIntervals.sort((a, b) => a[0] - b[0]);
+    const mergedClock = [];
+    for (const [start, end] of clockIntervals) {
+      if (!mergedClock.length || start > mergedClock[mergedClock.length - 1][1]) mergedClock.push([start, end]);
+      else mergedClock[mergedClock.length - 1][1] = Math.max(mergedClock[mergedClock.length - 1][1], end);
+    }
+    const rawMins = mergedClock.reduce((sum, [start, end]) => sum + end - start, 0);
     // Unión de intervalos justificados aprobados (sin duplicar superpuestos)
     const justIntervals = [];
     for (const inc of approvedIncidents) {
@@ -143,7 +150,7 @@ export function calcEffectiveMetrics({
     const effectiveBreak = Math.max(0, breakMinutes);
     const totalMins = Math.max(0, rawMins + justMins - effectiveBreak);
     return {
-      rawWorkedHours: rawMins / 60,
+      rawWorkedHours: Math.max(0, rawMins - effectiveBreak) / 60,
       justifiedHours: justMins / 60,
       totalWorkedHours: totalMins / 60,
       fullDayHours: 0,
@@ -543,6 +550,73 @@ export const getEffectiveOvertime = (record, enableCompensation) => {
     overtime_hours_25: Math.max(0, ot25 - deduct25),
     overtime_hours_35: Math.max(0, ot35 - deduct35),
   };
+};
+
+/**
+ * Calcula la compensación cruzada entre días: asigna minutos compensables
+ * (HE) de días posteriores a tardanzas de días anteriores, dentro del mismo
+ * mes y hasta maxDaysAfter días calendario después de la tardanza.
+ *
+ * Algoritmo voraz: para cada día de tardanza (de más antiguo a más reciente),
+ * usa minutos compensables del día elegible más cercano que tenga saldo
+ * disponible. Evita reutilizar el mismo minuto compensable.
+ *
+ * @param {Array} tardanzaDays - [{ date, lateMinutes }] días con tardanza > 0
+ * @param {Array} compensableDays - [{ date, overtimeMinutes }] días con HE > 0
+ * @param {number} maxDaysAfter - máx. días después de la tardanza (default 15)
+ * @returns {Object} { assignments, remainingTardanza, remainingCompensable, totalCompensated }
+ */
+export const computeCrossDayCompensation = (tardanzaDays, compensableDays, maxDaysAfter = 15) => {
+  const tDays = [...tardanzaDays]
+    .filter(d => d.lateMinutes > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const compMap = new Map();
+  for (const d of compensableDays) {
+    if (d.overtimeMinutes > 0) {
+      compMap.set(d.date, { date: d.date, available: d.overtimeMinutes, used: 0 });
+    }
+  }
+
+  const assignments = [];
+
+  for (const tDay of tDays) {
+    let remaining = tDay.lateMinutes;
+    const tDate = new Date(tDay.date + "T00:00:00");
+    const tYM = tDay.date.slice(0, 7);
+
+    const eligible = [...compMap.values()]
+      .filter(c => {
+        if (c.available - c.used <= 0) return false;
+        const cDate = new Date(c.date + "T00:00:00");
+        const diff = Math.round((cDate - tDate) / 86400000);
+        return diff >= 0 && diff <= maxDaysAfter && c.date.slice(0, 7) === tYM;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    for (const comp of eligible) {
+      if (remaining <= 0) break;
+      const avail = comp.available - comp.used;
+      if (avail <= 0) continue;
+      const use = Math.min(remaining, avail);
+      assignments.push({ tardanzaDate: tDay.date, compensableDate: comp.date, minutes: use });
+      comp.used += use;
+      remaining -= use;
+    }
+  }
+
+  const remainingTardanza = tDays.map(t => {
+    const comp = assignments.filter(a => a.tardanzaDate === t.date).reduce((s, a) => s + a.minutes, 0);
+    return { date: t.date, minutes: t.lateMinutes - comp };
+  });
+
+  const remainingCompensable = [...compMap.values()].map(c => ({
+    date: c.date, minutes: c.available - c.used,
+  }));
+
+  const totalCompensated = assignments.reduce((s, a) => s + a.minutes, 0);
+
+  return { assignments, remainingTardanza, remainingCompensable, totalCompensated };
 };
 
 export const computeScheduledHoursForPeriod = (schedule, startDateStr, endDateStr) => {
