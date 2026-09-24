@@ -106,16 +106,23 @@ export function calcEffectiveMetrics({
       ["clock_in_3", "clock_out_3"],
       ["clock_in_4", "clock_out_4"],
     ];
-    let rawMins = 0;
+    const clockIntervals = [];
     for (const [inField, outField] of segFields) {
       const ci = record?.[inField] ? String(record[inField]).slice(0, 5) : null;
       const co = record?.[outField] ? String(record[outField]).slice(0, 5) : null;
       if (ci && co) {
         let d = toMin(co) - toMin(ci);
         if (d < 0) d += 1440; // cruce de medianoche
-        rawMins += Math.max(0, d);
+        clockIntervals.push([toMin(ci), toMin(ci) + Math.max(0, d)]);
       }
     }
+    clockIntervals.sort((a, b) => a[0] - b[0]);
+    const mergedClock = [];
+    for (const [start, end] of clockIntervals) {
+      if (!mergedClock.length || start > mergedClock[mergedClock.length - 1][1]) mergedClock.push([start, end]);
+      else mergedClock[mergedClock.length - 1][1] = Math.max(mergedClock[mergedClock.length - 1][1], end);
+    }
+    const rawMins = mergedClock.reduce((sum, [start, end]) => sum + end - start, 0);
     // Unión de intervalos justificados aprobados (sin duplicar superpuestos)
     const justIntervals = [];
     for (const inc of approvedIncidents) {
@@ -143,7 +150,7 @@ export function calcEffectiveMetrics({
     const effectiveBreak = Math.max(0, breakMinutes);
     const totalMins = Math.max(0, rawMins + justMins - effectiveBreak);
     return {
-      rawWorkedHours: rawMins / 60,
+      rawWorkedHours: Math.max(0, rawMins - effectiveBreak) / 60,
       justifiedHours: justMins / 60,
       totalWorkedHours: totalMins / 60,
       fullDayHours: 0,

@@ -30,11 +30,16 @@ function getScheduleForDate(employeeId, departmentName, schedules, dateStr) {
 // Regla Peruana: primeras 2h extra → 25%, a partir de la 3ra → 35%
 // Soporta turnos nocturnos (schedEnd < schedStart, ej: 18:00 a 06:00)
 function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
-  const clockIn = record.clock_in;
-  const clockOut = record.clock_out;
+  const segFields = [
+    ["clock_in", "clock_out"],
+    ["clock_in_2", "clock_out_2"],
+    ["clock_in_3", "clock_out_3"],
+    ["clock_in_4", "clock_out_4"],
+  ];
 
-  // Sin entrada → todo en cero
-  if (!clockIn) {
+  // Sin ninguna entrada en ningún segmento → todo en cero
+  const hasAnyClockIn = segFields.some(([inF]) => record[inF]);
+  if (!hasAnyClockIn) {
     return {
       worked_hours: 0,
       regular_hours: 0,
@@ -57,14 +62,11 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
   const breakMinutes    = schedule?.break_duration_minutes ?? 60;
   const toleranceMinutes = schedule?.tolerance_minutes ?? 10;
 
-  const inTotal       = toMin(clockIn);
   const schedTotal    = toMin(scheduledStart);
   const schedEndTotal = toMin(scheduledEnd);
 
   const isNightShift = schedEndTotal < schedTotal;
 
-  // For night shifts, normalize all times relative to shift start
-  // This transforms the shift into [0, fullJornada] linear space
   const fullJornada = isNightShift
     ? (schedEndTotal - schedTotal + 1440)
     : Math.max(0, schedEndTotal - schedTotal);
@@ -77,40 +79,70 @@ function calcularMetricas(record, schedule, dateStr, overtimeAuthorized) {
   const normSchedStart = isNightShift ? 0 : schedTotal;
   const normSchedEnd   = isNightShift ? fullJornada : schedEndTotal;
 
-  // Lateness
-  const normIn = norm(inTotal);
-  // Only late if arrived within the shift window (not before it)
-  const rawLate = (normIn <= fullJornada) ? Math.max(0, normIn - normSchedStart) : 0;
+  // Recopilar intervalos válidos (con entrada Y salida) de TODOS los segmentos
+  // y la entrada más temprana para cálculo de tardanza
+  const intervals = [];
+  let earliestNormIn = null;
+  for (const [inF, outF] of segFields) {
+    const ci = record[inF] ? String(record[inF]).slice(0, 5) : null;
+    const co = record[outF] ? String(record[outF]).slice(0, 5) : null;
+    if (ci && co) {
+      let nIn  = norm(toMin(ci));
+      let nOut = norm(toMin(co));
+      if (isNightShift && nIn > fullJornada) nIn = 0;
+      if (nOut < nIn) nOut += 1440; // cruce de medianoche
+      if (nOut >= nIn) intervals.push([nIn, nOut]);
+    }
+    if (ci) {
+      let nIn = norm(toMin(ci));
+      if (isNightShift && nIn > fullJornada) nIn = 0;
+      if (earliestNormIn === null || nIn < earliestNormIn) earliestNormIn = nIn;
+    }
+  }
+
+  // Fusionar intervalos superpuestos (evita duplicar horas)
+  intervals.sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const [s, e] of intervals) {
+    if (merged.length === 0 || s > merged[merged.length - 1][1]) merged.push([s, e]);
+    else merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], e);
+  }
+
+  // Total marcado = unión de intervalos (sin duplicar)
+  const totalMarkedMin = merged.reduce((sum, [s, e]) => sum + (e - s), 0);
+
+  // Horas trabajadas = total marcado - refrigerio (una sola vez)
+  const workedHours = Math.max(0, (totalMarkedMin - effectiveBreakMinutes) / 60);
+
+  // Horas regulares = intersección con horario programado - refrigerio
+  let regularRawMin = 0;
+  for (const [s, e] of merged) {
+    const iS = Math.max(s, normSchedStart);
+    const iE = Math.min(e, normSchedEnd);
+    if (iE > iS) regularRawMin += (iE - iS);
+  }
+  const regularHours = Math.max(0, (regularRawMin - effectiveBreakMinutes) / 60);
+
+  // Horas extras = tiempo fuera del horario programado
+  let outsideMin = 0;
+  for (const [s, e] of merged) {
+    if (s < normSchedStart) outsideMin += Math.min(e, normSchedStart) - s;
+    if (e > normSchedEnd) outsideMin += e - Math.max(s, normSchedEnd);
+  }
+  outsideMin = Math.max(0, outsideMin);
+  const overtimeHours = outsideMin / 60;
+
+  // Tardanza (desde la entrada más temprana de todos los segmentos)
+  const rawLate = (earliestNormIn !== null && earliestNormIn <= fullJornada)
+    ? Math.max(0, earliestNormIn - normSchedStart) : 0;
   const lateMinutes = rawLate > toleranceMinutes ? rawLate : 0;
   const isLate = lateMinutes > 0;
 
-  let workedHours = 0;
-  let regularHours = 0;
-  let overtimeHours25 = 0;
-  let overtimeHours35 = 0;
-
-  if (clockOut) {
-    const outTotal = toMin(clockOut);
-    const normOut = norm(outTotal);
-    const effectiveNormIn = (isNightShift && normIn > fullJornada) ? 0 : normIn;
-
-    const totalMinutes = (normOut >= effectiveNormIn ? normOut - effectiveNormIn : 0) - effectiveBreakMinutes;
-    workedHours = Math.max(0, totalMinutes / 60);
-
-    const effectiveStart = Math.max(effectiveNormIn, normSchedStart);
-    const regularMinutes = Math.max(0, normSchedEnd - effectiveStart - effectiveBreakMinutes);
-    const normalHoursMax = regularMinutes / 60;
-
-    if (workedHours <= normalHoursMax) {
-      regularHours = workedHours;
-    } else {
-      regularHours = normalHoursMax;
-      const extraHours = workedHours - normalHoursMax;
-      if (overtimeAuthorized) {
-        overtimeHours25 = Math.min(extraHours, 2);
-        overtimeHours35 = Math.max(0, extraHours - 2);
-      }
-    }
+  // HE 25% y 35% (solo si autorizadas)
+  let overtimeHours25 = 0, overtimeHours35 = 0;
+  if (overtimeAuthorized && overtimeHours > 0) {
+    overtimeHours25 = Math.min(overtimeHours, 2);
+    overtimeHours35 = Math.max(0, overtimeHours - 2);
   }
 
   return {

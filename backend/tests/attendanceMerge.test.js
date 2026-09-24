@@ -31,14 +31,14 @@ for (const [name, changes, raw, additional] of cases) {
   });
 }
 
-test('HE autorizadas usan segmentos completos sin contar huecos ni anticipos', () => {
+test('HE autorizadas incluyen anticipos completos sin contar huecos', () => {
   const schedule = { monday_start: '09:00', monday_end: '18:00', break_duration_minutes: 60 };
   const r = { ...record, clock_in: '08:00', clock_out: '18:00', clock_in_2: '19:00', clock_out_2: '22:00' };
   const paid = backend.calcularMetricas(r, schedule, '2026-09-21', true);
   assert.equal(paid.regular_hours, 8);
   assert.equal(paid.overtime_hours_25, 2);
-  assert.equal(paid.overtime_hours_35, 1);
-  assert.equal(paid.worked_hours, 11);
+  assert.equal(paid.overtime_hours_35, 2);
+  assert.equal(paid.worked_hours, 12);
   const unpaid = backend.calcularMetricas(r, schedule, '2026-09-21', false);
   assert.equal(unpaid.overtime_hours_25 + unpaid.overtime_hours_35, 0);
   assert.equal(unpaid.worked_hours, 8);
@@ -60,6 +60,8 @@ test('sincronización local crea, actualiza y descarta sin reabrir decisiones', 
   let alerts = [];
   const writes = [];
   const tx = {
+    employee: { findUnique: async () => ({ id: "e1" }) },
+    work_schedule: { findMany: async () => [{ employee_id: "e1", is_active: true, monday_start: "09:00", monday_end: "18:00" }] },
     attendance_record: { findUnique: async () => current },
     overtime_alert: {
       findMany: async () => alerts,
@@ -94,4 +96,61 @@ test('primera entrada y última salida respetan los segmentos de un turno noctur
     assert.deepEqual(metrics.getSegmentClockTimes(r), { firstClockIn: '22:00', lastClockOut: '08:00' });
   }
   assert.equal(frontend.getPreShiftMinutes(r), 0);
+});
+
+for (const [name, marks, breakMinutes, expected] of [
+  ['segmento único', { clock_in: '07:00', clock_out: '16:00' }, 60, 8],
+  ['dos segmentos', { clock_in: '07:00', clock_out: '15:00', clock_in_2: '18:00', clock_out_2: '20:00' }, 60, 9],
+  ['segundo incompleto', { clock_in: '07:00', clock_out: '15:00', clock_in_2: '18:00' }, 60, 7],
+  ['duplicados', { clock_in: '07:00', clock_out: '16:00', clock_in_2: '07:00', clock_out_2: '16:00' }, 60, 8],
+  ['sin refrigerio', { clock_in: '07:00', clock_out: '15:00', clock_in_2: '18:00', clock_out_2: '20:00' }, 0, 10],
+]) {
+  test(`consolidación RRHH: ${name}`, () => {
+    const args = { record: marks, schedStart: '07:00', schedEnd: '16:00', breakMinutes };
+    assert.equal(backend.calcEffectiveMetrics(args).rawWorkedHours, expected);
+    assert.equal(frontend.calcEffectiveMetrics(args).rawWorkedHours, expected);
+    assert.equal(frontend.calcEffectiveMetrics({ ...args, isUnscheduledDay: true }).rawWorkedHours, expected);
+  });
+}
+
+test('anticipo incompleto genera aviso pero no horas extras pagables', () => {
+  const r = { ...record, clock_in: '08:00', clock_out: null };
+  const schedule = { monday_start: '09:00', monday_end: '18:00' };
+  assert.equal(backend.getPreShiftMinutes(r), 60);
+  const metrics = backend.calcularMetricas(r, schedule, '2026-09-21', true);
+  assert.equal(metrics.overtime_hours_25 + metrics.overtime_hours_35, 0);
+  assert.equal(metrics.worked_hours, 0);
+});
+
+test('alertas locales distinguen anticipos, decisiones y días libres', async t => {
+  let current = { ...record, clock_in: '08:00' };
+  let schedule = { employee_id: 'e1', is_active: true, monday_start: '09:00', monday_end: '18:00' };
+  let alerts = [{ id: 'post', status: 'Descartado', overtime_hours: 2 }];
+  const writes = [];
+  const tx = {
+    employee: { findUnique: async () => ({ id: 'e1' }) },
+    work_schedule: { findMany: async () => [schedule] },
+    attendance_record: { findUnique: async () => current },
+    overtime_alert: {
+      findMany: async () => alerts,
+      create: async args => writes.push(args),
+      update: async args => writes.push(args),
+    },
+  };
+  t.mock.method(prisma, '$transaction', async fn => fn(tx));
+  await syncOvertimeAlert('r1');
+  assert.equal(writes.length, 1);
+  assert.equal(writes.pop().data.overtime_hours, -1);
+  alerts.push({ id: 'pre', status: 'Autorizado', overtime_hours: -1 });
+  await syncOvertimeAlert('r1');
+  assert.equal(writes.length, 0);
+  alerts = [{ id: 'pre', status: 'Pendiente', overtime_hours: -1 }];
+  current = { ...current, clock_in: '09:00', overtime_authorized: true };
+  await syncOvertimeAlert('r1');
+  assert.equal(writes.pop().data.status, 'Descartado');
+  schedule = { ...schedule, monday_start: null, monday_end: null };
+  alerts = [];
+  current = { ...record, clock_in: '08:00' };
+  await syncOvertimeAlert('r1');
+  assert.equal(writes.length, 0);
 });
