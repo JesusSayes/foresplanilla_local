@@ -11,6 +11,16 @@ import {
 } from "../../utils/attendanceMetrics.js";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
+
+const normalizeDate = (value) => {
+  // El frontend reenvía fechas serializadas por Prisma. Conservar el día
+  // indicado, sin desplazarlo al convertir medianoche UTC a la zona de Lima.
+  if (typeof value === "string" && ISO_DATETIME.test(value) && Number.isFinite(Date.parse(value))) {
+    return value.slice(0, 10);
+  }
+  return value;
+};
 
 const recalcularAsistencia = async (req, res) => {
   try {
@@ -19,7 +29,9 @@ const recalcularAsistencia = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { employee_id, date_from, date_to } = req.body;
+    const { employee_id } = req.body;
+    const date_from = normalizeDate(req.body.date_from);
+    const date_to = normalizeDate(req.body.date_to);
 
     if (!employee_id || !date_from || !date_to) {
       return res.status(400).json({ error: 'employee_id, date_from y date_to son requeridos' });
