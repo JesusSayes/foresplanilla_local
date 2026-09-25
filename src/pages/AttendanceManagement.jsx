@@ -26,6 +26,7 @@ import { usePermissions } from "../components/hooks/usePermissions";
 import { calcEffectiveMetrics, getSegmentClockTimes, getAdditionalMinutes, getPreShiftMinutes } from "@/lib/attendanceMetrics";
 import { isEmploymentDateValid } from "@/lib/employmentDate";
 import { syncOvertimeAlert, syncOvertimeAlertsBatch } from "@/lib/overtimeAlertSync";
+import { generateOvertimeAlertsForAllRecords } from "@/lib/overtimeAlertGenerator";
 import TardinessCompensationModal from "../components/attendance/TardinessCompensationModal";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
@@ -930,6 +931,8 @@ export default function AttendanceManagement() {
 
   const [recalculandoTodo, setRecalculandoTodo] = useState(false);
   const [recalcProgress, setRecalcProgress] = useState({ done: 0, total: 0 });
+  const [generatingAlerts, setGeneratingAlerts] = useState(false);
+  const [alertGenProgress, setAlertGenProgress] = useState({ done: 0, total: 0 });
 
   const handleRecalcularTodo = async () => {
     if (!window.confirm("¿Recalcular tardanzas y horas para TODOS los empleados? Esto puede tardar varios minutos.")) return;
@@ -969,6 +972,28 @@ export default function AttendanceManagement() {
     queryClient.invalidateQueries(["todayAttendance"]);
     queryClient.invalidateQueries(["overtimeAlerts"]);
     toast.success(`✓ Recálculo completado para ${done} empleados`);
+  };
+
+  // Revisa TODOS los registros de asistencia guardados y genera/actualiza
+  // las alertas de HE pendientes (ingreso anticipado y salida posterior).
+  const handleGenerateOvertimeAlerts = async () => {
+    if (!window.confirm("¿Revisar todos los registros de asistencia y generar alertas de horas extras? Esto puede tardar unos minutos.")) return;
+    setGeneratingAlerts(true);
+    setAlertGenProgress({ done: 0, total: 0 });
+    try {
+      const result = await generateOvertimeAlertsForAllRecords({
+        currentUser,
+        workSchedules,
+        allEmployees,
+        onProgress: (p) => setAlertGenProgress(p),
+      });
+      queryClient.invalidateQueries(["overtimeAlerts"]);
+      toast.success(`✓ Revisión completada: ${result.pending} alerta(s) pendiente(s)`);
+    } catch (error) {
+      toast.error("Error al generar alertas: " + (error.message || ""));
+    } finally {
+      setGeneratingAlerts(false);
+    }
   };
 
   const handleExportIncidentsExcel = () => {
@@ -1523,14 +1548,14 @@ export default function AttendanceManagement() {
               <div className="flex flex-wrap items-center gap-2">
                 {hasPermission("system.admin") && (
                   <Button
-                    onClick={handleRecalcularTodo}
+                    onClick={handleGenerateOvertimeAlerts}
                     variant="outline"
-                    disabled={recalculandoTodo}
+                    disabled={generatingAlerts}
                     className="whitespace-nowrap border-orange-300 text-orange-700 hover:bg-orange-50 text-xs sm:text-sm"
                   >
-                    {recalculandoTodo
-                      ? `Recalculando... ${recalcProgress.done}/${recalcProgress.total}`
-                      : "Recalcular Todo"}
+                    {generatingAlerts
+                      ? `Actualizando... ${alertGenProgress.done}/${alertGenProgress.total}`
+                      : "Actualizar Alertas"}
                   </Button>
                 )}
                 {canExportAttendance && <Button onClick={() => handleExportToExcel()} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap text-xs sm:text-sm">
