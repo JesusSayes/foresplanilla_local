@@ -19,6 +19,7 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { parseDateLima, todayLima } from "@/lib/dateUtils";
 import { calcEffectiveMetrics } from "@/lib/attendanceMetrics";
+import { useQueryLoading } from "@/lib/useQueryLoading";
 import ClockInOutWidget from "../components/attendance/ClockInOutWidget";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
@@ -85,7 +86,7 @@ export default function Attendance() {
     enabled: !!employee?.id,
   });
 
-  const { data: attendanceRecords = [], isLoading, refetch: refetchRecords } = useQuery({
+  const { data: attendanceRecords = [], isLoading, refetch: refetchRecords, isFetching: attFetching } = useQuery({
     queryKey: ["attendanceRecords", employee?.id, dateRange, selectedDate],
     queryFn: async () => {
       if (!employee?.id) return [];
@@ -99,18 +100,17 @@ export default function Attendance() {
         endDate = endOfMonth(selectedDate);
       }
 
-      const records = await entitiesAPI.AttendanceRecord.filter(
-        { employee_id: employee.id },
+      const fromStr = format(startDate, "yyyy-MM-dd");
+      const toStr = format(endDate, "yyyy-MM-dd");
+      return await entitiesAPI.AttendanceRecord.filter(
+        { employee_id: employee.id, date: { $gte: fromStr, $lte: toStr } },
         "-date"
       );
-
-      return records.filter(r => {
-        const recordDate = parseDateLima(r.date);
-        return recordDate >= startDate && recordDate <= endDate;
-      });
     },
     enabled: !!employee?.id,
   });
+
+  useQueryLoading([{ isFetching: attFetching, message: "Consultando tus registros de asistencia..." }]);
 
   const todayRecord = attendanceRecords.find(
     r => r.date === todayLima()

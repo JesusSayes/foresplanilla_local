@@ -18,6 +18,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, differe
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { parseDateLima, dateToStringLima } from "@/lib/dateUtils";
+import { useQueryLoading } from "@/lib/useQueryLoading";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import jsPDF from 'jspdf'; import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -81,27 +82,32 @@ export default function AttendanceReports() {
     },
   });
 
-  const { data: attendanceRecords = [] } = useQuery({
+  const { data: attendanceRecords = [], isFetching: attFetching } = useQuery({
     queryKey: ["allAttendanceRecords", appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      const records = await entitiesAPI.AttendanceRecord.list("-date");
-      return records.filter(r => {
-        const recordDate = parseDateLima(r.date);
-        return recordDate >= appliedStartDate && recordDate <= appliedEndDate;
-      });
+      const fromStr = format(appliedStartDate, "yyyy-MM-dd");
+      const toStr = format(appliedEndDate, "yyyy-MM-dd");
+      return await entitiesAPI.AttendanceRecord.filter(
+        { date: { $gte: fromStr, $lte: toStr } }, "-date"
+      );
     },
   });
 
-  const { data: incidents = [] } = useQuery({
+  const { data: incidents = [], isFetching: incFetching } = useQuery({
     queryKey: ["allIncidents", appliedStartDate, appliedEndDate],
     queryFn: async () => {
-      const allIncidents = await entitiesAPI.AttendanceIncident.list("-created_date");
-      return allIncidents.filter(i => {
-        const incidentDate = parseDateLima(i.incident_date);
-        return incidentDate >= appliedStartDate && incidentDate <= appliedEndDate;
-      });
+      const fromStr = format(appliedStartDate, "yyyy-MM-dd");
+      const toStr = format(appliedEndDate, "yyyy-MM-dd");
+      return await entitiesAPI.AttendanceIncident.filter(
+        { incident_date: { $gte: fromStr, $lte: toStr } }, "-created_date"
+      );
     },
   });
+
+  useQueryLoading([
+    { isFetching: attFetching, message: "Consultando registros de asistencia..." },
+    { isFetching: incFetching, message: "Consultando incidencias..." },
+  ]);
 
   const { data: holidays = [] } = useQuery({
     queryKey: ["holidays"],

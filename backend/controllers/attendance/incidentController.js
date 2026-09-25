@@ -1,3 +1,4 @@
+import { attendanceDateFilter } from '../../utils/attendanceDateFilter.js';
 import prisma from "../../config/prisma.js";
 
 import { generate24HexId } from '../../utils/idGenerator.js';
@@ -53,9 +54,17 @@ export const filter = async (req, res) => {
     }
 
     if (filters.incident_date) {
-      const incidentDate = toPrismaDate(filters.incident_date);
-      if (!incidentDate) return res.status(400).json({ error: 'Fecha de incidente inválida' });
-      where.incident_date = incidentDate;
+      if (typeof filters.incident_date === 'object') {
+        try {
+          where.incident_date = attendanceDateFilter(filters.incident_date);
+        } catch (error) {
+          return res.status(400).json({ error: error.message });
+        }
+      } else {
+        const incidentDate = toPrismaDate(filters.incident_date);
+        if (!incidentDate) return res.status(400).json({ error: 'Fecha de incidente inválida' });
+        where.incident_date = incidentDate;
+      }
     }
 
     // rango de fechas (ajusta nombres de campos a tu schema)

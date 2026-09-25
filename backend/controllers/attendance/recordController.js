@@ -1,3 +1,4 @@
+import { attendanceDateFilter } from '../../utils/attendanceDateFilter.js';
 import { normalizeVacationAttendance } from "../../services/vacationAttendance.js";
 import prisma from "../../config/prisma.js";
 
@@ -187,13 +188,13 @@ export const filter = async (req, res) => {
     // log de lo que llega
     console.log('AttendanceRecord.filter body:', req.body);
 
-    // date exacto (string yyyy-MM-dd)
+    // Fecha exacta o rango { $gte, $lte } enviado por el frontend
     if (filters.date) {
-      const dateStr = filters.date;
-      where.date = {
-        gte: new Date(dateStr + 'T00:00:00.000Z'),
-        lte: new Date(dateStr + 'T23:59:59.999Z'),
-      };
+      try {
+        where.date = attendanceDateFilter(filters.date);
+      } catch (error) {
+        return res.status(400).json({ error: error.message });
+      }
     }
 
     if (filters.employee_id) {
