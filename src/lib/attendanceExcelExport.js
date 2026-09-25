@@ -82,7 +82,7 @@ export function buildAttendanceExportRows({
       // En fines de semana (sábados/domingos) las vacaciones no contabilizan horas
       excelHours = (!isWeekendEx && schedForRow && !isDayOffEx) ? Math.max(0, (
         (parseInt(schedEndEx.split(':')[0]) * 60 + parseInt(schedEndEx.split(':')[1])) -
-        (parseInt(schedStartEx.split(':')[0]) * 60 + parseInt(schedStartEx.split(':')[1])) - breakMinEx
+        (parseInt(schedStartEx.split(':')[0]) * 60 + parseInt(schedStartEx.split(':')[1]))
       ) / 60) : 0;
       excelLate = 0;
     } else {

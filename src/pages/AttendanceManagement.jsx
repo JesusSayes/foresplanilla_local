@@ -1599,11 +1599,9 @@ export default function AttendanceManagement() {
                                     if (isWeekendRow || !schedSt || !schedEn) {
                                       return <span className="text-sm font-bold text-slate-900">0h 0m</span>;
                                     }
-                                    const breakMinVac = sched?.break_duration_minutes ?? 60;
                                     const [vsh, vsm] = schedSt.split(":").map(Number);
                                     const [veh, vem] = schedEn.split(":").map(Number);
                                     let vacMin = (veh * 60 + vem) - (vsh * 60 + vsm);
-                                    if (vacMin >= 360) vacMin -= breakMinVac;
                                     vacMin = Math.max(0, vacMin);
                                     const vhh = Math.floor(vacMin / 60);
                                     const vmm = vacMin % 60;
