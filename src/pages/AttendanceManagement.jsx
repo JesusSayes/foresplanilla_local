@@ -1179,11 +1179,9 @@ export default function AttendanceManagement() {
     const dayMap = ["sunday_start", "monday_start", "tuesday_start", "wednesday_start", "thursday_start", "friday_start", "saturday_start"];
     const dayEndMap = ["sunday_end", "monday_end", "tuesday_end", "wednesday_end", "thursday_end", "friday_end", "saturday_end"];
     const dow = selectedDate.getDay();
-    // Fines de semana (sábado/domingo): no mostrar horario programado en vacaciones
-    if (dow === 0 || dow === 6) return { start: null, end: null };
     return {
-      start: schedule[dayMap[dow]] || "09:00",
-      end: schedule[dayEndMap[dow]] || "18:00",
+      start: schedule[dayMap[dow]] || null,
+      end: schedule[dayEndMap[dow]] || null,
     };
   };
 
@@ -1595,10 +1593,9 @@ export default function AttendanceManagement() {
                               <td className="px-2 py-2 text-center">
                                 {(() => {
                                   if (vacation) {
-                                    const isWeekendRow = dow2 === 0 || dow2 === 6;
-                                    if (isWeekendRow || !schedSt || !schedEn) {
-                                      return <span className="text-sm font-bold text-slate-900">0h 0m</span>;
-                                    }
+                                      if (!schedSt || !schedEn) {
+                                          return <span className="text-sm font-bold text-slate-900">0h 0m</span>;
+                                      }
                                     const [vsh, vsm] = schedSt.split(":").map(Number);
                                     const [veh, vem] = schedEn.split(":").map(Number);
                                     let vacMin = (veh * 60 + vem) - (vsh * 60 + vsm);

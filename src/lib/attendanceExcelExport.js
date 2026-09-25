@@ -79,8 +79,8 @@ export function buildAttendanceExportRows({
     let excelHours, excelLate, excelRawHours = 0;
     const isWeekendEx = dowForRow2 === 0 || dowForRow2 === 6;
     if (estadoMarcacion === 'Vacaciones') {
-      // En fines de semana (sábados/domingos) las vacaciones no contabilizan horas
-      excelHours = (!isWeekendEx && schedForRow && !isDayOffEx) ? Math.max(0, (
+      // Días sin horario programado (domingos, sábados sin horario) = 0h
+      excelHours = (schedForRow && !isDayOffEx) ? Math.max(0, (
         (parseInt(schedEndEx.split(':')[0]) * 60 + parseInt(schedEndEx.split(':')[1])) -
         (parseInt(schedStartEx.split(':')[0]) * 60 + parseInt(schedStartEx.split(':')[1]))
       ) / 60) : 0;
@@ -158,7 +158,7 @@ export function buildAttendanceExportRows({
     const { firstClockIn: rowFirstIn, lastClockOut: rowLastOut } = getSegmentClockTimes(emp.record);
     let entradaExcel = timeStrToExcelFraction(rowFirstIn);
     let salidaExcel  = timeStrToExcelFraction(rowLastOut);
-    if (estadoMarcacion === 'Vacaciones' && !isDayOffEx && !isWeekendEx) {
+    if (estadoMarcacion === 'Vacaciones' && !isDayOffEx) {
       entradaExcel = timeStrToExcelFraction(schedStartEx);
       salidaExcel  = timeStrToExcelFraction(schedEndEx);
     }
