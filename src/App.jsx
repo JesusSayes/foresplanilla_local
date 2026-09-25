@@ -15,6 +15,8 @@ import BeneficiosSociales from './pages/BeneficiosSociales';
 import ConfiguracionStarsoft from './pages/ConfiguracionStarsoft';
 import HistorialRemunerativo from './pages/HistorialRemunerativo';
 import TipoCambioManagement from './pages/TipoCambioManagement';
+import { LoadingProvider, useLoading } from '@/lib/loadingContext';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -126,15 +128,23 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <NavigationTracker />
-          <AuthenticatedApp />
-        </Router>
-        <Toaster />
-        <VisualEditAgent />
+        <LoadingProvider>
+          <Router>
+            <NavigationTracker />
+            <AuthenticatedApp />
+            <GlobalLoadingOverlay />
+          </Router>
+          <Toaster />
+          <VisualEditAgent />
+        </LoadingProvider>
       </QueryClientProvider>
     </AuthProvider>
   );
 }
 
-export default App;
+const GlobalLoadingOverlay = () => {
+  const { isLoading, message } = useLoading();
+  return <LoadingOverlay isLoading={isLoading} message={message} />;
+};
+
+export default App

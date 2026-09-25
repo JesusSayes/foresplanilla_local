@@ -1,5 +1,6 @@
 import express from 'express';
 const router = express.Router();
+import { correctVacationWeekends } from '../../controllers/attendance/vacationWeekendController.js';
 import controller from '../../controllers/attendance/recordController.js';
 import { authenticateToken } from '../../middleware/auth.js';
 import {
@@ -24,6 +25,7 @@ router.get('/:id', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScop
 router.post('/', requireAnyPermission('attendance.edit', 'attendance.manage'), attachEmployeeScope('attendance.edit', 'attendance.manage'), controller.create);
 router.put('/:id', requireAnyPermission('attendance.edit', 'attendance.approve_compensations', 'attendance.manage'), attachEmployeeScope('attendance.edit', 'attendance.approve_compensations', 'attendance.manage'), controller.update);
 router.delete('/:id', requireAnyPermission('attendance.edit', 'attendance.manage'), attachEmployeeScope('attendance.edit', 'attendance.manage'), controller.delete);
+router.post('/corregir-vacaciones-fin-de-semana', requireAnyPermission('attendance.edit', 'attendance.manage'), attachEmployeeScope('attendance.edit', 'attendance.manage'), correctVacationWeekends);
 router.post('/filter', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.filter);
 
 export default router

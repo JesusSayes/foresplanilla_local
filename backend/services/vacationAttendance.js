@@ -9,7 +9,7 @@ export function vacationAttendanceData(record, employee, schedules, holidays) {
   const date = toDateString(record.date);
   const schedule = getScheduleForDate(record.employee_id, employee?.department_name, schedules, date);
   const day = days[new Date(`${date}T00:00:00Z`).getUTCDay()];
-  const nonWorking = holidays.some(h => toDateString(h.date) === date) ||
+  const nonWorking = day === 'saturday' || day === 'sunday' || holidays.some(h => toDateString(h.date) === date) ||
     !schedule?.[`${day}_start`]?.trim() || !schedule?.[`${day}_end`]?.trim();
   return {
     status: 'Vacaciones', is_late: false, late_minutes: 0, is_absent: false,
