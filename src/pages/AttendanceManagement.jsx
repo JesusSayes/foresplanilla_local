@@ -925,6 +925,28 @@ export default function AttendanceManagement() {
     toast.success(`✓ Recálculo completado para ${done} empleados`);
   };
 
+  // Revisa TODOS los registros de asistencia guardados y genera/actualiza
+  // las alertas de HE pendientes (ingreso anticipado y salida posterior).
+  const handleGenerateOvertimeAlerts = async () => {
+    if (!window.confirm("¿Revisar todos los registros de asistencia y generar alertas de horas extras? Esto puede tardar unos minutos.")) return;
+    setGeneratingAlerts(true);
+    setAlertGenProgress({ done: 0, total: 0 });
+    try {
+      const result = await generateOvertimeAlertsForAllRecords({
+        currentUser,
+        workSchedules,
+        allEmployees,
+        onProgress: (p) => setAlertGenProgress(p),
+      });
+      queryClient.invalidateQueries(["overtimeAlerts"]);
+      toast.success(`✓ Revisión completada: ${result.pending} alerta(s) pendiente(s)`);
+    } catch (error) {
+      toast.error("Error al generar alertas: " + (error.message || ""));
+    } finally {
+      setGeneratingAlerts(false);
+    }
+  };
+
   const handleExportIncidentsExcel = () => {
     const statusMap = { pending: "Pendiente", approved: "Aprobada", rejected: "Rechazada" };
     const statusLabel = statusMap[incidentSubTab];
@@ -1479,14 +1501,14 @@ export default function AttendanceManagement() {
               <div className="flex flex-wrap items-center gap-2">
                 {hasPermission("system.admin") && (
                   <Button
-                    onClick={handleRecalcularTodo}
+                    onClick={handleGenerateOvertimeAlerts}
                     variant="outline"
-                    disabled={recalculandoTodo}
+                    disabled={generatingAlerts}
                     className="whitespace-nowrap border-orange-300 text-orange-700 hover:bg-orange-50 text-xs sm:text-sm"
                   >
-                    {recalculandoTodo
-                      ? `Recalculando... ${recalcProgress.done}/${recalcProgress.total}`
-                      : "Recalcular Todo"}
+                    {generatingAlerts
+                      ? `Actualizando... ${alertGenProgress.done}/${alertGenProgress.total}`
+                      : "Actualizar Alertas"}
                   </Button>
                 )}
                 <Button onClick={() => handleExportToExcel()} variant="outline" className="bg-green-600 text-white hover:bg-green-700 whitespace-nowrap text-xs sm:text-sm">
