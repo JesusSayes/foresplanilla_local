@@ -26,6 +26,7 @@ import { calcEffectiveMetrics, toMin as attToMin, getSegmentClockTimes, getAddit
 import { syncOvertimeAlert, syncOvertimeAlertsBatch } from "@/lib/overtimeAlertSync";
 import { generateOvertimeAlertsForAllRecords } from "@/lib/overtimeAlertGenerator";
 import { useLoading } from "@/lib/loadingContext";
+import { useQueryLoading } from "@/lib/useQueryLoading";
 import TardinessCompensationModal from "../components/attendance/TardinessCompensationModal";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
@@ -105,8 +106,7 @@ export default function AttendanceManagement() {
   const { getAccessibleSites, hasPermission, loading: permissionsLoading, employee: permEmployee } = usePermissions();
   const queryClient = useQueryClient();
   const { showLoading, hideLoading } = useLoading();
-
-  // Definir aquí para que esté disponible en todos los useEffect y handlers
+  useQueryLoading([{ isFetching: attFetching, message: "Consultando registros de asistencia..." }]);
   const effectiveEmployee = employee || permEmployee;
 
   useEffect(() => {
@@ -130,15 +130,15 @@ export default function AttendanceManagement() {
     queryFn: async () => await base44.entities.Employee.list("-created_date"),
   });
 
-  const { data: todayRecords = [] } = useQuery({
+  const { data: todayRecords = [], isFetching: attFetching } = useQuery({
     queryKey: ["todayAttendance", selectedDate, dateFrom, dateTo, isRangeMode],
     queryFn: async () => {
       if (isRangeMode && dateFrom && dateTo) {
-        // Cargar todos los registros en el rango
-        const allRecs = await base44.entities.AttendanceRecord.list("-date", 2000);
         const fromStr = dateToStringLima(dateFrom);
         const toStr = dateToStringLima(dateTo);
-        return allRecs.filter(r => r.date >= fromStr && r.date <= toStr);
+        return await base44.entities.AttendanceRecord.filter(
+          { date: { $gte: fromStr, $lte: toStr } }, "-date", 2000
+        );
       }
       const dateStr = dateToStringLima(selectedDate);
       return await base44.entities.AttendanceRecord.filter({ date: dateStr }, "-created_date");
