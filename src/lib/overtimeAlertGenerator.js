@@ -14,7 +14,7 @@
  * @param {Function} opts.onProgress - Callback ({done, total}) para progreso.
  * @returns {Promise<{total: number, pending: number}>}
  */
-import { base44 } from "@/api/base44Client";
+import { entitiesAPI } from "@/api/entitiesClient";
 import { syncOvertimeAlertsBatch } from "@/lib/overtimeAlertSync";
 
 // Obtiene el horario vigente de un empleado para una fecha (misma lógica
@@ -57,9 +57,9 @@ export const generateOvertimeAlertsForAllRecords = async ({
   onProgress,
 }) => {
   // Cargar TODOS los registros de asistencia (no solo los visibles)
-  const allRecords = await base44.entities.AttendanceRecord.list("-date", 5000);
+  const allRecords = await entitiesAPI.AttendanceRecord.list("-date");
   // Cargar alertas pendientes existentes (lista mutable que syncOvertimeAlert actualiza)
-  const pendingAlerts = await base44.entities.OvertimeAlert.filter({
+  const pendingAlerts = await entitiesAPI.OvertimeAlert.filter({
     status: "Pendiente",
   });
 
@@ -90,7 +90,11 @@ export const generateOvertimeAlertsForAllRecords = async ({
       batch,
       pendingAlerts,
       currentUser,
-      (r) => !!getScheduleForDate(r.employee_id, r.date, workSchedules, allEmployees)
+      (r) => {
+        const sched = getScheduleForDate(r.employee_id, r.date, workSchedules, allEmployees);
+        const dow = new Date(r.date + "T00:00:00").getDay();
+        return !!(sched?.[stMap[dow]] && sched?.[enMap[dow]]);
+      }
     );
     if (onProgress) {
       onProgress({ done: Math.min(i + batchSize, total), total });
