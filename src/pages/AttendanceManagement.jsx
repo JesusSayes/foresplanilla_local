@@ -25,6 +25,7 @@ import { usePermissions } from "../components/hooks/usePermissions";
 import { calcEffectiveMetrics, toMin as attToMin, getSegmentClockTimes, getAdditionalMinutes, getPreShiftMinutes, getEffectiveLateMinutes, getEffectiveOvertime } from "@/lib/attendanceMetrics";
 import { syncOvertimeAlert, syncOvertimeAlertsBatch } from "@/lib/overtimeAlertSync";
 import { generateOvertimeAlertsForAllRecords } from "@/lib/overtimeAlertGenerator";
+import { useLoading } from "@/lib/loadingContext";
 import TardinessCompensationModal from "../components/attendance/TardinessCompensationModal";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
@@ -103,6 +104,7 @@ export default function AttendanceManagement() {
 
   const { getAccessibleSites, hasPermission, loading: permissionsLoading, employee: permEmployee } = usePermissions();
   const queryClient = useQueryClient();
+  const { showLoading, hideLoading } = useLoading();
 
   // Definir aquí para que esté disponible en todos los useEffect y handlers
   const effectiveEmployee = employee || permEmployee;
@@ -286,12 +288,14 @@ export default function AttendanceManagement() {
     mutationFn: async (connectionId) => {
       const connection = dbConnections.find(c => c.id === connectionId);
       if (!connection) throw new Error("Conexión no encontrada");
+      showLoading("Importando marcaciones desde base de datos externa...");
       toast.info("Iniciando importación desde base de datos externa...");
       return new Promise((resolve) => {
         setTimeout(() => resolve({ success: true, imported: 45, errors: 2 }), 2000);
       });
     },
     onSuccess: async (result) => {
+      showLoading("Recalculando métricas de asistencia...");
       // Recalcular métricas para todos los empleados con registros en la fecha seleccionada
       const dateStr = dateToStringLima(selectedDate);
       const recordsForDate = await base44.entities.AttendanceRecord.filter({ date: dateStr });
@@ -304,9 +308,10 @@ export default function AttendanceManagement() {
         });
       }
       queryClient.invalidateQueries(["todayAttendance"]);
+      hideLoading();
       toast.success(`✓ ${result.imported} marcaciones importadas y métricas recalculadas. ${result.errors} errores.`);
     },
-    onError: () => toast.error("Error al importar marcaciones"),
+    onError: () => { hideLoading(); toast.error("Error al importar marcaciones"); },
   });
 
   // Obtener horario vigente para un empleado en una fecha específica (respeta effective_from/to)
@@ -897,6 +902,7 @@ export default function AttendanceManagement() {
   const handleRecalcularTodo = async () => {
     if (!window.confirm("¿Recalcular tardanzas y horas para TODOS los empleados? Esto puede tardar varios minutos.")) return;
     setRecalculandoTodo(true);
+    showLoading("Recalculando tardanzas y horas para todos los empleados...");
     const empList = allEmployees.filter(e => e.status === "Activo");
     setRecalcProgress({ done: 0, total: empList.length });
     let done = 0;
@@ -908,8 +914,10 @@ export default function AttendanceManagement() {
       });
       done++;
       setRecalcProgress({ done, total: empList.length });
+      showLoading(`Recalculando asistencia... ${done}/${empList.length} empleados`);
     }
     setRecalculandoTodo(false);
+    showLoading("Sincronizando alertas de horas extras...");
 
     // Sincronizar alertas de HE para los registros visibles usando el mismo
     // cálculo que la tabla (getAdditionalMinutes: todos los segmentos, cruce
@@ -922,6 +930,7 @@ export default function AttendanceManagement() {
 
     queryClient.invalidateQueries(["todayAttendance"]);
     queryClient.invalidateQueries(["overtimeAlerts"]);
+    hideLoading();
     toast.success(`✓ Recálculo completado para ${done} empleados`);
   };
 
@@ -931,12 +940,16 @@ export default function AttendanceManagement() {
     if (!window.confirm("¿Revisar todos los registros de asistencia y generar alertas de horas extras? Esto puede tardar unos minutos.")) return;
     setGeneratingAlerts(true);
     setAlertGenProgress({ done: 0, total: 0 });
+    showLoading("Revisando registros de asistencia y generando alertas de horas extras...");
     try {
       const result = await generateOvertimeAlertsForAllRecords({
         currentUser,
         workSchedules,
         allEmployees,
-        onProgress: (p) => setAlertGenProgress(p),
+        onProgress: (p) => {
+          setAlertGenProgress(p);
+          showLoading(`Revisando registros de asistencia... ${p.done}/${p.total}`);
+        },
       });
       queryClient.invalidateQueries(["overtimeAlerts"]);
       toast.success(`✓ Revisión completada: ${result.pending} alerta(s) pendiente(s)`);
@@ -944,6 +957,7 @@ export default function AttendanceManagement() {
       toast.error("Error al generar alertas: " + (error.message || ""));
     } finally {
       setGeneratingAlerts(false);
+      hideLoading();
     }
   };
 
@@ -1023,6 +1037,7 @@ export default function AttendanceManagement() {
   };
 
   const handleExportToExcel = async () => {
+    showLoading("Generando archivo Excel de asistencia...");
     // Cargar TODOS los incidentes frescos para no depender del caché limitado
     let freshIncidents = allIncidents;
     try {
@@ -1246,6 +1261,7 @@ export default function AttendanceManagement() {
       ? `${dateToStringLima(dateFrom)}_${dateToStringLima(dateTo)}`
       : dateToStringLima(selectedDate);
     XLSX.writeFile(wb, `Asistencia_${dateLabel}_${filterText}.xlsx`);
+    hideLoading();
     toast.success('✓ Archivo Excel generado correctamente');
   };
 

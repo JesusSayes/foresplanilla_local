@@ -15,6 +15,8 @@ import CompensacionTardanzas from './pages/CompensacionTardanzas';
 import TipoCambioManagement from './pages/TipoCambioManagement';
 import PageGuard from '@/components/PageGuard';
 import { PAGE_PERMISSIONS } from './pagePermissions';
+import { LoadingProvider, useLoading } from '@/lib/loadingContext';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -88,15 +90,23 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <NavigationTracker />
-          <AuthenticatedApp />
-        </Router>
-        <Toaster />
-        <VisualEditAgent />
+        <LoadingProvider>
+          <Router>
+            <NavigationTracker />
+            <AuthenticatedApp />
+            <GlobalLoadingOverlay />
+          </Router>
+          <Toaster />
+          <VisualEditAgent />
+        </LoadingProvider>
       </QueryClientProvider>
     </AuthProvider>
   )
 }
+
+const GlobalLoadingOverlay = () => {
+  const { isLoading, message } = useLoading();
+  return <LoadingOverlay isLoading={isLoading} message={message} />;
+};
 
 export default App
