@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { calcEffectiveMetrics, toMin as attToMin, getSegmentClockTimes, getAdditionalMinutes, getPreShiftMinutes, getEffectiveLateMinutes, getEffectiveOvertime } from "@/lib/attendanceMetrics";
 import { syncOvertimeAlert, syncOvertimeAlertsBatch } from "@/lib/overtimeAlertSync";
+import { generateOvertimeAlertsForAllRecords } from "@/lib/overtimeAlertGenerator";
 import TardinessCompensationModal from "../components/attendance/TardinessCompensationModal";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
@@ -890,6 +891,8 @@ export default function AttendanceManagement() {
 
   const [recalculandoTodo, setRecalculandoTodo] = useState(false);
   const [recalcProgress, setRecalcProgress] = useState({ done: 0, total: 0 });
+  const [generatingAlerts, setGeneratingAlerts] = useState(false);
+  const [alertGenProgress, setAlertGenProgress] = useState({ done: 0, total: 0 });
 
   const handleRecalcularTodo = async () => {
     if (!window.confirm("¿Recalcular tardanzas y horas para TODOS los empleados? Esto puede tardar varios minutos.")) return;
