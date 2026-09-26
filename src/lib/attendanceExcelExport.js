@@ -77,12 +77,11 @@ export function buildAttendanceExportRows({
     );
 
     let excelHours, excelLate, excelRawHours = 0;
-    const isWeekendEx = dowForRow2 === 0 || dowForRow2 === 6;
     if (estadoMarcacion === 'Vacaciones') {
-      // En fines de semana (sábados/domingos) las vacaciones no contabilizan horas
-      excelHours = (!isWeekendEx && schedForRow && !isDayOffEx) ? Math.max(0, (
+      // Días sin horario programado = 0h
+      excelHours = (schedForRow && !isDayOffEx) ? Math.max(0, (
         (parseInt(schedEndEx.split(':')[0]) * 60 + parseInt(schedEndEx.split(':')[1])) -
-        (parseInt(schedStartEx.split(':')[0]) * 60 + parseInt(schedStartEx.split(':')[1])) - breakMinEx
+        (parseInt(schedStartEx.split(':')[0]) * 60 + parseInt(schedStartEx.split(':')[1]))
       ) / 60) : 0;
       excelLate = 0;
     } else {
@@ -154,13 +153,13 @@ export function buildAttendanceExportRows({
       tiempoPapeleta = `${justMetrics.totalWorkedHours.toFixed(2)} h`;
     }
 
-    // Para vacaciones: mostrar horario programado como marcación (salvo día libre y fines de semana)
+    // Para vacaciones: mostrar únicamente el horario programado de la fecha
     const { firstClockIn: rowFirstIn, lastClockOut: rowLastOut } = getSegmentClockTimes(emp.record);
     let entradaExcel = timeStrToExcelFraction(rowFirstIn);
     let salidaExcel  = timeStrToExcelFraction(rowLastOut);
-    if (estadoMarcacion === 'Vacaciones' && !isDayOffEx && !isWeekendEx) {
-      entradaExcel = timeStrToExcelFraction(schedStartEx);
-      salidaExcel  = timeStrToExcelFraction(schedEndEx);
+    if (estadoMarcacion === 'Vacaciones') {
+      entradaExcel = timeStrToExcelFraction(isUnscheduledDayEx ? null : schedStartEx);
+      salidaExcel  = timeStrToExcelFraction(isUnscheduledDayEx ? null : schedEndEx);
     }
 
     const diaSemana = format(parseDateLima(rowDate), "EEEE", { locale: es });
