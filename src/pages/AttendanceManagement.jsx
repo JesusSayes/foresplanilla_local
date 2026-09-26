@@ -1234,7 +1234,6 @@ export default function AttendanceManagement() {
     const dayMap = ["sunday_start", "monday_start", "tuesday_start", "wednesday_start", "thursday_start", "friday_start", "saturday_start"];
     const dayEndMap = ["sunday_end", "monday_end", "tuesday_end", "wednesday_end", "thursday_end", "friday_end", "saturday_end"];
     const dow = new Date(rowDate + "T00:00:00").getDay();
-    if (dow === 0 || dow === 6) return { start: null, end: null };
     return {
       start: schedule[dayMap[dow]] || null,
       end: schedule[dayEndMap[dow]] || null,
@@ -1653,15 +1652,12 @@ export default function AttendanceManagement() {
                               <td className="px-2 py-2 text-center">
                                 {(() => {
                                   if (isVacation) {
-                                    const isWeekendRow = dow2 === 0 || dow2 === 6;
-                                    if (isWeekendRow || !schedSt || !schedEn) {
+                                    if (!schedSt || !schedEn) {
                                       return <span className="text-sm font-bold text-slate-900">0h 0m</span>;
                                     }
-                                    const breakMinVac = sched?.break_duration_minutes ?? 60;
                                     const [vsh, vsm] = schedSt.split(":").map(Number);
                                     const [veh, vem] = schedEn.split(":").map(Number);
                                     let vacMin = (veh * 60 + vem) - (vsh * 60 + vsm);
-                                    if (vacMin >= 360) vacMin -= breakMinVac;
                                     vacMin = Math.max(0, vacMin);
                                     const vhh = Math.floor(vacMin / 60);
                                     const vmm = vacMin % 60;
