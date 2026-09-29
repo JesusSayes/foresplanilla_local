@@ -953,6 +953,7 @@ export default function CompensationPanel({
 
       {showModal && selectedEmployee && (
         <CompensationModal
+          key={`${selectedEmployee.id}-${editMode}`}
           employee={selectedEmployee}
           employeeSchedule={scheduleByEmployee.get(selectedEmployee.id)}
           periodStart={periodStart}

@@ -80,12 +80,18 @@ export default function CompensationModal({
       ? pendingCompensations[0]?.justification || ""
       : ""
   );
-  const [authorizer, setAuthorizer] = useState(
-    editMode && pendingCompensations?.length && allEmployees?.length
-      ? allEmployees.find(
-          (e) => e.id === pendingCompensations[0]?.authorizer_id
-        ) || null
+  const [authorizerId, setAuthorizerId] = useState(
+    editMode && pendingCompensations?.length
+      ? pendingCompensations[0]?.authorizer_id || null
       : null
+  );
+  // Derivar el objeto autorizador desde allEmployees usando el ID estable.
+  // Una carga tardía de allEmployees (edición) resuelve el autorizador
+  // automáticamente; una recarga no sobrescribe la selección manual ni
+  // reinicia el formulario.
+  const authorizer = useMemo(
+    () => allEmployees.find((e) => e.id === authorizerId) || null,
+    [allEmployees, authorizerId]
   );
   const [authorizerSearch, setAuthorizerSearch] = useState("");
   const [showAuthorizerList, setShowAuthorizerList] = useState(false);
@@ -532,7 +538,7 @@ export default function CompensationModal({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => { setAuthorizer(null); setAuthorizerSearch(""); setShowAuthorizerList(true); }}
+                  onClick={() => { setAuthorizerId(null); setAuthorizerSearch(""); setShowAuthorizerList(true); }}
                   className="text-slate-500 hover:text-red-500"
                 >
                   <X className="w-4 h-4" /> Cambiar
@@ -563,10 +569,10 @@ export default function CompensationModal({
                           key={emp.id}
                           type="button"
                           onClick={() => {
-                            setAuthorizer(emp);
-                            setShowAuthorizerList(false);
-                            setAuthorizerSearch("");
-                          }}
+                             setAuthorizerId(emp.id);
+                             setShowAuthorizerList(false);
+                             setAuthorizerSearch("");
+                           }}
                           className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-50 transition-colors text-left border-b border-slate-50 last:border-b-0"
                         >
                           <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 bg-gradient-to-br from-slate-400 to-slate-500">
