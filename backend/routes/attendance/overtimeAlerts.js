@@ -9,6 +9,7 @@ router.use(authenticateToken, loadAccessContext)
 
 router.get('/', requireAnyPermission('attendance.edit', 'attendance.approve_incidents'), attachEmployeeScope('attendance.edit', 'attendance.approve_incidents'), controller.getAll)
 router.post('/filter', requireAnyPermission('attendance.edit', 'attendance.approve_incidents'), attachEmployeeScope('attendance.edit', 'attendance.approve_incidents'), controller.filter)
+router.post('/generate', requireAnyPermission('attendance.edit'), attachEmployeeScope('attendance.edit'), controller.generate)
 router.get('/:id', requireAnyPermission('attendance.edit', 'attendance.approve_incidents'), attachEmployeeScope('attendance.edit', 'attendance.approve_incidents'), controller.getById)
 router.post('/', requireAnyPermission('attendance.edit'), attachEmployeeScope('attendance.edit'), controller.create)
 router.put('/:id', requireAnyPermission('attendance.edit', 'attendance.approve_incidents'), attachEmployeeScope('attendance.edit', 'attendance.approve_incidents'), controller.update)

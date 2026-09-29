@@ -983,15 +983,20 @@ export default function AttendanceManagement() {
     toast.success(`✓ Recálculo completado para ${done} empleados`);
   };
 
-  // Revisa TODOS los registros de asistencia guardados y genera/actualiza
+  // Revisa los registros del período seleccionado y genera/actualiza
   // las alertas de HE pendientes (ingreso anticipado y salida posterior).
   const handleGenerateOvertimeAlerts = async () => {
+    if (generatingAlerts) return;
+    const date = isRangeMode && dateFrom && dateTo
+      ? { $gte: dateToStringLima(dateFrom), $lte: dateToStringLima(dateTo) }
+      : selectedDate ? dateToStringLima(selectedDate) : undefined;
     if (!window.confirm("¿Revisar registros de asistencia, generar alertas de horas extras y corregir vacaciones en fines de semana? Esto puede tardar unos minutos.")) return;
     setGeneratingAlerts(true);
     setAlertGenProgress({ done: 0, total: 0 });
     showLoading("Revisando registros de asistencia y generando alertas de horas extras...");
     try {
       const result = await generateOvertimeAlertsForAllRecords({
+        date,
         currentUser,
         workSchedules,
         allEmployees,
@@ -1004,7 +1009,7 @@ export default function AttendanceManagement() {
 
       // Corregir vacaciones en fines de semana (sábados/domingos → 0 horas)
       updateLoadingMessage("Corrigiendo vacaciones en fines de semana...");
-      const { data: vacResult } = await localClient.post('/api/attendance/records/corregir-vacaciones-fin-de-semana', {});
+      const { data: vacResult } = await localClient.post('/api/attendance/records/corregir-vacaciones-fin-de-semana', date ? { date } : {});
       queryClient.invalidateQueries(["todayAttendance"]);
       queryClient.invalidateQueries(["allAttendanceRecords"]);
 
@@ -2045,6 +2050,7 @@ export default function AttendanceManagement() {
                                   queryClient.invalidateQueries(["overtimeAlerts"]);
                                   queryClient.invalidateQueries(["todayAttendance"]);
                                   queryClient.invalidateQueries(["attendanceRecords"]);
+                                  queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
                                   toast.success(`HE aceptadas y recalculadas para el ${format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}: HE25% y HE35% actualizadas`);
                                 }}
                               >

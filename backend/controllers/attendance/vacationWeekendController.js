@@ -1,3 +1,4 @@
+import { attendanceDateFilter } from '../../utils/attendanceDateFilter.js';
 import prisma from '../../config/prisma.js';
 
 export const correctVacationWeekends = async (req, res) => {
@@ -7,6 +8,10 @@ export const correctVacationWeekends = async (req, res) => {
   }
   try {
     const where = { status: 'Vacaciones' };
+    if (req.body?.date !== undefined) {
+      try { where.date = attendanceDateFilter(req.body.date); }
+      catch (error) { return res.status(400).json({ error: error.message }); }
+    }
     if (req.accessibleEmployeeIds !== null) where.employee_id = { in: req.accessibleEmployeeIds || [] };
     const result = await prisma.$transaction(async tx => {
       const records = await tx.attendance_record.findMany({ where, select: { id: true, date: true } });

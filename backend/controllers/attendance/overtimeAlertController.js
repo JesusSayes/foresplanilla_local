@@ -1,3 +1,6 @@
+import { attendanceDateFilter } from '../../utils/attendanceDateFilter.js';
+import { syncOvertimeAlert } from '../../services/overtimeAlertSync.js';
+import { toDateString } from '../../utils/employmentDate.js';
 import prisma from "../../config/prisma.js";
 
 import { generate24HexId } from '../../utils/idGenerator.js'
@@ -11,7 +14,12 @@ const withResolution = async alerts => {
     ...alerts.map(alert => alert.id)
   );
   const byId = new Map(rows.map(row => [row.id, row]));
-  return alerts.map(alert => ({ ...alert, ...byId.get(alert.id) }));
+  return alerts.map(alert => ({
+    ...alert, ...byId.get(alert.id),
+    alert_date: toDateString(alert.alert_date),
+    overtime_hours: Number(alert.overtime_hours),
+    resolution_date: toDateString(byId.get(alert.id)?.resolution_date || alert.resolution_date),
+  }));
 };
 
 export const getAll = async (req, res) => {
@@ -153,7 +161,33 @@ export const filter = async (req, res) => {
   }
 }
 
+// Una sola petición del navegador; filtrar antes de consultar y procesar.
+export const generate = async (req, res) => {
+  try {
+    const where = req.accessibleEmployeeIds === null ? {} : { employee_id: { in: req.accessibleEmployeeIds || [] } };
+    if (req.body?.date !== undefined) {
+      try { where.date = attendanceDateFilter(req.body.date); }
+      catch (error) { return res.status(400).json({ error: error.message }); }
+    }
+    const records = await prisma.attendance_record.findMany({ where, select: { id: true, employee_id: true } });
+    const [employees, schedules] = await Promise.all([
+      prisma.employee.findMany({ where: { id: { in: [...new Set(records.map(r => r.employee_id))] } } }),
+      prisma.work_schedule.findMany({ where: { is_active: true } }),
+    ]);
+    const context = { employees: new Map(employees.map(e => [e.id, e])), schedules };
+    for (const record of records) await syncOvertimeAlert(record.id, req.user?.email, context);
+    const pending = await prisma.overtime_alert.count({ where: {
+      ...(where.employee_id ? { employee_id: where.employee_id } : {}),
+      ...(where.date ? { alert_date: where.date } : {}), status: 'Pendiente',
+    } });
+    return res.json({ total: records.length, pending });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 export default {
+  generate,
   getAll,
   getById,
   create,
