@@ -97,6 +97,7 @@ export default function CompensationModal({
   const [showAuthorizerList, setShowAuthorizerList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [statusMessage, setStatusMessage] = useState(null);
 
   const allEmployeeRecords = useMemo(() => {
     if (!employee) return [];
@@ -268,7 +269,13 @@ export default function CompensationModal({
   // mismo mes). Algoritmo voraz: usa el día compensable más cercano primero.
   const autoFillDay = (date) => {
     const day = allScheduledDays.find((d) => d.date === date);
-    if (!day || day.lateMinutes <= 0) return;
+    // Usar tardanza ingresada manualmente si existe; si no, la del registro
+    const manualLate = selectedDays[date]?.lateMinutes || 0;
+    const effectiveLate = manualLate > 0 ? manualLate : (day?.lateMinutes || 0);
+    if (!day || effectiveLate <= 0) {
+      setStatusMessage("Ingrese una tardanza para este día antes de auto-completar.");
+      return;
+    }
 
     const tDate = new Date(date + "T00:00:00");
     const tYM = date.slice(0, 7);
@@ -282,7 +289,12 @@ export default function CompensationModal({
       })
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    let remaining = day.lateMinutes;
+    if (eligible.length === 0) {
+      setStatusMessage("No hay horas extras disponibles (mismo mes, hasta 15 días después) para compensar esta tardanza.");
+      return;
+    }
+
+    let remaining = effectiveLate;
     const next = { ...selectedDays };
     if (!next[date]) {
       next[date] = { date, recordId: day.record?.id || null, lateMinutes: 0, overtimeMinutes: 0 };
@@ -302,6 +314,12 @@ export default function CompensationModal({
       next[compDay.date] = { ...next[compDay.date], overtimeMinutes: (next[compDay.date].overtimeMinutes || 0) + use };
       remaining -= use;
     }
+
+    if (next[date].lateMinutes === 0) {
+      setStatusMessage("No hay saldo de horas extras suficiente para compensar esta tardanza.");
+    } else {
+      setStatusMessage(`Día ${date}: ${next[date].lateMinutes} min de tardanza compensados con HE de otros días.`);
+    }
     setSelectedDays(next);
   };
 
@@ -315,7 +333,25 @@ export default function CompensationModal({
       .filter((d) => d.overtimeMinutes > 0 && !compensatedDates.has(d.date))
       .map((d) => ({ date: d.date, overtimeMinutes: d.overtimeMinutes }));
 
-    const { assignments } = computeCrossDayCompensation(tardanzaDays, compensableDays, 15);
+    if (tardanzaDays.length === 0 && compensableDays.length === 0) {
+      setStatusMessage("No hay días con tardanza ni horas extras disponibles en el período.");
+      return;
+    }
+    if (tardanzaDays.length === 0) {
+      setStatusMessage("No hay días con tardanza para compensar.");
+      return;
+    }
+    if (compensableDays.length === 0) {
+      setStatusMessage("No hay días con horas extras (HE) disponibles para compensar las tardanzas.");
+      return;
+    }
+
+    const { assignments, totalCompensated } = computeCrossDayCompensation(tardanzaDays, compensableDays, 15);
+
+    if (assignments.length === 0) {
+      setStatusMessage("No se encontraron coincidencias válidas (mismo mes, hasta 15 días después).");
+      return;
+    }
 
     const next = {};
     for (const a of assignments) {
@@ -332,25 +368,67 @@ export default function CompensationModal({
       next[a.compensableDate].overtimeMinutes += a.minutes;
     }
     setSelectedDays(next);
+    setStatusMessage(`Se seleccionaron ${Object.keys(next).length} día(s) con ${totalCompensated} min compensados.`);
   };
 
   const autoFillAll = () => {
-    setSelectedDays((prev) => {
-      const next = { ...prev };
-      for (const [date, data] of Object.entries(next)) {
-        const day = allScheduledDays.find((d) => d.date === date);
-        if (!day) continue;
-        const lateMin = day.lateMinutes;
-        const overtimeMin = day.overtimeMinutes;
-        const minVal = Math.min(lateMin, overtimeMin);
-        next[date] = {
-          ...data,
-          lateMinutes: minVal > 0 ? minVal : lateMin,
-          overtimeMinutes: minVal > 0 ? minVal : overtimeMin,
-        };
+    const selectedDates = Object.keys(selectedDays);
+    if (selectedDates.length === 0) {
+      setStatusMessage("Primero seleccione al menos un día en la tabla.");
+      return;
+    }
+
+    // Días de tardanza seleccionados (usar valor manual si existe, si no el del registro)
+    const tardanzaDays = allScheduledDays
+      .filter((d) => selectedDays[d.date] && (selectedDays[d.date].lateMinutes > 0 || d.lateMinutes > 0))
+      .map((d) => ({
+        date: d.date,
+        lateMinutes: selectedDays[d.date].lateMinutes > 0 ? selectedDays[d.date].lateMinutes : d.lateMinutes,
+      }));
+
+    // Días compensables de TODO el período (no solo los seleccionados)
+    const compensableDays = allScheduledDays
+      .filter((d) => d.overtimeMinutes > 0 && !compensatedDates.has(d.date))
+      .map((d) => ({ date: d.date, overtimeMinutes: d.overtimeMinutes }));
+
+    if (tardanzaDays.length === 0) {
+      setStatusMessage("Los días seleccionados no tienen tardanza para compensar.");
+      return;
+    }
+    if (compensableDays.length === 0) {
+      setStatusMessage("No hay horas extras (HE) disponibles para compensar las tardanzas seleccionadas.");
+      return;
+    }
+
+    const { assignments, totalCompensated } = computeCrossDayCompensation(tardanzaDays, compensableDays, 15);
+
+    if (assignments.length === 0) {
+      setStatusMessage("No se encontraron coincidencias válidas (mismo mes, hasta 15 días después).");
+      return;
+    }
+
+    const next = { ...selectedDays };
+    // Resetear minutos de los días seleccionados antes de reasignar
+    for (const date of selectedDates) {
+      next[date] = { ...next[date], lateMinutes: 0, overtimeMinutes: 0 };
+    }
+
+    for (const a of assignments) {
+      if (!next[a.tardanzaDate]) {
+        const day = allScheduledDays.find((d) => d.date === a.tardanzaDate);
+        next[a.tardanzaDate] = { date: a.tardanzaDate, recordId: day?.record?.id || null, lateMinutes: 0, overtimeMinutes: 0 };
       }
-      return next;
-    });
+      next[a.tardanzaDate].lateMinutes += a.minutes;
+
+      if (!next[a.compensableDate]) {
+        const day = allScheduledDays.find((d) => d.date === a.compensableDate);
+        next[a.compensableDate] = { date: a.compensableDate, recordId: day?.record?.id || null, lateMinutes: 0, overtimeMinutes: 0 };
+      }
+      next[a.compensableDate].overtimeMinutes += a.minutes;
+    }
+
+    setSelectedDays(next);
+    setStatusMessage(`Auto-completado: ${assignments.length} asignación(es), ${totalCompensated} min compensados.`);
   };
 
   const selectedList = Object.entries(selectedDays).map(([date, data]) => {
@@ -368,11 +446,21 @@ export default function CompensationModal({
   );
 
   const handleSubmit = async () => {
-    if (selectedList.length === 0) return;
-    if (!compensationReason.trim()) return;
-    if (!authorizer) return;
-    setSubmitting(true);
     setSubmitError(null);
+    setStatusMessage(null);
+    if (selectedList.length === 0) {
+      setStatusMessage("Seleccione al menos un día en la tabla para compensar.");
+      return;
+    }
+    if (!compensationReason.trim()) {
+      setStatusMessage("Ingrese el motivo de la compensación.");
+      return;
+    }
+    if (!authorizer) {
+      setStatusMessage("Seleccione la persona que debe autorizar la compensación.");
+      return;
+    }
+    setSubmitting(true);
     try {
       await onSubmit(selectedList, compensationReason, authorizer);
     } catch (error) {
@@ -861,6 +949,14 @@ export default function CompensationModal({
                   Autorizador: {authorizer.first_name} {authorizer.last_name}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Mensaje de estado (validación / feedback de botones) */}
+          {statusMessage && !submitError && (
+            <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-700">{statusMessage}</p>
             </div>
           )}
 

@@ -370,6 +370,7 @@ export default function CompensationPanel({
       setSelectedEmployee(null);
     } catch (error) {
       toast.error("Error al registrar compensación: " + (error.message || ""));
+      throw error;
     } finally {
       setSubmitting(false);
     }
@@ -427,6 +428,7 @@ export default function CompensationPanel({
       setPendingCompsForEdit([]);
     } catch (error) {
       toast.error("Error al actualizar compensación: " + (error.message || ""));
+      throw error;
     } finally {
       setSubmitting(false);
     }
