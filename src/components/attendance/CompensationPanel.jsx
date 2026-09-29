@@ -337,19 +337,6 @@ export default function CompensationPanel({
         );
       }
 
-      for (const item of selectedList) {
-        if (item.recordId) {
-          await entitiesAPI.AttendanceRecord.update(item.recordId, {
-            status: "Compensación",
-            notes:
-              (item.record?.notes ? item.record.notes + " | " : "") +
-              `Compensación solicitada: ${item.lateMinutes || 0} min tardanza, ${
-                item.overtimeMinutes || 0
-              } min HE`,
-          });
-        }
-      }
-
       queryClient.invalidateQueries(["compensationIncidents"]);
       queryClient.invalidateQueries(["compensationRecords"]);
       queryClient.invalidateQueries(["allIncidents"]);
@@ -361,7 +348,7 @@ export default function CompensationPanel({
       setShowModal(false);
       setSelectedEmployee(null);
     } catch (error) {
-      toast.error("Error al registrar compensación: " + (error.message || ""));
+      throw new Error(error.response?.data?.error || error.message || "Error al registrar compensación");
     } finally {
       setSubmitting(false);
     }
@@ -401,14 +388,6 @@ export default function CompensationPanel({
         );
       }
 
-      for (const item of selectedList) {
-        if (item.recordId && item.record?.status !== "Compensación") {
-          await entitiesAPI.AttendanceRecord.update(item.recordId, {
-            status: "Compensación",
-          });
-        }
-      }
-
       queryClient.invalidateQueries(["compensationIncidents"]);
       queryClient.invalidateQueries(["compensationRecords"]);
       queryClient.invalidateQueries(["allIncidents"]);
@@ -422,7 +401,7 @@ export default function CompensationPanel({
       setEditMode(false);
       setPendingCompsForEdit([]);
     } catch (error) {
-      toast.error("Error al actualizar compensación: " + (error.message || ""));
+      throw new Error(error.response?.data?.error || error.message || "Error al actualizar compensación");
     } finally {
       setSubmitting(false);
     }
@@ -949,6 +928,7 @@ export default function CompensationPanel({
 
       {showModal && selectedEmployee && (
         <CompensationModal
+          key={`${selectedEmployee.id}-${editMode}`}
           employee={selectedEmployee}
           employeeSchedule={scheduleByEmployee.get(selectedEmployee.id)}
           periodStart={periodStart}

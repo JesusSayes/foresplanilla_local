@@ -120,17 +120,37 @@ export const create = async (req, res) => {
     if (!canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     const incidentDate = toPrismaDate(incident_date);
     if (!incidentDate) return res.status(400).json({ error: 'Fecha de incidente inválida' });
-    const incident = await prisma.attendance_incident.create({
-      data: {
-        id: generate24HexId(),
-        incident_date: incidentDate,
-        review_date: review_date ? toPrismaDate(review_date) : null,
-        ...data
-      }
-    });
+    const incidentData = {
+      id: generate24HexId(), incident_date: incidentDate,
+      review_date: review_date ? toPrismaDate(review_date) : null, ...data,
+    };
+    const isPendingCompensation = data.incident_type === 'Compensación de Tardanza' && data.status === 'Pendiente';
+    const incident = isPendingCompensation
+      ? await prisma.$transaction(async tx => {
+          const record = data.attendance_record_id
+            ? await tx.attendance_record.findUnique({ where: { id: data.attendance_record_id } }) : null;
+          if (!record || record.employee_id !== data.employee_id || toDateString(record.date) !== toDateString(incidentDate)) {
+            throw Object.assign(new Error('La asistencia no corresponde al empleado y fecha de la compensación'), { status: 400 });
+          }
+          const late = Number(data.late_minutes_to_adjust || 0);
+          const hours = Number(data.hours_to_adjust || 0);
+          const available = Number(record.overtime_hours_25 || 0) + Number(record.overtime_hours_35 || 0);
+          if (!Number.isInteger(late) || late < 0 || !Number.isFinite(hours) || hours < 0 ||
+              (late === 0 && hours === 0) || late > Number(record.late_minutes || 0) || Math.round(hours * 60) > Math.round(available * 60)) {
+            throw Object.assign(new Error('Los minutos solicitados exceden el saldo disponible de la asistencia'), { status: 400 });
+          }
+          const created = await tx.attendance_incident.create({ data: incidentData });
+          await tx.attendance_record.update({ where: { id: record.id }, data: {
+            status: 'Compensación',
+            notes: (record.notes ? record.notes + ' | ' : '') +
+              `Compensación solicitada: ${late} min tardanza, ${Math.round(hours * 60)} min HE`,
+          } });
+          return created;
+        })
+      : await prisma.attendance_incident.create({ data: incidentData });
     res.status(201).json(serializeIncident(incident));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.status || 500).json({ error: error.message });
   }
 };
 

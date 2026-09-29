@@ -80,17 +80,24 @@ export default function CompensationModal({
       ? pendingCompensations[0]?.justification || ""
       : ""
   );
-  const [authorizer, setAuthorizer] = useState(
-    editMode && pendingCompensations?.length && allEmployees?.length
-      ? allEmployees.find(
-          (e) => e.id === pendingCompensations[0]?.authorizer_id
-        ) || null
+  const [authorizerId, setAuthorizerId] = useState(
+    editMode && pendingCompensations?.length
+      ? pendingCompensations[0]?.authorizer_id || null
       : null
+  );
+  // Derivar el objeto autorizador desde allEmployees usando el ID estable.
+  // Una carga tardía de allEmployees (edición) resuelve el autorizador
+  // automáticamente; una recarga no sobrescribe la selección manual ni
+  // reinicia el formulario.
+  const authorizer = useMemo(
+    () => allEmployees.find((e) => e.id === authorizerId) || null,
+    [allEmployees, authorizerId]
   );
   const [authorizerSearch, setAuthorizerSearch] = useState("");
   const [showAuthorizerList, setShowAuthorizerList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [statusMessage, setStatusMessage] = useState(null);
 
   const allEmployeeRecords = useMemo(() => {
     if (!employee) return [];
@@ -120,12 +127,12 @@ export default function CompensationModal({
           record,
           hasRecord: !!record,
           workedHours: record?.worked_hours ?? 0,
-          lateMinutes: record?.late_minutes || 0,
+          lateMinutes: Number(record?.late_minutes || 0),
           overtimeMinutes: Math.max(
             0,
             Math.round(
-              ((record?.overtime_hours_25 ?? 0) +
-                (record?.overtime_hours_35 ?? 0)) *
+              ((Number(record?.overtime_hours_25 ?? 0)) +
+                (Number(record?.overtime_hours_35 ?? 0))) *
                 60
             )
           ),
@@ -160,18 +167,18 @@ export default function CompensationModal({
       ? computeScheduledHoursForPeriod(employeeSchedule, periodStart, periodEnd)
       : allEmployeeRecords.reduce((s, r) => s + computeScheduledHours(r), 0);
     const regularHours = allEmployeeRecords.reduce(
-      (s, r) => s + (r.regular_hours ?? 0),
+      (s, r) => s + (Number(r.regular_hours ?? 0)),
       0
     );
     const overtimeHours = Math.max(
       0,
       allEmployeeRecords.reduce(
-        (s, r) => s + (r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0),
+        (s, r) => s + (Number(r.overtime_hours_25 ?? 0)) + (Number(r.overtime_hours_35 ?? 0)),
         0
       )
     );
     const lateMinutes = allEmployeeRecords.reduce(
-      (s, r) => s + (r.late_minutes ?? 0),
+      (s, r) => s + (Number(r.late_minutes ?? 0)),
       0
     );
     return { scheduledHours, regularHours, overtimeHours, lateMinutes };
@@ -179,9 +186,9 @@ export default function CompensationModal({
 
   // Resumen mensual de compensación: tardanzas, compensable, compensado, saldo
   const monthlySummary = useMemo(() => {
-    const totalLateMin = allEmployeeRecords.reduce((s, r) => s + (r.late_minutes ?? 0), 0);
+    const totalLateMin = allEmployeeRecords.reduce((s, r) => s + (Number(r.late_minutes ?? 0)), 0);
     const totalCompensableMin = Math.max(0, Math.round(
-      allEmployeeRecords.reduce((s, r) => s + (r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0), 0) * 60
+      allEmployeeRecords.reduce((s, r) => s + (Number(r.overtime_hours_25 ?? 0)) + (Number(r.overtime_hours_35 ?? 0)), 0) * 60
     ));
     const selectedMin = Object.values(selectedDays).reduce((s, d) => s + (d.lateMinutes || 0), 0);
     const approvedLateMin = existingCompensations.filter(c => c.employee_id === employee?.id && c.status === "Aprobada").reduce((sum, c) => sum + (c.late_minutes_to_adjust || 0), 0);
@@ -246,48 +253,24 @@ export default function CompensationModal({
   // Auto-completar un día de tardanza con HE de días posteriores (hasta 15 días,
   // mismo mes). Algoritmo voraz: usa el día compensable más cercano primero.
   const autoFillDay = (date) => {
+    setSubmitError(null);
     const day = allScheduledDays.find((d) => d.date === date);
-    if (!day || day.lateMinutes <= 0) return;
-    const alreadyCompensated = selectedDays[date]?.lateMinutes || 0;
-
-    const tDate = new Date(date + "T00:00:00");
-    const tYM = date.slice(0, 7);
-    const eligible = allScheduledDays
-      .filter((d) => {
-        if (d.overtimeMinutes <= 0) return false;
-        if (compensatedDates.has(d.date)) return false;
-        const cDate = new Date(d.date + "T00:00:00");
-        const diff = Math.round((cDate - tDate) / 86400000);
-        return diff >= 0 && diff <= 15 && d.date.slice(0, 7) === tYM;
-      })
-      .sort((a, b) => a.date.localeCompare(b.date));
-
-    let remaining = Math.max(0, day.lateMinutes - alreadyCompensated);
-    const next = { ...selectedDays };
-    if (!next[date]) {
-      next[date] = { date, recordId: day.record?.id || null, lateMinutes: 0, overtimeMinutes: 0 };
+    // Usar tardanza ingresada manualmente si existe; si no, la del registro
+    const manualLate = selectedDays[date]?.lateMinutes || 0;
+    const effectiveLate = manualLate > 0 ? manualLate : (day?.lateMinutes || 0);
+    if (!day || effectiveLate <= 0) {
+      setStatusMessage("Ingrese una tardanza para este día antes de auto-completar.");
+      return;
     }
-    next[date] = { ...next[date], lateMinutes: alreadyCompensated };
 
-    for (const compDay of eligible) {
-      if (remaining <= 0) break;
-      const alreadyUsed = next[compDay.date]?.overtimeMinutes || 0;
-      const avail = compDay.overtimeMinutes - alreadyUsed;
-      if (avail <= 0) continue;
-      const use = Math.min(remaining, avail);
-      next[date].lateMinutes += use;
-      if (!next[compDay.date]) {
-        next[compDay.date] = { date: compDay.date, recordId: compDay.record?.id || null, lateMinutes: 0, overtimeMinutes: 0 };
-      }
-      next[compDay.date] = { ...next[compDay.date], overtimeMinutes: (next[compDay.date].overtimeMinutes || 0) + use };
-      remaining -= use;
-    }
-    setSelectedDays(next);
+    // Reasignar las HE de la selección completa evita duplicarlas al repetir Auto.
+    autoFillAll(date);
   };
 
   // Seleccionar todos los días compensables usando matching cruzado entre días
   // (tardanza de un día se compensa con HE de hasta 15 días después, mismo mes)
   const selectAllCompensable = () => {
+    setSubmitError(null);
     const tardanzaDays = allScheduledDays
       .filter((d) => d.lateMinutes > 0 && !compensatedDates.has(d.date))
       .map((d) => ({ date: d.date, lateMinutes: d.lateMinutes }));
@@ -295,7 +278,25 @@ export default function CompensationModal({
       .filter((d) => d.overtimeMinutes > 0 && !compensatedDates.has(d.date))
       .map((d) => ({ date: d.date, overtimeMinutes: d.overtimeMinutes }));
 
-    const { assignments } = computeCrossDayCompensation(tardanzaDays, compensableDays, 15);
+    if (tardanzaDays.length === 0 && compensableDays.length === 0) {
+      setStatusMessage("No hay días con tardanza ni horas extras disponibles en el período.");
+      return;
+    }
+    if (tardanzaDays.length === 0) {
+      setStatusMessage("No hay días con tardanza para compensar.");
+      return;
+    }
+    if (compensableDays.length === 0) {
+      setStatusMessage("No hay días con horas extras (HE) disponibles para compensar las tardanzas.");
+      return;
+    }
+
+    const { assignments, totalCompensated } = computeCrossDayCompensation(tardanzaDays, compensableDays, 15);
+
+    if (assignments.length === 0) {
+      setStatusMessage("No se encontraron coincidencias válidas (mismo mes, hasta 15 días después).");
+      return;
+    }
 
     const next = {};
     for (const a of assignments) {
@@ -312,14 +313,74 @@ export default function CompensationModal({
       next[a.compensableDate].overtimeMinutes += a.minutes;
     }
     setSelectedDays(next);
+    setStatusMessage(`Se seleccionaron ${Object.keys(next).length} día(s) con ${totalCompensated} min compensados.`);
   };
 
-  const autoFillAll = () => selectAllCompensable();
+  const autoFillAll = (targetDate = null) => {
+    setSubmitError(null);
+    const selectedDates = Object.keys(selectedDays);
+    if (selectedDates.length === 0) {
+      setStatusMessage("Primero seleccione al menos un día en la tabla.");
+      return;
+    }
+
+    // Días de tardanza seleccionados (usar valor manual si existe, si no el del registro)
+    const tardanzaDays = allScheduledDays
+      .filter((d) => !compensatedDates.has(d.date) && selectedDays[d.date] && (selectedDays[d.date].lateMinutes > 0 || ((targetDate === null || targetDate === d.date) && d.lateMinutes > 0)))
+      .map((d) => ({
+        date: d.date,
+        lateMinutes: Math.min(d.lateMinutes, selectedDays[d.date].lateMinutes > 0 ? selectedDays[d.date].lateMinutes : d.lateMinutes),
+      }));
+
+    // Días compensables de TODO el período (no solo los seleccionados)
+    const compensableDays = allScheduledDays
+      .filter((d) => d.overtimeMinutes > 0 && !compensatedDates.has(d.date))
+      .map((d) => ({ date: d.date, overtimeMinutes: d.overtimeMinutes }));
+
+    if (tardanzaDays.length === 0) {
+      setStatusMessage("Los días seleccionados no tienen tardanza para compensar.");
+      return;
+    }
+    if (compensableDays.length === 0) {
+      setStatusMessage("No hay horas extras (HE) disponibles para compensar las tardanzas seleccionadas.");
+      return;
+    }
+
+    const { assignments, totalCompensated } = computeCrossDayCompensation(tardanzaDays, compensableDays, 15);
+
+    if (assignments.length === 0) {
+      setStatusMessage("No se encontraron coincidencias válidas (mismo mes, hasta 15 días después).");
+      return;
+    }
+
+    const next = { ...selectedDays };
+    // Resetear minutos de los días seleccionados antes de reasignar
+    for (const date of selectedDates) {
+      next[date] = { ...next[date], lateMinutes: 0, overtimeMinutes: 0 };
+    }
+
+    for (const a of assignments) {
+      if (!next[a.tardanzaDate]) {
+        const day = allScheduledDays.find((d) => d.date === a.tardanzaDate);
+        next[a.tardanzaDate] = { date: a.tardanzaDate, recordId: day?.record?.id || null, lateMinutes: 0, overtimeMinutes: 0 };
+      }
+      next[a.tardanzaDate].lateMinutes += a.minutes;
+
+      if (!next[a.compensableDate]) {
+        const day = allScheduledDays.find((d) => d.date === a.compensableDate);
+        next[a.compensableDate] = { date: a.compensableDate, recordId: day?.record?.id || null, lateMinutes: 0, overtimeMinutes: 0 };
+      }
+      next[a.compensableDate].overtimeMinutes += a.minutes;
+    }
+
+    setSelectedDays(next);
+    setStatusMessage(`Auto-completado: ${assignments.length} asignación(es), ${totalCompensated} min compensados.`);
+  };
 
   const selectedList = Object.entries(selectedDays).map(([date, data]) => {
     const day = allScheduledDays.find((d) => d.date === date);
     return { recordId: data.recordId || null, record: day?.record, ...data };
-  });
+  }).filter(item => item.lateMinutes > 0 || item.overtimeMinutes > 0);
 
   const totalLateToCompensate = selectedList.reduce(
     (sum, s) => sum + (s.lateMinutes || 0),
@@ -331,24 +392,35 @@ export default function CompensationModal({
   );
 
   const handleSubmit = async () => {
-    if (selectedList.length === 0) return;
-    if (!compensationReason.trim()) return;
-    if (!authorizer) return;
+    setSubmitError(null);
+    setStatusMessage(null);
+    if (selectedList.length === 0) {
+      setStatusMessage("Seleccione al menos un día en la tabla para compensar.");
+      return;
+    }
+    if (!compensationReason.trim()) {
+      setStatusMessage("Ingrese el motivo de la compensación.");
+      return;
+    }
+    if (!authorizer) {
+      setStatusMessage("Seleccione la persona que debe autorizar la compensación.");
+      return;
+    }
+    if (submitting) return;
     const matched = computeCrossDayCompensation(selectedList, selectedList);
     const invalidDay = selectedList.some(item => {
       const day = allScheduledDays.find(d => d.date === item.date);
-      return !item.recordId || !day || item.lateMinutes > day.lateMinutes || item.overtimeMinutes > day.overtimeMinutes;
+      return !item.recordId || !day || compensatedDates.has(item.date) || item.lateMinutes > day.lateMinutes || item.overtimeMinutes > day.overtimeMinutes;
     });
     if (invalidDay || totalLateToCompensate <= 0 || totalLateToCompensate !== totalOvertimeToCompensate || matched.totalCompensated !== totalLateToCompensate) {
-      setSubmitError("La compensación debe usar saldos disponibles, con minutos equilibrados, dentro del mismo mes y hasta 15 días después de la tardanza.");
+      setSubmitError("Seleccione minutos de tardanza y HE disponibles en cantidades iguales, del mismo día o hasta 15 días después dentro del mismo mes.");
       return;
     }
     setSubmitting(true);
-    setSubmitError(null);
     try {
       await onSubmit(selectedList, compensationReason, authorizer);
     } catch (error) {
-      setSubmitError(error?.message || "Ocurrió un error al registrar la compensación.");
+      setSubmitError(error?.response?.data?.error || error?.message || "Ocurrió un error al registrar la compensación.");
     } finally {
       setSubmitting(false);
     }
@@ -510,7 +582,7 @@ export default function CompensationModal({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => { setAuthorizer(null); setAuthorizerSearch(""); setShowAuthorizerList(true); }}
+                  onClick={() => { setAuthorizerId(null); setAuthorizerSearch(""); setShowAuthorizerList(true); }}
                   className="text-slate-500 hover:text-red-500"
                 >
                   <X className="w-4 h-4" /> Cambiar
@@ -541,10 +613,10 @@ export default function CompensationModal({
                           key={emp.id}
                           type="button"
                           onClick={() => {
-                            setAuthorizer(emp);
-                            setShowAuthorizerList(false);
-                            setAuthorizerSearch("");
-                          }}
+                             setAuthorizerId(emp.id);
+                             setShowAuthorizerList(false);
+                             setAuthorizerSearch("");
+                           }}
                           className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-50 transition-colors text-left border-b border-slate-50 last:border-b-0"
                         >
                           <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 bg-gradient-to-br from-slate-400 to-slate-500">
@@ -589,7 +661,7 @@ export default function CompensationModal({
                     size="sm"
                     variant="outline"
                     className="h-7 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                    onClick={autoFillAll}
+                    onClick={() => autoFillAll()}
                   >
                     <Zap className="w-3 h-3 mr-1" />
                     Auto-completar todo
@@ -836,6 +908,14 @@ export default function CompensationModal({
             </div>
           )}
 
+          {/* Mensaje de estado (validación / feedback de botones) */}
+          {statusMessage && !submitError && (
+            <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-700">{statusMessage}</p>
+            </div>
+          )}
+
           {/* Error de envío */}
           {submitError && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
@@ -857,12 +937,7 @@ export default function CompensationModal({
             <Button
               className="flex-1 bg-indigo-600 hover:bg-indigo-700"
               onClick={handleSubmit}
-              disabled={
-                submitting ||
-                selectedList.length === 0 ||
-                !compensationReason.trim() ||
-                !authorizer
-              }
+              disabled={submitting}
             >
               {submitting
                 ? "Guardando..."
