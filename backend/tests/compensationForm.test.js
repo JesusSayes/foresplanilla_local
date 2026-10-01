@@ -127,3 +127,26 @@ test('muestra error del servidor y permite reintentar después del envío', asyn
   fail({ response: { data: { error: 'Permiso insuficiente' } } }); await pending; h.render();
   assert.match(h.text(), /Permiso insuficiente/); assert.equal(h.button('Actualizar compensación').props.disabled, false);
 });
+
+for (const [lateDate, overtimeDate] of [['2026-09-30', '2026-09-01'], ['2026-09-01', '2026-09-30']]) {
+  for (const action of ['Seleccionar días con compensación', 'Auto-completar todo']) {
+    test(`apertura mensual registra con ${action}: ${lateDate} / ${overtimeDate}`, async () => {
+      let submitted;
+      const props = fixture();
+      props.periodRecords[0].date = lateDate;
+      props.periodRecords[1].date = overtimeDate;
+      const h = harness({ ...props, periodStart: '2026-09-01', periodEnd: '2026-09-30', onSubmit: async list => { submitted = list; } });
+      if (action === 'Auto-completar todo') {
+        for (const checkbox of h.nodes().filter(n => n.type === 'Checkbox')) {
+          checkbox.props.onCheckedChange(true);
+        }
+        h.render();
+      }
+      await h.click(action);
+      await h.click('Actualizar compensación');
+      assert.ok(submitted);
+      assert.equal(submitted.find(d => d.date === lateDate).lateMinutes, 12);
+      assert.equal(submitted.find(d => d.date === overtimeDate).overtimeMinutes, 12);
+    });
+  }
+}

@@ -554,19 +554,20 @@ export const getEffectiveOvertime = (record, enableCompensation) => {
 
 /**
  * Calcula la compensación cruzada entre días: asigna minutos compensables
- * (HE) de días posteriores a tardanzas de días anteriores, dentro del mismo
- * mes y hasta maxDaysAfter días calendario después de la tardanza.
+ * (HE) a tardanzas de cualquier fecha, dentro del mismo
+ * mes. Si maxDaysAfter es numérico, limita las HE a los días posteriores.
  *
  * Algoritmo voraz: para cada día de tardanza (de más antiguo a más reciente),
- * usa minutos compensables del día elegible más cercano que tenga saldo
+ * usa minutos compensables del día elegible más antiguo que tenga saldo
  * disponible. Evita reutilizar el mismo minuto compensable.
  *
  * @param {Array} tardanzaDays - [{ date, lateMinutes }] días con tardanza > 0
  * @param {Array} compensableDays - [{ date, overtimeMinutes }] días con HE > 0
- * @param {number} maxDaysAfter - máx. días después de la tardanza (default 15)
+ * @param {number|null} maxDaysAfter - null permite todo el mes; 15 restaura el límite anterior.
  * @returns {Object} { assignments, remainingTardanza, remainingCompensable, totalCompensated }
  */
-export const computeCrossDayCompensation = (tardanzaDays, compensableDays, maxDaysAfter = 15) => {
+// Apertura temporal: restaurar el valor por defecto a 15 al cerrar la carga inicial.
+export const computeCrossDayCompensation = (tardanzaDays, compensableDays, maxDaysAfter = null) => {
   const tDays = [...tardanzaDays]
     .filter(d => d.lateMinutes > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -590,7 +591,7 @@ export const computeCrossDayCompensation = (tardanzaDays, compensableDays, maxDa
         if (c.available - c.used <= 0) return false;
         const cDate = new Date(c.date + "T00:00:00");
         const diff = Math.round((cDate - tDate) / 86400000);
-        return diff >= 0 && diff <= maxDaysAfter && c.date.slice(0, 7) === tYM;
+        return c.date.slice(0, 7) === tYM && (maxDaysAfter === null || (diff >= 0 && diff <= maxDaysAfter));
       })
       .sort((a, b) => a.date.localeCompare(b.date));
 

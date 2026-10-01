@@ -250,8 +250,8 @@ export default function CompensationModal({
     }));
   };
 
-  // Auto-completar un día de tardanza con HE de días posteriores (hasta 15 días,
-  // mismo mes). Algoritmo voraz: usa el día compensable más cercano primero.
+  // Auto-completar con HE de cualquier fecha del mismo mes.
+  // Algoritmo voraz: usa primero las HE más antiguas disponibles.
   const autoFillDay = (date) => {
     setSubmitError(null);
     const day = allScheduledDays.find((d) => d.date === date);
@@ -268,7 +268,7 @@ export default function CompensationModal({
   };
 
   // Seleccionar todos los días compensables usando matching cruzado entre días
-  // (tardanza de un día se compensa con HE de hasta 15 días después, mismo mes)
+  // (tardanza de un día se compensa con HE de cualquier fecha del mismo mes)
   const selectAllCompensable = () => {
     setSubmitError(null);
     const tardanzaDays = allScheduledDays
@@ -291,10 +291,10 @@ export default function CompensationModal({
       return;
     }
 
-    const { assignments, totalCompensated } = computeCrossDayCompensation(tardanzaDays, compensableDays, 15);
+    const { assignments, totalCompensated } = computeCrossDayCompensation(tardanzaDays, compensableDays);
 
     if (assignments.length === 0) {
-      setStatusMessage("No se encontraron coincidencias válidas (mismo mes, hasta 15 días después).");
+      setStatusMessage("No se encontraron coincidencias válidas (dentro del mismo mes).");
       return;
     }
 
@@ -346,10 +346,10 @@ export default function CompensationModal({
       return;
     }
 
-    const { assignments, totalCompensated } = computeCrossDayCompensation(tardanzaDays, compensableDays, 15);
+    const { assignments, totalCompensated } = computeCrossDayCompensation(tardanzaDays, compensableDays);
 
     if (assignments.length === 0) {
-      setStatusMessage("No se encontraron coincidencias válidas (mismo mes, hasta 15 días después).");
+      setStatusMessage("No se encontraron coincidencias válidas (dentro del mismo mes).");
       return;
     }
 
@@ -413,7 +413,7 @@ export default function CompensationModal({
       return !item.recordId || !day || compensatedDates.has(item.date) || item.lateMinutes > day.lateMinutes || item.overtimeMinutes > day.overtimeMinutes;
     });
     if (invalidDay || totalLateToCompensate <= 0 || totalLateToCompensate !== totalOvertimeToCompensate || matched.totalCompensated !== totalLateToCompensate) {
-      setSubmitError("Seleccione minutos de tardanza y HE disponibles en cantidades iguales, del mismo día o hasta 15 días después dentro del mismo mes.");
+      setSubmitError("Seleccione minutos de tardanza y HE disponibles en cantidades iguales, de cualquier fecha dentro del mismo mes.");
       return;
     }
     setSubmitting(true);
@@ -545,13 +545,12 @@ export default function CompensationModal({
             <div className="flex items-start gap-2">
               <ArrowRightLeft className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
               <div className="text-xs text-indigo-800">
-                <p className="font-semibold mb-1">Compensación mensual (hasta 15 días después)</p>
+                <p className="font-semibold mb-1">Compensación mensual (mes completo)</p>
                 <p>
                   Las tardanzas de un día pueden compensarse con tiempo
-                  compensable (horas en exceso) del mismo día o de hasta{" "}
-                  <span className="font-medium">15 días calendario después</span>,
-                  dentro del mismo mes. Use "Auto" para que el sistema asigne
-                  automáticamente el tiempo compensable más cercano, o
+                  compensable (horas en exceso) de cualquier fecha anterior o posterior{" "}
+                  <span className="font-medium">dentro del mismo mes</span>. Use "Auto" para que el sistema asigne
+                  automáticamente el tiempo compensable disponible, o
                   "Seleccionar días con compensación" para compensar todas las
                   tardanzas del mes.
                 </p>
