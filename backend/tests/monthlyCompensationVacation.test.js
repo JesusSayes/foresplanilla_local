@@ -20,7 +20,7 @@ test('compensación mensual reparte saldo sin reutilizar minutos', () => {
 
 for (const [date, expected] of [['2026-08-31', 0], ['2026-09-01', 30], ['2026-09-16', 30], ['2026-09-17', 0], ['2026-10-01', 0]]) {
   test(`compensación respeta fechas: ${date}`, () => {
-    assert.equal(computeCrossDayCompensation([{ date: '2026-09-01', lateMinutes: 30 }], [{ date, overtimeMinutes: 30 }]).totalCompensated, expected);
+    assert.equal(computeCrossDayCompensation([{ date: '2026-09-01', lateMinutes: 30 }], [{ date, overtimeMinutes: 30 }], 15).totalCompensated, expected);
   });
 }
 
@@ -91,3 +91,18 @@ test('automatización local limita actualizaciones al empleado y rango aprobado'
   assert.equal(writes[0].where.id, 'r1');
   assert.equal(writes[0].data.scheduled_start, '');
 });
+
+for (const [lateDate, overtimeDate, expected] of [
+  ['2026-09-30', '2026-09-01', 30],
+  ['2026-09-01', '2026-09-30', 30],
+  ['2026-09-01', '2026-08-31', 0],
+  ['2026-09-30', '2026-10-01', 0],
+]) {
+  test(`apertura mensual: tardanza ${lateDate}, HE ${overtimeDate}`, () => {
+    const result = computeCrossDayCompensation(
+      [{ date: lateDate, lateMinutes: 30 }],
+      [{ date: overtimeDate, overtimeMinutes: 30 }]
+    );
+    assert.equal(result.totalCompensated, expected);
+  });
+}
