@@ -2,7 +2,7 @@ import { attendanceDateFilter } from '../../utils/attendanceDateFilter.js';
 import prisma from "../../config/prisma.js";
 
 import { generate24HexId } from '../../utils/idGenerator.js';
-import { canAccessEmployee } from "../../middleware/authorization.js";
+import { canAccessEmployee, hasPermission, resolveAccessibleEmployeeIds } from "../../middleware/authorization.js";
 import { toDateString } from "../../utils/employmentDate.js";
 
 const toPrismaDate = (value) => {
@@ -160,6 +160,17 @@ export const update = async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Incident not found' });
     if (!canAccessEmployee(req, existing.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     const { incident_date, review_date, ...data } = req.body;
+    if (existing.incident_type === 'Compensación de Tardanza' && ['Aprobada', 'Rechazada'].includes(data.status)) {
+      const permissions = ['attendance.approve_compensations', 'attendance.manage'];
+      if (!permissions.some(permission => hasPermission(req.access, permission)) ||
+          existing.authorizer_id !== req.access?.employee?.id) {
+        return res.status(403).json({ error: 'Solo el autorizador con permiso de compensaciones puede revisar esta solicitud' });
+      }
+      const allowedIds = await resolveAccessibleEmployeeIds(req.access, permissions);
+      if (allowedIds !== null && !allowedIds.includes(existing.employee_id)) {
+        return res.status(403).json({ error: 'No tiene permiso para aprobar compensaciones de esta sede' });
+      }
+    }
     if (data.employee_id && !canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     if (incident_date !== undefined && !toPrismaDate(incident_date)) return res.status(400).json({ error: 'Fecha de incidente inválida' });
     if (review_date && !toPrismaDate(review_date)) return res.status(400).json({ error: 'Fecha de revisión inválida' });

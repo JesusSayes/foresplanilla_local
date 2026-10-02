@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,6 +63,7 @@ export default function CompensationPanel({
   effectiveEmployee,
   accessibleEmployeeIds,
   hasPermission,
+  selectedSite,
 }) {
   const queryClient = useQueryClient();
   const today = new Date();
@@ -73,7 +74,6 @@ export default function CompensationPanel({
   const [useCustomRange, setUseCustomRange] = useState(false);
   const [monthOffset, setMonthOffset] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedSite, setSelectedSite] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
@@ -81,6 +81,14 @@ export default function CompensationPanel({
   const [submitting, setSubmitting] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [pendingCompsForEdit, setPendingCompsForEdit] = useState([]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setShowModal(false);
+    setSelectedEmployee(null);
+    setEditMode(false);
+    setPendingCompsForEdit([]);
+  }, [selectedSite]);
 
   const selectedMonthDate = useMemo(() => {
     return new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
@@ -108,14 +116,6 @@ export default function CompensationPanel({
     queryFn: async () => {
       const all = await entitiesAPI.AttendanceRecord.list("-date", 2000);
       return all.filter((r) => r.date >= periodStart && r.date <= periodEnd);
-    },
-  });
-
-  const { data: sites = [] } = useQuery({
-    queryKey: ["sites"],
-    queryFn: async () => {
-      const all = await entitiesAPI.Site.list("name");
-      return all.filter((s) => s.is_active);
     },
   });
 
@@ -259,14 +259,6 @@ export default function CompensationPanel({
         }
       }
 
-      if (
-        selectedSite !== "all" &&
-        stat.employee.site !== selectedSite &&
-        !(selectedSite === "sin_sede" && !stat.employee.site)
-      ) {
-        return false;
-      }
-
       if (filterType === "late" && stat.totalLateMinutes === 0) return false;
       if (
         filterType === "overtime" &&
@@ -276,7 +268,7 @@ export default function CompensationPanel({
 
       return true;
     });
-  }, [employeeStats, searchTerm, selectedSite, filterType]);
+  }, [employeeStats, searchTerm, filterType]);
 
   const employeesWithCompensation = useMemo(() => {
     return new Set(existingCompensations.map((c) => c.employee_id));
@@ -501,27 +493,6 @@ export default function CompensationPanel({
               className="pl-9"
             />
           </div>
-
-          <Select
-            value={selectedSite}
-            onValueChange={(v) => {
-              setSelectedSite(v);
-              setCurrentPage(1);
-            }}
-          >
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Sede" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              <SelectItem value="sin_sede">Sin sede</SelectItem>
-              {sites.map((site) => (
-                <SelectItem key={site.id} value={site.name}>
-                  {site.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
           <Select
             value={filterType}
