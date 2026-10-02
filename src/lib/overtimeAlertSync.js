@@ -57,12 +57,17 @@ export const syncOvertimeAlert = async (record, pendingAlerts, currentUser, hasS
   const result = { preShift: null, postShift: null };
 
   // ── Salida posterior (overtime_hours POSITIVO) ──────────────────────
-  const existingPost = pendingAlerts.find(
-    (a) => a.attendance_record_id === record.id && a.status === "Pendiente" && (a.overtime_hours || 0) > 0
+  // Buscar ANY alerta existente (no solo Pendiente) para evitar duplicar
+  // alertas ya revisadas (Autorizado/Descartado).
+  const existingPostAny = pendingAlerts.find(
+    (a) => a.attendance_record_id === record.id && (a.overtime_hours || 0) > 0
   );
+  const existingPost = existingPostAny?.status === "Pendiente" ? existingPostAny : null;
 
   if (postShiftHrs > EPSILON && !isAuthorized) {
-    if (!existingPost) {
+    if (existingPostAny && existingPostAny.status !== "Pendiente") {
+      // Ya revisada: conservar la decisión, no crear duplicado
+    } else if (!existingPost) {
       const created = await base44.entities.OvertimeAlert.create({
         employee_id: record.employee_id,
         attendance_record_id: record.id,
@@ -99,12 +104,15 @@ export const syncOvertimeAlert = async (record, pendingAlerts, currentUser, hasS
   }
 
   // ── Ingreso anticipado (overtime_hours NEGATIVO) ────────────────────
-  const existingPre = pendingAlerts.find(
-    (a) => a.attendance_record_id === record.id && a.status === "Pendiente" && (a.overtime_hours || 0) < 0
+  const existingPreAny = pendingAlerts.find(
+    (a) => a.attendance_record_id === record.id && (a.overtime_hours || 0) < 0
   );
+  const existingPre = existingPreAny?.status === "Pendiente" ? existingPreAny : null;
 
   if (preShiftHrs > EPSILON) {
-    if (!existingPre) {
+    if (existingPreAny && existingPreAny.status !== "Pendiente") {
+      // Ya revisada: conservar la decisión, no crear duplicado
+    } else if (!existingPre) {
       const created = await base44.entities.OvertimeAlert.create({
         employee_id: record.employee_id,
         attendance_record_id: record.id,

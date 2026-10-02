@@ -26,13 +26,24 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ error: "Solo administradores pueden ejecutar esta corrección" }, { status: 403 });
     }
 
-    // Cargar todos los registros de vacaciones con paginación
+    // Parámetros opcionales de fecha para limitar el período
+    const body = await req.json().catch(() => ({}));
+    const dateFrom: string | null = body?.dateFrom || null;
+    const dateTo: string | null = body?.dateTo || null;
+
+    // Cargar registros de vacaciones con paginación, opcionalmente filtrados por fecha
     let allVacationRecords: any[] = [];
     const PAGE = 500;
     let skip = 0;
     while (true) {
+      const filter: any = { status: "Vacaciones" };
+      if (dateFrom || dateTo) {
+        filter.date = {};
+        if (dateFrom) filter.date.$gte = dateFrom;
+        if (dateTo) filter.date.$lte = dateTo;
+      }
       const raw = await base44.asServiceRole.entities.AttendanceRecord.filter(
-        { status: "Vacaciones" }, "-date", PAGE, skip
+        filter, "-date", PAGE, skip
       );
       const page = Array.isArray(raw) ? raw : (raw ? Object.values(raw) : []);
       if (page.length === 0) break;

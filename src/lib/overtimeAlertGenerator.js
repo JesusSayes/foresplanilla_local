@@ -55,13 +55,24 @@ export const generateOvertimeAlertsForAllRecords = async ({
   workSchedules,
   allEmployees,
   onProgress,
+  dateFrom,
+  dateTo,
 }) => {
-  // Cargar TODOS los registros de asistencia (no solo los visibles)
-  const allRecords = await base44.entities.AttendanceRecord.list("-date", 5000);
-  // Cargar alertas pendientes existentes (lista mutable que syncOvertimeAlert actualiza)
-  const pendingAlerts = await base44.entities.OvertimeAlert.filter({
-    status: "Pendiente",
-  });
+  // Cargar registros de asistencia, opcionalmente filtrados por fecha
+  let allRecords;
+  if (dateFrom || dateTo) {
+    const dateFilter = {};
+    if (dateFrom) dateFilter.$gte = dateFrom;
+    if (dateTo) dateFilter.$lte = dateTo;
+    allRecords = await base44.entities.AttendanceRecord.filter(
+      { date: dateFilter }, "-date", 5000
+    );
+  } else {
+    allRecords = await base44.entities.AttendanceRecord.list("-date", 5000);
+  }
+  // Cargar TODAS las alertas (no solo pendientes) para evitar duplicar
+  // alertas ya revisadas (Autorizado/Descartado).
+  const pendingAlerts = await base44.entities.OvertimeAlert.list("-created_date", 5000);
 
   const stMap = [
     "sunday_start", "monday_start", "tuesday_start", "wednesday_start",
@@ -97,5 +108,6 @@ export const generateOvertimeAlertsForAllRecords = async ({
     }
   }
 
-  return { total, pending: pendingAlerts.length };
+  const pendingCount = pendingAlerts.filter((a) => a.status === "Pendiente").length;
+  return { total, pending: pendingCount };
 };

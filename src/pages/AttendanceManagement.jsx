@@ -941,12 +941,25 @@ export default function AttendanceManagement() {
     if (!window.confirm("¿Revisar registros de asistencia, generar alertas de horas extras y corregir vacaciones en fines de semana? Esto puede tardar unos minutos.")) return;
     setGeneratingAlerts(true);
     setAlertGenProgress({ done: 0, total: 0 });
+
+    // Determinar el período a procesar según los filtros seleccionados
+    let filterFrom = null, filterTo = null;
+    if (isRangeMode && dateFrom && dateTo) {
+      filterFrom = dateToStringLima(dateFrom);
+      filterTo = dateToStringLima(dateTo);
+    } else {
+      filterFrom = dateToStringLima(selectedDate);
+      filterTo = dateToStringLima(selectedDate);
+    }
+
     showLoading("Revisando registros de asistencia y generando alertas de horas extras...");
     try {
       const result = await generateOvertimeAlertsForAllRecords({
         currentUser,
         workSchedules,
         allEmployees,
+        dateFrom: filterFrom,
+        dateTo: filterTo,
         onProgress: (p) => {
           setAlertGenProgress(p);
           showLoading(`Revisando registros de asistencia... ${p.done}/${p.total}`);
@@ -956,7 +969,10 @@ export default function AttendanceManagement() {
 
       // Corregir vacaciones en fines de semana (sábados/domingos → 0 horas)
       showLoading("Corrigiendo vacaciones en fines de semana...");
-      const vacResult = await base44.functions.invoke("corregirVacacionesFinDeSemana", {});
+      const vacResult = await base44.functions.invoke("corregirVacacionesFinDeSemana", {
+        dateFrom: filterFrom,
+        dateTo: filterTo,
+      });
       queryClient.invalidateQueries(["todayAttendance"]);
       queryClient.invalidateQueries(["allAttendanceRecords"]);
 
