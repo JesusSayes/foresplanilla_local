@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { entitiesAPI } from "@/api/entitiesClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,7 +20,12 @@ import { parseDateLima } from "@/lib/dateUtils";
 import { computeScheduledHours } from "@/lib/attendanceMetrics";
 import { toast } from "sonner";
 
-export default function PendingCompensationsApproval({ allEmployees }) {
+export default function PendingCompensationsApproval({
+  allEmployees,
+  siteEmployeeIds,
+  selectedSite,
+  canApprove = false,
+}) {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
   const currentEmployee = currentUser?.employee || null;
@@ -28,9 +33,13 @@ export default function PendingCompensationsApproval({ allEmployees }) {
   const [rejectComment, setRejectComment] = useState("");
   const [processing, setProcessing] = useState(false);
 
-  // Cargar todas las compensaciones pendientes asignadas al usuario actual
+  useEffect(() => {
+    setRejectingId(null);
+    setRejectComment("");
+  }, [selectedSite]);
+
   const { data: pendingComps = [], isLoading } = useQuery({
-    queryKey: ["pendingCompsForApproval", currentEmployee?.id],
+    queryKey: ["pendingCompsForApproval", currentEmployee?.id, selectedSite, [...siteEmployeeIds].sort().join(",")],
     queryFn: async () => {
       if (!currentEmployee) return [];
       const all = await entitiesAPI.AttendanceIncident.list(
@@ -41,7 +50,8 @@ export default function PendingCompensationsApproval({ allEmployees }) {
         (i) =>
           i.incident_type === "Compensación de Tardanza" &&
           i.status === "Pendiente" &&
-          i.authorizer_id === currentEmployee.id
+          i.authorizer_id === currentEmployee.id &&
+          siteEmployeeIds.has(i.employee_id)
       );
     },
     enabled: !!currentEmployee,
@@ -124,6 +134,10 @@ export default function PendingCompensationsApproval({ allEmployees }) {
   }, [pendingComps, allEmployees]);
 
   const handleApprove = async (comp) => {
+    if (!canApprove || !siteEmployeeIds.has(comp.employee_id)) {
+      toast.error("No tiene permiso para aprobar compensaciones de esta sede");
+      return;
+    }
     setProcessing(true);
     try {
       const record = relatedRecords.find(
@@ -193,6 +207,10 @@ export default function PendingCompensationsApproval({ allEmployees }) {
   };
 
   const handleApproveAll = async (employeeGroup) => {
+    if (!canApprove || !siteEmployeeIds.has(employeeGroup.employee_id)) {
+      toast.error("No tiene permiso para aprobar compensaciones de esta sede");
+      return;
+    }
     setProcessing(true);
     try {
       for (const comp of employeeGroup.compensations) {
@@ -260,6 +278,12 @@ export default function PendingCompensationsApproval({ allEmployees }) {
 
   const handleReject = async () => {
     if (!rejectingId) return;
+    const comp = pendingComps.find((c) => c.id === rejectingId);
+    if (!canApprove || !comp || !siteEmployeeIds.has(comp.employee_id)) {
+      toast.error("No tiene permiso para rechazar compensaciones de esta sede");
+      setRejectingId(null);
+      return;
+    }
     if (!rejectComment.trim()) {
       toast.error("Debe ingresar un motivo de rechazo");
       return;
@@ -384,7 +408,7 @@ export default function PendingCompensationsApproval({ allEmployees }) {
                   <Button
                     size="sm"
                     className="bg-green-600 hover:bg-green-700 text-white h-8"
-                    disabled={processing}
+                    disabled={processing || !canApprove}
                     onClick={() => handleApproveAll(group)}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
@@ -437,7 +461,7 @@ export default function PendingCompensationsApproval({ allEmployees }) {
                             size="sm"
                             variant="outline"
                             className="h-7 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
-                            disabled={processing}
+                            disabled={processing || !canApprove}
                             onClick={() => handleApprove(comp)}
                           >
                             <CheckCircle2 className="w-3 h-3 mr-1" />
@@ -447,7 +471,7 @@ export default function PendingCompensationsApproval({ allEmployees }) {
                             size="sm"
                             variant="outline"
                             className="h-7 px-2 text-xs text-red-700 border-red-300 hover:bg-red-50"
-                            disabled={processing}
+                            disabled={processing || !canApprove}
                             onClick={() => {
                               setRejectingId(comp.id);
                               setRejectComment("");
@@ -484,7 +508,7 @@ export default function PendingCompensationsApproval({ allEmployees }) {
                             <Button
                               size="sm"
                               className="bg-red-600 hover:bg-red-700 text-white text-xs"
-                              disabled={processing || !rejectComment.trim()}
+                              disabled={processing || !canApprove || !rejectComment.trim()}
                               onClick={handleReject}
                             >
                               Confirmar rechazo
