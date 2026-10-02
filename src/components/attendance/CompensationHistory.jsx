@@ -29,7 +29,7 @@ const MONTHS_ES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-export default function CompensationHistory({ allEmployees }) {
+export default function CompensationHistory({ allEmployees, siteEmployeeIds }) {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -49,9 +49,10 @@ export default function CompensationHistory({ allEmployees }) {
     "yyyy-MM-dd"
   );
 
-  // Cargar compensaciones ya procesadas (Aprobada o Rechazada)
+  // Cargar compensaciones ya procesadas (Aprobada o Rechazada), filtradas por sede
+  const siteKey = siteEmployeeIds ? Array.from(siteEmployeeIds).join(",") : "all";
   const { data: processedComps = [], isLoading } = useQuery({
-    queryKey: ["processedCompensations", periodStart, periodEnd],
+    queryKey: ["processedCompensations", periodStart, periodEnd, siteKey],
     queryFn: async () => {
       const all = await base44.entities.AttendanceIncident.list(
         "-review_date",
@@ -62,7 +63,8 @@ export default function CompensationHistory({ allEmployees }) {
           i.incident_type === "Compensación de Tardanza" &&
           (i.status === "Aprobada" || i.status === "Rechazada") &&
           i.incident_date >= periodStart &&
-          i.incident_date <= periodEnd
+          i.incident_date <= periodEnd &&
+          siteEmployeeIds.has(i.employee_id)
       );
     },
   });

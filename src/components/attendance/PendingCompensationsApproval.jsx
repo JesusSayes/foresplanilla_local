@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,13 +20,23 @@ import { parseDateLima } from "@/lib/dateUtils";
 import { computeScheduledHours } from "@/lib/attendanceMetrics";
 import { toast } from "sonner";
 
-export default function PendingCompensationsApproval({ allEmployees }) {
+export default function PendingCompensationsApproval({
+  allEmployees,
+  siteEmployeeIds,
+  selectedSite,
+}) {
   const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState(null);
   const [currentEmployee, setCurrentEmployee] = useState(null);
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectComment, setRejectComment] = useState("");
   const [processing, setProcessing] = useState(false);
+
+  // Limpiar selección de rechazo al cambiar de sede
+  useEffect(() => {
+    setRejectingId(null);
+    setRejectComment("");
+  }, [selectedSite]);
 
   // Obtener usuario actual y su empleado
   useQuery({
@@ -46,9 +56,10 @@ export default function PendingCompensationsApproval({ allEmployees }) {
     },
   });
 
-  // Cargar todas las compensaciones pendientes asignadas al usuario actual
+  // Cargar todas las compensaciones pendientes asignadas al usuario actual,
+  // filtradas por la sede seleccionada
   const { data: pendingComps = [], isLoading } = useQuery({
-    queryKey: ["pendingCompsForApproval", currentEmployee?.id],
+    queryKey: ["pendingCompsForApproval", currentEmployee?.id, selectedSite],
     queryFn: async () => {
       if (!currentEmployee) return [];
       const all = await base44.entities.AttendanceIncident.list(
@@ -59,7 +70,8 @@ export default function PendingCompensationsApproval({ allEmployees }) {
         (i) =>
           i.incident_type === "Compensación de Tardanza" &&
           i.status === "Pendiente" &&
-          i.authorizer_id === currentEmployee.id
+          i.authorizer_id === currentEmployee.id &&
+          siteEmployeeIds.has(i.employee_id)
       );
     },
     enabled: !!currentEmployee,
@@ -142,6 +154,10 @@ export default function PendingCompensationsApproval({ allEmployees }) {
   }, [pendingComps, allEmployees]);
 
   const handleApprove = async (comp) => {
+    if (!siteEmployeeIds.has(comp.employee_id)) {
+      toast.error("No tiene permiso para aprobar compensaciones de esta sede");
+      return;
+    }
     setProcessing(true);
     try {
       const record = relatedRecords.find(
@@ -211,6 +227,10 @@ export default function PendingCompensationsApproval({ allEmployees }) {
   };
 
   const handleApproveAll = async (employeeGroup) => {
+    if (!siteEmployeeIds.has(employeeGroup.employee_id)) {
+      toast.error("No tiene permiso para aprobar compensaciones de esta sede");
+      return;
+    }
     setProcessing(true);
     try {
       for (const comp of employeeGroup.compensations) {
@@ -278,6 +298,12 @@ export default function PendingCompensationsApproval({ allEmployees }) {
 
   const handleReject = async () => {
     if (!rejectingId) return;
+    const comp = pendingComps.find((c) => c.id === rejectingId);
+    if (comp && !siteEmployeeIds.has(comp.employee_id)) {
+      toast.error("No tiene permiso para rechazar compensaciones de esta sede");
+      setRejectingId(null);
+      return;
+    }
     if (!rejectComment.trim()) {
       toast.error("Debe ingresar un motivo de rechazo");
       return;
