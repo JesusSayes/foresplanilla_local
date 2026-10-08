@@ -159,6 +159,29 @@ export default function CompensationPanel({
     return map;
   }, [workSchedules, allEmployees]);
 
+  // Minutos de horas extras ya utilizados en compensaciones APROBADAS (por empleado)
+  const approvedOvertimeByEmployee = useMemo(() => {
+    const map = new Map();
+    for (const c of existingCompensations) {
+      if (c.status === "Aprobada") {
+        const mins = Math.round((c.hours_to_adjust || 0) * 60);
+        map.set(c.employee_id, (map.get(c.employee_id) || 0) + mins);
+      }
+    }
+    return map;
+  }, [existingCompensations]);
+
+  // Minutos de tardanza ya compensados (aprobados) por empleado
+  const approvedLateCompensatedByEmployee = useMemo(() => {
+    const map = new Map();
+    for (const c of existingCompensations) {
+      if (c.status === "Aprobada") {
+        map.set(c.employee_id, (map.get(c.employee_id) || 0) + (c.late_minutes_to_adjust || 0));
+      }
+    }
+    return map;
+  }, [existingCompensations]);
+
   // Mostrar TODOS los empleados accesibles con sus métricas
   const employeeStats = useMemo(() => {
     const map = new Map();
@@ -261,29 +284,6 @@ export default function CompensationPanel({
       if (c.status === "Pendiente" || c.status === "Rechazada") {
         if (!map.has(c.employee_id)) map.set(c.employee_id, []);
         map.get(c.employee_id).push(c);
-      }
-    }
-    return map;
-  }, [existingCompensations]);
-
-  // Minutos de horas extras ya utilizados en compensaciones APROBADAS (por empleado)
-  const approvedOvertimeByEmployee = useMemo(() => {
-    const map = new Map();
-    for (const c of existingCompensations) {
-      if (c.status === "Aprobada") {
-        const mins = Math.round((c.hours_to_adjust || 0) * 60);
-        map.set(c.employee_id, (map.get(c.employee_id) || 0) + mins);
-      }
-    }
-    return map;
-  }, [existingCompensations]);
-
-  // Minutos de tardanza ya compensados (aprobados) por empleado
-  const approvedLateCompensatedByEmployee = useMemo(() => {
-    const map = new Map();
-    for (const c of existingCompensations) {
-      if (c.status === "Aprobada") {
-        map.set(c.employee_id, (map.get(c.employee_id) || 0) + (c.late_minutes_to_adjust || 0));
       }
     }
     return map;
