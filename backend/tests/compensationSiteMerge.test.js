@@ -70,7 +70,7 @@ function pageHarness(initialSites) {
     const result = [];
     const walk = node => {
       if (Array.isArray(node)) return node.forEach(walk);
-      if (node && typeof node === 'object') { result.push(node); walk(node.props?.children); }
+      if (node && typeof node === 'object') { result.push(node); walk(node.props?.children); walk(node.props?.headerExtra); }
     };
     walk(tree); return result;
   };
@@ -80,15 +80,15 @@ function pageHarness(initialSites) {
 
 test('selector conserva la sede en nuevos renders y actualiza los empleados visibles', () => {
   const h = pageHarness(['Lima', 'Cusco']);
-  const select = () => h.nodes().find(n => n.type === 'Select');
-  assert.equal(select().props.disabled, false);
-  select().props.onValueChange('Cusco'); h.render(); h.render();
+  const select = () => h.nodes().find(n => n.props.availableSites);
+  assert.equal(select().props.isSingleSite, false);
+  select().props.onChange('Cusco'); h.render(); h.render();
   assert.equal(select().props.value, 'Cusco');
   const panel = h.nodes().find(n => n.props.accessibleEmployeeIds);
   assert.deepEqual([...panel.props.accessibleEmployeeIds], ['cusco']);
   h.setAllowed(['Lima']);
   assert.equal(select().props.value, 'Lima');
-  assert.equal(select().props.disabled, true);
+  assert.equal(select().props.isSingleSite, true);
   h.setAllowed([]);
   assert.equal(select(), undefined);
   assert.equal(h.nodes().some(n => n.props.accessibleEmployeeIds), false);
@@ -96,8 +96,8 @@ test('selector conserva la sede en nuevos renders y actualiza los empleados visi
 
 test('acceso total permite cambiar y conservar la sede seleccionada', () => {
   const h = pageHarness(null);
-  const select = () => h.nodes().find(n => n.type === 'Select');
-  select().props.onValueChange('Lima'); h.render();
+  const select = () => h.nodes().find(n => n.props.availableSites);
+  select().props.onChange('Lima'); h.render();
   assert.equal(select().props.value, 'Lima');
-  assert.equal(select().props.disabled, false);
+  assert.equal(select().props.isSingleSite, false);
 });
