@@ -28,6 +28,7 @@ import { generateOvertimeAlertsForAllRecords } from "@/lib/overtimeAlertGenerato
 import { useLoading } from "@/lib/loadingContext";
 import { useQueryLoading } from "@/lib/useQueryLoading";
 import { buildAttendanceExportRows } from "@/lib/attendanceExcelExport";
+import OvertimeAlertsTab from "@/components/attendance/OvertimeAlertsTab";
 import TardinessCompensationModal from "../components/attendance/TardinessCompensationModal";
 import IncidentHistory from "../components/attendance/IncidentHistory";
 import { generateAutoClockings } from "../components/attendance/AutoClockingJob";
@@ -88,10 +89,7 @@ export default function AttendanceManagement() {
   const [solDateFrom, setSolDateFrom] = useState("");
   const [solDateTo, setSolDateTo] = useState("");
 
-  const [overtimeSearchTerm, setOvertimeSearchTerm] = useState("");
-  const [overtimeDateFilter, setOvertimeDateFilter] = useState("");
-  const [overtimePage, setOvertimePage] = useState(1);
-  const OVERTIME_PAGE_SIZE = 20;
+  // Overtime alerts state moved to OvertimeAlertsTab component
 
   const [pageSize, setPageSize] = useState(300);
   const [currentPage, setCurrentPage] = useState(1);
@@ -200,7 +198,7 @@ export default function AttendanceManagement() {
 
   const { data: overtimeAlerts = [] } = useQuery({
     queryKey: ["overtimeAlerts"],
-    queryFn: async () => await base44.entities.OvertimeAlert.filter({ status: "Pendiente" }, "-created_date"),
+    queryFn: async () => await base44.entities.OvertimeAlert.filter({}, "-alert_date", 2000),
   });
 
   const { data: pendingEditRequests = [] } = useQuery({
@@ -1330,7 +1328,7 @@ export default function AttendanceManagement() {
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-red-100 rounded-lg shrink-0"><Clock className="w-4 h-4 text-red-600" /></div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xl font-bold text-red-900 leading-tight">{overtimeAlerts.length}</div>
+                    <div className="text-xl font-bold text-red-900 leading-tight">{overtimeAlerts.filter(a => a.status === "Pendiente").length}</div>
                     <p className="text-red-700 text-xs truncate">HE sin autorización</p>
                   </div>
                 </div>
@@ -1354,7 +1352,7 @@ export default function AttendanceManagement() {
                 </TabsTrigger>
                 <TabsTrigger value="overtime-alerts">
                   Alertas HE
-                  {overtimeAlerts.length > 0 && <Badge className="ml-2 bg-orange-500 text-white">{overtimeAlerts.length}</Badge>}
+                  {(() => { const n = overtimeAlerts.filter(a => a.status === "Pendiente").length; return n > 0 ? <Badge className="ml-2 bg-orange-500 text-white">{n}</Badge> : null; })()}
                 </TabsTrigger>
                 <TabsTrigger value="edit-requests">
                   Ediciones
@@ -1872,147 +1870,16 @@ export default function AttendanceManagement() {
 
             {/* Overtime Alerts Tab */}
             <TabsContent value="overtime-alerts" className="space-y-6">
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="border-b bg-red-50/50">
-                  <CardTitle className="text-xl font-bold flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-red-600" />Alertas de Horas Extras No Autorizadas
-                  </CardTitle>
-                  <p className="text-sm text-slate-600 mt-2">Personal que registró horas extras sin autorización previa</p>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="flex flex-wrap items-center gap-3 mb-6">
-                    <div className="relative flex-1 min-w-[180px]">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                      <Input placeholder="Buscar por nombre..." value={overtimeSearchTerm} onChange={(e) => { setOvertimeSearchTerm(e.target.value); setOvertimePage(1); }} className="pl-9" />
-                    </div>
-                    <Input type="date" value={overtimeDateFilter} onChange={(e) => { setOvertimeDateFilter(e.target.value); setOvertimePage(1); }} className="w-40" title="Filtrar por fecha" />
-                    {overtimeDateFilter && <Button size="sm" variant="outline" onClick={() => { setOvertimeDateFilter(""); setOvertimePage(1); }}>✕ Fecha</Button>}
-                    <div className="ml-auto">
-                      <PaginationBar inline currentPage={overtimePage} totalItems={overtimeAlerts.filter(a => accessibleEmployeeIds.has(a.employee_id) && (!overtimeSearchTerm || (() => { const e = allEmployees.find(x => x.id === a.employee_id); return e ? `${e.first_name} ${e.last_name}`.toLowerCase().includes(overtimeSearchTerm.toLowerCase()) : false; })()) && (!overtimeDateFilter || a.alert_date === overtimeDateFilter)).length} pageSize={OVERTIME_PAGE_SIZE} onPageChange={setOvertimePage} />
-                    </div>
-                  </div>
-                  {overtimeAlerts.length === 0 ? (
-                    <div className="text-center py-12">
-                      <CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" />
-                      <p className="text-slate-600">No hay alertas de horas extras</p>
-                    </div>
-                  ) : (
-                    <>
-                    {(() => {
-                      const filteredOT = overtimeAlerts.filter(a => {
-                        if (!accessibleEmployeeIds.has(a.employee_id)) return false;
-                        if (overtimeSearchTerm) {
-                          const emp = allEmployees.find(e => e.id === a.employee_id);
-                          const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
-                          if (!name.includes(overtimeSearchTerm.toLowerCase())) return false;
-                        }
-                        if (overtimeDateFilter && a.alert_date !== overtimeDateFilter) return false;
-                        return true;
-                      });
-                      const pagedOT = filteredOT.slice((overtimePage - 1) * OVERTIME_PAGE_SIZE, overtimePage * OVERTIME_PAGE_SIZE);
-                      return (
-                    <>
-                    <div className="space-y-4">
-                      {pagedOT.map(alert => {
-                       const emp = allEmployees.find(e => e.id === alert.employee_id);
-                       const record = todayRecords.find(r => r.id === alert.attendance_record_id);
-                       const alertSched = emp ? getEmployeeScheduleForDate(emp.id, alert.alert_date) : null;
-                       const alertDow = new Date(alert.alert_date + "T00:00:00").getDay();
-                       const dowStarts = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
-                       const dowEnds   = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-                       const schedStart = alertSched?.[dowStarts[alertDow]];
-                       const schedEnd   = alertSched?.[dowEnds[alertDow]];
-                       const schedName  = alertSched?.schedule_name?.replace(new RegExp(`\\s*-\\s*${emp?.first_name}\\s+${emp?.last_name}\\s*$`, 'i'), '') || null;
-
-                       return (
-                         <div key={alert.id} className="p-4 border-2 border-red-200 bg-red-50 rounded-lg">
-                           <div className="flex items-start justify-between mb-4">
-                             <div className="flex-1">
-                               <div className="flex items-center gap-3 mb-2">
-                                 <h4 className="font-bold text-slate-900">{emp ? `${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}` : "Empleado desconocido"}</h4>
-                                 <Badge className={alert.overtime_hours < 0 ? "bg-amber-600 text-white" : "bg-red-600 text-white"}>
-                                   {alert.overtime_hours < 0 ? "Ingreso anticipado" : "Salida posterior"}: {Math.abs(alert.overtime_hours).toFixed(2)}h
-                                 </Badge>
-                               </div>
-                               <p className="text-sm text-slate-600 mb-2">{emp?.position} • {emp?.department_name}</p>
-                               <p className="text-sm text-slate-700">📅 {format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}</p>
-                               {record && (() => { const seg = getSegmentClockTimes(record); return <p className="text-sm text-slate-600 mt-1">Marcación: {seg.firstClockIn || "—"} - {seg.lastClockOut || "—"} ({record.worked_hours?.toFixed(2)}h trabajadas)</p>; })()}
-                               {alertSched && (
-                                 <p className="text-sm text-slate-600 mt-1">
-                                   🗓️ Horario: <span className="font-medium">{schedName}</span>
-                                   {schedStart && schedEnd && <span className="text-indigo-600 ml-1">({schedStart}–{schedEnd})</span>}
-                                 </p>
-                               )}
-                             </div>
-                           </div>
-                           <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
-                             <p className="text-sm text-yellow-900">⚠️ {alert.overtime_hours < 0
-                               ? <>Este empleado <strong>ingresó antes</strong> de la hora programada. Puede corregir la marcación, descartar la alerta o <strong>autorizar el tiempo adicional solo para este día</strong>.</>
-                               : <>Este empleado <strong>no está autorizado</strong> para realizar horas extras de forma permanente. Puede corregir la marcación, descartar la alerta o <strong>aceptar las HE únicamente para este día</strong> sin modificar su autorización general.</>
-                             }</p>
-                           </div>
-                           <div className="flex gap-2 flex-wrap">
-                              <Button size="sm" variant="outline" className="flex-1" onClick={() => {
-                                if (!record) return;
-                                const empForAlert = allEmployees.find(e => e.id === alert.employee_id);
-                                handleEditRecord(record, empForAlert);
-                              }}>
-                                <Edit className="w-4 h-4 mr-2" />Solicitar Corrección
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="flex-1 text-blue-700 border-blue-300 hover:bg-blue-50"
-                                onClick={async () => {
-                                   // 1. Marcar overtime_authorized=true en el registro del día
-                                   if (record) {
-                                     await base44.entities.AttendanceRecord.update(record.id, {
-                                       overtime_authorized: true,
-                                       notes: (record.notes ? record.notes + " | " : "") + `HE aceptadas: ${alert.overtime_hours.toFixed(2)}h (${alert.alert_date})`
-                                     });
-                                   }
-                                   // 2. Marcar alerta como autorizada (status válido del enum OvertimeAlert)
-                                   await base44.entities.OvertimeAlert.update(alert.id, {
-                                     status: "Autorizado",
-                                     resolved_by: currentUser?.email || "",
-                                     resolution_date: todayLima(),
-                                     resolution_notes: `HE aceptadas solo para el día ${alert.alert_date}`
-                                   });
-                                  // 3. Recalcular asistencia del día (tardanza + HE 25% + HE 35%)
-                                  await base44.functions.invoke("recalcularAsistencia", {
-                                    employee_id: alert.employee_id,
-                                    date_from: alert.alert_date,
-                                    date_to: alert.alert_date,
-                                  });
-                                  queryClient.invalidateQueries(["overtimeAlerts"]);
-                                  queryClient.invalidateQueries(["todayAttendance"]);
-                                  queryClient.invalidateQueries(["attendanceRecords"]);
-                                  toast.success(`HE aceptadas y recalculadas para el ${format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}: HE25% y HE35% actualizadas`);
-                                }}
-                              >
-                                <CheckCircle className="w-4 h-4 mr-2" />{alert.overtime_hours < 0 ? "Autorizar anticipado (solo este día)" : "Aceptar HE (solo este día)"}
-                              </Button>
-                              <Button size="sm" variant="outline" className="text-slate-600" onClick={async () => {
-                                await base44.entities.OvertimeAlert.update(alert.id, { status: "Descartado" });
-                                queryClient.invalidateQueries(["overtimeAlerts"]);
-                                toast.success("Alerta descartada");
-                              }}>
-                                <XCircle className="w-4 h-4 mr-2" />Descartar
-                              </Button>
-                            </div>
-                         </div>
-                         );
-                         })}
-                         </div>
-
-                         </>
-                         );
-                         })()}
-                         </>
-                         )}
-                         </CardContent>
-                         </Card>
-                         </TabsContent>
+              <OvertimeAlertsTab
+                overtimeAlerts={overtimeAlerts}
+                allEmployees={allEmployees}
+                todayRecords={todayRecords}
+                getEmployeeScheduleForDate={getEmployeeScheduleForDate}
+                accessibleEmployeeIds={accessibleEmployeeIds}
+                currentUser={currentUser}
+                onEditRecord={handleEditRecord}
+              />
+            </TabsContent>
 
             {/* Incidents Tab */}
             <IncidentsTabContent
