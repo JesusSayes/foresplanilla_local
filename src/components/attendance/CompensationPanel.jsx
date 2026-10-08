@@ -64,6 +64,7 @@ export default function CompensationPanel({
   accessibleEmployeeIds,
   hasPermission,
   selectedSite,
+  headerExtra,
 }) {
   const queryClient = useQueryClient();
   const today = new Date();
@@ -441,13 +442,18 @@ export default function CompensationPanel({
   return (
     <Card className="border-0 shadow-lg">
       <CardHeader className="border-b bg-indigo-50/50">
-        <CardTitle className="text-xl font-bold flex items-center gap-2">
-          <Clock className="w-5 h-5 text-indigo-600" />
-          Compensación de Tardanzas y Horas en Exceso
-        </CardTitle>
-        <p className="text-sm text-slate-600 mt-1">
-          Horas programadas vs. trabajadas por empleado en el período
-        </p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <CardTitle className="text-xl font-bold flex items-center gap-2">
+              <Clock className="w-5 h-5 text-indigo-600" />
+              Compensación de Tardanzas y Horas en Exceso
+            </CardTitle>
+            <p className="text-sm text-slate-600 mt-1">
+              Horas programadas vs. trabajadas por empleado en el período
+            </p>
+          </div>
+          {headerExtra}
+        </div>
       </CardHeader>
       <CardContent className="p-6">
         {/* Resumen general del período */}
