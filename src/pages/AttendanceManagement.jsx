@@ -105,7 +105,6 @@ export default function AttendanceManagement() {
   const { getAccessibleSites, hasPermission, loading: permissionsLoading, employee: permEmployee } = usePermissions();
   const queryClient = useQueryClient();
   const { showLoading, hideLoading } = useLoading();
-  useQueryLoading([{ isFetching: attFetching, message: "Consultando registros de asistencia..." }]);
   const effectiveEmployee = employee || permEmployee;
 
   useEffect(() => {
@@ -143,6 +142,7 @@ export default function AttendanceManagement() {
       return await base44.entities.AttendanceRecord.filter({ date: dateStr }, "-created_date");
     },
   });
+  useQueryLoading([{ isFetching: attFetching, message: "Consultando registros de asistencia..." }]);
 
   const { data: holidays = [] } = useQuery({
     queryKey: ["holidays"],
