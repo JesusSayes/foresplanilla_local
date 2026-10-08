@@ -29,7 +29,7 @@ const MONTHS_ES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-export default function CompensationHistory({ allEmployees, siteEmployeeIds }) {
+export default function CompensationHistory({ allEmployees, siteEmployeeIds, headerExtra }) {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -135,13 +135,18 @@ export default function CompensationHistory({ allEmployees, siteEmployeeIds }) {
   return (
     <Card className="border-0 shadow-lg">
       <CardHeader className="border-b bg-slate-50/50">
-        <CardTitle className="text-xl font-bold flex items-center gap-2">
-          <History className="w-5 h-5 text-slate-600" />
-          Histórico de Aprobaciones
-        </CardTitle>
-        <p className="text-sm text-slate-600 mt-1">
-          Solicitudes de compensación ya procesadas (aprobadas o rechazadas)
-        </p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <CardTitle className="text-xl font-bold flex items-center gap-2">
+              <History className="w-5 h-5 text-slate-600" />
+              Histórico de Aprobaciones
+            </CardTitle>
+            <p className="text-sm text-slate-600 mt-1">
+              Solicitudes de compensación ya procesadas (aprobadas o rechazadas)
+            </p>
+          </div>
+          {headerExtra}
+        </div>
       </CardHeader>
       <CardContent className="p-6">
         {/* Resumen de estadísticas */}

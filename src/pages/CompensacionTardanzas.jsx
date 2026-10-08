@@ -3,18 +3,12 @@ import { usePermissions } from "@/components/hooks/usePermissions";
 import CompensationPanel from "@/components/attendance/CompensationPanel";
 import PendingCompensationsApproval from "@/components/attendance/PendingCompensationsApproval";
 import CompensationHistory from "@/components/attendance/CompensationHistory";
+import SiteSelector from "@/components/attendance/SiteSelector";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { entitiesAPI } from "@/api/entitiesClient";
-import { Clock, History, MapPin, AlertCircle } from "lucide-react";
+import { Clock, History, AlertCircle } from "lucide-react";
 
 export default function CompensacionTardanzas() {
   const [activeTab, setActiveTab] = useState("pendientes");
@@ -133,62 +127,43 @@ export default function CompensacionTardanzas() {
     );
   }
 
+  // Selector de sede reutilizable, ubicado inline en el header de cada módulo
+  const siteSelector = (
+    <SiteSelector
+      value={selectedSite}
+      onChange={setSelectedSite}
+      availableSites={availableSites}
+      accessibleSites={accessibleSites}
+      isSingleSite={isSingleSite}
+      compact
+    />
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <div className="max-w-full mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
+      <div className="max-w-full mx-auto px-4 py-4">
+        <div className="mb-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
             Compensación de Tardanzas y Horas en Exceso
           </h1>
-          <p className="text-slate-600 text-lg">
+          <p className="text-slate-600 text-sm sm:text-base">
             Gestión de compensaciones de tardanzas y horas extras del personal
           </p>
         </div>
 
-        {/* Selector de sede */}
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-indigo-600" />
-            <span className="text-sm font-semibold text-slate-700">Sede:</span>
-          </div>
-          <Select
-            value={selectedSite}
-            onValueChange={(v) => setSelectedSite(v)}
-            disabled={isSingleSite}
-          >
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder="Seleccionar sede" />
-            </SelectTrigger>
-            <SelectContent>
-              {accessibleSites === null && (
-                <SelectItem value="all">Todas las sedes</SelectItem>
-              )}
-              {accessibleSites !== null &&
-                accessibleSites.length > 1 && (
-                  <SelectItem value="all">Todas las sedes autorizadas</SelectItem>
-                )}
-              {availableSites.map((site) => (
-                <SelectItem key={site.id} value={site.name}>
-                  {site.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-xs grid-cols-2 h-9">
             <TabsTrigger value="pendientes">
-              <Clock className="w-4 h-4 mr-2" />
+              <Clock className="w-4 h-4 mr-1.5" />
               Solicitudes
             </TabsTrigger>
             <TabsTrigger value="historico">
-              <History className="w-4 h-4 mr-2" />
+              <History className="w-4 h-4 mr-1.5" />
               Histórico
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pendientes" className="mt-6 space-y-6">
+          <TabsContent value="pendientes" className="mt-4 space-y-4">
             <PendingCompensationsApproval
               allEmployees={allEmployees}
               siteEmployeeIds={siteEmployeeIds}
@@ -202,13 +177,15 @@ export default function CompensacionTardanzas() {
               hasPermission={hasPermission}
               selectedSite={selectedSite}
               standalone
+              headerExtra={siteSelector}
             />
           </TabsContent>
 
-          <TabsContent value="historico" className="mt-6">
+          <TabsContent value="historico" className="mt-4">
             <CompensationHistory
               allEmployees={allEmployees}
               siteEmployeeIds={siteEmployeeIds}
+              headerExtra={siteSelector}
             />
           </TabsContent>
         </Tabs>
