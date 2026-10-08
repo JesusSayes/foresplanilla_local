@@ -16,6 +16,14 @@ import PaginationBar from "@/components/ui/PaginationBar";
 
 const PAGE_SIZE = 20;
 
+// Convierte horas decimales (ej: 2.83) a formato "Xh Ym" (ej: "2h 50m")
+const formatHorasMinutos = (horasDec) => {
+  const totalMin = Math.round(Math.abs(horasDec) * 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${h}h ${m}m`;
+};
+
 /**
  * Pestaña de Alertas de Horas Extras con sub-tabs (Pendientes / Procesadas),
  * filtro por rango de fechas y filas compactas con botones a la derecha.
@@ -241,7 +249,7 @@ export default function OvertimeAlertsTab({
                         }
                       >
                         {alert.overtime_hours < 0 ? "Ingreso anticipado" : "Salida posterior"}:{" "}
-                        {Math.abs(alert.overtime_hours).toFixed(2)}h
+                        {formatHorasMinutos(alert.overtime_hours)}
                       </Badge>
                       {isProcessed && (
                         <Badge
