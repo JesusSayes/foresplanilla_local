@@ -115,25 +115,28 @@ export default function CompensationPanel({
   const { data: periodRecords = [], isLoading } = useQuery({
     queryKey: ["compensationRecords", periodStart, periodEnd],
     queryFn: async () => {
-      const all = await entitiesAPI.AttendanceRecord.list("-date", 2000);
-      return all.filter((r) => r.date >= periodStart && r.date <= periodEnd);
+      const records = await entitiesAPI.AttendanceRecord.filter(
+        { date: { $gte: periodStart, $lte: periodEnd } },
+        "-date"
+      );
+      return records;
     },
+    staleTime: 60000,
   });
 
   const { data: existingCompensations = [] } = useQuery({
     queryKey: ["compensationIncidents", periodStart, periodEnd],
     queryFn: async () => {
-      const all = await entitiesAPI.AttendanceIncident.list(
-        "-incident_date",
-        2000
+      const records = await entitiesAPI.AttendanceIncident.filter(
+        {
+          incident_type: "Compensación de Tardanza",
+          incident_date: { $gte: periodStart, $lte: periodEnd },
+        },
+        "-incident_date"
       );
-      return all.filter(
-        (i) =>
-          i.incident_type === "Compensación de Tardanza" &&
-          i.incident_date >= periodStart &&
-          i.incident_date <= periodEnd
-      );
+      return records;
     },
+    staleTime: 60000,
   });
 
   const { data: workSchedules = [] } = useQuery({
