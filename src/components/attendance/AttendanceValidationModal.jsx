@@ -48,6 +48,51 @@ const extractTime = (punchTime) => {
   }
 };
 
+// Recalcula is_late y late_minutes a partir de la entrada efectiva y los
+// segmentos existentes, replicando la lógica de tardanza del backend
+// (recalcularAsistencia). No modifica otros campos. Tolerancia por defecto 10 min.
+const computeTardiness = (record, effectiveClockIn) => {
+  const sStart = record?.scheduled_start;
+  const sEnd = record?.scheduled_end;
+  if (!sStart || !sEnd || !effectiveClockIn) {
+    return { is_late: false, late_minutes: 0 };
+  }
+  const toMin = (t) => {
+    const parts = String(t).slice(0, 5).split(":").map(Number);
+    if (parts.some(isNaN)) return NaN;
+    return parts[0] * 60 + parts[1];
+  };
+  const schedTotal = toMin(sStart);
+  const schedEndTotal = toMin(sEnd);
+  const inMin = toMin(effectiveClockIn);
+  if (isNaN(schedTotal) || isNaN(schedEndTotal) || isNaN(inMin)) {
+    return { is_late: false, late_minutes: 0 };
+  }
+  const isNightShift = schedEndTotal < schedTotal;
+  const fullJornada = isNightShift ? (schedEndTotal - schedTotal + 1440) : Math.max(0, schedEndTotal - schedTotal);
+  const norm = (t) => (isNightShift ? (t - schedTotal + 1440) % 1440 : t);
+  const normSchedStart = isNightShift ? 0 : schedTotal;
+
+  // Entradas de todos los segmentos: la efectiva (seg. 1) + las existentes (seg. 2-4)
+  const inTimes = [effectiveClockIn, record.clock_in_2, record.clock_in_3, record.clock_in_4]
+    .filter(Boolean)
+    .map(toMin)
+    .filter((v) => !isNaN(v));
+  if (inTimes.length === 0) return { is_late: false, late_minutes: 0 };
+
+  let earliestNormIn = null;
+  for (const t of inTimes) {
+    let nIn = norm(t);
+    if (isNightShift && nIn > fullJornada) nIn = 0;
+    if (earliestNormIn === null || nIn < earliestNormIn) earliestNormIn = nIn;
+  }
+  const toleranceMinutes = 10;
+  const rawLate = (earliestNormIn !== null && earliestNormIn <= normSchedStart + fullJornada)
+    ? Math.max(0, earliestNormIn - normSchedStart) : 0;
+  const lateMinutes = rawLate > toleranceMinutes ? rawLate : 0;
+  return { is_late: lateMinutes > 0, late_minutes: lateMinutes };
+};
+
 // ─── Detectar motivo según el estado real del sistema ───────────────────────
 const detectMotive = (record, logs) => {
   if (!record.scheduled_start || !record.scheduled_end) {
@@ -181,6 +226,7 @@ export default function AttendanceValidationModal({ record, logs = [], onClose, 
           status:      "Incompleto",
           is_absent:   false,
           notes:       `Validado manualmente por RRHH: Antes: ${record.clock_in || "—"} / ${record.clock_out || "—"} → Entrada registrada: ${selectedIn}, salida pendiente`,
+          ...computeTardiness(record, selectedIn),
         };
         const updated = await entitiesAPI.AttendanceRecord.update(record.id, payload);
         toast.success("Registro guardado como Incompleto.");
@@ -203,6 +249,7 @@ export default function AttendanceValidationModal({ record, logs = [], onClose, 
           clock_out: selectedOut,
           status: "Incompleto",
           notes: `Validado manualmente por RRHH: Solo salida registrada: ${selectedOut}`,
+          ...computeTardiness(record, record.clock_in),
         };
         const updated = await entitiesAPI.AttendanceRecord.update(record.id, payload);
         toast.success("Salida registrada correctamente.");
@@ -242,6 +289,7 @@ export default function AttendanceValidationModal({ record, logs = [], onClose, 
         status:      "Aprobada",
         is_absent:   false,
         notes:       notesAudit,
+        ...computeTardiness(record, selectedIn),
       };
       const updated = await entitiesAPI.AttendanceRecord.update(record.id, payload);
       toast.success("Registro corregido y aprobado correctamente.");

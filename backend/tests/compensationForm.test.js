@@ -128,9 +128,9 @@ test('muestra error del servidor y permite reintentar después del envío', asyn
   assert.match(h.text(), /Permiso insuficiente/); assert.equal(h.button('Actualizar compensación').props.disabled, false);
 });
 
-for (const [lateDate, overtimeDate] of [['2026-09-30', '2026-09-01'], ['2026-09-01', '2026-09-30']]) {
+for (const [lateDate, overtimeDate, allowed] of [['2026-09-30', '2026-09-01', false], ['2026-09-01', '2026-09-30', false], ['2026-09-01', '2026-09-16', true], ['2026-09-01', '2026-09-17', false]]) {
   for (const action of ['Seleccionar días con compensación', 'Auto-completar todo']) {
-    test(`apertura mensual registra con ${action}: ${lateDate} / ${overtimeDate}`, async () => {
+    test(`regla de main limita fechas con ${action}: ${lateDate} / ${overtimeDate}`, async () => {
       let submitted;
       const props = fixture();
       props.periodRecords[0].date = lateDate;
@@ -143,10 +143,46 @@ for (const [lateDate, overtimeDate] of [['2026-09-30', '2026-09-01'], ['2026-09-
         h.render();
       }
       await h.click(action);
+      if (!allowed) assert.match(h.text(), /No se encontraron coincidencias válidas/);
       await h.click('Actualizar compensación');
+      if (!allowed) {
+        assert.equal(submitted, undefined);
+        return;
+      }
       assert.ok(submitted);
       assert.equal(submitted.find(d => d.date === lateDate).lateMinutes, 12);
       assert.equal(submitted.find(d => d.date === overtimeDate).overtimeMinutes, 12);
     });
   }
 }
+
+test('compensación cruza diciembre y enero y consume primero el saldo anterior', async () => {
+  let submitted;
+  const h = harness({
+    periodStart: '2027-01-01', periodEnd: '2027-01-02',
+    prevMonthStart: '2026-12-26', prevMonthEnd: '2026-12-31',
+    periodRecords: [
+      { id: 'r1', employee_id: 'e1', date: '2027-01-01', late_minutes: 30 },
+      { id: 'r2', employee_id: 'e1', date: '2027-01-02', overtime_hours_25: 1 },
+    ],
+    prevMonthRecords: [{ id: 'prev', employee_id: 'e1', date: '2026-12-31', overtime_hours_25: '0.25', overtime_hours_35: '0.00' }],
+    onSubmit: async list => { submitted = list; },
+  });
+  await h.click('Seleccionar días con compensación');
+  await h.click('Actualizar compensación');
+  assert.ok(submitted);
+  assert.equal(submitted.find(d => d.date === '2026-12-31').overtimeMinutes, 15);
+  assert.equal(submitted.find(d => d.date === '2027-01-02').overtimeMinutes, 15);
+  assert.equal(submitted.find(d => d.date === '2027-01-01').lateMinutes, 30);
+});
+
+test('matching anterior limita seis días, respeta cambio de año y no reutiliza saldo', () => {
+  const result = metrics.computeCrossDayCompensationWithPrevMonth(
+    [{ date: '2027-01-01', lateMinutes: 20 }, { date: '2027-01-02', lateMinutes: 20 }],
+    [{ date: '2027-01-03', overtimeMinutes: 10 }],
+    [{ date: '2026-12-26', overtimeMinutes: 15 }, { date: '2026-12-25', overtimeMinutes: 100 }, { date: '2026-11-30', overtimeMinutes: 100 }],
+  );
+  assert.equal(result.totalCompensated, 25);
+  assert.equal(result.assignments[0].compensableDate, '2026-12-26');
+  assert.equal(result.assignments.filter(a => a.compensableDate === '2026-12-26').reduce((s, a) => s + a.minutes, 0), 15);
+});

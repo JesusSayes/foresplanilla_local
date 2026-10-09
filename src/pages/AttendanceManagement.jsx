@@ -1942,6 +1942,7 @@ export default function AttendanceManagement() {
                 currentUser={currentUser}
                 onEditRecord={handleEditRecord}
                 canEditAttendance={canEditAttendance}
+                canReviewApproved={hasPermission("system.admin")}
               />
             </TabsContent>
 
