@@ -46,7 +46,23 @@ export const filter = async (req, res) => {
     }
 
     if (filters.status) {
-      where.status = filters.status;
+      if (typeof filters.status === 'object') {
+        const statuses = filters.status.$in;
+        if (Object.keys(filters.status).length !== 1 || !Array.isArray(statuses) ||
+            statuses.some(status => typeof status !== 'string' || !status)) {
+          return res.status(400).json({ error: 'Filtro de estados inválido' });
+        }
+        where.status = { in: statuses };
+      } else {
+        where.status = filters.status;
+      }
+    }
+
+    if (filters.authorizer_id !== undefined) {
+      if (typeof filters.authorizer_id !== 'string' || !filters.authorizer_id) {
+        return res.status(400).json({ error: 'Autorizador inválido' });
+      }
+      where.authorizer_id = filters.authorizer_id;
     }
 
     if (filters.incident_type) {

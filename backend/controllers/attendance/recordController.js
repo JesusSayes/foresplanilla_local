@@ -198,8 +198,17 @@ export const filter = async (req, res) => {
     }
 
     if (filters.employee_id) {
-      if (!canAccessEmployee(req, filters.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
-      where.employee_id = filters.employee_id;
+      if (typeof filters.employee_id === 'object') {
+        const ids = filters.employee_id.$in;
+        if (Object.keys(filters.employee_id).length !== 1 || !Array.isArray(ids) ||
+            ids.some(id => typeof id !== 'string' || !id)) {
+          return res.status(400).json({ error: 'Filtro de empleados inválido' });
+        }
+        where.employee_id = { in: ids.filter(id => canAccessEmployee(req, id)) };
+      } else {
+        if (!canAccessEmployee(req, filters.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
+        where.employee_id = filters.employee_id;
+      }
     }
 
     if (filters.status) {
