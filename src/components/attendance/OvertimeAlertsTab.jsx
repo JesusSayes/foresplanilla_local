@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Edit, CheckCircle, XCircle, Search, AlertCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Clock, Edit, CheckCircle, XCircle, Search, AlertCircle, Layers } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima, todayLima } from "@/lib/dateUtils";
 import { getSegmentClockTimes } from "@/lib/attendanceMetrics";
 import { toast } from "sonner";
 import PaginationBar from "@/components/ui/PaginationBar";
+import BulkOvertimeModal from "./BulkOvertimeModal";
 
 const PAGE_SIZE = 20;
 
@@ -26,7 +28,8 @@ const formatHorasMinutos = (horasDec) => {
 
 /**
  * Pestaña de Alertas de Horas Extras con sub-tabs (Pendientes / Procesadas),
- * filtro por rango de fechas y filas compactas con botones a la derecha.
+ * filtro por rango de fechas, filtro por área, selección masiva y filas compactas.
+ * La lista se ordena por fecha descendente (más recientes primero).
  */
 export default function OvertimeAlertsTab({
   overtimeAlerts,
@@ -42,7 +45,11 @@ export default function OvertimeAlertsTab({
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [areaFilter, setAreaFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedAlertIds, setSelectedAlertIds] = useState(new Set());
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
 
   const pendingAlerts = useMemo(
     () => overtimeAlerts.filter((a) => a.status === "Pendiente"),
@@ -53,18 +60,30 @@ export default function OvertimeAlertsTab({
     [overtimeAlerts]
   );
 
-  const applyFilters = (list) =>
-    list.filter((a) => {
-      if (!accessibleEmployeeIds.has(a.employee_id)) return false;
-      if (searchTerm) {
-        const emp = allEmployees.find((e) => e.id === a.employee_id);
-        const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
-        if (!name.includes(searchTerm.toLowerCase())) return false;
-      }
-      if (dateFrom && a.alert_date < dateFrom) return false;
-      if (dateTo && a.alert_date > dateTo) return false;
-      return true;
+  // Áreas únicas para el filtro
+  const areas = useMemo(() => {
+    const set = new Set();
+    allEmployees.forEach((e) => {
+      if (e.department_name) set.add(e.department_name);
     });
+    return [...set].sort();
+  }, [allEmployees]);
+
+  const applyFilters = (list) =>
+    list
+      .filter((a) => {
+        if (!accessibleEmployeeIds.has(a.employee_id)) return false;
+        const emp = allEmployees.find((e) => e.id === a.employee_id);
+        if (searchTerm) {
+          const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
+          if (!name.includes(searchTerm.toLowerCase())) return false;
+        }
+        if (areaFilter && emp?.department_name !== areaFilter) return false;
+        if (dateFrom && a.alert_date < dateFrom) return false;
+        if (dateTo && a.alert_date > dateTo) return false;
+        return true;
+      })
+      .sort((a, b) => b.alert_date.localeCompare(a.alert_date)); // más recientes primero
 
   const activeList = subTab === "pendientes" ? pendingAlerts : processedAlerts;
   const filteredAlerts = useMemo(() => applyFilters(activeList), [
@@ -73,6 +92,8 @@ export default function OvertimeAlertsTab({
     searchTerm,
     dateFrom,
     dateTo,
+    areaFilter,
+    allEmployees,
   ]);
   const pagedAlerts = filteredAlerts.slice(
     (page - 1) * PAGE_SIZE,
@@ -81,7 +102,38 @@ export default function OvertimeAlertsTab({
 
   const resetPage = () => setPage(1);
 
-  const handleAcceptHE = async (alert, record) => {
+  // --- Selección masiva ---
+  const filteredPendingIds = subTab === "pendientes" ? filteredAlerts.map((a) => a.id) : [];
+  const allSelected =
+    filteredPendingIds.length > 0 &&
+    filteredPendingIds.every((id) => selectedAlertIds.has(id));
+  const someSelected = filteredPendingIds.some((id) => selectedAlertIds.has(id));
+  const selectedCount = selectedAlertIds.size;
+
+  const toggleSelectAll = () => {
+    setSelectedAlertIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        filteredPendingIds.forEach((id) => next.delete(id));
+      } else {
+        filteredPendingIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const toggleOne = (id) => {
+    setSelectedAlertIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedAlertIds(new Set());
+
+  const handleAcceptHE = async (alert, record, silent = false) => {
     if (record) {
       await base44.entities.AttendanceRecord.update(record.id, {
         overtime_authorized: true,
@@ -100,18 +152,85 @@ export default function OvertimeAlertsTab({
       date_from: alert.alert_date,
       date_to: alert.alert_date,
     });
-    queryClient.invalidateQueries(["overtimeAlerts"]);
-    queryClient.invalidateQueries(["todayAttendance"]);
-    queryClient.invalidateQueries(["attendanceRecords"]);
-    toast.success(
-      `HE aceptadas y recalculadas para el ${format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}`
-    );
+    if (!silent) {
+      queryClient.invalidateQueries(["overtimeAlerts"]);
+      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries(["attendanceRecords"]);
+      toast.success(
+        `HE aceptadas y recalculadas para el ${format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}`
+      );
+    }
   };
 
   const handleDismiss = async (alert) => {
     await base44.entities.OvertimeAlert.update(alert.id, { status: "Descartado" });
     queryClient.invalidateQueries(["overtimeAlerts"]);
     toast.success("Alerta descartada");
+  };
+
+  // --- Ejecución masiva ---
+  const bulkAceptarHE = async () => {
+    const selected = filteredAlerts.filter((a) => selectedAlertIds.has(a.id));
+    if (selected.length === 0) return;
+    setShowBulkModal(false);
+    setBulkProcessing(true);
+    let ok = 0;
+    let fail = 0;
+    for (const alert of selected) {
+      try {
+        const record = todayRecords.find((r) => r.id === alert.attendance_record_id);
+        await handleAcceptHE(alert, record, true);
+        ok++;
+      } catch (e) {
+        console.error("Error aceptando HE masivo:", e);
+        fail++;
+      }
+    }
+    setBulkProcessing(false);
+    clearSelection();
+    queryClient.invalidateQueries(["overtimeAlerts"]);
+    queryClient.invalidateQueries(["todayAttendance"]);
+    queryClient.invalidateQueries(["attendanceRecords"]);
+    if (fail > 0) toast.warning(`${ok} aprobadas, ${fail} con error`);
+    else toast.success(`${ok} alerta(s) aprobada(s) correctamente`);
+  };
+
+  const bulkDescartar = async () => {
+    const selected = filteredAlerts.filter((a) => selectedAlertIds.has(a.id));
+    if (selected.length === 0) return;
+    setShowBulkModal(false);
+    setBulkProcessing(true);
+    let ok = 0;
+    let fail = 0;
+    for (const alert of selected) {
+      try {
+        await base44.entities.OvertimeAlert.update(alert.id, { status: "Descartado" });
+        ok++;
+      } catch (e) {
+        console.error("Error descartando masivo:", e);
+        fail++;
+      }
+    }
+    setBulkProcessing(false);
+    clearSelection();
+    queryClient.invalidateQueries(["overtimeAlerts"]);
+    if (fail > 0) toast.warning(`${ok} descartadas, ${fail} con error`);
+    else toast.success(`${ok} alerta(s) descartada(s)`);
+  };
+
+  const bulkCorregir = () => {
+    const selected = filteredAlerts.filter((a) => selectedAlertIds.has(a.id));
+    if (selected.length === 0) return;
+    setShowBulkModal(false);
+    const first = selected[0];
+    const record = todayRecords.find((r) => r.id === first.attendance_record_id);
+    const emp = allEmployees.find((e) => e.id === first.employee_id);
+    if (record) {
+      onEditRecord(record, emp);
+      toast.info(`Abriendo edición del primer registro. ${selected.length - 1} pendiente(s) restante(s).`);
+    } else {
+      toast.error("No se encontró el registro de asistencia para corregir");
+    }
   };
 
   const renderScheduleInfo = (alert, emp) => {
@@ -127,6 +246,8 @@ export default function OvertimeAlertsTab({
     return { schedName, schedStart, schedEnd };
   };
 
+  const isPendientes = subTab === "pendientes";
+
   return (
     <Card className="border-0 shadow-lg">
       <CardHeader className="border-b bg-red-50/50">
@@ -140,7 +261,11 @@ export default function OvertimeAlertsTab({
       </CardHeader>
       <CardContent className="p-6">
         {/* Sub-tabs: Pendientes / Procesadas */}
-        <Tabs value={subTab} onValueChange={(v) => { setSubTab(v); resetPage(); }} className="mb-4">
+        <Tabs
+          value={subTab}
+          onValueChange={(v) => { setSubTab(v); resetPage(); clearSelection(); }}
+          className="mb-4"
+        >
           <TabsList>
             <TabsTrigger value="pendientes">
               Pendientes
@@ -168,6 +293,18 @@ export default function OvertimeAlertsTab({
               className="pl-9"
             />
           </div>
+          {/* Filtro por área */}
+          <select
+            value={areaFilter}
+            onChange={(e) => { setAreaFilter(e.target.value); resetPage(); }}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-ring"
+            title="Filtrar por área"
+          >
+            <option value="">Todas las áreas</option>
+            {areas.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
           <Input
             type="date"
             value={dateFrom}
@@ -183,13 +320,13 @@ export default function OvertimeAlertsTab({
             className="w-40"
             title="Hasta"
           />
-          {(dateFrom || dateTo) && (
+          {(dateFrom || dateTo || areaFilter) && (
             <Button
               size="sm"
               variant="outline"
-              onClick={() => { setDateFrom(""); setDateTo(""); resetPage(); }}
+              onClick={() => { setDateFrom(""); setDateTo(""); setAreaFilter(""); resetPage(); }}
             >
-              ✕ Rango
+              ✕ Filtros
             </Button>
           )}
           <div className="ml-auto">
@@ -203,12 +340,52 @@ export default function OvertimeAlertsTab({
           </div>
         </div>
 
+        {/* Barra de selección masiva (solo en Pendientes) */}
+        {isPendientes && filteredAlerts.length > 0 && (
+          <div className="flex items-center gap-3 mb-3 px-4 py-2 rounded-lg bg-indigo-50/60 border border-indigo-100">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="select-all-alerts"
+                checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                onCheckedChange={toggleSelectAll}
+              />
+              <label htmlFor="select-all-alerts" className="text-sm font-medium text-slate-700 cursor-pointer select-none">
+                Seleccionar todos ({filteredAlerts.length})
+              </label>
+            </div>
+            {selectedCount > 0 && (
+              <span className="text-sm text-indigo-700 font-medium">
+                {selectedCount} seleccionado(s)
+              </span>
+            )}
+            <Button
+              size="sm"
+              className="ml-auto bg-indigo-600 hover:bg-indigo-700 text-white"
+              disabled={selectedCount === 0 || bulkProcessing}
+              onClick={() => setShowBulkModal(true)}
+            >
+              <Layers className="w-4 h-4 mr-1.5" />
+              Ejecución masiva
+            </Button>
+            {selectedCount > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={clearSelection}
+                disabled={bulkProcessing}
+              >
+                Limpiar
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Alert list */}
         {filteredAlerts.length === 0 ? (
           <div className="text-center py-12">
             <CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" />
             <p className="text-slate-600">
-              {subTab === "pendientes"
+              {isPendientes
                 ? "No hay alertas pendientes en el rango seleccionado"
                 : "No hay alertas procesadas en el rango seleccionado"}
             </p>
@@ -221,18 +398,30 @@ export default function OvertimeAlertsTab({
               const { schedName, schedStart, schedEnd } = renderScheduleInfo(alert, emp);
               const isProcessed = subTab === "procesadas";
               const isAuthorized = alert.status === "Autorizado";
+              const isSelected = selectedAlertIds.has(alert.id);
 
               return (
                 <div
                   key={alert.id}
-                  className={`flex items-center gap-4 px-4 py-2.5 rounded-lg border ${
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border transition-colors ${
                     isProcessed
                       ? isAuthorized
                         ? "border-green-200 bg-green-50/50"
                         : "border-slate-200 bg-slate-50/50"
-                      : "border-red-200 bg-red-50/50"
+                      : isSelected
+                        ? "border-indigo-300 bg-indigo-50/60"
+                        : "border-red-200 bg-red-50/50"
                   }`}
                 >
+                  {/* Checkbox masivo (solo Pendientes) */}
+                  {isPendientes && (
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleOne(alert.id)}
+                      disabled={bulkProcessing}
+                    />
+                  )}
+
                   {/* Left: info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -334,6 +523,27 @@ export default function OvertimeAlertsTab({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Modal de ejecución masiva */}
+        <BulkOvertimeModal
+          open={showBulkModal}
+          onClose={setShowBulkModal}
+          selectedCount={selectedCount}
+          onCorregir={bulkCorregir}
+          onAceptarHE={bulkAceptarHE}
+          onDescartar={bulkDescartar}
+          processing={bulkProcessing}
+        />
+
+        {/* Overlay de procesamiento masivo */}
+        {bulkProcessing && (
+          <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[60]">
+            <div className="bg-white rounded-xl shadow-xl px-8 py-6 flex items-center gap-4">
+              <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+              <span className="text-slate-700 font-medium">Procesando registros...</span>
+            </div>
           </div>
         )}
       </CardContent>
