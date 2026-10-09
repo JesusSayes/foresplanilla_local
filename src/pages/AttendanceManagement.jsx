@@ -1878,6 +1878,7 @@ export default function AttendanceManagement() {
                 accessibleEmployeeIds={accessibleEmployeeIds}
                 currentUser={currentUser}
                 onEditRecord={handleEditRecord}
+                canReviewApproved={hasPermission("system.admin")}
               />
             </TabsContent>
 
