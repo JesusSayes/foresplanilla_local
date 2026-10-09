@@ -620,6 +620,96 @@ export const computeCrossDayCompensation = (tardanzaDays, compensableDays, maxDa
   return { assignments, remainingTardanza, remainingCompensable, totalCompensated };
 };
 
+/**
+ * Matching cruzado de compensación que incluye horas extras de los últimos
+ * 6 días del mes inmediatamente anterior. Consume PRIMERO las horas del mes
+ * anterior (cualquier día, sin restricción de "15 días después") y luego las
+ * horas del mes actual (mismo mes, hasta maxDaysAfter días después de la tardanza).
+ * No reutiliza horas ya compensadas ni permite saldos negativos.
+ *
+ * @param {Array} tardanzaDays - [{ date, lateMinutes }] días con tardanza > 0 (mes actual)
+ * @param {Array} compensableDays - [{ date, overtimeMinutes }] días con HE > 0 (mes actual)
+ * @param {Array} prevMonthDays - [{ date, overtimeMinutes }] días con HE > 0 (mes anterior)
+ * @param {number} maxDaysAfter - máx. días después de la tardanza (default 15)
+ * @returns {Object} { assignments, totalCompensated }
+ */
+export const computeCrossDayCompensationWithPrevMonth = (tardanzaDays, compensableDays, prevMonthDays, maxDaysAfter = 15) => {
+  const tDays = [...tardanzaDays]
+    .filter(d => d.lateMinutes > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Mapa de HE del mes anterior (se consumen primero)
+  const prevMap = new Map();
+  for (const d of prevMonthDays) {
+    if (d.overtimeMinutes > 0) {
+      prevMap.set(d.date, { date: d.date, available: d.overtimeMinutes, used: 0 });
+    }
+  }
+
+  // Mapa de HE del mes actual
+  const compMap = new Map();
+  for (const d of compensableDays) {
+    if (d.overtimeMinutes > 0) {
+      compMap.set(d.date, { date: d.date, available: d.overtimeMinutes, used: 0 });
+    }
+  }
+
+  const assignments = [];
+
+  for (const tDay of tDays) {
+    let remaining = tDay.lateMinutes;
+    const tDate = new Date(tDay.date + "T00:00:00");
+    const tYM = tDay.date.slice(0, 7);
+
+    const prevEnd = new Date(tDate.getFullYear(), tDate.getMonth(), 0);
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevStart.getDate() - 5);
+
+    // Fase 1: Consumir HE de los últimos seis días del mes anterior.
+    const prevEligible = [...prevMap.values()]
+      .filter(c => {
+        const date = new Date(c.date + "T00:00:00");
+        return c.available - c.used > 0 && date >= prevStart && date <= prevEnd;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    for (const comp of prevEligible) {
+      if (remaining <= 0) break;
+      const avail = comp.available - comp.used;
+      if (avail <= 0) continue;
+      const use = Math.min(remaining, avail);
+      assignments.push({ tardanzaDate: tDay.date, compensableDate: comp.date, minutes: use });
+      comp.used += use;
+      remaining -= use;
+    }
+
+    // Fase 2: Consumir HE del mes actual (mismo mes, hasta maxDaysAfter después)
+    if (remaining > 0) {
+      const eligible = [...compMap.values()]
+        .filter(c => {
+          if (c.available - c.used <= 0) return false;
+          const cDate = new Date(c.date + "T00:00:00");
+          const diff = Math.round((cDate - tDate) / 86400000);
+          return diff >= 0 && diff <= maxDaysAfter && c.date.slice(0, 7) === tYM;
+        })
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      for (const comp of eligible) {
+        if (remaining <= 0) break;
+        const avail = comp.available - comp.used;
+        if (avail <= 0) continue;
+        const use = Math.min(remaining, avail);
+        assignments.push({ tardanzaDate: tDay.date, compensableDate: comp.date, minutes: use });
+        comp.used += use;
+        remaining -= use;
+      }
+    }
+  }
+
+  const totalCompensated = assignments.reduce((s, a) => s + a.minutes, 0);
+  return { assignments, totalCompensated };
+};
+
 export const computeScheduledHoursForPeriod = (schedule, startDateStr, endDateStr) => {
   if (!schedule) return 0;
   const start = new Date(startDateStr + "T00:00:00");

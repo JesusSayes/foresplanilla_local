@@ -112,6 +112,19 @@ export default function CompensationPanel({
       ? format(today, "yyyy-MM-dd")
       : format(selectedMonthEnd, "yyyy-MM-dd");
 
+  // Últimos 6 días del mes inmediatamente anterior (incluye cambio de año)
+  const { prevMonthStart, prevMonthEnd } = useMemo(() => {
+    const pStart = new Date(periodStart + "T00:00:00");
+    const prevEnd = new Date(pStart);
+    prevEnd.setDate(0); // último día del mes anterior
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevStart.getDate() - 5); // 6 días en total
+    return {
+      prevMonthStart: format(prevStart, "yyyy-MM-dd"),
+      prevMonthEnd: format(prevEnd, "yyyy-MM-dd"),
+    };
+  }, [periodStart]);
+
   const { data: periodRecords = [], isLoading } = useQuery({
     queryKey: ["compensationRecords", periodStart, periodEnd],
     queryFn: async () => {
@@ -124,13 +137,26 @@ export default function CompensationPanel({
     staleTime: 60000,
   });
 
+  // Registros de asistencia de los últimos 6 días del mes anterior
+  const { data: prevMonthRecords = [] } = useQuery({
+    queryKey: ["compensationPrevMonthRecords", prevMonthStart, prevMonthEnd],
+    queryFn: async () => {
+      const records = await entitiesAPI.AttendanceRecord.filter(
+        { date: { $gte: prevMonthStart, $lte: prevMonthEnd } },
+        "-date"
+      );
+      return records;
+    },
+    staleTime: 60000,
+  });
+
   const { data: existingCompensations = [] } = useQuery({
-    queryKey: ["compensationIncidents", periodStart, periodEnd],
+    queryKey: ["compensationIncidents", periodStart, periodEnd, prevMonthStart, prevMonthEnd],
     queryFn: async () => {
       const records = await entitiesAPI.AttendanceIncident.filter(
         {
           incident_type: "Compensación de Tardanza",
-          incident_date: { $gte: periodStart, $lte: periodEnd },
+          incident_date: { $gte: prevMonthStart, $lte: periodEnd },
         },
         "-incident_date"
       );
@@ -175,12 +201,12 @@ export default function CompensationPanel({
   const approvedLateCompensatedByEmployee = useMemo(() => {
     const map = new Map();
     for (const c of existingCompensations) {
-      if (c.status === "Aprobada") {
+      if (c.status === "Aprobada" && c.incident_date >= periodStart && c.incident_date <= periodEnd) {
         map.set(c.employee_id, (map.get(c.employee_id) || 0) + (c.late_minutes_to_adjust || 0));
       }
     }
     return map;
-  }, [existingCompensations]);
+  }, [existingCompensations, periodStart, periodEnd]);
 
   // Mostrar TODOS los empleados accesibles con sus métricas
   const employeeStats = useMemo(() => {
@@ -274,20 +300,27 @@ export default function CompensationPanel({
     });
   }, [employeeStats, searchTerm, filterType]);
 
+  // Incluir las filas anteriores solo si pertenecen a una solicitud del período.
+  const periodCompensations = useMemo(() => {
+    const inPeriod = c => c.incident_date >= periodStart && c.incident_date <= periodEnd;
+    const requestCodes = new Set(existingCompensations.filter(inPeriod).map(c => c.codigo_solicitud).filter(Boolean));
+    return existingCompensations.filter(c => inPeriod(c) || (c.codigo_solicitud && requestCodes.has(c.codigo_solicitud)));
+  }, [existingCompensations, periodStart, periodEnd]);
+
   const employeesWithCompensation = useMemo(() => {
-    return new Set(existingCompensations.map((c) => c.employee_id));
-  }, [existingCompensations]);
+    return new Set(periodCompensations.map((c) => c.employee_id));
+  }, [periodCompensations]);
 
   const editableCompsByEmployee = useMemo(() => {
     const map = new Map();
-    for (const c of existingCompensations) {
+    for (const c of periodCompensations) {
       if (c.status === "Pendiente" || c.status === "Rechazada") {
         if (!map.has(c.employee_id)) map.set(c.employee_id, []);
         map.get(c.employee_id).push(c);
       }
     }
     return map;
-  }, [existingCompensations]);
+  }, [periodCompensations]);
 
   const handleOpenModal = (stat) => {
     setSelectedEmployee(stat.employee);
@@ -914,6 +947,9 @@ export default function CompensationPanel({
           periodStart={periodStart}
           periodEnd={periodEnd}
           periodRecords={periodRecords}
+          prevMonthRecords={prevMonthRecords}
+          prevMonthStart={prevMonthStart}
+          prevMonthEnd={prevMonthEnd}
           existingCompensations={existingCompensations}
           allEmployees={allEmployees}
           editMode={editMode}

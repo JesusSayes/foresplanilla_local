@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Users, Trash2, Plus, Edit, Loader2, Search, AlertTriangle, FileText, Lock, UploadCloud, GraduationCap, Baby, CheckCircle2 } from "lucide-react";
 import UbigeoSelect from "./UbigeoSelect";
-import { format } from "date-fns";
+import { format, subMonths } from "date-fns";
 import { toast } from "sonner";
 import { usePermissions } from "../hooks/usePermissions";
 import { uploadFile } from "@/services/uploadService";
@@ -80,6 +80,8 @@ export default function EmployeeForm({
   const [selectedProvincia, setSelectedProvincia] = React.useState(editingEmployee?.province || "");
   const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
   const [lookingUpDni, setLookingUpDni] = React.useState(false);
+
+  const minHireDate = format(subMonths(new Date(), 2), "yyyy-MM-dd");
 
   const handleDniLookup = async () => {
     const dni = formData.document_number;
@@ -490,7 +492,23 @@ export default function EmployeeForm({
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div><Label>Fecha de Ingreso</Label><Input type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} /></div>
+                <div>
+                  <Label>Fecha de Ingreso</Label>
+                  <Input
+                    type="date"
+                    min={formData.hire_date === editingEmployee?.hire_date ? undefined : minHireDate}
+                    value={formData.hire_date}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v && v < minHireDate && v !== editingEmployee?.hire_date) {
+                        toast.error("La fecha de ingreso no puede ser anterior a dos meses de la fecha actual");
+                        return;
+                      }
+                      setFormData({ ...formData, hire_date: v });
+                    }}
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Máx. 2 meses antes de la fecha actual</p>
+                </div>
                 <div><Label>Fecha de Cese</Label><Input type="date" value={formData.termination_date} onChange={(e) => setFormData({ ...formData, termination_date: e.target.value })} /></div>
                 <div>
                   <Label>Estado</Label>

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Clock, Edit, CheckCircle, XCircle, Search, Layers } from "lucide-react";
+import { Clock, Edit, CheckCircle, XCircle, Search, Layers, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima, todayLima } from "@/lib/dateUtils";
@@ -41,6 +41,7 @@ export default function OvertimeAlertsTab({
   currentUser,
   onEditRecord,
   canEditAttendance = false,
+  canReviewApproved = false,
 }) {
   const queryClient = useQueryClient();
   const [subTab, setSubTab] = useState("pendientes");
@@ -52,6 +53,7 @@ export default function OvertimeAlertsTab({
   const [selectedAlertIds, setSelectedAlertIds] = useState(new Set());
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [reviewingApproved, setReviewingApproved] = useState(false);
 
   const pendingAlerts = useMemo(
     () => overtimeAlerts.filter((a) => a.status === "Pendiente"),
@@ -162,11 +164,16 @@ export default function OvertimeAlertsTab({
         queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
         queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
         queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
+        queryClient.invalidateQueries({ queryKey: ["compensationPrevMonthRecords"] });
+        queryClient.invalidateQueries({ queryKey: ["allAttendanceRecords"] });
         toast.success(
           `HE aceptadas y recalculadas para el ${format(parseDateLima(alert.alert_date), "dd MMM yyyy", { locale: es })}`
         );
       }
     } catch (error) {
+      queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["allAttendanceRecords"] });
       if (silent) throw error;
       toast.error("No se pudo completar la autorización de horas extras");
     }
@@ -208,6 +215,8 @@ export default function OvertimeAlertsTab({
     queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
     queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
     queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
+    queryClient.invalidateQueries({ queryKey: ["compensationPrevMonthRecords"] });
+    queryClient.invalidateQueries({ queryKey: ["allAttendanceRecords"] });
     if (fail > 0) toast.warning(`${ok} aprobadas, ${fail} con error`);
     else toast.success(`${ok} alerta(s) aprobada(s) correctamente`);
   };
@@ -253,6 +262,80 @@ export default function OvertimeAlertsTab({
     }
   };
 
+  // Revisa todas las autorizaciones ya aprobadas: asegura que cada registro
+  // tenga overtime_authorized=true y recalcula las métricas de asistencia
+  // para que las HE se reflejen en el listado. No recarga la página.
+  const handleRevisarAutorizadas = async () => {
+    if (!canReviewApproved || reviewingApproved || bulkProcessing) return;
+    setReviewingApproved(true);
+    try {
+      const allAuthorized = await entitiesAPI.OvertimeAlert.filter({ status: "Autorizado" });
+      const accessible = allAuthorized.filter((a) => accessibleEmployeeIds.has(a.employee_id));
+
+      if (accessible.length === 0) {
+        toast.info("No hay autorizaciones aprobadas para revisar");
+        return;
+      }
+
+      // Group by attendance_record_id to avoid duplicate work (pre + post
+      // shift alerts share the same record).
+      const byRecord = new Map();
+      for (const alert of accessible) {
+        if (alert.attendance_record_id && !byRecord.has(alert.attendance_record_id)) {
+          byRecord.set(alert.attendance_record_id, alert);
+        }
+      }
+
+      const recalcKeys = new Set();
+      let recalcCount = 0;
+      let failCount = 0;
+
+      for (const alert of byRecord.values()) {
+        // Ensure overtime_authorized is true (idempotent — no notes appended
+        // to avoid duplication on repeated reviews).
+        try {
+          await entitiesAPI.AttendanceRecord.update(alert.attendance_record_id, {
+            overtime_authorized: true,
+          });
+        } catch (e) {
+          console.error("Error actualizando overtime_authorized:", e);
+          failCount++;
+          continue;
+        }
+
+        // Recalculate the date (deduped per employee+date).
+        const key = `${alert.employee_id}|${alert.alert_date}`;
+        if (!recalcKeys.has(key)) {
+          recalcKeys.add(key);
+          try {
+            await recalcularAsistenciaService.recalculate(alert.employee_id, alert.alert_date, alert.alert_date);
+            recalcCount++;
+          } catch (e) {
+            console.error("Error en recálculo de autorización aprobada:", e);
+            failCount++;
+          }
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationPrevMonthRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allAttendanceRecords"] });
+
+      if (failCount > 0) {
+        toast.warning(`Revisión completada: ${recalcCount} recálculo(s), ${failCount} con error`);
+      } else {
+        toast.success(`✓ ${recalcCount} registro(s) recalculado(s) correctamente`);
+      }
+    } catch (error) {
+      toast.error("Error al revisar autorizaciones: " + (error.message || ""));
+    } finally {
+      setReviewingApproved(false);
+    }
+  };
+
   const renderScheduleInfo = (alert, emp) => {
     const alertSched = emp ? getEmployeeScheduleForDate(emp.id, alert.alert_date) : null;
     const alertDow = new Date(alert.alert_date + "T00:00:00").getDay();
@@ -271,13 +354,30 @@ export default function OvertimeAlertsTab({
   return (
     <Card className="border-0 shadow-lg">
       <CardHeader className="border-b bg-red-50/50">
-        <CardTitle className="text-xl font-bold flex items-center gap-2">
-          <Clock className="w-5 h-5 text-red-600" />
-          Alertas de Horas Extras No Autorizadas
-        </CardTitle>
-        <p className="text-sm text-slate-600 mt-2">
-          Personal que registró horas extras sin autorización previa
-        </p>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <CardTitle className="text-xl font-bold flex items-center gap-2">
+              <Clock className="w-5 h-5 text-red-600" />
+              Alertas de Horas Extras No Autorizadas
+            </CardTitle>
+            <p className="text-sm text-slate-600 mt-2">
+              Personal que registró horas extras sin autorización previa
+            </p>
+          </div>
+          {canReviewApproved && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={reviewingApproved || bulkProcessing}
+              onClick={handleRevisarAutorizadas}
+              className="border-green-300 text-green-700 hover:bg-green-50 whitespace-nowrap"
+              title="Revisa las autorizaciones ya aprobadas y recalcula las horas extras en el listado de asistencia"
+            >
+              <RefreshCw className={`w-4 h-4 mr-1.5 ${reviewingApproved ? "animate-spin" : ""}`} />
+              {reviewingApproved ? "Revisando..." : "Revisar Autorizadas"}
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="p-6">
         {/* Sub-tabs: Pendientes / Procesadas */}
