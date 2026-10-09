@@ -54,19 +54,17 @@ export default function CompensationHistory({ allEmployees, siteEmployeeIds, hea
   const { data: processedComps = [], isLoading } = useQuery({
     queryKey: ["processedCompensations", periodStart, periodEnd, siteKey],
     queryFn: async () => {
-      const all = await base44.entities.AttendanceIncident.list(
-        "-review_date",
-        2000
+      const page = await base44.entities.AttendanceIncident.filter(
+        {
+          incident_type: "Compensación de Tardanza",
+          status: { $in: ["Aprobada", "Rechazada"] },
+          incident_date: { $gte: periodStart, $lte: periodEnd },
+        },
+        { sort: "-review_date", limit: 2000 }
       );
-      return all.filter(
-        (i) =>
-          i.incident_type === "Compensación de Tardanza" &&
-          (i.status === "Aprobada" || i.status === "Rechazada") &&
-          i.incident_date >= periodStart &&
-          i.incident_date <= periodEnd &&
-          siteEmployeeIds.has(i.employee_id)
-      );
+      return page.items.filter((i) => siteEmployeeIds.has(i.employee_id));
     },
+    staleTime: 60000,
   });
 
   // Lista de autorizadores únicos para el filtro

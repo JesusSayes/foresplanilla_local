@@ -62,52 +62,51 @@ export default function PendingCompensationsApproval({
     queryKey: ["pendingCompsForApproval", currentEmployee?.id, selectedSite],
     queryFn: async () => {
       if (!currentEmployee) return [];
-      const all = await base44.entities.AttendanceIncident.list(
-        "-incident_date",
-        2000
+      const page = await base44.entities.AttendanceIncident.filter(
+        {
+          incident_type: "Compensación de Tardanza",
+          status: "Pendiente",
+          authorizer_id: currentEmployee.id,
+        },
+        { sort: "-incident_date", limit: 2000 }
       );
-      return all.filter(
-        (i) =>
-          i.incident_type === "Compensación de Tardanza" &&
-          i.status === "Pendiente" &&
-          i.authorizer_id === currentEmployee.id &&
-          siteEmployeeIds.has(i.employee_id)
-      );
+      return page.items.filter((i) => siteEmployeeIds.has(i.employee_id));
     },
     enabled: !!currentEmployee,
+    staleTime: 60000,
   });
 
-  // Cargar registros de asistencia relacionados
+  // IDs derivados de las compensaciones pendientes
   const recordIds = useMemo(
     () => pendingComps.map((c) => c.attendance_record_id).filter(Boolean),
     [pendingComps]
   );
 
-  const { data: relatedRecords = [] } = useQuery({
-    queryKey: ["compRecordsForApproval", recordIds.join(",")],
-    queryFn: async () => {
-      if (recordIds.length === 0) return [];
-      const all = await base44.entities.AttendanceRecord.list("-date", 2000);
-      return all.filter((r) => recordIds.includes(r.id));
-    },
-    enabled: recordIds.length > 0,
-  });
-
-  // Cargar todos los registros del período para mostrar métricas de horas
   const employeeIdsForMetrics = useMemo(
     () => [...new Set(pendingComps.map((c) => c.employee_id))],
     [pendingComps]
   );
 
+  // Carga única de registros de los empleados involucrados (filtrado en servidor por employee_id)
   const { data: allPeriodRecords = [] } = useQuery({
     queryKey: ["allRecordsForCompMetrics", employeeIdsForMetrics.join(",")],
     queryFn: async () => {
       if (employeeIdsForMetrics.length === 0) return [];
-      const all = await base44.entities.AttendanceRecord.list("-date", 2000);
-      return all.filter((r) => employeeIdsForMetrics.includes(r.employee_id));
+      const page = await base44.entities.AttendanceRecord.filter(
+        { employee_id: { $in: employeeIdsForMetrics } },
+        { sort: "-date", limit: 2000 }
+      );
+      return page.items;
     },
     enabled: employeeIdsForMetrics.length > 0,
+    staleTime: 60000,
   });
+
+  // Registros relacionados (derivados de allPeriodRecords, sin consulta adicional)
+  const relatedRecords = useMemo(
+    () => allPeriodRecords.filter((r) => recordIds.includes(r.id)),
+    [allPeriodRecords, recordIds]
+  );
 
   // Métricas por empleado: programadas, trabajadas (dentro), exceso (fuera)
   const employeeMetrics = useMemo(() => {
