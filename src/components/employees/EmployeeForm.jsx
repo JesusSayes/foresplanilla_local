@@ -483,7 +483,25 @@ export default function EmployeeForm({
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div><Label>Fecha de Ingreso</Label><Input type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} /></div>
+                <div>
+                  <Label>Fecha de Ingreso</Label>
+                  <Input
+                    type="date"
+                    min={(() => { const d = new Date(); d.setMonth(d.getMonth() - 2); return format(d, "yyyy-MM-dd"); })()}
+                    value={formData.hire_date}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const d = new Date(); d.setMonth(d.getMonth() - 2);
+                      const minDate = format(d, "yyyy-MM-dd");
+                      if (v && v < minDate) {
+                        toast.error("La fecha de ingreso no puede ser anterior a dos meses de la fecha actual");
+                        return;
+                      }
+                      setFormData({ ...formData, hire_date: v });
+                    }}
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Máx. 2 meses antes de la fecha actual</p>
+                </div>
                 <div><Label>Fecha de Cese</Label><Input type="date" value={formData.termination_date} onChange={(e) => setFormData({ ...formData, termination_date: e.target.value })} /></div>
                 <div>
                   <Label>Estado</Label>

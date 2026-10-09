@@ -104,6 +104,19 @@ export default function CompensationPanel({
       ? format(today, "yyyy-MM-dd")
       : format(selectedMonthEnd, "yyyy-MM-dd");
 
+  // Últimos 6 días del mes inmediatamente anterior (incluye cambio de año)
+  const { prevMonthStart, prevMonthEnd } = useMemo(() => {
+    const pStart = new Date(periodStart + "T00:00:00");
+    const prevEnd = new Date(pStart);
+    prevEnd.setDate(prevEnd.getDate() - 1); // último día del mes anterior
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevStart.getDate() - 5); // 6 días en total
+    return {
+      prevMonthStart: format(prevStart, "yyyy-MM-dd"),
+      prevMonthEnd: format(prevEnd, "yyyy-MM-dd"),
+    };
+  }, [periodStart]);
+
   const { data: periodRecords = [], isLoading } = useQuery({
     queryKey: ["compensationRecords", periodStart, periodEnd],
     queryFn: async () => {
@@ -116,13 +129,26 @@ export default function CompensationPanel({
     staleTime: 60000,
   });
 
+  // Registros de asistencia de los últimos 6 días del mes anterior
+  const { data: prevMonthRecords = [] } = useQuery({
+    queryKey: ["compensationPrevMonthRecords", prevMonthStart, prevMonthEnd],
+    queryFn: async () => {
+      const page = await base44.entities.AttendanceRecord.filter(
+        { date: { $gte: prevMonthStart, $lte: prevMonthEnd } },
+        { sort: "-date", limit: 2000 }
+      );
+      return page.items;
+    },
+    staleTime: 60000,
+  });
+
   const { data: existingCompensations = [] } = useQuery({
-    queryKey: ["compensationIncidents", periodStart, periodEnd],
+    queryKey: ["compensationIncidents", periodStart, periodEnd, prevMonthStart, prevMonthEnd],
     queryFn: async () => {
       const page = await base44.entities.AttendanceIncident.filter(
         {
           incident_type: "Compensación de Tardanza",
-          incident_date: { $gte: periodStart, $lte: periodEnd },
+          incident_date: { $gte: prevMonthStart, $lte: periodEnd },
         },
         { sort: "-incident_date", limit: 2000 }
       );
@@ -933,6 +959,9 @@ export default function CompensationPanel({
           periodStart={periodStart}
           periodEnd={periodEnd}
           periodRecords={periodRecords}
+          prevMonthRecords={prevMonthRecords}
+          prevMonthStart={prevMonthStart}
+          prevMonthEnd={prevMonthEnd}
           existingCompensations={existingCompensations}
           allEmployees={allEmployees}
           editMode={editMode}

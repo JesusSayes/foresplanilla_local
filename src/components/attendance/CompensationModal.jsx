@@ -26,6 +26,7 @@ import {
   computeScheduledHoursForPeriod,
   getScheduleForDate,
   computeCrossDayCompensation,
+  computeCrossDayCompensationWithPrevMonth,
 } from "@/lib/attendanceMetrics";
 
 const fmtHours = (h) => {
@@ -51,6 +52,9 @@ export default function CompensationModal({
   periodStart,
   periodEnd,
   periodRecords,
+  prevMonthRecords = [],
+  prevMonthStart,
+  prevMonthEnd,
   existingCompensations = [],
   allEmployees = [],
   editMode = false,
@@ -104,6 +108,12 @@ export default function CompensationModal({
     return periodRecords.filter((r) => r.employee_id === employee.id);
   }, [employee, periodRecords]);
 
+  // Registros de los últimos 6 días del mes anterior
+  const prevMonthEmployeeRecords = useMemo(() => {
+    if (!employee) return [];
+    return prevMonthRecords.filter((r) => r.employee_id === employee.id);
+  }, [employee, prevMonthRecords]);
+
   // Minutos de HE ya utilizados en compensaciones APROBADAS (por fecha del empleado)
   const approvedUsedByDate = useMemo(() => {
     const map = {};
@@ -117,10 +127,45 @@ export default function CompensationModal({
   }, [existingCompensations, employee]);
 
   // Generar TODOS los días del período (con y sin registro de asistencia)
+  // Incluye los últimos 6 días del mes anterior como días compensables (solo HE)
   const allScheduledDays = useMemo(() => {
     if (!employee || !periodStart || !periodEnd) return [];
 
     const days = [];
+
+    // --- Días del mes anterior (últimos 6 días, solo HE, sin tardanzas) ---
+    if (prevMonthStart && prevMonthEnd) {
+      const pmStart = new Date(prevMonthStart + "T00:00:00");
+      const pmEnd = new Date(prevMonthEnd + "T00:00:00");
+      for (let d = new Date(pmStart); d <= pmEnd; d.setDate(d.getDate() + 1)) {
+        const dateStr = format(d, "yyyy-MM-dd");
+        const record = prevMonthEmployeeRecords.find((r) => r.date === dateStr);
+        const schedForDay = employeeSchedule
+          ? getScheduleForDate(employeeSchedule, d)
+          : null;
+        if (schedForDay || record) {
+          days.push({
+            date: dateStr,
+            scheduleTimes: schedForDay,
+            record,
+            hasRecord: !!record,
+            workedHours: record?.worked_hours ?? 0,
+            lateMinutes: 0,
+            overtimeMinutes: Math.max(
+              0,
+              Math.round(
+                ((record?.overtime_hours_25 ?? 0) +
+                  (record?.overtime_hours_35 ?? 0)) *
+                  60
+              ) - (approvedUsedByDate[dateStr] || 0)
+            ),
+            isPrevMonth: true,
+          });
+        }
+      }
+    }
+
+    // --- Días del período actual ---
     const start = new Date(periodStart + "T00:00:00");
     const end = new Date(periodEnd + "T00:00:00");
 
@@ -172,7 +217,7 @@ export default function CompensationModal({
     }
 
     return days.sort((a, b) => a.date.localeCompare(b.date));
-  }, [employee, employeeSchedule, periodStart, periodEnd, allEmployeeRecords, editMode, pendingCompensations, approvedUsedByDate]);
+  }, [employee, employeeSchedule, periodStart, periodEnd, allEmployeeRecords, editMode, pendingCompensations, approvedUsedByDate, prevMonthStart, prevMonthEnd, prevMonthEmployeeRecords]);
 
   const summary = useMemo(() => {
     const scheduledHours = employeeSchedule
@@ -205,12 +250,13 @@ export default function CompensationModal({
     const totalLateMin = allEmployeeRecords.reduce((s, r) => s + (r.late_minutes ?? 0), 0);
     const approvedUsedTotalMin = Object.values(approvedUsedByDate).reduce((a, b) => a + b, 0);
     const totalCompensableMin = Math.max(0, Math.round(
-      allEmployeeRecords.reduce((s, r) => s + (r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0), 0) * 60
+      (allEmployeeRecords.reduce((s, r) => s + (r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0), 0) +
+       prevMonthEmployeeRecords.reduce((s, r) => s + (r.overtime_hours_25 ?? 0) + (r.overtime_hours_35 ?? 0), 0)) * 60
     ) - approvedUsedTotalMin);
     const totalCompensatedMin = Object.values(selectedDays).reduce((s, d) => s + (d.lateMinutes || 0), 0);
     const pendingBalanceMin = Math.max(0, totalLateMin - totalCompensatedMin);
     return { totalLateMin, totalCompensableMin, totalCompensatedMin, pendingBalanceMin };
-  }, [allEmployeeRecords, approvedUsedByDate, selectedDays]);
+  }, [allEmployeeRecords, prevMonthEmployeeRecords, approvedUsedByDate, selectedDays]);
 
   const compensatedDates = useMemo(() => {
     return new Set(
@@ -279,8 +325,21 @@ export default function CompensationModal({
 
     const tDate = new Date(date + "T00:00:00");
     const tYM = date.slice(0, 7);
-    const eligible = allScheduledDays
+
+    // Fase 1: HE del mes anterior (se consumen primero, sin restricción de cercanía)
+    const prevEligible = allScheduledDays
       .filter((d) => {
+        if (!d.isPrevMonth) return false;
+        if (d.overtimeMinutes <= 0) return false;
+        if (compensatedDates.has(d.date)) return false;
+        return true;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Fase 2: HE del mes actual (mismo mes, hasta 15 días después)
+    const currentEligible = allScheduledDays
+      .filter((d) => {
+        if (d.isPrevMonth) return false;
         if (d.overtimeMinutes <= 0) return false;
         if (compensatedDates.has(d.date)) return false;
         const cDate = new Date(d.date + "T00:00:00");
@@ -289,8 +348,10 @@ export default function CompensationModal({
       })
       .sort((a, b) => a.date.localeCompare(b.date));
 
+    const eligible = [...prevEligible, ...currentEligible];
+
     if (eligible.length === 0) {
-      setStatusMessage("No hay horas extras disponibles (mismo mes, hasta 15 días después) para compensar esta tardanza.");
+      setStatusMessage("No hay horas extras disponibles (mes anterior ni mismo mes) para compensar esta tardanza.");
       return;
     }
 
@@ -327,13 +388,16 @@ export default function CompensationModal({
   // (tardanza de un día se compensa con HE de hasta 15 días después, mismo mes)
   const selectAllCompensable = () => {
     const tardanzaDays = allScheduledDays
-      .filter((d) => d.lateMinutes > 0 && !compensatedDates.has(d.date))
+      .filter((d) => d.lateMinutes > 0 && !d.isPrevMonth && !compensatedDates.has(d.date))
       .map((d) => ({ date: d.date, lateMinutes: d.lateMinutes }));
     const compensableDays = allScheduledDays
-      .filter((d) => d.overtimeMinutes > 0 && !compensatedDates.has(d.date))
+      .filter((d) => d.overtimeMinutes > 0 && !d.isPrevMonth && !compensatedDates.has(d.date))
+      .map((d) => ({ date: d.date, overtimeMinutes: d.overtimeMinutes }));
+    const prevMonthCompensable = allScheduledDays
+      .filter((d) => d.overtimeMinutes > 0 && d.isPrevMonth && !compensatedDates.has(d.date))
       .map((d) => ({ date: d.date, overtimeMinutes: d.overtimeMinutes }));
 
-    if (tardanzaDays.length === 0 && compensableDays.length === 0) {
+    if (tardanzaDays.length === 0 && compensableDays.length === 0 && prevMonthCompensable.length === 0) {
       setStatusMessage("No hay días con tardanza ni horas extras disponibles en el período.");
       return;
     }
@@ -341,15 +405,17 @@ export default function CompensationModal({
       setStatusMessage("No hay días con tardanza para compensar.");
       return;
     }
-    if (compensableDays.length === 0) {
+    if (compensableDays.length === 0 && prevMonthCompensable.length === 0) {
       setStatusMessage("No hay días con horas extras (HE) disponibles para compensar las tardanzas.");
       return;
     }
 
-    const { assignments, totalCompensated } = computeCrossDayCompensation(tardanzaDays, compensableDays, 15);
+    const { assignments, totalCompensated } = computeCrossDayCompensationWithPrevMonth(
+      tardanzaDays, compensableDays, prevMonthCompensable, 15
+    );
 
     if (assignments.length === 0) {
-      setStatusMessage("No se encontraron coincidencias válidas (mismo mes, hasta 15 días después).");
+      setStatusMessage("No se encontraron coincidencias válidas (mes anterior ni mismo mes, hasta 15 días después).");
       return;
     }
 
@@ -386,24 +452,29 @@ export default function CompensationModal({
         lateMinutes: selectedDays[d.date].lateMinutes > 0 ? selectedDays[d.date].lateMinutes : d.lateMinutes,
       }));
 
-    // Días compensables de TODO el período (no solo los seleccionados)
+    // Días compensables de TODO el período + mes anterior (no solo los seleccionados)
     const compensableDays = allScheduledDays
-      .filter((d) => d.overtimeMinutes > 0 && !compensatedDates.has(d.date))
+      .filter((d) => d.overtimeMinutes > 0 && !d.isPrevMonth && !compensatedDates.has(d.date))
+      .map((d) => ({ date: d.date, overtimeMinutes: d.overtimeMinutes }));
+    const prevMonthCompensable = allScheduledDays
+      .filter((d) => d.overtimeMinutes > 0 && d.isPrevMonth && !compensatedDates.has(d.date))
       .map((d) => ({ date: d.date, overtimeMinutes: d.overtimeMinutes }));
 
     if (tardanzaDays.length === 0) {
       setStatusMessage("Los días seleccionados no tienen tardanza para compensar.");
       return;
     }
-    if (compensableDays.length === 0) {
+    if (compensableDays.length === 0 && prevMonthCompensable.length === 0) {
       setStatusMessage("No hay horas extras (HE) disponibles para compensar las tardanzas seleccionadas.");
       return;
     }
 
-    const { assignments, totalCompensated } = computeCrossDayCompensation(tardanzaDays, compensableDays, 15);
+    const { assignments, totalCompensated } = computeCrossDayCompensationWithPrevMonth(
+      tardanzaDays, compensableDays, prevMonthCompensable, 15
+    );
 
     if (assignments.length === 0) {
-      setStatusMessage("No se encontraron coincidencias válidas (mismo mes, hasta 15 días después).");
+      setStatusMessage("No se encontraron coincidencias válidas (mes anterior ni mismo mes, hasta 15 días después).");
       return;
     }
 
@@ -589,15 +660,15 @@ export default function CompensationModal({
             <div className="flex items-start gap-2">
               <ArrowRightLeft className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
               <div className="text-xs text-indigo-800">
-                <p className="font-semibold mb-1">Compensación mensual (hasta 15 días después)</p>
+                <p className="font-semibold mb-1">Compensación mensual con mes anterior (hasta 15 días después)</p>
                 <p>
-                  Las tardanzas de un día pueden compensarse con tiempo
-                  compensable (horas en exceso) del mismo día o de hasta{" "}
-                  <span className="font-medium">15 días calendario después</span>,
-                  dentro del mismo mes. Use "Auto" para que el sistema asigne
-                  automáticamente el tiempo compensable más cercano, o
-                  "Seleccionar días con compensación" para compensar todas las
-                  tardanzas del mes.
+                  Las tardanzas se compensan con horas en exceso (HE) del mismo
+                  día o de hasta <span className="font-medium">15 días después</span>{" "}
+                  dentro del mismo mes. Además, se pueden usar las HE de los{" "}
+                  <span className="font-medium">últimos 6 días del mes anterior</span>{" "}
+                  (incluyendo cambio de año), consumiéndose primero las del mes
+                  anterior. No se reutilizan horas ya compensadas ni se permiten
+                  saldos negativos.
                 </p>
               </div>
             </div>
@@ -775,6 +846,11 @@ export default function CompensationModal({
                               })}
                             </span>
                             <div className="flex items-center gap-1 mt-0.5">
+                              {day.isPrevMonth && (
+                                <Badge className="bg-indigo-100 text-indigo-700 text-[10px] px-1.5 py-0">
+                                  Mes anterior
+                                </Badge>
+                              )}
                               {day.hasRecord ? (
                                 <Badge className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0">
                                   Trabajado
@@ -832,19 +908,21 @@ export default function CompensationModal({
                             {isSelected && (
                               <div className="space-y-1">
                                 <div className="flex items-center gap-1 justify-center">
-                                  <Input
-                                    type="number"
-                                    placeholder="tard"
-                                    className="h-8 w-20 text-xs text-center border-orange-300 focus:border-orange-500"
-                                    value={selectedDays[day.date]?.lateMinutes || ""}
-                                    onChange={(e) =>
-                                      updateCompensationMinutes(
-                                        day.date,
-                                        "lateMinutes",
-                                        e.target.value
-                                      )
-                                    }
-                                  />
+                                  {!day.isPrevMonth && (
+                                    <Input
+                                      type="number"
+                                      placeholder="tard"
+                                      className="h-8 w-20 text-xs text-center border-orange-300 focus:border-orange-500"
+                                      value={selectedDays[day.date]?.lateMinutes || ""}
+                                      onChange={(e) =>
+                                        updateCompensationMinutes(
+                                          day.date,
+                                          "lateMinutes",
+                                          e.target.value
+                                        )
+                                      }
+                                    />
+                                  )}
                                   <Input
                                     type="number"
                                     placeholder="HE"
@@ -858,18 +936,20 @@ export default function CompensationModal({
                                       )
                                     }
                                   />
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 px-1.5 text-xs text-indigo-600 hover:bg-indigo-100"
-                                    onClick={() => autoFillDay(day.date)}
-                                    title="Auto-completar con el mínimo entre tardanza y HE"
-                                  >
-                                    <Zap className="w-3 h-3" />
-                                  </Button>
+                                  {!day.isPrevMonth && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 px-1.5 text-xs text-indigo-600 hover:bg-indigo-100"
+                                      onClick={() => autoFillDay(day.date)}
+                                      title="Auto-completar con HE del mes anterior primero y luego del mismo mes"
+                                    >
+                                      <Zap className="w-3 h-3" />
+                                    </Button>
+                                  )}
                                 </div>
                                 <div className="flex justify-center gap-3 text-[9px] text-slate-400">
-                                  <span className="text-orange-500">↓ tardanza</span>
+                                  {!day.isPrevMonth && <span className="text-orange-500">↓ tardanza</span>}
                                   <span className="text-blue-500">↓ HE</span>
                                 </div>
                               </div>
