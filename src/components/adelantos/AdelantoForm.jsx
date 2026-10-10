@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
+import EmployeeSearchSelect from "@/components/employees/EmployeeSearchSelect";
 
 export default function AdelantoForm({ initialData, employees, onSave, onCancel }) {
   const [formData, setFormData] = useState({
@@ -57,19 +58,12 @@ export default function AdelantoForm({ initialData, employees, onSave, onCancel 
         <CardContent className="p-6 space-y-4">
           <div>
             <Label>Empleado *</Label>
-            <Select
+            <EmployeeSearchSelect
+              employees={employees}
               value={formData.employee_id}
               onValueChange={(v) => setFormData({ ...formData, employee_id: v })}
-            >
-              <SelectTrigger><SelectValue placeholder="Seleccionar empleado..." /></SelectTrigger>
-              <SelectContent>
-                {employees.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    {emp.first_name} {emp.last_name} — {emp.employee_code}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Buscar empleado..."
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

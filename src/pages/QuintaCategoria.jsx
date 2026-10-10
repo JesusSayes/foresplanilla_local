@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { formatMoney } from "@/lib/payrollUtils";
 import QuintaConfigModal from "@/components/quinta/QuintaConfigModal";
 import QuintaCalculoDetailModal from "@/components/quinta/QuintaCalculoDetailModal";
+import EmployeeSearchSelect from "@/components/employees/EmployeeSearchSelect";
 
 export default function QuintaCategoria() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -224,16 +225,12 @@ export default function QuintaCategoria() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                   <div>
                     <Label>Empleado</Label>
-                    <Select value={calcEmployee} onValueChange={setCalcEmployee}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                      <SelectContent>
-                        {allEmployees.map((emp) => (
-                          <SelectItem key={emp.id} value={emp.id}>
-                            {emp.first_name} {emp.last_name} — {emp.employee_code}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <EmployeeSearchSelect
+                      employees={allEmployees}
+                      value={calcEmployee}
+                      onValueChange={setCalcEmployee}
+                      placeholder="Buscar empleado..."
+                    />
                   </div>
                   <div>
                     <Label>Mes</Label>
