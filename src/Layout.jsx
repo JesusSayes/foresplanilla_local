@@ -288,6 +288,9 @@ export default function Layout({ children, currentPageName }) {
       if (hasAnyPermission(["payroll.view_all", "payroll.create", "payroll.calculate"])) {
         submenu.push({ name: "Beneficios Sociales", path: "BeneficiosSociales" });
         submenu.push({ name: "Historial Remunerativo", path: "HistorialRemunerativo" });
+        submenu.push({ name: "Quinta Categoría", path: "QuintaCategoria" });
+        submenu.push({ name: "Adelantos de Gratificación", path: "AdelantosGratificacion" });
+        submenu.push({ name: "Venta de Vacaciones", path: "VentaVacaciones" });
       }
       // Solo mostrar el menú si hay al menos un submenú disponible
       if (submenu.length > 0) {

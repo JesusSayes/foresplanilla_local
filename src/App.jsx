@@ -13,6 +13,9 @@ import ConfiguracionStarsoft from './pages/ConfiguracionStarsoft';
 import HistorialRemunerativo from './pages/HistorialRemunerativo';
 import CompensacionTardanzas from './pages/CompensacionTardanzas';
 import TipoCambioManagement from './pages/TipoCambioManagement';
+import QuintaCategoria from './pages/QuintaCategoria';
+import AdelantosGratificacion from './pages/AdelantosGratificacion';
+import VentaVacaciones from './pages/VentaVacaciones';
 import PageGuard from '@/components/PageGuard';
 import { PAGE_PERMISSIONS } from './pagePermissions';
 import { LoadingProvider, useLoading } from '@/lib/loadingContext';
@@ -79,6 +82,9 @@ const AuthenticatedApp = () => {
       <Route path="/HistorialRemunerativo" element={<LayoutWrapper currentPageName="HistorialRemunerativo"><PageGuard requiredPermission="payroll.view_all"><HistorialRemunerativo /></PageGuard></LayoutWrapper>} />
       <Route path="/CompensacionTardanzas" element={<LayoutWrapper currentPageName="CompensacionTardanzas"><PageGuard {...PAGE_PERMISSIONS.CompensacionTardanzas}><CompensacionTardanzas /></PageGuard></LayoutWrapper>} />
       <Route path="/TipoCambioManagement" element={<LayoutWrapper currentPageName="TipoCambioManagement"><PageGuard {...PAGE_PERMISSIONS.TipoCambioManagement}><TipoCambioManagement /></PageGuard></LayoutWrapper>} />
+      <Route path="/QuintaCategoria" element={<LayoutWrapper currentPageName="QuintaCategoria"><PageGuard requiredPermission="payroll.view_all"><QuintaCategoria /></PageGuard></LayoutWrapper>} />
+      <Route path="/AdelantosGratificacion" element={<LayoutWrapper currentPageName="AdelantosGratificacion"><PageGuard requiredPermission="payroll.view_all"><AdelantosGratificacion /></PageGuard></LayoutWrapper>} />
+      <Route path="/VentaVacaciones" element={<LayoutWrapper currentPageName="VentaVacaciones"><PageGuard requiredAnyPermissions={["payroll.view_all", "vacations.view_all"]}><VentaVacaciones /></PageGuard></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
