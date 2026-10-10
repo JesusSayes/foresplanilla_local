@@ -36,6 +36,13 @@ import {
   findCalculatedCost,
   findCalculatedFamilyAllowance,
 } from "@/lib/payrollIncomeHelpers";
+import {
+  getCostFromSummary,
+  dedupeIncomesByCost,
+  computeDedupedTotalIncome,
+  getAfpBreakdown,
+  getOvertimePaySplit,
+} from "@/lib/payrollExcelHelpers";
 
 // Rate limiter global + retry con backoff exponencial para errores de rate-limit
 // Garantiza un gap mínimo entre TODAS las llamadas API y reintenta en caso de 429
@@ -281,6 +288,21 @@ export default function PayrollManagement() {
   });
   const { data: approvedVacations = [] } = vacationsQuery;
 
+  // Horas extras manuales registradas desde el panel de asistencia
+  const manualOvertimeQuery = useQuery({
+    queryKey: ["manualOvertime", selectedMonth, selectedYear, payrollType],
+    queryFn: async () => {
+      return await withRetry(() => base44.entities.HorasExtrasManual.filter({
+        status: "Activo",
+        month: selectedMonth,
+        year: selectedYear,
+        payroll_type: payrollType,
+      }, "-created_date"));
+    },
+    staleTime: 0,
+  });
+  const { data: manualOvertimeRecords = [] } = manualOvertimeQuery;
+
   // Bandera combinada de carga/errores de los datos críticos para el cálculo de planilla.
   // Diferencia una consulta pendiente (payrollDataLoading=true) de un resultado válido vacío.
   const payrollDataLoading =
@@ -466,6 +488,7 @@ export default function PayrollManagement() {
         ["payrollConfig"],
         ["payslips", selectedMonth, selectedYear],
         ["approvedVacations"],
+        ["manualOvertime", selectedMonth, selectedYear, payrollType],
       ];
       await Promise.all(criticalKeys.map(key => queryClient.refetchQueries({ queryKey: key, exact: true })));
 
@@ -485,6 +508,7 @@ export default function PayrollManagement() {
       const payrollConfig = queryClient.getQueryData(["payrollConfig"]) ?? { quincenal_percentage: 40, quincenal_cutoff_day: 7 };
       const existingPayslips = queryClient.getQueryData(["payslips", selectedMonth, selectedYear]) ?? [];
       const approvedVacations = queryClient.getQueryData(["approvedVacations"]) ?? [];
+      const manualOvertimeRecords = queryClient.getQueryData(["manualOvertime", selectedMonth, selectedYear, payrollType]) ?? [];
 
       const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
     
@@ -723,13 +747,13 @@ export default function PayrollManagement() {
       // Horas extras efectivas: si un registro tiene compensación de tardanza activa,
       // los minutos compensados se descuentan de las HE (primero 25%, luego 35%)
       // para evitar doble contabilización.
-      const overtimeHours25 = empAttendance.reduce((sum, record) => {
+      const overtimeHours25Auto = empAttendance.reduce((sum, record) => {
         const ot25 = Number(record.overtime_hours_25 || 0);
         if (!enableTardinessCompensation || record.tardiness_compensation_status !== "Activa") return sum + ot25;
         const compHours = (record.tardiness_compensation_minutes || 0) / 60;
         return sum + Math.max(0, ot25 - Math.min(ot25, compHours));
       }, 0);
-      const overtimeHours35 = empAttendance.reduce((sum, record) => {
+      const overtimeHours35Auto = empAttendance.reduce((sum, record) => {
         const ot25 = Number(record.overtime_hours_25 || 0);
         const ot35 = Number(record.overtime_hours_35 || 0);
         if (!enableTardinessCompensation || record.tardiness_compensation_status !== "Activa") return sum + ot35;
@@ -738,6 +762,15 @@ export default function PayrollManagement() {
         const remainingComp = compHours - deduct25;
         return sum + Math.max(0, ot35 - Math.min(ot35, remainingComp));
       }, 0);
+      // Horas extras manuales (registradas desde el panel de asistencia)
+      // Se suman al cálculo automático una sola vez, sin afectar compensaciones de tardanza.
+      const empManualOT = (manualOvertimeRecords || []).filter(r => r.employee_id === emp.id);
+      const manualOT25 = empManualOT.reduce((sum, r) =>
+        sum + (r.overtime_hours_25 || 0) + (r.overtime_minutes_25 || 0) / 60, 0);
+      const manualOT35 = empManualOT.reduce((sum, r) =>
+        sum + (r.overtime_hours_35 || 0) + (r.overtime_minutes_35 || 0) / 60, 0);
+      const overtimeHours25 = roundMoney(overtimeHours25Auto + manualOT25);
+      const overtimeHours35 = roundMoney(overtimeHours35Auto + manualOT35);
       const nightHours = empAttendance.reduce(
         (sum, record) => sum + Number(record.horas_nocturnas ?? record.night_hours ?? 0), 0
       );
@@ -1298,106 +1331,9 @@ export default function PayrollManagement() {
     toast.success("Boleta generada");
   };
 
-  // Exportar planilla a Excel (formato lineal)
-  // Los costos desglosados provienen de los importes calculados guardados en la boleta
-  // (activity_cost_amount, food_cost_amount, transport_cost_amount), no de los valores
-  // nominales del contrato. Para boletas antiguas sin estos campos, se intenta el
-  // desglose desde calculation_summary.breakdown.incomes.items; si no existe, va 0.
-  const getCostFromSummary = (payslip, varName, nameKeywords) => {
-    const items = payslip?.calculation_summary?.breakdown?.incomes?.items;
-    if (!Array.isArray(items)) return null;
-    let match = items.find(it => {
-      const f = _normStr(it.formula);
-      return f && f.includes(varName);
-    });
-    if (match) return safeNum(match.amount);
-    match = items.find(it => {
-      const n = _normStr(it.name);
-      return nameKeywords.some(kw => n.includes(kw));
-    });
-    return match ? safeNum(match.amount) : null;
-  };
-
-  // Deduplica conceptos de costo en el breakdown de ingresos: para cada variable
-  // de costo (activity_cost, food_cost, transport_cost) conserva un único item,
-  // prefiriendo el concepto prorrateado (fórmula con worked_days) que corresponde
-  // al concepto general configurado. Evita doble conteo en el Total Ingresos
-  // cuando existen conceptos redundantes (ej. "Actividad" y "Costo de Actividad").
-  const dedupeIncomesByCost = (payslip) => {
-    const items = payslip?.calculation_summary?.breakdown?.incomes?.items;
-    if (!Array.isArray(items)) return null;
-    const costVars = ["activity_cost", "food_cost", "transport_cost"];
-    const groups = {};
-    items.forEach(it => {
-      const f = _normStr(it.calculation_formula || it.formula || "");
-      const cv = costVars.find(v => f.includes(v));
-      if (!cv) return;
-      if (!groups[cv]) groups[cv] = [];
-      groups[cv].push(it);
-    });
-    const keepSet = new Set();
-    Object.values(groups).forEach(arr => {
-      const preferred = arr.find(it => /worked_days/i.test(it.calculation_formula || it.formula || "")) || arr[0];
-      keepSet.add(preferred);
-    });
-    return items.filter(it => {
-      const f = _normStr(it.calculation_formula || it.formula || "");
-      const cv = costVars.find(v => f.includes(v));
-      if (!cv) return true;
-      return keepSet.has(it);
-    });
-  };
-
-  const computeDedupedTotalIncome = (payslip) => {
-    const deduped = dedupeIncomesByCost(payslip);
-    if (!deduped) return null;
-    return deduped.reduce((sum, it) => sum + safeNum(it.amount), 0);
-  };
-
-  // Extrae el desglose de AFP/ONP desde el breakdown de descuentos de la boleta.
-  // Cada componente (aporte obligatorio, prima de seguro, comisión, u ONP) viene
-  // como un ítem independiente con concept_category === "AFP/ONP".
-  // Retorna null si no hay breakdown disponible (boletas antiguas sin resumen).
-  const getAfpBreakdown = (payslip) => {
-    const items = payslip?.calculation_summary?.breakdown?.deductions?.items;
-    if (!Array.isArray(items)) return null;
-    const pensionItems = items.filter(it =>
-      it.concept_category === "AFP/ONP" || it.system_logic_type === "pension_contribution"
-    );
-    if (pensionItems.length === 0) return null;
-    const find = (re) => {
-      const m = pensionItems.find(it => re.test(it.name || ""));
-      return m ? safeNum(m.amount) : 0;
-    };
-    return {
-      aporte: find(/aporte obligatorio/i),
-      prima: find(/prima de seguro|prima seguro/i),
-      comision: find(/comisi[oó]n/i),
-      onp: find(/^onp\b|snp/i),
-    };
-  };
-
-  // Extrae el desglose del pago de horas extras al 25% y 35% desde el breakdown
-  // de ingresos de la boleta. Busca ítems con categoría "Horas Extras" y los
-  // separa según el nombre contenga "25" o "35". Retorna null si no hay breakdown.
-  const getOvertimePaySplit = (payslip) => {
-    const items = payslip?.calculation_summary?.breakdown?.incomes?.items;
-    if (!Array.isArray(items)) return null;
-    const heItems = items.filter(it =>
-      _normStr(it.concept_category) === "horas extras" ||
-      /horas?\s*extras?\s*(al\s*)?25/i.test(it.name || "") ||
-      /horas?\s*extras?\s*(al\s*)?35/i.test(it.name || "")
-    );
-    if (heItems.length === 0) return null;
-    let pay25 = 0, pay35 = 0;
-    heItems.forEach(it => {
-      const name = _normStr(it.name || "");
-      if (/25/.test(name)) pay25 += safeNum(it.amount);
-      else if (/35/.test(name)) pay35 += safeNum(it.amount);
-      // Si no menciona 25 ni 35, no se puede clasificar → se ignora del desglose
-    });
-    return { pay25: roundMoney(pay25), pay35: roundMoney(pay35) };
-  };
+  // Helpers de exportación Excel extraídos a @/lib/payrollExcelHelpers
+  // (getCostFromSummary, dedupeIncomesByCost, computeDedupedTotalIncome,
+  // getAfpBreakdown, getOvertimePaySplit)
 
   const exportToExcel = (payslipsData, filename, filterType) => {
     // Si se pasa filterType, filtrar solo las boletas de ese tipo
