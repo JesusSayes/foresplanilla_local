@@ -267,6 +267,11 @@ export const LEGACY_ROLE_PERMISSIONS = Object.freeze({
 });
 
 export const ACCESSIBLE_EMPLOYEE_PERMISSION_KEYS = Object.freeze([
+  'payroll.view_all',
+  'payroll.create',
+  'payroll.calculate',
+  'vacations.view_all',
+  'vacations.manage',
   'attendance.view_all',
   'attendance.view_department',
   'attendance.view_own',
