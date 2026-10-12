@@ -39,8 +39,8 @@ export default function EmployeeSearchSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[300px] p-0" align="start">
-        <Command filter={(itemValue, search) => {
-          return itemValue.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+        <Command filter={(_itemValue, search, keywords) => {
+          return (keywords || []).join(" ").toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
         }}>
           <CommandInput placeholder="Buscar por nombre o código..." />
           <CommandList>
@@ -51,7 +51,8 @@ export default function EmployeeSearchSelect({
                 return (
                   <CommandItem
                     key={emp.id}
-                    value={empLabel}
+                    value={emp.id}
+                    keywords={[empLabel]}
                     onSelect={() => {
                       onValueChange(emp.id === value ? "" : emp.id);
                       setOpen(false);
