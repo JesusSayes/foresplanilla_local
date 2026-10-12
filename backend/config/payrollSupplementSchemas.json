@@ -1,0 +1,425 @@
+{
+  "AdelantoGratificacion": {
+    "type": "object",
+    "properties": {
+      "employee_id": {
+        "type": "string"
+      },
+      "amount": {
+        "type": "number"
+      },
+      "advance_date": {
+        "type": "string",
+        "format": "date"
+      },
+      "gratification_period": {
+        "type": "string",
+        "enum": [
+          "Julio",
+          "Diciembre"
+        ]
+      },
+      "gratification_year": {
+        "type": "integer"
+      },
+      "apply_to_gratification": {
+        "type": "boolean",
+        "default": true
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "Pendiente",
+          "Aprobado",
+          "Aplicado",
+          "Pagado",
+          "Revertido"
+        ],
+        "default": "Pendiente"
+      },
+      "approved_by": {
+        "type": "string"
+      },
+      "approved_date": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "payment_reference": {
+        "type": "string"
+      },
+      "payment_date": {
+        "type": "string",
+        "format": "date"
+      },
+      "applied_amount": {
+        "type": "number",
+        "default": 0
+      },
+      "remaining_balance": {
+        "type": "number",
+        "default": 0
+      },
+      "applied_to_payslip_id": {
+        "type": "string"
+      },
+      "reverted_by": {
+        "type": "string"
+      },
+      "reverted_date": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "revert_reason": {
+        "type": "string"
+      },
+      "reason": {
+        "type": "string"
+      },
+      "notes": {
+        "type": "string"
+      },
+      "created_by": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "employee_id",
+      "amount",
+      "advance_date",
+      "gratification_period",
+      "gratification_year"
+    ]
+  },
+  "HorasExtrasManual": {
+    "type": "object",
+    "properties": {
+      "employee_id": {
+        "type": "string"
+      },
+      "payslip_id": {
+        "type": "string"
+      },
+      "month": {
+        "type": "integer"
+      },
+      "year": {
+        "type": "integer"
+      },
+      "payroll_type": {
+        "type": "string",
+        "enum": [
+          "Quincenal",
+          "Mensual",
+          "Adicional",
+          "SNP"
+        ]
+      },
+      "overtime_hours_25": {
+        "type": "number",
+        "default": 0
+      },
+      "overtime_minutes_25": {
+        "type": "integer",
+        "default": 0
+      },
+      "overtime_hours_35": {
+        "type": "number",
+        "default": 0
+      },
+      "overtime_minutes_35": {
+        "type": "integer",
+        "default": 0
+      },
+      "reason": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "Activo",
+          "Revertido"
+        ],
+        "default": "Activo"
+      },
+      "created_by": {
+        "type": "string"
+      },
+      "reverted_by": {
+        "type": "string"
+      },
+      "reverted_date": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "revert_reason": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "employee_id",
+      "month",
+      "year",
+      "payroll_type",
+      "reason"
+    ]
+  },
+  "QuintaCategoriaCalculo": {
+    "type": "object",
+    "properties": {
+      "employee_id": {
+        "type": "string"
+      },
+      "year": {
+        "type": "integer"
+      },
+      "month": {
+        "type": "integer"
+      },
+      "payroll_type": {
+        "type": "string",
+        "enum": [
+          "Mensual",
+          "Adicional"
+        ],
+        "default": "Mensual"
+      },
+      "projected_annual_income": {
+        "type": "number",
+        "default": 0
+      },
+      "annual_deduction": {
+        "type": "number",
+        "default": 0
+      },
+      "projected_taxable_base": {
+        "type": "number",
+        "default": 0
+      },
+      "projected_annual_tax": {
+        "type": "number",
+        "default": 0
+      },
+      "prior_retentions": {
+        "type": "number",
+        "default": 0
+      },
+      "current_month_retention": {
+        "type": "number",
+        "default": 0
+      },
+      "calculation_mode": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "manual"
+        ],
+        "default": "auto"
+      },
+      "manual_amount": {
+        "type": "number",
+        "default": 0
+      },
+      "manual_reason": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "Pendiente",
+          "Aprobada",
+          "Aplicada",
+          "Revertida"
+        ],
+        "default": "Pendiente"
+      },
+      "approved_by": {
+        "type": "string"
+      },
+      "approved_date": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "applied_to_payslip_id": {
+        "type": "string"
+      },
+      "applied_date": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "reverted_by": {
+        "type": "string"
+      },
+      "reverted_date": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "revert_reason": {
+        "type": "string"
+      },
+      "calculation_detail": {
+        "type": "object"
+      },
+      "config_id": {
+        "type": "string"
+      },
+      "created_by": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "employee_id",
+      "year",
+      "month"
+    ]
+  },
+  "QuintaCategoriaConfig": {
+    "type": "object",
+    "properties": {
+      "year": {
+        "type": "integer"
+      },
+      "uit_amount": {
+        "type": "number"
+      },
+      "annual_deduction_uit": {
+        "type": "number",
+        "default": 7
+      },
+      "tax_brackets": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "from_uit": {
+              "type": "number"
+            },
+            "to_uit": {
+              "type": "number"
+            },
+            "rate": {
+              "type": "number"
+            },
+            "deduction": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "from_uit",
+            "to_uit",
+            "rate"
+          ]
+        }
+      },
+      "is_active": {
+        "type": "boolean",
+        "default": true
+      },
+      "notes": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "year",
+      "uit_amount"
+    ]
+  },
+  "VentaVacaciones": {
+    "type": "object",
+    "properties": {
+      "employee_id": {
+        "type": "string"
+      },
+      "vacation_period_origin": {
+        "type": "string"
+      },
+      "days_sold": {
+        "type": "number"
+      },
+      "amount": {
+        "type": "number"
+      },
+      "sale_date": {
+        "type": "string",
+        "format": "date"
+      },
+      "payment_period_month": {
+        "type": "integer"
+      },
+      "payment_period_year": {
+        "type": "integer"
+      },
+      "payroll_type": {
+        "type": "string",
+        "enum": [
+          "Mensual",
+          "Adicional"
+        ],
+        "default": "Mensual"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "Pendiente",
+          "Aprobada",
+          "Aplicada",
+          "Pagada",
+          "Rechazada",
+          "Revertida"
+        ],
+        "default": "Pendiente"
+      },
+      "approved_by": {
+        "type": "string"
+      },
+      "approved_date": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "payment_reference": {
+        "type": "string"
+      },
+      "applied_to_payslip_id": {
+        "type": "string"
+      },
+      "applied_date": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "reverted_by": {
+        "type": "string"
+      },
+      "reverted_date": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "revert_reason": {
+        "type": "string"
+      },
+      "rejected_by": {
+        "type": "string"
+      },
+      "rejected_date": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "rejection_reason": {
+        "type": "string"
+      },
+      "reason": {
+        "type": "string"
+      },
+      "notes": {
+        "type": "string"
+      },
+      "created_by": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "employee_id",
+      "days_sold",
+      "amount",
+      "sale_date"
+    ]
+  }
+}

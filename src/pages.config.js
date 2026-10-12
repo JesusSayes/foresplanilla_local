@@ -77,6 +77,9 @@ import PayrollConcepts from './pages/PayrollConcepts';
 import PayrollManagement from './pages/PayrollManagement';
 import PayslipTemplateConfig from './pages/PayslipTemplateConfig';
 import Payslips from './pages/Payslips';
+import QuintaCategoria from './pages/QuintaCategoria';
+import AdelantosGratificacion from './pages/AdelantosGratificacion';
+import VentaVacaciones from './pages/VentaVacaciones';
 import Reports from './pages/Reports';
 import RoleManagement from './pages/RoleManagement';
 import AsientosContables from './pages/AsientosContables';
@@ -130,6 +133,9 @@ export const PAGES = {
     "PayrollManagement": PayrollManagement,
     "PayslipTemplateConfig": PayslipTemplateConfig,
     "Payslips": Payslips,
+    "QuintaCategoria": QuintaCategoria,
+    "AdelantosGratificacion": AdelantosGratificacion,
+    "VentaVacaciones": VentaVacaciones,
     "Reports": Reports,
     "RoleManagement": RoleManagement,
     "SystemRoleInitializer": SystemRoleInitializer,

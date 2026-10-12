@@ -1,0 +1,165 @@
+{
+  "name": "HorasExtrasManual",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "payslip_id": {
+      "type": "string",
+      "description": "ID de la boleta/planilla vinculada (opcional: se completa si la planilla ya existe)"
+    },
+    "month": {
+      "type": "integer",
+      "description": "Mes del per\u00edodo (1-12)"
+    },
+    "year": {
+      "type": "integer",
+      "description": "A\u00f1o del per\u00edodo"
+    },
+    "payroll_type": {
+      "type": "string",
+      "enum": [
+        "Quincenal",
+        "Mensual",
+        "Adicional",
+        "SNP"
+      ],
+      "description": "Tipo de planilla al que se vincula el registro manual de horas extras"
+    },
+    "overtime_hours_25": {
+      "type": "number",
+      "default": 0,
+      "description": "Horas extras manuales al 25% (parte entera en horas)"
+    },
+    "overtime_minutes_25": {
+      "type": "integer",
+      "default": 0,
+      "description": "Minutos extras manuales al 25% (0-59)"
+    },
+    "overtime_hours_35": {
+      "type": "number",
+      "default": 0,
+      "description": "Horas extras manuales al 35% (parte entera en horas)"
+    },
+    "overtime_minutes_35": {
+      "type": "integer",
+      "default": 0,
+      "description": "Minutos extras manuales al 35% (0-59)"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Motivo/nota obligatoria del registro manual de horas extras"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Activo",
+        "Revertido"
+      ],
+      "default": "Activo",
+      "description": "Estado del registro: Activo (vigente, se suma al c\u00e1lculo de planilla), Revertido (anulado, no se suma)"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Email del usuario que registr\u00f3 las horas extras manuales"
+    },
+    "reverted_by": {
+      "type": "string",
+      "description": "Email del usuario que revirti\u00f3 el registro"
+    },
+    "reverted_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de reversi\u00f3n"
+    },
+    "revert_reason": {
+      "type": "string",
+      "description": "Motivo de la reversi\u00f3n"
+    }
+  },
+  "required": [
+    "employee_id",
+    "month",
+    "year",
+    "payroll_type",
+    "reason"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_attendance": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_create_payroll": true
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_view_all_attendance": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_view_all_payroll": true
+          }
+        },
+        {
+          "data.employee_id": "{{user.data.employee_id}}"
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_attendance": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_edit_payroll": true
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_attendance": true
+          }
+        }
+      ]
+    }
+  }
+}

@@ -46,6 +46,15 @@ import IncidentDetailModal from "../components/attendance/IncidentDetailModal";
 import PeriodApprovalModal from "../components/attendance/PeriodApprovalModal";
 import IncidentsTabContent from "../components/attendance/IncidentsTabContent";
 import SolicitudesPeriodoTab from "../components/attendance/SolicitudesPeriodoTab";
+import ManualOvertimeModal from "../components/attendance/ManualOvertimeModal";
+
+
+const formatHM = (decimalHours) => {
+  const totalMin = Math.round(decimalHours * 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+};
 
 export default function AttendanceManagement() {
   const { user: currentUser } = useAuth();
@@ -231,6 +240,12 @@ export default function AttendanceManagement() {
     queryFn: async () => {
       return await entitiesAPI.WorkSchedule.list("-created_date");
     },
+  });
+
+  // Horas extras manuales registradas desde el panel (para indicador rojo en la tabla)
+  const { data: manualOvertimeRecords = [] } = useQuery({
+    queryKey: ["manualOvertime"],
+    queryFn: async () => await entitiesAPI.HorasExtrasManual.filter({ status: "Activo" }, "-created_date", 2000),
   });
 
   // Configuración general: flag de compensación de tardanzas (deshabilitado por defecto)
@@ -669,6 +684,8 @@ export default function AttendanceManagement() {
   const [compensationRecord, setCompensationRecord] = useState(null);
   const [compensationEmployee, setCompensationEmployee] = useState(null);
   const [showCompensationModal, setShowCompensationModal] = useState(false);
+  const [manualOTEmployee, setManualOTEmployee] = useState(null);
+  const [showManualOTModal, setShowManualOTModal] = useState(false);
 
   const handleJustifyClick = async (emp, record, overrideDate) => {
     setJustifyingEmployee(emp);
@@ -840,6 +857,13 @@ export default function AttendanceManagement() {
 
   // IDs de empleados accesibles para filtrar incidentes y alertas
   const accessibleEmployeeIds = new Set(siteAllowedEmployees.map(e => e.id));
+
+  // Mes/año derivados de la fecha seleccionada para filtrar HE manuales
+  const viewDate = isRangeMode && dateFrom ? dateFrom : selectedDate;
+  const viewMonth = viewDate.getMonth() + 1;
+  const viewYear = viewDate.getFullYear();
+
+  const canManageManualOT = hasPermission("attendance.manage") || hasPermission("payroll.create") || hasPermission("system.admin");
 
   // En modo rango: generar una fila por cada combinación empleado × fecha con registro
   // En modo fecha única: comportamiento original (todos los empleados para esa fecha)
@@ -1609,6 +1633,14 @@ export default function AttendanceManagement() {
                           const hasPendingEdit = emp.record && pendingEditRequests.some(r => r.attendance_record_id === emp.record?.id);
                           const compAdj = getCompensationAdjustments(emp.id, rowDate);
                           const { firstClockIn, lastClockOut } = getSegmentClockTimes(emp.record);
+                          // HE manuales del período (mes/año de la fecha en vista)
+                          const empManualOT = manualOvertimeRecords.filter(r =>
+                            r.employee_id === emp.id && r.month === Number(rowDate.slice(5, 7)) && r.year === Number(rowDate.slice(0, 4))
+                          );
+                          const empManualOT25 = empManualOT.reduce((sum, r) =>
+                            sum + (r.overtime_hours_25 || 0) + (r.overtime_minutes_25 || 0) / 60, 0);
+                          const empManualOT35 = empManualOT.reduce((sum, r) =>
+                            sum + (r.overtime_hours_35 || 0) + (r.overtime_minutes_35 || 0) / 60, 0);
 
                           return (
                             <tr key={rowKey} className={`border-b last:border-b-0 hover:bg-slate-50 transition-colors ${isVacation ? "bg-amber-50/40" : "bg-white"}`}>
@@ -1800,11 +1832,16 @@ export default function AttendanceManagement() {
                                           ↓{(compAdj.pendingOTHours * 60).toFixed(0)}m
                                         </span>
                                       )}
-                                    </span>
-                                  );
-                                })()}
-                              </td>
-                              {/* HE 35% — descontando compensaciones pendientes */}
+                                      {empManualOT25 > 0 && (
+                                        <span className="text-[9px] text-red-600 font-bold whitespace-nowrap" title={`HE Manual 25%: ${formatHM(empManualOT25)}`}>
+                                          +M:{formatHM(empManualOT25)}
+                                        </span>
+                                      )}
+                                      </span>
+                                      );
+                                      })()}
+                                      </td>
+                                      {/* HE 35% — descontando compensaciones pendientes */}
                               <td className="px-2 py-2 text-center">
                                 {(() => {
                                   if (vacation) return <span className="text-xs font-bold text-slate-400">0m</span>;
@@ -1816,8 +1853,17 @@ export default function AttendanceManagement() {
                                   const hh = Math.floor(heMin / 60);
                                   const hm = heMin % 60;
                                   const heStr = hh > 0 ? `${hh}h ${hm}m` : `${hm}m`;
-                                  return <span className={`text-xs font-bold ${heMin > 0 ? 'text-purple-600' : 'text-slate-300'}`}>{heStr}</span>;
-                                })()}
+                                  return (
+                                    <span className="flex flex-col items-center">
+                                      <span className={`text-xs font-bold ${heMin > 0 ? 'text-purple-600' : 'text-slate-300'}`}>{heStr}</span>
+                                      {empManualOT35 > 0 && (
+                                        <span className="text-[9px] text-red-600 font-bold whitespace-nowrap" title={`HE Manual 35%: ${formatHM(empManualOT35)}`}>
+                                          +M:{formatHM(empManualOT35)}
+                                        </span>
+                                      )}
+                                    </span>
+                                  );
+                                  })()}
                               </td>
                               {/* H. Justificadas (attendance_incident.hours_to_adjust) */}
                               <td className="px-2 py-2 text-center">
@@ -1920,6 +1966,15 @@ export default function AttendanceManagement() {
                                       </Button>
                                      );
                                    })()}
+                                  {canManageManualOT && !isVacation && (
+                                   <Button size="sm" variant="outline"
+                                     className={`h-7 px-2 text-xs shrink-0 whitespace-nowrap ${empManualOT25 > 0 || empManualOT35 > 0 ? "text-red-600 border-red-300 hover:bg-red-50 bg-red-50 font-bold" : "text-red-600 border-red-200 hover:bg-red-50"}`}
+                                     title={empManualOT25 > 0 || empManualOT35 > 0 ? `HE Manual: 25%=${empManualOT25 > 0 ? formatHM(empManualOT25) : "0m"}, 35%=${empManualOT35 > 0 ? formatHM(empManualOT35) : "0m"}` : "Registrar horas extras manuales"}
+                                     onClick={() => { setManualOTEmployee({ ...emp, _rowDate: rowDate }); setShowManualOTModal(true); }}>
+                                     <Clock className="w-3 h-3 mr-1" />HE Manual
+                                     {(empManualOT25 > 0 || empManualOT35 > 0) && <span className="ml-1 w-1.5 h-1.5 bg-red-500 rounded-full" />}
+                                   </Button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -2245,6 +2300,20 @@ export default function AttendanceManagement() {
               setCompensationRecord(null);
               setCompensationEmployee(null);
               queryClient.invalidateQueries(["todayAttendance"]);
+            }}
+          />
+        )}
+
+        {/* Manual Overtime Modal */}
+        {showManualOTModal && manualOTEmployee && (
+          <ManualOvertimeModal
+            employee={manualOTEmployee}
+            defaultMonth={manualOTEmployee._rowDate ? Number(manualOTEmployee._rowDate.slice(5, 7)) : viewMonth}
+            defaultYear={manualOTEmployee._rowDate ? Number(manualOTEmployee._rowDate.slice(0, 4)) : viewYear}
+            currentUser={currentUser}
+            onClose={() => { setShowManualOTModal(false); setManualOTEmployee(null); }}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ["manualOvertime"] });
             }}
           />
         )}

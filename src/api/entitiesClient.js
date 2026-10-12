@@ -33,6 +33,17 @@ const createEntityAPI = (endpoint) => ({
 });
 
 export const entitiesAPI = {
+  AdelantoGratificacion: createEntityAPI('/api/payroll/supplements/AdelantoGratificacion'),
+  HorasExtrasManual: createEntityAPI('/api/payroll/supplements/HorasExtrasManual'),
+  QuintaCategoriaCalculo: {
+    ...createEntityAPI('/api/payroll/supplements/QuintaCategoriaCalculo'),
+    calculate: async (data) => {
+      const response = await localClient.post('/api/payroll/supplements/QuintaCategoriaCalculo/calculate', data);
+      return response.data;
+    },
+  },
+  QuintaCategoriaConfig: createEntityAPI('/api/payroll/supplements/QuintaCategoriaConfig'),
+  VentaVacaciones: createEntityAPI('/api/payroll/supplements/VentaVacaciones'),
   Employee: {
     ...createEntityAPI('/api/employees'),
     accessible: async (permissions) => {
