@@ -1,0 +1,135 @@
+{
+  "name": "QuintaCategoriaConfig",
+  "type": "object",
+  "properties": {
+    "year": {
+      "type": "integer",
+      "description": "A\u00f1o/ejercicio fiscal al que aplica la configuraci\u00f3n"
+    },
+    "uit_amount": {
+      "type": "number",
+      "description": "Monto de la UIT vigente para el ejercicio (en soles)"
+    },
+    "annual_deduction_uit": {
+      "type": "number",
+      "default": 7,
+      "description": "N\u00famero de UIT que se deducen de la base imponible anual (est\u00e1ndar: 7 UIT)"
+    },
+    "tax_brackets": {
+      "type": "array",
+      "description": "Escalas progresivas del Impuesto a la Renta de Quinta Categor\u00eda. Cada escala define un tramo de UIT con su tasa y deducci\u00f3n. Se aplican sobre la base imponible anual (remuneraci\u00f3n bruta proyectada menos deducci\u00f3n de UIT).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "from_uit": {
+            "type": "number",
+            "description": "L\u00edmite inferior del tramo en UIT (ej: 0, 5, 20, 35, 45)"
+          },
+          "to_uit": {
+            "type": "number",
+            "description": "L\u00edmite superior del tramo en UIT (ej: 5, 20, 35, 45, 999)"
+          },
+          "rate": {
+            "type": "number",
+            "description": "Tasa del tramo en porcentaje (ej: 8, 14, 17, 20, 30)"
+          },
+          "deduction": {
+            "type": "number",
+            "description": "Deducci\u00f3n fija del tramo en UIT (para c\u00e1lculo por tramos)"
+          }
+        },
+        "required": [
+          "from_uit",
+          "to_uit",
+          "rate"
+        ]
+      }
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Configuraci\u00f3n vigente para el ejercicio"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales sobre la configuraci\u00f3n tributaria"
+    }
+  },
+  "required": [
+    "year",
+    "uit_amount"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_payroll": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_view_all_payroll": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_payroll": true
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_payroll": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_system": true
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_payroll": true
+          }
+        }
+      ]
+    }
+  }
+}

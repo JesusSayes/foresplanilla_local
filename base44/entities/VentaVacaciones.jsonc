@@ -1,0 +1,199 @@
+{
+  "name": "VentaVacaciones",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "vacation_period_origin": {
+      "type": "string",
+      "description": "Per\u00edodo vacacional de origen (ej: '2025', 'Ene-Mar 2025'). Identifica el bloque de vacaciones del cual se venden los d\u00edas."
+    },
+    "days_sold": {
+      "type": "number",
+      "description": "D\u00edas de vacaciones vendidos (registrados manualmente, validados por RR. HH.)"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Importe de la venta de vacaciones (registrado manualmente, validado por RR. HH.)"
+    },
+    "sale_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha en que se registra la venta"
+    },
+    "payment_period_month": {
+      "type": "integer",
+      "description": "Mes en que se pagar\u00e1 la venta de vacaciones (1-12)"
+    },
+    "payment_period_year": {
+      "type": "integer",
+      "description": "A\u00f1o en que se pagar\u00e1 la venta de vacaciones"
+    },
+    "payroll_type": {
+      "type": "string",
+      "enum": [
+        "Mensual",
+        "Adicional"
+      ],
+      "default": "Mensual",
+      "description": "Tipo de planilla donde se incorporar\u00e1 el pago de la venta"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pendiente",
+        "Aprobada",
+        "Aplicada",
+        "Pagada",
+        "Rechazada",
+        "Revertida"
+      ],
+      "default": "Pendiente",
+      "description": "Estado de la venta: Pendiente (registrada, en revisi\u00f3n), Aprobada (autorizada), Aplicada (incorporada a planilla), Pagada (pago realizado), Rechazada (no autorizada), Revertida (anulada)"
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Email del usuario que aprob\u00f3 la venta"
+    },
+    "approved_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de aprobaci\u00f3n"
+    },
+    "payment_reference": {
+      "type": "string",
+      "description": "Referencia del pago realizado"
+    },
+    "applied_to_payslip_id": {
+      "type": "string",
+      "description": "ID de la boleta donde se aplic\u00f3 el pago de la venta"
+    },
+    "applied_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora en que se aplic\u00f3 a la boleta"
+    },
+    "reverted_by": {
+      "type": "string",
+      "description": "Email del usuario que revirti\u00f3 la venta"
+    },
+    "reverted_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de reversi\u00f3n"
+    },
+    "revert_reason": {
+      "type": "string",
+      "description": "Motivo de la reversi\u00f3n"
+    },
+    "rejected_by": {
+      "type": "string",
+      "description": "Email del usuario que rechaz\u00f3 la venta"
+    },
+    "rejected_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de rechazo"
+    },
+    "rejection_reason": {
+      "type": "string",
+      "description": "Motivo del rechazo"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Motivo de la venta de vacaciones"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Email del usuario que registr\u00f3 la venta"
+    }
+  },
+  "required": [
+    "employee_id",
+    "days_sold",
+    "amount",
+    "sale_date"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_vacations": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_create_payroll": true
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_view_all_vacations": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_view_all_payroll": true
+          }
+        },
+        {
+          "data.employee_id": "{{user.data.employee_id}}"
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_vacations": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_edit_payroll": true
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_manage_vacations": true
+          }
+        }
+      ]
+    }
+  }
+}

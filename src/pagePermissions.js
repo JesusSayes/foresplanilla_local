@@ -30,6 +30,9 @@ export const PAGE_PERMISSIONS = {
   BeneficiosSociales: { requiredPermission: "payroll.view_all" },
   HistorialRemunerativo: { requiredAnyPermissions: ["payroll.view_all", "payroll.view_department"] },
   PayrollConcepts: { requiredAnyPermissions: ["payroll.view_all", "payroll.view_department"] },
+  QuintaCategoria: { requiredPermission: "payroll.view_all" },
+  AdelantosGratificacion: { requiredPermission: "payroll.view_all" },
+  VentaVacaciones: { requiredAnyPermissions: ["payroll.view_all", "vacations.view_all"] },
   CostCenterValuation: { requiredPermission: "cost_centers.view" },
 
   // ── Contracts ──

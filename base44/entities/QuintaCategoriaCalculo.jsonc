@@ -1,0 +1,200 @@
+{
+  "name": "QuintaCategoriaCalculo",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "year": {
+      "type": "integer",
+      "description": "A\u00f1o del ejercicio fiscal"
+    },
+    "month": {
+      "type": "integer",
+      "description": "Mes del per\u00edodo de c\u00e1lculo (1-12)"
+    },
+    "payroll_type": {
+      "type": "string",
+      "enum": [
+        "Mensual",
+        "Adicional"
+      ],
+      "default": "Mensual",
+      "description": "Tipo de planilla donde se aplica la retenci\u00f3n"
+    },
+    "projected_annual_income": {
+      "type": "number",
+      "default": 0,
+      "description": "Proyecci\u00f3n de remuneraci\u00f3n bruta anual (ingresos gravables proyectados)"
+    },
+    "annual_deduction": {
+      "type": "number",
+      "default": 0,
+      "description": "Deducci\u00f3n anual aplicada (UIT \u00d7 n\u00famero de UIT deducibles)"
+    },
+    "projected_taxable_base": {
+      "type": "number",
+      "default": 0,
+      "description": "Base imponible anual proyectada (ingreso proyectado menos deducci\u00f3n)"
+    },
+    "projected_annual_tax": {
+      "type": "number",
+      "default": 0,
+      "description": "Impuesto anual proyectado calculado sobre la base imponible"
+    },
+    "prior_retentions": {
+      "type": "number",
+      "default": 0,
+      "description": "Suma de retenciones de quinta categor\u00eda aplicadas en meses anteriores del mismo ejercicio"
+    },
+    "current_month_retention": {
+      "type": "number",
+      "default": 0,
+      "description": "Retenci\u00f3n del per\u00edodo actual (impuesto anual proyectado menos retenciones previas, dividido entre meses restantes)"
+    },
+    "calculation_mode": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "manual"
+      ],
+      "default": "auto",
+      "description": "Modo de c\u00e1lculo: auto (calculado por el sistema) o manual (ajustado por un autorizador)"
+    },
+    "manual_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Monto manual ajustado por un autorizador (solo cuando calculation_mode=manual)"
+    },
+    "manual_reason": {
+      "type": "string",
+      "description": "Motivo del ajuste manual autorizado"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pendiente",
+        "Aprobada",
+        "Aplicada",
+        "Revertida"
+      ],
+      "default": "Pendiente",
+      "description": "Estado del c\u00e1lculo: Pendiente (en revisi\u00f3n), Aprobada (lista para aplicar), Aplicada (reflejada en boleta), Revertida (anulada)"
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Email del usuario que aprob\u00f3 el c\u00e1lculo"
+    },
+    "approved_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de aprobaci\u00f3n"
+    },
+    "applied_to_payslip_id": {
+      "type": "string",
+      "description": "ID de la boleta donde se aplic\u00f3 la retenci\u00f3n"
+    },
+    "applied_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora en que se aplic\u00f3 a la boleta"
+    },
+    "reverted_by": {
+      "type": "string",
+      "description": "Email del usuario que revirti\u00f3 el c\u00e1lculo"
+    },
+    "reverted_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de reversi\u00f3n"
+    },
+    "revert_reason": {
+      "type": "string",
+      "description": "Motivo de la reversi\u00f3n"
+    },
+    "calculation_detail": {
+      "type": "object",
+      "description": "Desglose detallado del c\u00e1lculo: remuneraci\u00f3n mensual proyectada, meses restantes, ingresos gravables, tramos aplicados, retenciones por mes, etc. Se persiste para mostrar el desglose en la boleta y en reportes."
+    },
+    "config_id": {
+      "type": "string",
+      "description": "ID de la configuraci\u00f3n de QuintaCategoriaConfig usada para el c\u00e1lculo"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Email del usuario que cre\u00f3 el c\u00e1lculo"
+    }
+  },
+  "required": [
+    "employee_id",
+    "year",
+    "month"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_create_payroll": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_calculate_payroll": true
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_view_all_payroll": true
+          }
+        },
+        {
+          "data.employee_id": "{{user.data.employee_id}}"
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_edit_payroll": true
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_delete_payroll": true
+          }
+        }
+      ]
+    }
+  }
+}

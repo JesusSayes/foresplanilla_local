@@ -1405,3 +1405,134 @@ model tipo_cambio_config {
 
   @@index([is_active], map: "idx_tipo_cambio_config_active")
 }
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model adelantogratificacion {
+  id                     String    @id @db.VarChar(255)
+  created_date           DateTime  @default(now()) @db.Timestamp(6)
+  updated_date           DateTime  @default(now()) @db.Timestamp(6)
+  employee_id            String
+  amount                 Decimal   @db.Decimal(18, 2)
+  advance_date           DateTime  @db.Date
+  gratification_period   String
+  gratification_year     Int
+  apply_to_gratification Boolean?  @default(true)
+  status                 String?   @default("Pendiente")
+  approved_by            String?
+  approved_date          DateTime? @db.Timestamptz(6)
+  payment_reference      String?
+  payment_date           DateTime? @db.Date
+  applied_amount         Decimal?  @default(0) @db.Decimal(18, 2)
+  remaining_balance      Decimal?  @default(0) @db.Decimal(18, 2)
+  applied_to_payslip_id  String?
+  reverted_by            String?
+  reverted_date          DateTime? @db.Timestamptz(6)
+  revert_reason          String?
+  reason                 String?
+  notes                  String?
+  created_by             String?
+
+  @@index([employee_id], map: "adelantogratificacion_employee_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model horasextrasmanual {
+  id                  String    @id @db.VarChar(255)
+  created_date        DateTime  @default(now()) @db.Timestamp(6)
+  updated_date        DateTime  @default(now()) @db.Timestamp(6)
+  employee_id         String
+  payslip_id          String?
+  month               Int
+  year                Int
+  payroll_type        String
+  overtime_hours_25   Decimal?  @default(0) @db.Decimal(18, 2)
+  overtime_minutes_25 Int?      @default(0)
+  overtime_hours_35   Decimal?  @default(0) @db.Decimal(18, 2)
+  overtime_minutes_35 Int?      @default(0)
+  reason              String
+  status              String?   @default("Activo")
+  created_by          String?
+  reverted_by         String?
+  reverted_date       DateTime? @db.Timestamptz(6)
+  revert_reason       String?
+
+  @@index([employee_id], map: "horasextrasmanual_employee_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model quintacategoriacalculo {
+  id                      String    @id @db.VarChar(255)
+  created_date            DateTime  @default(now()) @db.Timestamp(6)
+  updated_date            DateTime  @default(now()) @db.Timestamp(6)
+  employee_id             String
+  year                    Int
+  month                   Int
+  payroll_type            String?   @default("Mensual")
+  projected_annual_income Decimal?  @default(0) @db.Decimal(18, 2)
+  annual_deduction        Decimal?  @default(0) @db.Decimal(18, 2)
+  projected_taxable_base  Decimal?  @default(0) @db.Decimal(18, 2)
+  projected_annual_tax    Decimal?  @default(0) @db.Decimal(18, 2)
+  prior_retentions        Decimal?  @default(0) @db.Decimal(18, 2)
+  current_month_retention Decimal?  @default(0) @db.Decimal(18, 2)
+  calculation_mode        String?   @default("auto")
+  manual_amount           Decimal?  @default(0) @db.Decimal(18, 2)
+  manual_reason           String?
+  status                  String?   @default("Pendiente")
+  approved_by             String?
+  approved_date           DateTime? @db.Timestamptz(6)
+  applied_to_payslip_id   String?
+  applied_date            DateTime? @db.Timestamptz(6)
+  reverted_by             String?
+  reverted_date           DateTime? @db.Timestamptz(6)
+  revert_reason           String?
+  calculation_detail      Json?
+  config_id               String?
+  created_by              String?
+
+  @@index([employee_id], map: "quintacategoriacalculo_employee_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model quintacategoriaconfig {
+  id                   String   @id @db.VarChar(255)
+  created_date         DateTime @default(now()) @db.Timestamp(6)
+  updated_date         DateTime @default(now()) @db.Timestamp(6)
+  year                 Int
+  uit_amount           Decimal  @db.Decimal(18, 2)
+  annual_deduction_uit Decimal? @default(7) @db.Decimal(18, 2)
+  tax_brackets         Json?
+  is_active            Boolean? @default(true)
+  notes                String?
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ventavacaciones {
+  id                     String    @id @db.VarChar(255)
+  created_date           DateTime  @default(now()) @db.Timestamp(6)
+  updated_date           DateTime  @default(now()) @db.Timestamp(6)
+  employee_id            String
+  vacation_period_origin String?
+  days_sold              Decimal   @db.Decimal(18, 2)
+  amount                 Decimal   @db.Decimal(18, 2)
+  sale_date              DateTime  @db.Date
+  payment_period_month   Int?
+  payment_period_year    Int?
+  payroll_type           String?   @default("Mensual")
+  status                 String?   @default("Pendiente")
+  approved_by            String?
+  approved_date          DateTime? @db.Timestamptz(6)
+  payment_reference      String?
+  applied_to_payslip_id  String?
+  applied_date           DateTime? @db.Timestamptz(6)
+  reverted_by            String?
+  reverted_date          DateTime? @db.Timestamptz(6)
+  revert_reason          String?
+  rejected_by            String?
+  rejected_date          DateTime? @db.Timestamptz(6)
+  rejection_reason       String?
+  reason                 String?
+  notes                  String?
+  created_by             String?
+
+  @@index([employee_id], map: "ventavacaciones_employee_idx")
+}

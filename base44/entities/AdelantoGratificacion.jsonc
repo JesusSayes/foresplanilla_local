@@ -1,0 +1,173 @@
+{
+  "name": "AdelantoGratificacion",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Monto del adelanto de gratificaci\u00f3n (en soles)"
+    },
+    "advance_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha en que se otorg\u00f3 el adelanto"
+    },
+    "gratification_period": {
+      "type": "string",
+      "enum": [
+        "Julio",
+        "Diciembre"
+      ],
+      "description": "Per\u00edodo de gratificaci\u00f3n al que corresponde el adelanto (Julio o Diciembre)"
+    },
+    "gratification_year": {
+      "type": "integer",
+      "description": "A\u00f1o de la gratificaci\u00f3n de destino"
+    },
+    "apply_to_gratification": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si es true, el adelanto se descontar\u00e1 de la gratificaci\u00f3n correspondiente al calcularse. Si es false, el adelanto queda registrado solo como pago anticipado controlado, sin descuento autom\u00e1tico de la gratificaci\u00f3n."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pendiente",
+        "Aprobado",
+        "Aplicado",
+        "Pagado",
+        "Revertido"
+      ],
+      "default": "Pendiente",
+      "description": "Estado del adelanto: Pendiente (registrado, en revisi\u00f3n), Aprobado (autorizado para aplicar), Aplicado (descontado de la gratificaci\u00f3n), Pagado (pago realizado sin descuento de gratificaci\u00f3n), Revertido (anulado)"
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Email del usuario que aprob\u00f3 el adelanto"
+    },
+    "approved_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de aprobaci\u00f3n"
+    },
+    "payment_reference": {
+      "type": "string",
+      "description": "Referencia del pago realizado (n\u00famero de transferencia, recibo, etc.)"
+    },
+    "payment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha en que se realiz\u00f3 el pago del adelanto"
+    },
+    "applied_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Monto ya descontado/aplicado de la gratificaci\u00f3n (para pagos parciales)"
+    },
+    "remaining_balance": {
+      "type": "number",
+      "default": 0,
+      "description": "Saldo pendiente por descontar (amount - applied_amount)"
+    },
+    "applied_to_payslip_id": {
+      "type": "string",
+      "description": "ID de la boleta de gratificaci\u00f3n donde se aplic\u00f3 el descuento"
+    },
+    "reverted_by": {
+      "type": "string",
+      "description": "Email del usuario que revirti\u00f3 el adelanto"
+    },
+    "reverted_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de reversi\u00f3n"
+    },
+    "revert_reason": {
+      "type": "string",
+      "description": "Motivo de la reversi\u00f3n"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Motivo del adelanto"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Email del usuario que registr\u00f3 el adelanto"
+    }
+  },
+  "required": [
+    "employee_id",
+    "amount",
+    "advance_date",
+    "gratification_period",
+    "gratification_year"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_create_payroll": true
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_view_all_payroll": true
+          }
+        },
+        {
+          "data.employee_id": "{{user.data.employee_id}}"
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_edit_payroll": true
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_delete_payroll": true
+          }
+        }
+      ]
+    }
+  }
+}

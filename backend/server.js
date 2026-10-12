@@ -1,3 +1,4 @@
+import payrollSupplementsRoutes from './routes/payroll/supplements.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import path from 'path';
@@ -163,6 +164,7 @@ app.use('/api/payroll/loan-types', loanTypesRoutes);
 app.use('/api/payroll/loans', loansRoutes);
 app.use('/api/payroll/loan-installments', loanInstallmentsRoutes);
 app.use('/api/payroll/config', payrollConfigRoutes);
+app.use('/api/payroll/supplements', payrollSupplementsRoutes);
 app.use('/api/certificates', certificatesRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/notification-preferences', notificationPreferencesRoutes);
