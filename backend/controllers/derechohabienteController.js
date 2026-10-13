@@ -198,10 +198,8 @@ export const filter = async (req, res) => {
     if (filters.is_active !== undefined) {
       where.is_active = filters.is_active
     }
-    Object.assign(where, employeeScopeWhere(req))
-
     const derechohabientes = await prisma.derechohabiente.findMany({
-      where,
+      where: { AND: [where, employeeScopeWhere(req)] },
       orderBy: {
         [field]: desc ? 'desc' : 'asc'
       }
