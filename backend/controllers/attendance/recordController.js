@@ -1,4 +1,5 @@
 import { attendanceDateFilter } from '../../utils/attendanceDateFilter.js';
+import { editedAttendanceTardiness } from '../../services/editedAttendanceTardiness.js';
 import { normalizeVacationAttendance, isVacationAttendance, hasApprovedVacation } from "../../services/vacationAttendance.js";
 import prisma from "../../config/prisma.js";
 
@@ -147,6 +148,7 @@ export const update = async (req, res) => {
       await hasApprovedVacation(prisma, data.employee_id || existing.employee_id, data.date || existing.date))) {
       return res.status(409).json({ error: 'No se pueden autorizar horas extras durante vacaciones aprobadas' });
     }
+    Object.assign(data, await editedAttendanceTardiness(prisma, existing, data));
     Object.assign(data, await normalizeVacationAttendance(prisma, { ...existing, ...data }));
     const changedFields = changedAutoCalculatedFields(existing, data);
     if (changedFields.length > 0) {

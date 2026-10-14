@@ -1,4 +1,5 @@
 import { syncOvertimeAlert } from "../../services/overtimeAlertSync.js";
+import { editedAttendanceTardiness } from "../../services/editedAttendanceTardiness.js";
 import prisma from "../../config/prisma.js";
 import { canAccessEmployee, hasPermission } from "../../middleware/authorization.js";
 import { calcularAsistenciaDesdeLogs } from "../../scripts/calcularAsistenciaDesdeLogs.js";
@@ -208,9 +209,11 @@ export const approve = async (req, res) => {
 
       const requestedValues = normalizeRequestedValues(request.requested_values);
       validateDistinctSegmentTimes(requestedValues, record);
+      const tardiness = await editedAttendanceTardiness(tx, record, requestedValues);
       const protectedFields = [...new Set([
         ...(Array.isArray(record.manually_protected_fields) ? record.manually_protected_fields : []),
         ...Object.keys(requestedValues),
+        ...Object.keys(tardiness),
       ])];
       const now = new Date();
 
@@ -218,6 +221,7 @@ export const approve = async (req, res) => {
         where: { id: record.id },
         data: {
           ...requestedValues,
+          ...tardiness,
           manually_protected_fields: protectedFields,
           last_approved_edit_id: request.id,
           manually_modified_by_id: reviewer.id,
