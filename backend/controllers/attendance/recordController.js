@@ -1,5 +1,5 @@
 import { attendanceDateFilter } from '../../utils/attendanceDateFilter.js';
-import { normalizeVacationAttendance } from "../../services/vacationAttendance.js";
+import { normalizeVacationAttendance, isVacationAttendance, hasApprovedVacation } from "../../services/vacationAttendance.js";
 import prisma from "../../config/prisma.js";
 
 import crypto from 'crypto';
@@ -65,6 +65,9 @@ export const create = async (req, res) => {
     if (!employee) return res.status(404).json({ error: 'Empleado no encontrado' });
     if (!isEmploymentDateValid(employee, data.date)) {
       return res.status(409).json({ error: 'No se puede crear asistencia fuera del período laboral del empleado' });
+    }
+    if (data.overtime_authorized === true && (isVacationAttendance(data) || await hasApprovedVacation(prisma, data.employee_id, data.date))) {
+      return res.status(409).json({ error: 'No se pueden autorizar horas extras durante vacaciones aprobadas' });
     }
     Object.assign(data, await normalizeVacationAttendance(prisma, data));
     const now = new Date();
@@ -140,6 +143,10 @@ export const update = async (req, res) => {
       delete data.date;
     }
 
+    if (data.overtime_authorized === true && (isVacationAttendance(existing) || isVacationAttendance(data) ||
+      await hasApprovedVacation(prisma, data.employee_id || existing.employee_id, data.date || existing.date))) {
+      return res.status(409).json({ error: 'No se pueden autorizar horas extras durante vacaciones aprobadas' });
+    }
     Object.assign(data, await normalizeVacationAttendance(prisma, { ...existing, ...data }));
     const changedFields = changedAutoCalculatedFields(existing, data);
     if (changedFields.length > 0) {

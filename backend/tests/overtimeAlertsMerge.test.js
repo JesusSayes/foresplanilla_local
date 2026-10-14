@@ -5,7 +5,7 @@ import { transformSync } from 'esbuild';
 
 const source = readFileSync(new URL('../../src/components/attendance/OvertimeAlertsTab.jsx', import.meta.url), 'utf8');
 const code = transformSync(source, { loader: 'jsx', format: 'cjs' }).code;
-function render({ canEditAttendance = true, failLoad = false, selected = false, canReviewApproved = false, failRecalculate = false, failUpdate = false } = {}) {
+function render({ canEditAttendance = true, failLoad = false, selected = false, canReviewApproved = false, failRecalculate = false, failUpdate = false, approvedVacations = [] } = {}) {
   const calls = [];
   const react = {
     createElement: (type, props, ...children) => ({ type, props: { ...props, children } }),
@@ -38,7 +38,7 @@ function render({ canEditAttendance = true, failLoad = false, selected = false, 
     overtimeAlerts: [{ id: 'a1', employee_id: 'e1', attendance_record_id: 'r1', alert_date: '2026-10-01', overtime_hours: '2.83', status: 'Pendiente' }],
     allEmployees: [{ id: 'e1', first_name: 'Ana', last_name: 'Pérez' }], todayRecords: [],
     accessibleEmployeeIds: new Set(['e1']), getEmployeeScheduleForDate: () => null,
-    currentUser: { email: 'reviewer@example.test' }, canEditAttendance, canReviewApproved,
+    currentUser: { email: 'reviewer@example.test' }, canEditAttendance, canReviewApproved, approvedVacations,
     onEditRecord: record => calls.push(['edit', record.id]),
   });
   const buttons = [];
@@ -141,4 +141,17 @@ test('fallo de recálculo refresca asistencias guardadas sin anunciar éxito', a
   assert.ok(calls.some(([kind, data]) => kind === 'invalidate' && data.queryKey[0] === 'allAttendanceRecords'));
   assert.ok(calls.some(([kind]) => kind === 'error'));
   assert.ok(!calls.some(([kind]) => kind === 'success'));
+});
+
+test('vacaciones con fechas ISO bloquean autorización individual, masiva y revisión', async () => {
+  const approvedVacations = [{ employee_id: 'e1', start_date: '2026-10-01T00:00:00.000Z', end_date: '2026-10-02T00:00:00.000Z' }];
+  const single = render({ approvedVacations });
+  assert.equal(single.buttons.length, 2); // Corregir y descartar, sin aceptar HE.
+  const bulk = render({ approvedVacations, selected: true });
+  await bulk.bulk.props.onAceptarHE();
+  assert.ok(bulk.calls.some(([kind, message]) => kind === 'warning' && message.includes('bloqueada')));
+  assert.ok(!bulk.calls.some(([kind]) => ['record', 'alert', 'recalculate'].includes(kind)));
+  const review = render({ approvedVacations, canReviewApproved: true });
+  await review.buttons[0].props.onClick();
+  assert.ok(!review.calls.some(([kind]) => ['record', 'alert', 'recalculate'].includes(kind)));
 });

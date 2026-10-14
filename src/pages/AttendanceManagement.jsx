@@ -260,22 +260,24 @@ export default function AttendanceManagement() {
   const canCompensateTardiness = enableTardinessCompensation && (hasPermission("attendance.manage") || hasPermission("system.admin"));
 
   // Vacaciones aprobadas que cubren la(s) fecha(s) seleccionada(s)
-  const { data: approvedVacations = [] } = useQuery({
+  const { data: allApprovedVacations = [] } = useQuery({
     queryKey: ["approvedVacations", dateToStringLima(selectedDate), isRangeMode, dateFrom, dateTo],
     queryFn: async () => {
       const all = await entitiesAPI.VacationRequest.list("-start_date", 500);
-      const approvedOnly = all.filter(v => ["Aprobada", "Aprobado"].includes(v.status));
+      return all.filter(v => ["Aprobada", "Aprobado"].includes(v.status) && v.request_type === "Vacaciones");
+    },
+  });
+  const approvedVacations = (() => {
 
       if (isRangeMode && dateFrom && dateTo) {
         const fromStr = dateToStringLima(dateFrom);
         const toStr = dateToStringLima(dateTo);
-        return approvedOnly.filter(v => String(v.start_date).slice(0, 10) <= toStr && String(v.end_date).slice(0, 10) >= fromStr);
+        return allApprovedVacations.filter(v => String(v.start_date).slice(0, 10) <= toStr && String(v.end_date).slice(0, 10) >= fromStr);
       }
 
       const dateStr = dateToStringLima(selectedDate);
-      return approvedOnly.filter(v => String(v.start_date).slice(0, 10) <= dateStr && String(v.end_date).slice(0, 10) >= dateStr);
-    },
-  });
+      return allApprovedVacations.filter(v => String(v.start_date).slice(0, 10) <= dateStr && String(v.end_date).slice(0, 10) >= dateStr);
+  })();
 
   useEffect(() => {
     const generateExemptClockings = async () => {
@@ -1998,6 +2000,7 @@ export default function AttendanceManagement() {
                 onEditRecord={handleEditRecord}
                 canEditAttendance={canEditAttendance}
                 canReviewApproved={hasPermission("system.admin")}
+                approvedVacations={allApprovedVacations}
               />
             </TabsContent>
 

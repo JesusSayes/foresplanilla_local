@@ -5,6 +5,17 @@ const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 
 export const isVacationAttendance = record => record.status === 'Vacaciones' ||
   (record.status === 'Justificado' && /^Vacaciones aprobadas/.test(record.notes || ''));
 
+export async function hasApprovedVacation(db, employeeId, date) {
+  const day = new Date(`${toDateString(date)}T00:00:00.000Z`);
+  return Boolean(await db.vacation_request.findFirst({ where: {
+    employee_id: employeeId,
+    request_type: 'Vacaciones',
+    status: { in: ['Aprobada', 'Aprobado'] },
+    start_date: { lte: day },
+    end_date: { gte: day },
+  }, select: { id: true } }));
+}
+
 export function vacationAttendanceData(record, employee, schedules, holidays) {
   const date = toDateString(record.date);
   const schedule = getScheduleForDate(record.employee_id, employee?.department_name, schedules, date);

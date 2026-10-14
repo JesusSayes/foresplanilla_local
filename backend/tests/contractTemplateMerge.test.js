@@ -124,7 +124,10 @@ test('autorizar HE guarda estado y resolución en una transacción sin campos nu
   const { update } = await import('../controllers/attendance/overtimeAlertController.js');
   const original = prisma.overtime_alert.findUnique;
   t.after(() => { prisma.overtime_alert.findUnique = original; });
-  prisma.overtime_alert.findUnique = async () => ({ id: 'alert1', employee_id: 'emp1' });
+  prisma.overtime_alert.findUnique = async () => ({ id: 'alert1', employee_id: 'emp1', alert_date: new Date('2026-09-11') });
+  const previousVacation = prisma.vacation_request;
+  prisma.vacation_request = { findFirst: async () => null };
+  t.after(() => { prisma.vacation_request = previousVacation; });
   let saved = false;
   t.mock.method(prisma, '$transaction', async callback => callback({
     overtime_alert: { update: async ({ data }) => {
