@@ -64,6 +64,8 @@ export const create = async (req, res) => {
         document_number: data.document_number,
         first_name: data.first_name,
         last_name: data.last_name,
+        last_name_paterno: data.last_name_paterno,
+        last_name_materno: data.last_name_materno,
         gender: data.gender,
         relationship: data.relationship,
         is_active: data.is_active,
@@ -111,17 +113,19 @@ export const update = async (req, res) => {
         document_number: data.document_number,
         first_name: data.first_name,
         last_name: data.last_name,
+        last_name_paterno: data.last_name_paterno,
+        last_name_materno: data.last_name_materno,
         gender: data.gender,
         relationship: data.relationship,
         is_active: data.is_active,
         is_studying: data.is_studying,
         study_proof_url: data.study_proof_url,
 
-        birth_date: data.birth_date
+        birth_date: data.birth_date === undefined ? undefined : data.birth_date
           ? new Date(data.birth_date)
           : null,
 
-        registration_date: data.registration_date
+        registration_date: data.registration_date === undefined ? undefined : data.registration_date
           ? new Date(data.registration_date)
           : null,
 

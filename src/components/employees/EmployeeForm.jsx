@@ -151,6 +151,24 @@ export default function EmployeeForm({
     ? allContracts.find(c => c.employee_id === editingEmployee.id && c.status === "Vigente")
     : null;
 
+  // Prepara los datos de un derechohabiente existente para editar:
+  // - Si no tiene last_name_paterno/materno, usa last_name completo como paterno
+  //   (sin dividir arbitrariamente apellidos compuestos)
+  // - Normaliza birth_date a YYYY-MM-DD sin desplazar el día por timezone
+  // - Preserva género ausente (no reemplaza por "M")
+  const prepareDhForEdit = (dh) => {
+    const data = { ...dh };
+    // Normalizar fecha: extraer solo YYYY-MM-DD de cualquier formato ISO
+    if (data.birth_date && data.birth_date.length > 10) {
+      data.birth_date = data.birth_date.slice(0, 10);
+    }
+    // Si no tiene apellidos separados pero tiene last_name, usarlo como paterno
+    if (!data.last_name_paterno && !data.last_name_materno && data.last_name) {
+      data.last_name_paterno = data.last_name;
+    }
+    return data;
+  };
+
   const handleSaveDH = async () => {
     if (!dhFormData.document_number || !dhFormData.first_name || !dhFormData.birth_date || !dhFormData.relationship) {
       toast.error("Complete los campos obligatorios: Documento, Nombres, Fecha Nacimiento y Relación");
@@ -160,7 +178,9 @@ export default function EmployeeForm({
     try {
       // Construir apellidos completos si se ingresaron por separado
       const fullLastName = [dhFormData.last_name_paterno, dhFormData.last_name_materno].filter(Boolean).join(" ") || dhFormData.last_name || "";
+      // Conservar explícitamente la ausencia de género.
       const payload = { ...dhFormData, last_name: fullLastName };
+      if (!dhFormData.gender) payload.gender = null;
       if (editingDH) {
         await onDerechohabienteEdit(editingDH.id, payload);
       } else {
@@ -169,6 +189,8 @@ export default function EmployeeForm({
       setShowDerechohabienteForm(false);
       setEditingDH(null);
       setDhFormData({});
+    } catch {
+      // La mutación muestra el error; conservar el formulario para corregir o reintentar.
     } finally {
       setSavingDH(false);
     }
@@ -249,11 +271,23 @@ export default function EmployeeForm({
                     <div>
                       <Label>Número de Documento <span className="text-red-600">*</span></Label>
                       <div className="flex gap-2">
-                        <Input
-                          value={formData.document_number}
-                          onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setFormData({ ...formData, document_number: v.slice(0, formData.document_type === 'DNI' ? 8 : 20) }); }}
-                          className={!formData.document_number ? "border-red-300 flex-1" : "flex-1"}
-                        />
+                      <Input
+                        value={formData.document_number || ""}
+                        onChange={(e) => {
+                          const docType = formData.document_type;
+                          let v = e.target.value;
+                          // DNI: solo dígitos, máx 8. CE/Pasaporte: alfanumérico, preserva ceros iniciales
+                          if (docType === "DNI") {
+                            v = v.replace(/\D/g, "").slice(0, 8);
+                          } else if (docType === "CE") {
+                            v = v.replace(/[^A-Za-z0-9]/g, "").slice(0, 12);
+                          } else {
+                            v = v.replace(/[^A-Za-z0-9]/g, "").slice(0, 20);
+                          }
+                          setFormData({ ...formData, document_number: v });
+                        }}
+                        className={!formData.document_number ? "border-red-300 flex-1" : "flex-1"}
+                      />
                         {formData.document_type === "DNI" && (
                           <Button
                             type="button"
@@ -803,7 +837,7 @@ export default function EmployeeForm({
                               })()}
                             </div>
                             <div className="flex gap-2">
-                              <Button size="sm" variant="outline" onClick={() => { setDhFormData(dh); setEditingDH(dh); setShowDerechohabienteForm(true); }}><Edit className="w-4 h-4" /></Button>
+                              <Button size="sm" variant="outline" onClick={() => { setDhFormData(prepareDhForEdit(dh)); setEditingDH(dh); setShowDerechohabienteForm(true); }}><Edit className="w-4 h-4" /></Button>
                               <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if(confirm("¿Eliminar?")) onDerechohabienteDelete(dh.id); }}><Trash2 className="w-4 h-4" /></Button>
                             </div>
                           </div>
@@ -856,9 +890,13 @@ export default function EmployeeForm({
                               <div><Label>Apellido Materno</Label><Input value={dhFormData.last_name_materno || ""} onChange={(e) => setDhFormData({...dhFormData, last_name_materno: e.target.value})} /></div>
                               <div>
                                 <Label>Género</Label>
-                                <Select value={dhFormData.gender || "M"} onValueChange={(v) => setDhFormData({...dhFormData, gender: v})}>
-                                  <SelectTrigger><SelectValue /></SelectTrigger>
-                                  <SelectContent><SelectItem value="M">Masculino</SelectItem><SelectItem value="F">Femenino</SelectItem></SelectContent>
+                                <Select value={dhFormData.gender || "unspecified"} onValueChange={(v) => setDhFormData({...dhFormData, gender: v === "unspecified" ? null : v})}>
+                                  <SelectTrigger><SelectValue placeholder="Sin especificar" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="unspecified">Sin especificar</SelectItem>
+                                    <SelectItem value="M">Masculino</SelectItem>
+                                    <SelectItem value="F">Femenino</SelectItem>
+                                  </SelectContent>
                                 </Select>
                               </div>
                             </div>

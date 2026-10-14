@@ -1,6 +1,7 @@
 import { attendanceDateFilter } from '../../utils/attendanceDateFilter.js';
 import { syncOvertimeAlert } from '../../services/overtimeAlertSync.js';
 import { toDateString } from '../../utils/employmentDate.js';
+import { hasApprovedVacation } from '../../services/vacationAttendance.js';
 import prisma from "../../config/prisma.js";
 
 import { generate24HexId } from '../../utils/idGenerator.js'
@@ -56,6 +57,9 @@ export const create = async (req, res) => {
     const userEmail = req.user?.email || 'system';
     const { alert_date, ...data } = req.body
     if (!canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' })
+    if (data.status === 'Autorizado' && await hasApprovedVacation(prisma, data.employee_id, alert_date)) {
+      return res.status(409).json({ error: 'No se pueden autorizar horas extras durante vacaciones aprobadas' })
+    }
 
     const alert = await prisma.overtime_alert.create({
       data: {
@@ -93,6 +97,10 @@ export const update = async (req, res) => {
       return res.status(400).json({ error: 'Fecha de resolución no válida' })
     }
     if (data.employee_id && !canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' })
+    if ((data.status || existing.status) === 'Autorizado' &&
+      await hasApprovedVacation(prisma, data.employee_id || existing.employee_id, data.alert_date || existing.alert_date)) {
+      return res.status(409).json({ error: 'No se pueden autorizar horas extras durante vacaciones aprobadas' })
+    }
 
     const alert = await prisma.$transaction(async tx => {
       const updated = await tx.overtime_alert.update({

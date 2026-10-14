@@ -291,7 +291,7 @@ export default function EmployeeManagement() {
       return await entitiesAPI.Derechohabiente.create(data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["derechohabientes"]);
+      queryClient.invalidateQueries({ queryKey: ["derechohabientes"] });
       toast.success("Derechohabiente agregado");
       setShowDerechohabienteForm(false);
       setDerechohabienteFormData({});
@@ -307,7 +307,7 @@ export default function EmployeeManagement() {
       return await entitiesAPI.Derechohabiente.update(id, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["derechohabientes"]);
+      queryClient.invalidateQueries({ queryKey: ["derechohabientes"] });
       toast.success("Derechohabiente actualizado");
       setShowDerechohabienteForm(false);
       setEditingDerechohabiente(null);
@@ -324,7 +324,7 @@ export default function EmployeeManagement() {
       return await entitiesAPI.Derechohabiente.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["derechohabientes"]);
+      queryClient.invalidateQueries({ queryKey: ["derechohabientes"] });
       toast.success("Derechohabiente eliminado");
     },
     onError: (error) => {
@@ -566,6 +566,9 @@ export default function EmployeeManagement() {
 
     if (formData.document_type === 'DNI' && formData.document_number && formData.document_number.length !== 8) {
       errors.push("El DNI debe tener exactamente 8 dígitos");
+    }
+    if (formData.document_type === 'CE' && formData.document_number && formData.document_number.length > 12) {
+      errors.push("El Carné de Extranjería debe tener máximo 12 caracteres");
     }
 
     // Validar documento duplicado
@@ -999,8 +1002,8 @@ export default function EmployeeManagement() {
           derechohabientes={derechohabientes}
           showFinancials={canViewFinancials()}
           areaUnidadCargos={areaUnidadCargos}
-          onDerechohabienteAdd={(data) => createDerechohabienteMutation.mutate(data)}
-          onDerechohabienteEdit={(id, data) => updateDerechohabienteMutation.mutate({ id, data })}
+          onDerechohabienteAdd={(data) => createDerechohabienteMutation.mutateAsync(data)}
+          onDerechohabienteEdit={(id, data) => updateDerechohabienteMutation.mutateAsync({ id, data })}
           onDerechohabienteDelete={(id) => deleteDerechohabienteMutation.mutate(id)}
         />
       )}
@@ -1011,7 +1014,7 @@ export default function EmployeeManagement() {
           employees={allEmployees}
           onClose={() => setShowImportDH(false)}
           onSuccess={() => {
-            queryClient.invalidateQueries(["derechohabientes"]);
+            queryClient.invalidateQueries({ queryKey: ["derechohabientes"] });
           }}
         />
       )}

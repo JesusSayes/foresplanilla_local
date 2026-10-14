@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Clock, Edit, CheckCircle, XCircle, Search, Layers, RefreshCw } from "lucide-react";
+import { Clock, Edit, CheckCircle, XCircle, Search, Layers, RefreshCw, Palmtree } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima, todayLima } from "@/lib/dateUtils";
@@ -42,7 +42,16 @@ export default function OvertimeAlertsTab({
   onEditRecord,
   canEditAttendance = false,
   canReviewApproved = false,
+  approvedVacations = [],
 }) {
+  // Verifica si una fecha está cubierta por vacaciones aprobadas del empleado
+  const isDateOnVacation = (employeeId, dateStr) => {
+    return approvedVacations.some(v =>
+      v.employee_id === employeeId &&
+      String(v.start_date).slice(0, 10) <= String(dateStr).slice(0, 10) &&
+      String(v.end_date).slice(0, 10) >= String(dateStr).slice(0, 10)
+    );
+  };
   const queryClient = useQueryClient();
   const [subTab, setSubTab] = useState("pendientes");
   const [searchTerm, setSearchTerm] = useState("");
@@ -139,6 +148,15 @@ export default function OvertimeAlertsTab({
 
   const handleAcceptHE = async (alert, record, silent = false) => {
     if (!canEditAttendance) return;
+    // Bloquear autorización si la fecha está cubierta por vacaciones aprobadas
+    if (isDateOnVacation(alert.employee_id, alert.alert_date)) {
+      const emp = allEmployees.find(e => e.id === alert.employee_id);
+      const empName = emp ? `${emp.first_name} ${emp.last_name}` : "Empleado";
+      const msg = `No se pueden autorizar horas extras para ${empName} el ${alert.alert_date}: la fecha está cubierta por vacaciones aprobadas.`;
+      if (silent) throw new Error(msg);
+      toast.error(msg);
+      return;
+    }
     try {
       record = record || await entitiesAPI.AttendanceRecord.get(alert.attendance_record_id);
       if (record) {
@@ -199,7 +217,13 @@ export default function OvertimeAlertsTab({
     setBulkProcessing(true);
     let ok = 0;
     let fail = 0;
+    let blocked = 0;
     for (const alert of selected) {
+      // Validar vacaciones antes de procesar
+      if (isDateOnVacation(alert.employee_id, alert.alert_date)) {
+        blocked++;
+        continue;
+      }
       try {
         const record = todayRecords.find((r) => r.id === alert.attendance_record_id);
         await handleAcceptHE(alert, record, true);
@@ -217,8 +241,14 @@ export default function OvertimeAlertsTab({
     queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
     queryClient.invalidateQueries({ queryKey: ["compensationPrevMonthRecords"] });
     queryClient.invalidateQueries({ queryKey: ["allAttendanceRecords"] });
-    if (fail > 0) toast.warning(`${ok} aprobadas, ${fail} con error`);
-    else toast.success(`${ok} alerta(s) aprobada(s) correctamente`);
+    if (blocked > 0 && fail > 0)
+      toast.warning(`${ok} aprobadas, ${blocked} bloqueadas por vacaciones, ${fail} con error`);
+    else if (blocked > 0)
+      toast.warning(`${ok} aprobadas, ${blocked} bloqueada(s) por vacaciones aprobadas`);
+    else if (fail > 0)
+      toast.warning(`${ok} aprobadas, ${fail} con error`);
+    else
+      toast.success(`${ok} alerta(s) aprobada(s) correctamente`);
   };
 
   const bulkDescartar = async () => {
@@ -291,6 +321,10 @@ export default function OvertimeAlertsTab({
       let failCount = 0;
 
       for (const alert of byRecord.values()) {
+        // Skip records on vacation — cannot authorize HE for vacation dates
+        if (isDateOnVacation(alert.employee_id, alert.alert_date)) {
+          continue;
+        }
         // Ensure overtime_authorized is true (idempotent — no notes appended
         // to avoid duplication on repeated reviews).
         try {
@@ -483,10 +517,14 @@ export default function OvertimeAlertsTab({
               className="ml-auto bg-indigo-600 hover:bg-indigo-700 text-white"
               disabled={selectedCount === 0 || bulkProcessing}
               onClick={() => setShowBulkModal(true)}
+              title={selectedCount === 0 ? "Seleccione al menos una alerta para ejecutar acciones masivas" : ""}
             >
               <Layers className="w-4 h-4 mr-1.5" />
               Ejecución masiva
             </Button>
+            {selectedCount === 0 && !bulkProcessing && (
+              <span className="text-xs text-slate-400 ml-2">Seleccione alertas para habilitar</span>
+            )}
             {selectedCount > 0 && (
               <Button
                 size="sm"
@@ -519,6 +557,7 @@ export default function OvertimeAlertsTab({
               const isProcessed = subTab === "procesadas";
               const isAuthorized = alert.status === "Autorizado";
               const isSelected = selectedAlertIds.has(alert.id);
+              const isOnVacation = !isProcessed && isDateOnVacation(alert.employee_id, alert.alert_date);
 
               return (
                 <div
@@ -528,7 +567,9 @@ export default function OvertimeAlertsTab({
                       ? isAuthorized
                         ? "border-green-200 bg-green-50/50"
                         : "border-slate-200 bg-slate-50/50"
-                      : isSelected
+                      : isOnVacation
+                        ? "border-amber-300 bg-amber-50/50"
+                        : isSelected
                         ? "border-indigo-300 bg-indigo-50/60"
                         : "border-red-200 bg-red-50/50"
                   }`}
@@ -538,7 +579,7 @@ export default function OvertimeAlertsTab({
                     <Checkbox
                       checked={isSelected}
                       onCheckedChange={() => toggleOne(alert.id)}
-                      disabled={bulkProcessing}
+                      disabled={bulkProcessing || isOnVacation}
                     />
                   )}
 
@@ -624,6 +665,12 @@ export default function OvertimeAlertsTab({
                         >
                           <Edit className="w-3.5 h-3.5 mr-1" />Corregir
                         </Button>
+                        {isOnVacation ? (
+                          <Badge className="bg-amber-100 text-amber-700 border border-amber-300" title="La fecha está cubierta por vacaciones aprobadas">
+                            <Palmtree className="w-3 h-3 mr-1" />
+                            En vacaciones
+                          </Badge>
+                        ) : (
                         <Button
                           size="sm"
                           variant="outline"
@@ -633,6 +680,7 @@ export default function OvertimeAlertsTab({
                           <CheckCircle className="w-3.5 h-3.5 mr-1" />
                           {alert.overtime_hours < 0 ? "Autorizar" : "Aceptar HE"}
                         </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
