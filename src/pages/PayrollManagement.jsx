@@ -43,6 +43,7 @@ import {
   getAfpBreakdown,
   getOvertimePaySplit,
 } from "@/lib/payrollExcelHelpers";
+import { applyQuintaRetentionToResult } from "@/lib/quintaCategoriaPayroll";
 
 // Rate limiter global + retry con backoff exponencial para errores de rate-limit
 // Garantiza un gap mínimo entre TODAS las llamadas API y reintenta en caso de 429
@@ -303,6 +304,21 @@ export default function PayrollManagement() {
   });
   const { data: manualOvertimeRecords = [] } = manualOvertimeQuery;
 
+  // Retenciones de Quinta Categoría aprobadas/aplicadas del ejercicio.
+  // Se consultan con datos frescos al calcular la planilla para incorporar el
+  // importe vigente como descuento (income_tax) en la boleta del empleado.
+  const quintaCategoriaQuery = useQuery({
+    queryKey: ["quintaCategoriaCalculos", selectedYear],
+    queryFn: async () => {
+      return await withRetry(() => base44.entities.QuintaCategoriaCalculo.filter({
+        year: selectedYear,
+        status: { $in: ["Aprobada", "Aplicada"] },
+      }));
+    },
+    staleTime: 0,
+  });
+  const { data: quintaCategoriaCalculos = [] } = quintaCategoriaQuery;
+
   // Bandera combinada de carga/errores de los datos críticos para el cálculo de planilla.
   // Diferencia una consulta pendiente (payrollDataLoading=true) de un resultado válido vacío.
   const payrollDataLoading =
@@ -313,7 +329,8 @@ export default function PayrollManagement() {
     rmvQuery.isPending ||
     afpsQuery.isPending ||
     payrollConfigQuery.isPending ||
-    vacationsQuery.isPending;
+    vacationsQuery.isPending ||
+    quintaCategoriaQuery.isPending;
 
   const payrollDataError =
     employeesQuery.isError ||
@@ -489,11 +506,13 @@ export default function PayrollManagement() {
         ["payslips", selectedMonth, selectedYear],
         ["approvedVacations"],
         ["manualOvertime", selectedMonth, selectedYear, payrollType],
+        ["quintaCategoriaCalculos", selectedYear],
       ];
       await Promise.all(criticalKeys.map(key => queryClient.refetchQueries({ queryKey: key, exact: true })));
 
-      // Si alguna consulta crítica falló, cancelar el proceso sin crear boletas
-      const failedKey = criticalKeys.find(key => queryClient.getQueryState(key)?.status === "error");
+      // Si alguna consulta crítica falló, cancelar el proceso sin crear boletas.
+      // La consulta de Quinta Categoría es no bloqueante: si falla, no se aplica retención.
+      const failedKey = criticalKeys.find(key => key[0] !== "quintaCategoriaCalculos" && queryClient.getQueryState(key)?.status === "error");
       if (failedKey) {
         toast.error("Error al cargar datos de planilla. Reintente en unos segundos.");
         return;
@@ -509,6 +528,7 @@ export default function PayrollManagement() {
       const existingPayslips = queryClient.getQueryData(["payslips", selectedMonth, selectedYear]) ?? [];
       const approvedVacations = queryClient.getQueryData(["approvedVacations"]) ?? [];
       const manualOvertimeRecords = queryClient.getQueryData(["manualOvertime", selectedMonth, selectedYear, payrollType]) ?? [];
+      const quintaCategoriaCalculos = queryClient.getQueryData(["quintaCategoriaCalculos", selectedYear]) ?? [];
 
       const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
     
@@ -986,24 +1006,30 @@ export default function PayrollManagement() {
         }
       }
 
-      // Ajustar totales con descuentos adicionales — sanitizar cada término
-      const adjustedDeductions = roundMoney(
-        safePayrollNumber(result.totals.totalDeductions) + tardinessDiscount + absenceDiscount + advanceDeduction
-      );
-      const adjustedNetPay = roundMoney(safePayrollNumber(result.totals.totalIncome) - adjustedDeductions);
-
       // Extraer montos específicos del calculador para los campos dedicados de la boleta.
-      // AFP/ONP se itemiza (aporte obligatorio, prima de seguro, comisión, u ONP) y todos
-      // los ítems llevan concept_category === "AFP/ONP" (cálculo centralizado o sobrescritura manual).
       const pensionDeductionAmount = roundMoney(
         result.deductions
           .filter(d => d.concept_category === "AFP/ONP")
           .reduce((sum, d) => sum + safePayrollNumber(d.calculated_amount), 0)
       );
-      const incomeTaxAmount = safePayrollNumber(result.deductions.find(d => d.concept_name.includes("Renta"))?.calculated_amount);
+      // ── Retención de Quinta Categoría ──
+      // La retención vigente del módulo reemplaza al descuento de renta basado en conceptos.
+      const quintaResult = applyQuintaRetentionToResult(
+        result, quintaCategoriaCalculos, emp.id, selectedMonth, selectedYear, payrollType
+      );
+      const incomeTaxAmount = quintaResult.finalIncomeTax;
+      // Ajustar totales con descuentos adicionales — sanitizar cada término
+      const adjustedDeductions = roundMoney(
+        safePayrollNumber(result.totals.totalDeductions) + tardinessDiscount + absenceDiscount + advanceDeduction + quintaResult.adjustment
+      );
+      const adjustedNetPay = roundMoney(safePayrollNumber(result.totals.totalIncome) - adjustedDeductions);
+      if (quintaResult.retention > 0 && result.summary?.result) {
+        result.summary.result.totalDeductions = adjustedDeductions;
+        result.summary.result.netPay = adjustedNetPay;
+      }
       // other_deductions: descuentos del calculador que NO están en campos dedicados (AFP/ONP, Renta)
       const otherDeductionsFromCalc = roundMoney(
-        safePayrollNumber(result.totals.totalDeductions) - pensionDeductionAmount - incomeTaxAmount
+        safePayrollNumber(result.totals.totalDeductions) - pensionDeductionAmount - quintaResult.conceptIncomeTax
       );
 
       const rawPayslip = {
