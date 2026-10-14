@@ -1933,6 +1933,7 @@ export default function AttendanceManagement() {
                 currentUser={currentUser}
                 onEditRecord={handleEditRecord}
                 canReviewApproved={hasPermission("system.admin")}
+                approvedVacations={approvedVacations}
               />
             </TabsContent>
 

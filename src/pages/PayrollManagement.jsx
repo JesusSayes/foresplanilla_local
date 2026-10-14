@@ -179,7 +179,7 @@ export default function PayrollManagement() {
   const { data: allPayslips = [] } = useQuery({
     queryKey: ["allPayslips"],
     queryFn: async () => {
-      return await withRetry(() => base44.entities.Payslip.list("-created_date", 500));
+      return await withRetry(() => base44.entities.Payslip.list("-created_date", 5000));
     },
   });
 
@@ -1226,13 +1226,22 @@ export default function PayrollManagement() {
     total: filteredPayslips.reduce((sum, p) => sum + safeNum(p.net_pay), 0),
   };
 
-  const getLatestPayslipsByMonth = () => {
+  // Agrupa TODAS las boletas por año-mes-tipo (sin deduplicar a una por grupo).
+  // Reemplaza a getLatestPayslipsByMonth que mantenía solo una boleta por período,
+  // ocultando el resto de trabajadores del histórico.
+  const getAllPayslipsByMonth = () => {
     const grouped = {};
     allPayslips.forEach(p => {
       const key = `${p.year}-${p.month}-${p.payroll_type}`;
-      if (!grouped[key] || new Date(p.created_date) > new Date(grouped[key].created_date)) {
-        grouped[key] = p;
+      if (!grouped[key]) {
+        grouped[key] = {
+          year: p.year,
+          month: p.month,
+          payroll_type: p.payroll_type,
+          payslips: [],
+        };
       }
+      grouped[key].payslips.push(p);
     });
     return Object.values(grouped);
   };
@@ -2183,43 +2192,33 @@ export default function PayrollManagement() {
                   </div>
 
                   {(() => {
-                    const latestPayslips = getLatestPayslipsByMonth();
-                    const filtered = latestPayslips.filter(p => {
-                      if (Number(p.year) !== historyYearFilter) return false;
-                      if (historyMonthFilter !== "all" && Number(p.month) !== parseInt(historyMonthFilter)) return false;
-                      if (historyTypeFilter !== "all" && p.payroll_type !== historyTypeFilter) return false;
+                    // Agrupar TODAS las boletas por año-mes-tipo (sin deduplicar)
+                    const allGroups = getAllPayslipsByMonth();
+                    const filteredGroups = allGroups.filter(g => {
+                      if (Number(g.year) !== historyYearFilter) return false;
+                      if (historyMonthFilter !== "all" && Number(g.month) !== parseInt(historyMonthFilter)) return false;
+                      if (historyTypeFilter !== "all" && g.payroll_type !== historyTypeFilter) return false;
                       if (historySearchTerm) {
-                        const emp = allEmployees.find(e => e.id === p.employee_id);
-                        if (!emp) return false;
-                        const searchLower = historySearchTerm.toLowerCase();
-                        return (
-                          emp.first_name.toLowerCase().includes(searchLower) ||
-                          emp.last_name.toLowerCase().includes(searchLower) ||
-                          emp.employee_code.toLowerCase().includes(searchLower)
-                        );
+                        // Filtrar grupo si ninguna boleta coincide con la búsqueda
+                        const hasMatch = g.payslips.some(p => {
+                          const emp = allEmployees.find(e => e.id === p.employee_id);
+                          if (!emp) return false;
+                          const searchLower = historySearchTerm.toLowerCase();
+                          return (
+                            emp.first_name.toLowerCase().includes(searchLower) ||
+                            emp.last_name.toLowerCase().includes(searchLower) ||
+                            emp.employee_code.toLowerCase().includes(searchLower)
+                          );
+                        });
+                        return hasMatch;
                       }
                       return true;
                     });
 
-                    // Group by month and type
-                    const grouped = {};
-                    filtered.forEach(p => {
-                      const key = `${p.year}-${p.month}-${p.payroll_type}`;
-                      if (!grouped[key]) {
-                        grouped[key] = {
-                          year: p.year,
-                          month: p.month,
-                          type: p.payroll_type,
-                          payslips: []
-                        };
-                      }
-                      grouped[key].payslips.push(p);
-                    });
-
-                    const groups = Object.values(grouped).sort((a, b) => {
+                    const groups = filteredGroups.sort((a, b) => {
                       if (a.year !== b.year) return b.year - a.year;
                       if (a.month !== b.month) return b.month - a.month;
-                      return a.type.localeCompare(b.type);
+                      return a.payroll_type.localeCompare(b.payroll_type);
                     });
 
                     return groups.length === 0 ? (
@@ -2230,18 +2229,14 @@ export default function PayrollManagement() {
                     ) : (
                       <div className="space-y-4">
                         {groups.map((group, idx) => {
-                          const allGroupPayslips = allPayslips.filter(p => 
-                            p.year === group.year && 
-                            p.month === group.month && 
-                            p.payroll_type === group.type
-                          );
+                          const allGroupPayslips = group.payslips;
                           const total = allGroupPayslips.reduce((sum, p) => sum + safeNum(p.net_pay), 0);
                           const isSelected = selectedPayrollToDelete?.year === group.year && 
                                             selectedPayrollToDelete?.month === group.month && 
-                                            selectedPayrollToDelete?.type === group.type;
+                                            selectedPayrollToDelete?.type === group.payroll_type;
 
                           return (
-                            <Card key={`${group.year}-${group.month}-${group.type}`} className={`border-2 ${isSelected ? 'border-red-400 bg-red-50' : ''}`}>
+                            <Card key={`${group.year}-${group.month}-${group.payroll_type}`} className={`border-2 ${isSelected ? 'border-red-400 bg-red-50' : ''}`}>
                               <CardContent className="p-5">
                                 <div className="flex items-center justify-between mb-4">
                                   <div className="flex items-center gap-3">
@@ -2253,7 +2248,7 @@ export default function PayrollManagement() {
                                     />
                                     <div>
                                       <h3 className="text-lg font-bold text-slate-900">
-                                        {format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })} - {group.type}
+                                        {format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })} - {group.payroll_type}
                                       </h3>
                                       <p className="text-sm text-slate-600">
                                         {allGroupPayslips.length} empleado(s)
@@ -2268,7 +2263,7 @@ export default function PayrollManagement() {
                                       className="border-green-300 text-green-700 hover:bg-green-50"
                                       onClick={() => exportToExcel(
                                         allGroupPayslips,
-                                        `Planilla_${group.type}_${group.year}_${String(group.month).padStart(2,'0')}`
+                                        `Planilla_${group.payroll_type}_${group.year}_${String(group.month).padStart(2,'0')}`
                                       )}
                                     >
                                       <Download className="w-3 h-3 mr-1" />
@@ -2298,7 +2293,7 @@ export default function PayrollManagement() {
                                       variant="outline"
                                       onClick={() => {
                                        const doc = new jsPDF();
-                                       doc.text(`Planilla ${group.type}`, 14, 20);
+                                       doc.text(`Planilla ${group.payroll_type}`, 14, 20);
                                        doc.text(`${format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })}`, 14, 28);
                                        let y = 40;
                                        allGroupPayslips.forEach(p => {
@@ -2311,7 +2306,7 @@ export default function PayrollManagement() {
                                             if (y > 270) { doc.addPage(); y = 20; }
                                           }
                                         });
-                                       doc.save(`Planilla_${group.type}_${group.year}_${group.month}.pdf`);
+                                       doc.save(`Planilla_${group.payroll_type}_${group.year}_${group.month}.pdf`);
                                       }}
                                     >
                                       <FileText className="w-3 h-3 mr-1" />

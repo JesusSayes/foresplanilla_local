@@ -610,6 +610,9 @@ export default function EmployeeManagement() {
     if (formData.document_type === 'DNI' && formData.document_number && formData.document_number.length !== 8) {
       errors.push("El DNI debe tener exactamente 8 dígitos");
     }
+    if (formData.document_type === 'CE' && formData.document_number && formData.document_number.length > 12) {
+      errors.push("El Carné de Extranjería debe tener máximo 12 caracteres");
+    }
 
     // Validar documento duplicado
     const existingEmployee = allEmployees.find(emp => 
