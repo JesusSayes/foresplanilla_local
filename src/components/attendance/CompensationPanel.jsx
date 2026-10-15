@@ -308,7 +308,7 @@ export default function CompensationPanel({
   }, [existingCompensations, periodStart, periodEnd]);
 
   const employeesWithCompensation = useMemo(() => {
-    return new Set(periodCompensations.map((c) => c.employee_id));
+    return new Set(periodCompensations.filter(c => c.status === "Pendiente" || c.status === "Aprobada").map((c) => c.employee_id));
   }, [periodCompensations]);
 
   const editableCompsByEmployee = useMemo(() => {

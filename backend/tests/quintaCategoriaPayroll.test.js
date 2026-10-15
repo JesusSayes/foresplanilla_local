@@ -69,8 +69,16 @@ test('quincenal no incorpora retenciones y conserva el cálculo original', () =>
 });
 
 test('selecciona el cálculo aprobado más reciente y acepta importes decimales de PostgreSQL', () => {
-  assert.equal(retention([
+  assert.deepEqual(retention([
     calculation({ created_date: '2026-10-01', current_month_retention: '40.00' }),
     calculation({ created_date: '2026-10-02', calculation_mode: 'manual', manual_amount: '72.45' }),
-  ], 'e1', 10, 2026), 72.45);
+  ], 'e1', 10, 2026), { amount: 72.45, hasCalc: true });
+});
+
+test('contrato de main distingue cálculo cero de ausencia de retención', () => {
+  assert.deepEqual(retention([], 'e1', 10, 2026), { amount: 0, hasCalc: false });
+  const zero = calculation({ calculation_mode: 'manual', manual_amount: 0 });
+  assert.deepEqual(retention([zero], 'e1', 10, 2026), { amount: 0, hasCalc: true });
+  assert.equal(apply(result(), [zero], 'e1', 10, 2026, 'Mensual').hasQuintaCalc, true);
+  assert.equal(apply(result(), [], 'e1', 10, 2026, 'Mensual').hasQuintaCalc, false);
 });

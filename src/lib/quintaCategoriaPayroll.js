@@ -14,7 +14,7 @@ import { safePayrollNumber, roundMoney } from "@/lib/payrollUtils";
  * @param {string} employeeId - ID del empleado.
  * @param {number} month - Mes del período.
  * @param {number} year - Año del período.
- * @returns {number} - Importe de la retención (0 si no hay cálculo aplicable).
+ * @returns {Object|undefined} - Cálculo vigente para el empleado, período y tipo.
  */
 function findQuintaCalculation(quintaCategoriaCalculos, employeeId, month, year, payrollType) {
   return (quintaCategoriaCalculos || []).filter(
@@ -26,14 +26,15 @@ function findQuintaCalculation(quintaCategoriaCalculos, employeeId, month, year,
   ).sort((a, b) => String(b.created_date || "").localeCompare(String(a.created_date || "")))[0];
 }
 
+// Distingue una retención explícita de cero de la ausencia de cálculo.
 export function getQuintaRetention(quintaCategoriaCalculos, employeeId, month, year, payrollType = "Mensual") {
   const calc = findQuintaCalculation(quintaCategoriaCalculos, employeeId, month, year, payrollType);
-  if (!calc) return 0;
+  if (!calc) return { amount: 0, hasCalc: false };
   const calcMode = calc.calculation_mode || "auto";
   const rawAmount = calcMode === "manual"
     ? safePayrollNumber(calc.manual_amount)
     : safePayrollNumber(calc.current_month_retention);
-  return roundMoney(rawAmount);
+  return { amount: roundMoney(rawAmount), hasCalc: true };
 }
 
 /**
@@ -58,16 +59,18 @@ export function applyQuintaRetentionToResult(result, quintaCategoriaCalculos, em
     .reduce((sum, d) => sum + safePayrollNumber(d.calculated_amount), 0));
 
   let retention = 0;
+  let hasQuintaCalc = false;
   if (payrollType !== "Quincenal") {
-    retention = getQuintaRetention(quintaCategoriaCalculos, employeeId, month, year, payrollType);
+    const qr = getQuintaRetention(quintaCategoriaCalculos, employeeId, month, year, payrollType);
+    retention = qr.amount;
+    hasQuintaCalc = qr.hasCalc;
   }
 
-  const hasRetention = payrollType !== "Quincenal" && Boolean(findQuintaCalculation(quintaCategoriaCalculos, employeeId, month, year, payrollType));
-  const finalIncomeTax = hasRetention ? retention : conceptIncomeTax;
-  const adjustment = hasRetention ? roundMoney(retention - conceptIncomeTax) : 0;
+  const finalIncomeTax = hasQuintaCalc ? retention : conceptIncomeTax;
+  const adjustment = hasQuintaCalc ? roundMoney(retention - conceptIncomeTax) : 0;
 
   // Actualizar el breakdown del calculation_summary si la retención proviene del módulo.
-  if (hasRetention && result.summary?.breakdown?.deductions) {
+  if (hasQuintaCalc && result.summary?.breakdown?.deductions) {
     const summaryDeductions = result.summary.breakdown.deductions;
     const existingRentaIdx = summaryDeductions.items.findIndex(
       item => isQuinta(item.name)
@@ -89,5 +92,5 @@ export function applyQuintaRetentionToResult(result, quintaCategoriaCalculos, em
     summaryDeductions.total = roundMoney((summaryDeductions.total || 0) + adjustment);
   }
 
-  return { retention, adjustment, finalIncomeTax, conceptIncomeTax };
+  return { retention, adjustment, finalIncomeTax, conceptIncomeTax, hasQuintaCalc };
 }

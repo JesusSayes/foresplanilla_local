@@ -152,8 +152,7 @@ export default function EmployeeForm({
     : null;
 
   // Prepara los datos de un derechohabiente existente para editar:
-  // - Si no tiene last_name_paterno/materno, usa last_name completo como paterno
-  //   (sin dividir arbitrariamente apellidos compuestos)
+  // - Conserva el apellido completo antiguo sin asignarlo a un campo separado
   // - Normaliza birth_date a YYYY-MM-DD sin desplazar el día por timezone
   // - Preserva género ausente (no reemplaza por "M")
   const prepareDhForEdit = (dh) => {
@@ -162,10 +161,9 @@ export default function EmployeeForm({
     if (data.birth_date && data.birth_date.length > 10) {
       data.birth_date = data.birth_date.slice(0, 10);
     }
-    // Si no tiene apellidos separados pero tiene last_name, usarlo como paterno
-    if (!data.last_name_paterno && !data.last_name_materno && data.last_name) {
-      data.last_name_paterno = data.last_name;
-    }
+    // Si no tiene apellidos separados pero tiene last_name, conservar el dato
+    // original sin presentarlo como apellido paterno ni dividirlo por espacios.
+    // El last_name completo se muestra como placeholder en el campo paterno.
     return data;
   };
 
@@ -884,7 +882,7 @@ export default function EmployeeForm({
                             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Datos Personales</p>
                             <div className="grid grid-cols-2 gap-4 mb-3">
                               <div><Label>Nombres *</Label><Input value={dhFormData.first_name || ""} onChange={(e) => setDhFormData({...dhFormData, first_name: e.target.value})} /></div>
-                              <div><Label>Apellido Paterno</Label><Input value={dhFormData.last_name_paterno || ""} onChange={(e) => setDhFormData({...dhFormData, last_name_paterno: e.target.value})} /></div>
+                              <div><Label>Apellido Paterno</Label><Input value={dhFormData.last_name_paterno || ""} onChange={(e) => setDhFormData({...dhFormData, last_name_paterno: e.target.value})} placeholder={editingDH?.last_name && !dhFormData.last_name_paterno && !dhFormData.last_name_materno ? `Original: ${editingDH.last_name}` : ""} /></div>
                             </div>
                             <div className="grid grid-cols-2 gap-4 mb-3">
                               <div><Label>Apellido Materno</Label><Input value={dhFormData.last_name_materno || ""} onChange={(e) => setDhFormData({...dhFormData, last_name_materno: e.target.value})} /></div>

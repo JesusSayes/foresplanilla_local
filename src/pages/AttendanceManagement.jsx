@@ -2069,6 +2069,10 @@ export default function AttendanceManagement() {
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ["attendanceEditRequests"] });
               queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+              queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+              queryClient.invalidateQueries({ queryKey: ["allAttendanceRecords"] });
+              queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
+              queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
             }}
           />
         )}
@@ -2265,6 +2269,13 @@ export default function AttendanceManagement() {
               setShowValidationModal(false);
               setValidatingRecord(null);
               setValidationLogs([]);
+              queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+              queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+              queryClient.invalidateQueries({ queryKey: ["allAttendanceRecords"] });
+              queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
+              queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
+              queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
+              queryClient.invalidateQueries({ queryKey: ["compensationIncidents"] });
             }}
           />
         )}
