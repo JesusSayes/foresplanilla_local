@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import { validateOvertimePaymentPolicy } from "../../services/overtimePaymentPolicy.js";
 import { canAccessEmployee, employeeScopeWhere } from "../../middleware/authorization.js";
 
 import { generate24HexId } from '../../utils/idGenerator.js'
@@ -52,14 +53,15 @@ export const create = async (req, res) => {
       return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
 
-    const payslip = await prisma.payslip.create({
-      data: req.body
+    const payslip = await prisma.$transaction(async db => {
+      await validateOvertimePaymentPolicy(db, [req.body]);
+      return db.payslip.create({ data: req.body });
     });
 
     res.status(201).json(payslip);
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.code === 'P2034' ? 409 : error.status || 500).json({ error: error.code === 'P2034' ? 'Los datos cambiaron. Actualice e intente nuevamente.' : error.message });
   }
 };
 
@@ -164,6 +166,7 @@ export const bulkCreate = async (req, res) => {
     const chunkSize = 50;
     const replaceExisting = req.query.replace === 'true';
     const persistPayslips = async (db) => {
+      await validateOvertimePaymentPolicy(db, formattedPayslips);
       if (replaceExisting) {
         const replacementGroups = Object.values(formattedPayslips.reduce((groups, payslip) => {
           const key = `${payslip.month}-${payslip.year}-${payslip.payroll_type}`;
@@ -196,11 +199,8 @@ export const bulkCreate = async (req, res) => {
       }
     };
 
-    if (replaceExisting) {
-      await prisma.$transaction(persistPayslips);
-    } else {
-      await persistPayslips(prisma);
-    }
+    // Validar todo el lote antes de borrar o insertar; nunca guardar un lote parcial.
+    await prisma.$transaction(persistPayslips);
 
     console.log("bulkCreate terminado");
 
@@ -218,7 +218,7 @@ export const bulkCreate = async (req, res) => {
 
     console.error("Error en bulkCreate:", error);
 
-    res.status(500).json({
+    res.status(error.code === 'P2034' ? 409 : error.status || 500).json({
       success: false,
       message: error.message,
       data: []
@@ -238,15 +238,20 @@ export const update = async (req, res) => {
       return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
 
-    const payslip = await prisma.payslip.update({
-      where: { id: req.params.id },
-      data: req.body
-    });
+    const payslip = await prisma.$transaction(async db => {
+      const latest = await db.payslip.findUnique({ where: { id: req.params.id } });
+      if (!latest) throw Object.assign(new Error('Payslip not found'), { status: 404 });
+      if (!canAccessEmployee(req, latest.employee_id)) {
+        throw Object.assign(new Error('Acceso denegado al empleado'), { status: 403 });
+      }
+      await validateOvertimePaymentPolicy(db, [{ ...latest, ...req.body }]);
+      return db.payslip.update({ where: { id: req.params.id }, data: req.body });
+    }, { isolationLevel: 'Serializable' });
 
     res.json(payslip);
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.code === 'P2034' ? 409 : error.status || 500).json({ error: error.code === 'P2034' ? 'Los datos cambiaron. Actualice e intente nuevamente.' : error.message });
   }
 };
 
@@ -316,13 +321,24 @@ export const bulkUpdate = async (req, res) => {
       }
     }
 
-    const result = await prisma.$transaction(
-      updates.map(({ id, ...data }) => prisma.payslip.update({ where: { id }, data }))
-    );
+    const result = await prisma.$transaction(async db => {
+      const latest = await db.payslip.findMany({ where: { id: { in: ids } } });
+      if (latest.length !== ids.length) throw Object.assign(new Error('Una o más boletas no existen'), { status: 404 });
+      if (latest.some(p => !canAccessEmployee(req, p.employee_id))) {
+        throw Object.assign(new Error('Acceso denegado al empleado'), { status: 403 });
+      }
+      const byId = new Map(latest.map(p => [p.id, p]));
+      await validateOvertimePaymentPolicy(db, updates.map(p => ({ ...byId.get(p.id), ...p })));
+      const result = [];
+      for (const { id, ...data } of updates) {
+        result.push(await db.payslip.update({ where: { id }, data }));
+      }
+      return result;
+    }, { isolationLevel: 'Serializable' });
 
     res.json({ success: true, data: result });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.code === 'P2034' ? 409 : error.status || 500).json({ error: error.code === 'P2034' ? 'Los datos cambiaron. Actualice e intente nuevamente.' : error.message });
   }
 };
 

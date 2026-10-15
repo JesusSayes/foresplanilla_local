@@ -21,20 +21,26 @@ const DELETE_PERMISSIONS = ['system.admin', 'contracts.delete'];
 const syncEmployeeCosts = async (client, contract) => {
   if (!contract?.employee_id || contract.status !== 'Vigente') return;
 
+  // Elegir el contrato efectivo evita que una renovación futura o un contrato
+  // histórico sobrescriban la remuneración actual del trabajador.
   await client.query(
-    `UPDATE employee
-        SET activity_cost = $1,
-            food_cost = $2,
-            transport_cost = $3,
-            updated_date = $4
-      WHERE id = $5`,
-    [
-      contract.activity_cost ?? 0,
-      contract.food_cost ?? 0,
-      contract.transport_cost ?? 0,
-      new Date(),
-      contract.employee_id,
-    ]
+    `UPDATE employee e
+        SET base_salary = COALESCE(c.salary, e.base_salary),
+            activity_cost = COALESCE(c.activity_cost, 0),
+            food_cost = COALESCE(c.food_cost, 0),
+            transport_cost = COALESCE(c.transport_cost, 0),
+            updated_date = NOW()
+       FROM (
+         SELECT salary, activity_cost, food_cost, transport_cost
+           FROM contract
+          WHERE employee_id = $1 AND status = 'Vigente'
+            AND (start_date IS NULL OR start_date <= (NOW() AT TIME ZONE 'America/Lima')::date)
+            AND (end_date IS NULL OR end_date >= (NOW() AT TIME ZONE 'America/Lima')::date)
+          ORDER BY start_date DESC NULLS LAST, created_date DESC NULLS LAST, id DESC
+          LIMIT 1
+       ) c
+      WHERE e.id = $1`,
+    [contract.employee_id]
   );
 };
 

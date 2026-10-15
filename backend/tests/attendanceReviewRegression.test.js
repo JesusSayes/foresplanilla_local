@@ -22,7 +22,7 @@ test('compensación: solicitante sin permiso de edición guarda incidencia y asi
   assert.equal(denied.statusCode, 403);
   const writes = [];
   t.mock.method(prisma, '$transaction', async fn => fn({
-    attendance_incident: { create: async ({ data }) => { writes.push('incident'); return data; } },
+    attendance_incident: { findMany: async () => [], create: async ({ data }) => { writes.push('incident'); return data; } },
     attendance_record: {
       findUnique: async () => record,
       update: async ({ data }) => { assert.equal(data.status, 'Compensación'); assert.match(data.notes, /^Original \|/); writes.push('record'); },
@@ -39,7 +39,7 @@ for (const [name, changes, expected] of [
   ['tardanza excesiva', { late_minutes_to_adjust: 30 }, 400],
   ['sin minutos', { late_minutes_to_adjust: 0, hours_to_adjust: 0 }, 400],
 ]) test(`compensación rechaza ${name}`, async t => {
-  t.mock.method(prisma, '$transaction', async fn => fn({ attendance_record: { findUnique: async () => record }, attendance_incident: { create: async () => assert.fail('No debe escribir') } }));
+  t.mock.method(prisma, '$transaction', async fn => fn({ attendance_record: { findUnique: async () => record }, attendance_incident: { findMany: async () => [], create: async () => assert.fail('No debe escribir') } }));
   const req = request(); Object.assign(req.body, changes);
   const res = response(); await createIncident(req, res); assert.equal(res.statusCode, expected);
 });
