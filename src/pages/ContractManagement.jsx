@@ -99,6 +99,7 @@ export default function ContractManagement() {
     if (!employeeId || status !== "Vigente") return;
     try {
       await base44.entities.Employee.update(employeeId, {
+        base_salary: costs.base_salary ?? 0,
         activity_cost: costs.activity_cost ?? 0,
         food_cost: costs.food_cost ?? 0,
         transport_cost: costs.transport_cost ?? 0,
@@ -122,6 +123,7 @@ export default function ContractManagement() {
     onSuccess: (newContract) => {
       queryClient.invalidateQueries(["contracts"]);
       syncEmployeeCostsFromContract(newContract.employee_id, newContract.status, {
+        base_salary: newContract.salary ?? 0,
         activity_cost: newContract.activity_cost ?? 0,
         food_cost: newContract.food_cost ?? 0,
         transport_cost: newContract.transport_cost ?? 0,
@@ -138,6 +140,7 @@ export default function ContractManagement() {
       queryClient.invalidateQueries(["contracts"]);
       const savedData = variables?.data || {};
       syncEmployeeCostsFromContract(savedData.employee_id, savedData.status, {
+        base_salary: savedData.salary ?? 0,
         activity_cost: savedData.activity_cost ?? 0,
         food_cost: savedData.food_cost ?? 0,
         transport_cost: savedData.transport_cost ?? 0,
