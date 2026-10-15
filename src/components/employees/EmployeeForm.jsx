@@ -866,7 +866,7 @@ export default function EmployeeForm({
                             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Datos Personales</p>
                             <div className="grid grid-cols-2 gap-4 mb-3">
                               <div><Label>Nombres *</Label><Input value={dhFormData.first_name || ""} onChange={(e) => setDhFormData({...dhFormData, first_name: e.target.value})} /></div>
-                              <div><Label>Apellido Paterno</Label><Input value={dhFormData.last_name_paterno || ""} onChange={(e) => setDhFormData({...dhFormData, last_name_paterno: e.target.value})} /></div>
+                              <div><Label>Apellido Paterno</Label><Input value={dhFormData.last_name_paterno || ""} onChange={(e) => setDhFormData({...dhFormData, last_name_paterno: e.target.value})} placeholder={editingDH?.last_name && !dhFormData.last_name_paterno && !dhFormData.last_name_materno ? `Original: ${editingDH.last_name}` : ""} /></div>
                             </div>
                             <div className="grid grid-cols-2 gap-4 mb-3">
                               <div><Label>Apellido Materno</Label><Input value={dhFormData.last_name_materno || ""} onChange={(e) => setDhFormData({...dhFormData, last_name_materno: e.target.value})} /></div>
