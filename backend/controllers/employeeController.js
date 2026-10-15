@@ -1,4 +1,5 @@
 import pool, { query } from '../config/database.js';
+import { isValidOvertimePaymentMode } from '../services/overtimePaymentPolicy.js';
 import { buildFilterQuery, buildSortQuery } from '../utils/queryBuilder.js';
 import { canAccessEmployee, hasPermission, resolveAccessibleEmployeeIds } from '../middleware/authorization.js';
 import { ACCESSIBLE_EMPLOYEE_PERMISSION_KEYS } from '../config/permissions.js';
@@ -126,6 +127,9 @@ export const getEmployee = async (req, res) => {
 export const createEmployee = async (req, res) => {
   try {
     const data = req.body;
+    if (Object.hasOwn(data, 'overtime_payment_mode') && !isValidOvertimePaymentMode(data.overtime_payment_mode)) {
+      return res.status(400).json({ error: 'Política de HE inválida: use payment o compensation_only' });
+    }
     if (data.role && data.role !== 'empleado' && !hasPermission(req.access, 'system.admin')) {
       return res.status(403).json({ error: 'Solo un administrador del sistema puede asignar un rol legacy privilegiado' });
     }
@@ -154,12 +158,12 @@ export const createEmployee = async (req, res) => {
         status, role, managed_team_ids, supervisor_id, supervisor_name,
         emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
         attendance_method, activity_cost, food_cost, transport_cost, afp_commission_type,
-        id, created_date, updated_date, created_by_id, created_by
+        id, created_date, updated_date, created_by_id, created_by${data.overtime_payment_mode !== undefined ? ', overtime_payment_mode' : ''}
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
         $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
         $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44,
-        $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60
+        $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60${data.overtime_payment_mode !== undefined ? ', $61' : ''}
       ) RETURNING *
     `;
 
@@ -184,6 +188,7 @@ export const createEmployee = async (req, res) => {
       id, new Date(), new Date(), userId, userEmail
     ];
 
+    if (data.overtime_payment_mode !== undefined) values.push(data.overtime_payment_mode);
     const result = await query(sql, values);
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -197,6 +202,9 @@ export const updateEmployee = async (req, res) => {
   try {
     const { id } = req.params;
     const data = req.body;
+    if (Object.hasOwn(data, 'overtime_payment_mode') && !isValidOvertimePaymentMode(data.overtime_payment_mode)) {
+      return res.status(400).json({ error: 'Política de HE inválida: use payment o compensation_only' });
+    }
     if (!canAccessEmployee(req, id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
 
     await client.query('BEGIN');
@@ -229,6 +237,10 @@ export const updateEmployee = async (req, res) => {
     const values = [];
     let paramIndex = 1;
     const employeeColumns = await getEmployeeColumns();
+    if (Object.hasOwn(data, 'overtime_payment_mode') && !employeeColumns.has('overtime_payment_mode')) {
+      await client.query('ROLLBACK');
+      return res.status(503).json({ error: 'Falta aplicar el SQL de política de pago de HE y reiniciar el backend' });
+    }
 
     const dateFields = [ 'birth_date', 'hire_date', 'termination_date', 'afp_affiliation_date'];
 

@@ -19,6 +19,35 @@ const serializeIncident = (incident) => ({
   hours_to_adjust: incident.hours_to_adjust != null ? Number(incident.hours_to_adjust) : null,
 });
 
+const validateCompensationBalance = async (tx, data, excludeId) => {
+  const record = data.attendance_record_id
+    ? await tx.attendance_record.findUnique({ where: { id: data.attendance_record_id } }) : null;
+  if (!record || record.employee_id !== data.employee_id || toDateString(record.date) !== toDateString(data.incident_date)) {
+    throw Object.assign(new Error('La asistencia no corresponde al empleado y fecha de la compensación'), { status: 400 });
+  }
+  const reservations = await tx.attendance_incident.findMany({
+    where: {
+      attendance_record_id: record.id,
+      incident_type: 'Compensación de Tardanza',
+      // Las aprobadas ya descuentan sus minutos del registro de asistencia.
+      status: 'Pendiente',
+      ...(excludeId && { id: { not: excludeId } }),
+    },
+    select: { late_minutes_to_adjust: true, hours_to_adjust: true },
+  });
+  const reservedLate = reservations.reduce((sum, item) => sum + Number(item.late_minutes_to_adjust || 0), 0);
+  const reservedMinutes = reservations.reduce((sum, item) => sum + Math.round(Number(item.hours_to_adjust || 0) * 60), 0);
+  const late = Number(data.late_minutes_to_adjust || 0);
+  const hours = Number(data.hours_to_adjust || 0);
+  const availableMinutes = Math.round((Number(record.overtime_hours_25 || 0) + Number(record.overtime_hours_35 || 0)) * 60);
+  if (!Number.isInteger(late) || late < 0 || !Number.isFinite(hours) || hours < 0 ||
+      (late === 0 && hours === 0) || late > Math.max(0, Number(record.late_minutes || 0) - reservedLate) ||
+      Math.round(hours * 60) > Math.max(0, availableMinutes - reservedMinutes)) {
+    throw Object.assign(new Error('Los minutos solicitados exceden el saldo disponible de la asistencia'), { status: 400 });
+  }
+  return record;
+};
+
 export const getAll = async (req, res) => {
   try {
     const incidents = await prisma.attendance_incident.findMany({
@@ -143,18 +172,9 @@ export const create = async (req, res) => {
     const isPendingCompensation = data.incident_type === 'Compensación de Tardanza' && data.status === 'Pendiente';
     const incident = isPendingCompensation
       ? await prisma.$transaction(async tx => {
-          const record = data.attendance_record_id
-            ? await tx.attendance_record.findUnique({ where: { id: data.attendance_record_id } }) : null;
-          if (!record || record.employee_id !== data.employee_id || toDateString(record.date) !== toDateString(incidentDate)) {
-            throw Object.assign(new Error('La asistencia no corresponde al empleado y fecha de la compensación'), { status: 400 });
-          }
+          const record = await validateCompensationBalance(tx, incidentData);
           const late = Number(data.late_minutes_to_adjust || 0);
           const hours = Number(data.hours_to_adjust || 0);
-          const available = Number(record.overtime_hours_25 || 0) + Number(record.overtime_hours_35 || 0);
-          if (!Number.isInteger(late) || late < 0 || !Number.isFinite(hours) || hours < 0 ||
-              (late === 0 && hours === 0) || late > Number(record.late_minutes || 0) || Math.round(hours * 60) > Math.round(available * 60)) {
-            throw Object.assign(new Error('Los minutos solicitados exceden el saldo disponible de la asistencia'), { status: 400 });
-          }
           const created = await tx.attendance_incident.create({ data: incidentData });
           await tx.attendance_record.update({ where: { id: record.id }, data: {
             status: 'Compensación',
@@ -162,11 +182,11 @@ export const create = async (req, res) => {
               `Compensación solicitada: ${late} min tardanza, ${Math.round(hours * 60)} min HE`,
           } });
           return created;
-        })
+        }, { isolationLevel: 'Serializable' })
       : await prisma.attendance_incident.create({ data: incidentData });
     res.status(201).json(serializeIncident(incident));
   } catch (error) {
-    res.status(error.status || 500).json({ error: error.message });
+    res.status(error.code === 'P2034' ? 409 : error.status || 500).json({ error: error.code === 'P2034' ? 'El saldo cambió durante la solicitud. Actualice e intente nuevamente.' : error.message });
   }
 };
 
@@ -191,17 +211,26 @@ export const update = async (req, res) => {
     if (incident_date !== undefined && !toPrismaDate(incident_date)) return res.status(400).json({ error: 'Fecha de incidente inválida' });
     if (review_date && !toPrismaDate(review_date)) return res.status(400).json({ error: 'Fecha de revisión inválida' });
 
-    const incident = await prisma.attendance_incident.update({
-      where: { id: req.params.id },
-      data: {
-        ...data,
-        ...(incident_date !== undefined && { incident_date: toPrismaDate(incident_date) }),
-        ...(review_date !== undefined && { review_date: review_date ? toPrismaDate(review_date) : null }),
-      }
-    });
+    const updateData = {
+      ...data,
+      ...(incident_date !== undefined && { incident_date: toPrismaDate(incident_date) }),
+      ...(review_date !== undefined && { review_date: review_date ? toPrismaDate(review_date) : null }),
+    };
+    const next = { ...existing, ...updateData };
+    const needsBalanceCheck = next.incident_type === 'Compensación de Tardanza' &&
+      ['Pendiente', 'Aprobada'].includes(next.status) &&
+      (!['Pendiente', 'Aprobada'].includes(existing.status) ||
+       ['attendance_record_id', 'employee_id', 'incident_date', 'incident_type', 'late_minutes_to_adjust', 'hours_to_adjust']
+         .some(field => Object.hasOwn(updateData, field)));
+    const incident = needsBalanceCheck
+      ? await prisma.$transaction(async tx => {
+          await validateCompensationBalance(tx, next, existing.id);
+          return tx.attendance_incident.update({ where: { id: req.params.id }, data: updateData });
+        }, { isolationLevel: 'Serializable' })
+      : await prisma.attendance_incident.update({ where: { id: req.params.id }, data: updateData });
     res.json(serializeIncident(incident));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.code === 'P2034' ? 409 : error.status || 500).json({ error: error.code === 'P2034' ? 'El saldo cambió durante la solicitud. Actualice e intente nuevamente.' : error.message });
   }
 };
 

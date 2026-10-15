@@ -3,6 +3,13 @@ import { canAccessEmployee, employeeScopeWhere } from "../middleware/authorizati
 
 import { generate24HexId } from '../utils/idGenerator.js'
 
+// Campos del formulario que ya existen en PostgreSQL.
+const additionalFields = (data) => Object.fromEntries([
+  'phone', 'email', 'address', 'conception_month', 'city_code', 'ubigeo2',
+  'address_reference2', 'health_center_indicator', 'document_number_sustento',
+  'address2', 'document_type_sustento', 'address_reference', 'ubigeo', 'country_code',
+].filter(field => data[field] !== undefined).map(field => [field, data[field]]));
+
 export const getAll = async (req, res) => {
   try {
 
@@ -59,6 +66,9 @@ export const create = async (req, res) => {
         updated_date: new Date(),
         created_by: req.user?.username || req.user?.email || 'system',
 
+        ...additionalFields(data),
+        deregistration_date: data.deregistration_date === undefined ? undefined
+          : data.deregistration_date ? new Date(data.deregistration_date) : null,
         employee_id: data.employee_id,
         document_type: data.document_type,
         document_number: data.document_number,
@@ -108,6 +118,9 @@ export const update = async (req, res) => {
       where: { id: req.params.id },
       data: {
 
+        ...additionalFields(data),
+        deregistration_date: data.deregistration_date === undefined ? undefined
+          : data.deregistration_date ? new Date(data.deregistration_date) : null,
         employee_id: data.employee_id,
         document_type: data.document_type,
         document_number: data.document_number,

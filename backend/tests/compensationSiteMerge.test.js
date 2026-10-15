@@ -22,7 +22,7 @@ for (const status of ['Aprobada', 'Rechazada']) {
       };
       let writes = 0;
       mockModel(t, 'attendance_incident', {
-        findUnique: async () => ({ id: 'comp1', employee_id: 'e1', incident_type: 'Compensación de Tardanza', authorizer_id: scenario === 'otro autorizador' ? 'other' : 'authorizer' }),
+        findUnique: async () => ({ id: 'comp1', employee_id: 'e1', status: 'Pendiente', incident_type: 'Compensación de Tardanza', authorizer_id: scenario === 'otro autorizador' ? 'other' : 'authorizer' }),
         update: async ({ data }) => { writes++; return { id: 'comp1', ...data }; },
       });
       mockModel(t, 'employee', { findMany: async () => [{ id: 'e1', site: scenario === 'otra sede' ? 'Cusco' : 'Lima' }] });
