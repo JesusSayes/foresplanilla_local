@@ -1023,7 +1023,7 @@ export default function PayrollManagement() {
         safePayrollNumber(result.totals.totalDeductions) + tardinessDiscount + absenceDiscount + advanceDeduction + quintaResult.adjustment
       );
       const adjustedNetPay = roundMoney(safePayrollNumber(result.totals.totalIncome) - adjustedDeductions);
-      if (quintaResult.retention > 0 && result.summary?.result) {
+      if (quintaResult.hasQuintaCalc && result.summary?.result) {
         result.summary.result.totalDeductions = adjustedDeductions;
         result.summary.result.netPay = adjustedNetPay;
       }

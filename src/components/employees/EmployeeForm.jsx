@@ -155,10 +155,9 @@ export default function EmployeeForm({
     if (data.birth_date && data.birth_date.length > 10) {
       data.birth_date = data.birth_date.slice(0, 10);
     }
-    // Si no tiene apellidos separados pero tiene last_name, usarlo como paterno
-    if (!data.last_name_paterno && !data.last_name_materno && data.last_name) {
-      data.last_name_paterno = data.last_name;
-    }
+    // Si no tiene apellidos separados pero tiene last_name, conservar el dato
+    // original sin presentarlo como apellido paterno ni dividirlo por espacios.
+    // El last_name completo se muestra como placeholder en el campo paterno.
     return data;
   };
 

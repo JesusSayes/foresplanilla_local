@@ -304,8 +304,14 @@ export default function CompensationPanel({
     });
   }, [employeeStats, searchTerm, filterType]);
 
+  // Empleados con compensación vigente (Pendiente o Aprobada).
+  // Las Rechazadas no cuentan: no bloquean ni muestran badge de "Comp. solicitada".
   const employeesWithCompensation = useMemo(() => {
-    return new Set(existingCompensations.map((c) => c.employee_id));
+    return new Set(
+      existingCompensations
+        .filter((c) => c.status === "Pendiente" || c.status === "Aprobada")
+        .map((c) => c.employee_id)
+    );
   }, [existingCompensations]);
 
   const editableCompsByEmployee = useMemo(() => {

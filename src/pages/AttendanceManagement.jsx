@@ -251,6 +251,16 @@ export default function AttendanceManagement() {
     },
   });
 
+  // TODAS las vacaciones aprobadas (sin filtro de fecha) para validar alertas de HE
+  // en cualquier fecha, no solo la visible en la vista de asistencia actual.
+  const { data: allApprovedVacations = [] } = useQuery({
+    queryKey: ["allApprovedVacations"],
+    queryFn: async () => {
+      return await base44.entities.VacationRequest.filter({ status: "Aprobada" }, "-start_date", 2000);
+    },
+    staleTime: 60000,
+  });
+
   useEffect(() => {
     const generateExemptClockings = async () => {
       if (!effectiveEmployee) return;
@@ -1933,7 +1943,7 @@ export default function AttendanceManagement() {
                 currentUser={currentUser}
                 onEditRecord={handleEditRecord}
                 canReviewApproved={hasPermission("system.admin")}
-                approvedVacations={approvedVacations}
+                approvedVacations={allApprovedVacations}
               />
             </TabsContent>
 
@@ -2012,6 +2022,10 @@ export default function AttendanceManagement() {
             onSuccess={() => {
               queryClient.invalidateQueries(["attendanceEditRequests"]);
               queryClient.invalidateQueries(["todayAttendance"]);
+              queryClient.invalidateQueries(["attendanceRecords"]);
+              queryClient.invalidateQueries(["allAttendanceRecords"]);
+              queryClient.invalidateQueries(["overtimeAlerts"]);
+              queryClient.invalidateQueries(["allIncidents"]);
             }}
           />
         )}
@@ -2205,6 +2219,12 @@ export default function AttendanceManagement() {
               setValidationRecord(null);
               setValidationLogs([]);
               queryClient.invalidateQueries(["todayAttendance"]);
+              queryClient.invalidateQueries(["attendanceRecords"]);
+              queryClient.invalidateQueries(["allAttendanceRecords"]);
+              queryClient.invalidateQueries(["overtimeAlerts"]);
+              queryClient.invalidateQueries(["allIncidents"]);
+              queryClient.invalidateQueries(["compensationRecords"]);
+              queryClient.invalidateQueries(["compensationIncidents"]);
             }}
           />
         )}

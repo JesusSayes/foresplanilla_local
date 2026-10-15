@@ -259,10 +259,13 @@ export default function CompensationModal({
   }, [allEmployeeRecords, prevMonthEmployeeRecords, approvedUsedByDate, selectedDays]);
 
   const compensatedDates = useMemo(() => {
+    // En modo edición: bloquear solo Aprobadas (las Pendientes/Rechazadas se reemplazan).
+    // En modo nuevo: bloquear Pendientes y Aprobadas, pero NO Rechazadas
+    // (un rechazo previo no debe impedir una nueva solicitud si hay saldo disponible).
     return new Set(
       existingCompensations
         .filter((c) => c.employee_id === employee?.id)
-        .filter((c) => (editMode ? c.status === "Aprobada" : true))
+        .filter((c) => editMode ? c.status === "Aprobada" : (c.status === "Pendiente" || c.status === "Aprobada"))
         .map((c) => c.incident_date)
     );
   }, [existingCompensations, employee, editMode]);

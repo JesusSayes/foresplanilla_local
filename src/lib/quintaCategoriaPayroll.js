@@ -22,12 +22,12 @@ export function getQuintaRetention(quintaCategoriaCalculos, employeeId, month, y
          Number(c.month) === Number(month) &&
          Number(c.year) === Number(year)
   );
-  if (!calc) return 0;
+  if (!calc) return { amount: 0, hasCalc: false };
   const calcMode = calc.calculation_mode || "auto";
   const rawAmount = calcMode === "manual"
     ? safePayrollNumber(calc.manual_amount)
     : safePayrollNumber(calc.current_month_retention);
-  return roundMoney(rawAmount);
+  return { amount: roundMoney(rawAmount), hasCalc: true };
 }
 
 /**
@@ -46,24 +46,31 @@ export function getQuintaRetention(quintaCategoriaCalculos, employeeId, month, y
  * @returns {{ retention: number, adjustment: number, finalIncomeTax: number, conceptIncomeTax: number }}
  */
 export function applyQuintaRetentionToResult(result, quintaCategoriaCalculos, employeeId, month, year, payrollType) {
-  const conceptIncomeTax = safePayrollNumber(
-    result.deductions.find(d => d.concept_name.includes("Renta"))?.calculated_amount
-  );
+  // Suma de TODAS las retenciones de conceptos "Renta/Quinta" (puede haber más de una).
+  const conceptIncomeTax = result.deductions
+    .filter(d => /renta|quinta/i.test(d.concept_name || ""))
+    .reduce((sum, d) => sum + safePayrollNumber(d.calculated_amount), 0);
 
   let retention = 0;
+  let hasQuintaCalc = false;
   if (payrollType !== "Quincenal") {
-    retention = getQuintaRetention(quintaCategoriaCalculos, employeeId, month, year);
+    const qr = getQuintaRetention(quintaCategoriaCalculos, employeeId, month, year);
+    retention = qr.amount;
+    hasQuintaCalc = qr.hasCalc;
   }
 
-  const finalIncomeTax = retention > 0 ? retention : conceptIncomeTax;
-  const adjustment = retention > 0 ? roundMoney(retention - conceptIncomeTax) : 0;
+  // Si existe cálculo de quinta (incluso con monto manual 0), usar esa retención.
+  // Si no existe cálculo, conservar el descuento basado en conceptos.
+  const finalIncomeTax = hasQuintaCalc ? retention : conceptIncomeTax;
+  const adjustment = hasQuintaCalc ? roundMoney(retention - conceptIncomeTax) : 0;
 
   // Actualizar el breakdown del calculation_summary si la retención proviene del módulo.
-  if (retention > 0 && result.summary?.breakdown?.deductions) {
+  if (hasQuintaCalc && result.summary?.breakdown?.deductions) {
     const summaryDeductions = result.summary.breakdown.deductions;
-    const existingRentaIdx = summaryDeductions.items.findIndex(
-      item => /renta|quinta/i.test(item.name || "")
-    );
+    // Reemplazar TODOS los ítems de Renta/Quinta por uno solo del módulo (evita duplicados).
+    const rentaIndices = summaryDeductions.items
+      .map((item, i) => /renta|quinta/i.test(item.name || "") ? i : -1)
+      .filter(i => i >= 0);
     const quintaItem = {
       name: "Retención 5ta Categoría",
       concept_code: "",
@@ -75,8 +82,13 @@ export function applyQuintaRetentionToResult(result, quintaCategoriaCalculos, em
       concept_category: "Impuestos",
       is_worker_contribution: true,
     };
-    if (existingRentaIdx >= 0) {
-      summaryDeductions.items[existingRentaIdx] = { ...summaryDeductions.items[existingRentaIdx], ...quintaItem };
+    if (rentaIndices.length > 0) {
+      summaryDeductions.items[rentaIndices[0]] = { ...summaryDeductions.items[rentaIndices[0]], ...quintaItem };
+      // Eliminar duplicados restantes (si había más de un concepto de Renta)
+      for (let i = rentaIndices.length - 1; i >= 1; i--) {
+        summaryDeductions.items.splice(rentaIndices[i], 1);
+        summaryDeductions.count = Math.max(0, (summaryDeductions.count || 0) - 1);
+      }
     } else {
       summaryDeductions.items.push(quintaItem);
       summaryDeductions.count = (summaryDeductions.count || 0) + 1;
@@ -84,5 +96,5 @@ export function applyQuintaRetentionToResult(result, quintaCategoriaCalculos, em
     summaryDeductions.total = roundMoney((summaryDeductions.total || 0) + adjustment);
   }
 
-  return { retention, adjustment, finalIncomeTax, conceptIncomeTax };
+  return { retention, adjustment, finalIncomeTax, conceptIncomeTax, hasQuintaCalc };
 }
