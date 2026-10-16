@@ -1,3 +1,4 @@
+import { compensationMinutes } from '../services/compensationOvertime.js';
 import { PrismaClient } from '@prisma/client';
 import {
   getProtectedFields,
@@ -68,6 +69,8 @@ export async function recalcularAsistencia({ employee_id, date_from, date_to } =
       full_day_justification: true,
       late_minutes_to_adjust: true,
       hours_to_adjust: true,
+      overtime_minutes_25: true,
+      overtime_minutes_35: true,
     },
   });
 
@@ -122,7 +125,7 @@ export async function recalcularAsistencia({ employee_id, date_from, date_to } =
         0
       );
       let compensatedOvertimeHours = approvedCompensations.reduce(
-        (total, incident) => total + Number(incident.hours_to_adjust || 0),
+        (total, incident) => total + compensationMinutes(incident) / 60,
         0
       );
 

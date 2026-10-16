@@ -1,3 +1,4 @@
+import { compensationMinutes } from '../../services/compensationOvertime.js';
 import { normalizeVacationAttendance } from "../../services/vacationAttendance.js";
 import prisma from "../../config/prisma.js";
 import { canAccessEmployee } from "../../middleware/authorization.js";
@@ -82,6 +83,8 @@ const recalcularAsistencia = async (req, res) => {
         full_day_justification: true,
         late_minutes_to_adjust: true,
         hours_to_adjust: true,
+        overtime_minutes_25: true,
+        overtime_minutes_35: true,
       },
     });
 
@@ -146,7 +149,7 @@ const recalcularAsistencia = async (req, res) => {
           0
         );
         let compensatedOvertimeHours = approvedCompensations.reduce(
-          (total, incident) => total + Number(incident.hours_to_adjust || 0),
+          (total, incident) => total + compensationMinutes(incident) / 60,
           0
         );
 

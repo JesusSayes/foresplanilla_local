@@ -55,6 +55,8 @@ model attendance_incident {
   authorizer_id           String?
   authorizer_name         String?
   codigo_solicitud        String?   @db.VarChar(50)
+  overtime_minutes_25     Int?      @default(0)
+  overtime_minutes_35     Int?      @default(0)
 }
 
 model attendance_record {
@@ -479,6 +481,7 @@ model employee {
   food_cost                      Decimal?                  @default(0) @db.Decimal(18, 2)
   transport_cost                 Decimal?                  @default(0) @db.Decimal(18, 2)
   afp_commission_type            String?                   @db.VarChar(20)
+  overtime_payment_mode          String                    @default("payment") @db.VarChar(20)
   attendance_edit_request        attendance_edit_request[]
   attendance_logs                attendance_logs[]
   historial_remunerativo         historial_remunerativo[]
