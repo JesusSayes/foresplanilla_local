@@ -204,6 +204,8 @@ export const LOCAL_PERMISSION_KEYS = Object.freeze(Object.keys(LOCAL_PERMISSION_
 
 export const SCHEDULE_PERMISSION_GROUPS = Object.freeze({
   view: [
+    'payroll.create',
+    'payroll.calculate',
     'schedules.view',
     'schedules.create',
     'schedules.edit',

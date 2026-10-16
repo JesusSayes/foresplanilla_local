@@ -109,7 +109,18 @@ for (const name of Object.keys(schemas)) {
     if (name === 'AdelantoGratificacion') { data.applied_amount = 0; data.remaining_balance = data.amount; }
     const row = await transaction(async db => {
       if (data.employee_id) await employeeExists(db, data.employee_id);
-      if (name === 'HorasExtrasManual') await assertOpen(db, data);
+      if (name === 'HorasExtrasManual') {
+        await assertOpen(db, data);
+        if (!data.attendance_date || !/^\d{4}-\d{2}-\d{2}$/.test(data.attendance_date) ||
+            new Date(data.attendance_date).toISOString().slice(0, 10) !== data.attendance_date) throw badRequest('Indique una fecha de jornada válida');
+        const records = (await db.query('SELECT id, employee_id, date, overtime_destination, overtime_authorized, status FROM attendance_record WHERE employee_id = $1 AND date = $2::date FOR SHARE', [data.employee_id, data.attendance_date])).rows;
+        const record = data.attendance_record_id ? records.find(r => r.id === data.attendance_record_id) : records.length === 1 ? records[0] : null;
+        if (!record) throw badRequest('Seleccione una jornada de asistencia existente y única');
+        if (record.status === 'Vacaciones') throw badRequest('No se permiten HE durante vacaciones');
+        if ((record.overtime_destination || 'pago') !== data.overtime_destination) throw badRequest('El destino debe coincidir con la jornada de asistencia');
+        if (data.overtime_destination === 'pago' && record.overtime_authorized !== true) throw badRequest('La jornada no tiene HE autorizadas para pago');
+        data.attendance_record_id = record.id;
+      }
       return insert(db, name, data);
     });
     res.status(201).json(row);

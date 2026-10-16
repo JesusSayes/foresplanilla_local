@@ -7,7 +7,7 @@ import { isVacationAttendance } from './vacationAttendance.js';
 export async function editedAttendanceTardiness(db, existing, changes) {
   if (!Object.keys(changes).some(field => /^clock_(in|out)(_[234])?$/.test(field))) return {};
   const record = { ...existing, ...changes };
-  if (isVacationAttendance(record)) return { is_late: false, late_minutes: 0 };
+  if (isVacationAttendance(record)) return { is_late: false, late_minutes: 0, early_departure_minutes: 0 };
   const date = toDateString(record.date);
   const [employee, schedules, incidents] = await Promise.all([
     db.employee.findUnique({ where: { id: record.employee_id } }),
@@ -21,7 +21,7 @@ export async function editedAttendanceTardiness(db, existing, changes) {
     const day = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date(`${date}T00:00:00Z`).getUTCDay()];
     schedule = { [`${day}_start`]: record.scheduled_start, [`${day}_end`]: record.scheduled_end };
   }
-  if (schedule?.exempt_from_clocking) return { is_late: false, late_minutes: 0 };
-  const { is_late, late_minutes } = calcularMetricas(record, schedule, date, false, incidents);
-  return { is_late, late_minutes };
+  if (schedule?.exempt_from_clocking) return { is_late: false, late_minutes: 0, early_departure_minutes: 0 };
+  const { is_late, late_minutes, early_departure_minutes } = calcularMetricas(record, schedule, date, false, incidents);
+  return { is_late, late_minutes, early_departure_minutes };
 }

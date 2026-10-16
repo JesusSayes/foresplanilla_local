@@ -63,6 +63,10 @@ export default function OvertimeAlertsTab({
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [reviewingApproved, setReviewingApproved] = useState(false);
+  // Destino de HE seleccionado por alerta: "pago" (pagar en planilla) o
+  // "compensacion" (destinar exclusivamente a compensar tardanzas, sin pago).
+  // Se define por jornada/registro, no por empleado.
+  const [alertDestinations, setAlertDestinations] = useState({});
 
   const pendingAlerts = useMemo(
     () => overtimeAlerts.filter((a) => a.status === "Pendiente"),
@@ -146,7 +150,7 @@ export default function OvertimeAlertsTab({
 
   const clearSelection = () => setSelectedAlertIds(new Set());
 
-  const handleAcceptHE = async (alert, record, silent = false) => {
+  const handleAcceptHE = async (alert, record, silent = false, destination = "pago") => {
     if (!canEditAttendance) return;
     // Bloquear autorización si la fecha está cubierta por vacaciones aprobadas
     if (isDateOnVacation(alert.employee_id, alert.alert_date)) {
@@ -162,6 +166,7 @@ export default function OvertimeAlertsTab({
       if (record) {
         await entitiesAPI.AttendanceRecord.update(record.id, {
           overtime_authorized: true,
+          overtime_destination: destination,
           notes: (record.notes ? record.notes + " | " : "") +
             `HE aceptadas: ${Number(alert.overtime_hours || 0).toFixed(2)}h (${alert.alert_date})`,
         });
@@ -226,7 +231,7 @@ export default function OvertimeAlertsTab({
       }
       try {
         const record = todayRecords.find((r) => r.id === alert.attendance_record_id);
-        await handleAcceptHE(alert, record, true);
+        await handleAcceptHE(alert, record, true, alertDestinations[alert.id] || record?.overtime_destination || "pago");
         ok++;
       } catch (e) {
         console.error("Error aceptando HE masivo:", e);
@@ -671,15 +676,26 @@ export default function OvertimeAlertsTab({
                             En vacaciones
                           </Badge>
                         ) : (
+                        <>
+                        <select
+                          className="text-xs border border-slate-300 rounded-md px-1.5 py-1 bg-white text-slate-700"
+                          value={alertDestinations[alert.id] || record?.overtime_destination || "pago"}
+                          onChange={(e) => setAlertDestinations(prev => ({ ...prev, [alert.id]: e.target.value }))}
+                          title="Destino de las horas extras de esta jornada"
+                        >
+                          <option value="pago">Pago</option>
+                          <option value="compensacion">Compensación</option>
+                        </select>
                         <Button
                           size="sm"
                           variant="outline"
                           className="text-blue-700 border-blue-300 hover:bg-blue-50"
-                          onClick={() => handleAcceptHE(alert, record)}
+                          onClick={() => handleAcceptHE(alert, record, false, alertDestinations[alert.id] || record?.overtime_destination || "pago")}
                         >
                           <CheckCircle className="w-3.5 h-3.5 mr-1" />
                           {alert.overtime_hours < 0 ? "Autorizar" : "Aceptar HE"}
                         </Button>
+                        </>
                         )}
                         <Button
                           size="sm"

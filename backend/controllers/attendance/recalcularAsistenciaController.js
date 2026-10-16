@@ -177,6 +177,7 @@ const recalcularAsistencia = async (req, res) => {
           overtime_hours_35: protectValue(protectedFields, "overtime_hours_35", record.overtime_hours_35, finalOT35),
           is_late: protectValue(protectedFields, "is_late", record.is_late, finalIsLate),
           late_minutes: protectValue(protectedFields, "late_minutes", record.late_minutes, finalLate),
+          early_departure_minutes: metrics.early_departure_minutes,
           is_absent: protectValue(protectedFields, "is_absent", record.is_absent, status === "Ausente" && !!metrics.scheduled_start),
           scheduled_start: metrics.scheduled_start || "",
           scheduled_end: metrics.scheduled_end || "",

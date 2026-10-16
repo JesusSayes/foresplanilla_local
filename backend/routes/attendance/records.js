@@ -10,6 +10,8 @@ import {
 } from '../../middleware/authorization.js';
 
 const VIEW_PERMISSIONS = [
+  'payroll.create',
+  'payroll.calculate',
   'attendance.view_all',
   'attendance.view_department',
   'attendance.view_own',

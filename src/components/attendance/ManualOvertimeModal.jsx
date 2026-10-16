@@ -30,6 +30,8 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
   const [hours35, setHours35] = useState(0);
   const [minutes35, setMinutes35] = useState(0);
   const [reason, setReason] = useState("");
+  const [attendanceDate, setAttendanceDate] = useState("");
+  const [destination, setDestination] = useState("pago");
   const [saving, setSaving] = useState(false);
   const [revertingId, setRevertingId] = useState(null);
 
@@ -105,12 +107,14 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
         overtime_minutes_25: Number(minutes25) || 0,
         overtime_hours_35: Number(hours35) || 0,
         overtime_minutes_35: Number(minutes35) || 0,
+        overtime_destination: destination,
+        attendance_date: attendanceDate,
         reason: reason.trim(),
         status: "Activo",
         created_by: currentUser?.email || "",
       });
       toast.success("Horas extras manuales registradas correctamente.");
-      setHours25(0); setMinutes25(0); setHours35(0); setMinutes35(0); setReason("");
+      setHours25(0); setMinutes25(0); setHours35(0); setMinutes35(0); setReason(""); setDestination("pago");
       refetch();
       queryClient.invalidateQueries({ queryKey: ["manualOvertime"] });
       if (onSuccess) onSuccess();
@@ -243,7 +247,7 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
                       )}
                     </div>
                     <p className="text-xs text-slate-600 mt-1"><strong>Nota:</strong> {r.reason}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Registrado por {r.created_by}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Destino: {r.overtime_destination === "compensacion" ? "Compensación" : "Pago"} · Registrado por {r.created_by}</p>
                   </div>
                 );
               })}
@@ -284,6 +288,18 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
                     </div>
                   </div>
                 </div>
+              </div>
+              <div>
+                <Label>Fecha de la jornada</Label>
+                <Input type="date" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} />
+                <Label className="text-xs font-semibold text-slate-600 mb-1 block">Destino de las horas <span className="text-red-500">*</span></Label>
+                <Select value={destination} onValueChange={setDestination}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pago">Pago (se pagan en planilla)</SelectItem>
+                    <SelectItem value="compensacion">Compensación (solo compensan tardanzas, no se pagan)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs font-semibold text-slate-600 mb-1 block">Motivo / Nota <span className="text-red-500">*</span></Label>

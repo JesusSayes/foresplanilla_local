@@ -20,6 +20,12 @@ export const SYSTEM_LOGIC_TYPES = {
     concept_type: "Descuento",
     concept_category: "Descuentos Varios",
   },
+  early_departure_discount: {
+    label: "Descuento por Salida Anticipada",
+    description: "Calcula descuento según minutos de salida anticipada (sin tolerancia, desde el primer minuto)",
+    concept_type: "Descuento",
+    concept_category: "Descuentos Varios",
+  },
   absence_discount: {
     label: "Descuento por Inasistencias",
     description: "Calcula descuento proporcional por días de inasistencia",
@@ -184,6 +190,22 @@ export class PayrollCalculator {
           const hourlyRate = dailySalary / 8;
           result = -(hourlyRate * (totalLateMinutes / 60));
           detail = `${totalLateMinutes} min de tardanza en ${lateRecords.length} día(s)`;
+          break;
+        }
+
+        case "early_departure_discount": {
+          // Descuento por salida anticipada: (salario_diario / 8) * minutos_salida / 60
+          // Sin tolerancia: descuento desde el primer minuto de salida anticipada.
+          // Usa early_departure_minutes calculado por el motor de asistencia
+          // (ya considera justificaciones aprobadas y turnos nocturnos).
+          const earlyRecords = context.early_departure_records || [];
+          const totalEarlyMinutes = earlyRecords.reduce((sum, r) => {
+            return sum + (r.early_departure_minutes || 0);
+          }, 0);
+          const dailySalary = (context.base_salary || 0) / 30;
+          const hourlyRate = dailySalary / 8;
+          result = -(hourlyRate * (totalEarlyMinutes / 60));
+          detail = `${totalEarlyMinutes} min de salida anticipada en ${earlyRecords.length} día(s)`;
           break;
         }
 
@@ -514,6 +536,7 @@ export class PayrollCalculator {
       derechohabientes: extraContext.derechohabientes || [],
       late_records: extraContext.late_records || [],
       absent_records: extraContext.absent_records || [],
+      early_departure_records: extraContext.early_departure_records || [],
       loan_installments: extraContext.loan_installments || [],
       afp: extraContext.afp || null,
       enable_tardiness_compensation: extraContext.enable_tardiness_compensation || false,

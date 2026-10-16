@@ -100,6 +100,8 @@ model attendance_record {
   tardiness_compensation_authorized_at                                                     DateTime?                 @db.Timestamp(6)
   tardiness_compensation_reason                                                            String?
   tardiness_compensation_status                                                            String                    @default("") @db.VarChar(20)
+  overtime_destination                                                                     String?                   @default("pago")
+  early_departure_minutes                                                                  Int?                      @default(0)
   attendance_edit_request_attendance_edit_request_attendance_record_idToattendance_record  attendance_edit_request[] @relation("attendance_edit_request_attendance_record_idToattendance_record")
   attendance_edit_request_attendance_record_last_approved_edit_idToattendance_edit_request attendance_edit_request?  @relation("attendance_record_last_approved_edit_idToattendance_edit_request", fields: [last_approved_edit_id], references: [id], onUpdate: NoAction, map: "fk_attendance_record_last_approved_edit")
 
@@ -649,6 +651,7 @@ model payslip {
   digital_signature_name     String?
   digital_signature_position String?
   digital_signature_date     DateTime? @db.Timestamp(6)
+  early_departure_discount   Decimal?  @default(0) @db.Decimal(18, 2)
 }
 
 model payslip_template {
@@ -1440,24 +1443,27 @@ model adelantogratificacion {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model horasextrasmanual {
-  id                  String    @id @db.VarChar(255)
-  created_date        DateTime  @default(now()) @db.Timestamp(6)
-  updated_date        DateTime  @default(now()) @db.Timestamp(6)
-  employee_id         String
-  payslip_id          String?
-  month               Int
-  year                Int
-  payroll_type        String
-  overtime_hours_25   Decimal?  @default(0) @db.Decimal(18, 2)
-  overtime_minutes_25 Int?      @default(0)
-  overtime_hours_35   Decimal?  @default(0) @db.Decimal(18, 2)
-  overtime_minutes_35 Int?      @default(0)
-  reason              String
-  status              String?   @default("Activo")
-  created_by          String?
-  reverted_by         String?
-  reverted_date       DateTime? @db.Timestamptz(6)
-  revert_reason       String?
+  id                   String    @id @db.VarChar(255)
+  created_date         DateTime  @default(now()) @db.Timestamp(6)
+  updated_date         DateTime  @default(now()) @db.Timestamp(6)
+  employee_id          String
+  payslip_id           String?
+  month                Int
+  year                 Int
+  payroll_type         String
+  overtime_hours_25    Decimal?  @default(0) @db.Decimal(18, 2)
+  overtime_minutes_25  Int?      @default(0)
+  overtime_hours_35    Decimal?  @default(0) @db.Decimal(18, 2)
+  overtime_minutes_35  Int?      @default(0)
+  reason               String
+  status               String?   @default("Activo")
+  created_by           String?
+  reverted_by          String?
+  reverted_date        DateTime? @db.Timestamptz(6)
+  revert_reason        String?
+  attendance_record_id String?   @db.VarChar(255)
+  attendance_date      DateTime? @db.Date
+  overtime_destination String?   @default("pago")
 
   @@index([employee_id], map: "horasextrasmanual_employee_idx")
 }
