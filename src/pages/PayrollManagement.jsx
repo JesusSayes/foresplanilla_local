@@ -44,6 +44,7 @@ import {
   getOvertimePaySplit,
 } from "@/lib/payrollExcelHelpers";
 import { applyQuintaRetentionToResult } from "@/lib/quintaCategoriaPayroll";
+import { getEarlyDepartureMinutes } from "@/lib/attendanceMetrics";
 
 // Rate limiter global + retry con backoff exponencial para errores de rate-limit
 // Garantiza un gap mínimo entre TODAS las llamadas API y reintenta en caso de 429
@@ -764,16 +765,23 @@ export default function PayrollManagement() {
       // Horas extras y nocturnas calculadas desde los registros de asistencia del periodo.
       // horas_nocturnas: los registros de asistencia aún no cuentan con un campo dedicado,
       // por lo que se conserva en 0 hasta que exista una fuente de datos válida para calcularlas.
+      // DESTINO POR JORNADA: solo se suman las HE con destino "pago" y autorizadas
+      // (overtime_authorized=true). Las HE con destino "compensacion" se excluyen del
+      // pago y de las bases de cálculo, conservando su saldo para compensar tardanzas.
+      // Seleccionar "pago" NO autoriza automáticamente las horas.
+      const otPayableRecords = empAttendance.filter(record =>
+        (record.overtime_destination || "pago") === "pago" && record.overtime_authorized === true
+      );
       // Horas extras efectivas: si un registro tiene compensación de tardanza activa,
       // los minutos compensados se descuentan de las HE (primero 25%, luego 35%)
       // para evitar doble contabilización.
-      const overtimeHours25Auto = empAttendance.reduce((sum, record) => {
+      const overtimeHours25Auto = otPayableRecords.reduce((sum, record) => {
         const ot25 = Number(record.overtime_hours_25 || 0);
         if (!enableTardinessCompensation || record.tardiness_compensation_status !== "Activa") return sum + ot25;
         const compHours = (record.tardiness_compensation_minutes || 0) / 60;
         return sum + Math.max(0, ot25 - Math.min(ot25, compHours));
       }, 0);
-      const overtimeHours35Auto = empAttendance.reduce((sum, record) => {
+      const overtimeHours35Auto = otPayableRecords.reduce((sum, record) => {
         const ot25 = Number(record.overtime_hours_25 || 0);
         const ot35 = Number(record.overtime_hours_35 || 0);
         if (!enableTardinessCompensation || record.tardiness_compensation_status !== "Activa") return sum + ot35;
@@ -783,8 +791,11 @@ export default function PayrollManagement() {
         return sum + Math.max(0, ot35 - Math.min(ot35, remainingComp));
       }, 0);
       // Horas extras manuales (registradas desde el panel de asistencia)
-      // Se suman al cálculo automático una sola vez, sin afectar compensaciones de tardanza.
-      const empManualOT = (manualOvertimeRecords || []).filter(r => r.employee_id === emp.id);
+      // Solo se suman las con destino "pago". Las manuales con destino "compensacion"
+      // se excluyen del pago. Se suman al cálculo automático una sola vez.
+      const empManualOT = (manualOvertimeRecords || []).filter(r =>
+        r.employee_id === emp.id && (r.overtime_destination || "pago") === "pago"
+      );
       const manualOT25 = empManualOT.reduce((sum, r) =>
         sum + (r.overtime_hours_25 || 0) + (r.overtime_minutes_25 || 0) / 60, 0);
       const manualOT35 = empManualOT.reduce((sum, r) =>
@@ -930,6 +941,7 @@ export default function PayrollManagement() {
         derechohabientes: empDerechohabientes,
         late_records: lateRecords,
         absent_records: absentRecords,
+        early_departure_records: earlyDepartureRecords,
         afp: allAfps.find(a => a.id === emp.afp_id) || null,
         enable_tardiness_compensation: enableTardinessCompensation,
       };
@@ -953,6 +965,25 @@ export default function PayrollManagement() {
       const tardinessDiscount = payrollType === "Quincenal" ? 0 : roundMoney(hourlyRate * (totalLateMinutes / 60));
       // Descuento por inasistencias: un día de salario por cada falta completa.
       const absenceDiscount = payrollType === "Quincenal" ? 0 : roundMoney(absentRecords.length * dailyRate);
+      // ── Descuento por salida anticipada (concepto independiente) ──
+      // Sin tolerancia: descuento desde el primer minuto. Usa el mismo valor
+      // hora que tardanzas (salario diario / 8). Excluye registros justificados,
+      // de vacaciones, compensación, permiso sin goce y ausentes. No interpreta
+      // una marcación de salida ausente como salida anticipada.
+      const earlyDepartureRecords = attendanceForDiscounts.filter(r =>
+        r.status !== "Justificado" && r.status !== "Vacaciones" &&
+        r.status !== "Compensación" && r.status !== "Permiso sin goce" &&
+        r.status !== "Ausente" && !r.is_absent
+      );
+      const totalEarlyDepartureMinutes = earlyDepartureRecords.reduce((sum, r) => {
+        // Usar el valor almacenado por el motor si está disponible (considera
+        // justificaciones aprobadas). Si no, calcular inline como respaldo.
+        if (r.early_departure_minutes != null && r.early_departure_minutes > 0) {
+          return sum + r.early_departure_minutes;
+        }
+        return sum + getEarlyDepartureMinutes(r, []);
+      }, 0);
+      const earlyDepartureDiscount = payrollType === "Quincenal" ? 0 : roundMoney(hourlyRate * (totalEarlyDepartureMinutes / 60));
 
       // Buscar adelanto quincenal si es mensual.
       // Solo se descuenta a empleados que fueron elegibles para la quincenal
@@ -1020,7 +1051,7 @@ export default function PayrollManagement() {
       const incomeTaxAmount = quintaResult.finalIncomeTax;
       // Ajustar totales con descuentos adicionales — sanitizar cada término
       const adjustedDeductions = roundMoney(
-        safePayrollNumber(result.totals.totalDeductions) + tardinessDiscount + absenceDiscount + advanceDeduction + quintaResult.adjustment
+        safePayrollNumber(result.totals.totalDeductions) + tardinessDiscount + earlyDepartureDiscount + absenceDiscount + advanceDeduction + quintaResult.adjustment
       );
       const adjustedNetPay = roundMoney(safePayrollNumber(result.totals.totalIncome) - adjustedDeductions);
       if (quintaResult.hasQuintaCalc && result.summary?.result) {
@@ -1076,6 +1107,7 @@ export default function PayrollManagement() {
         health_insurance: 0,
         income_tax: incomeTaxAmount,
         tardiness_discount: tardinessDiscount,
+        early_departure_discount: earlyDepartureDiscount,
         absence_discount: absenceDiscount,
         loan_deduction: 0,
         advance_deduction: advanceDeduction,
@@ -1425,6 +1457,7 @@ export default function PayrollManagement() {
         "AFP/ONP Total": safeNum(p.pension_deduction),
         "Impuesto Renta": safeNum(p.income_tax),
         "Desc. Tardanzas": safeNum(p.tardiness_discount),
+        "Desc. Salida Anticipada": safeNum(p.early_departure_discount),
         "Desc. Faltas": safeNum(p.absence_discount),
         "Desc. Adelanto": safeNum(p.advance_deduction),
         "Otros Descuentos": safeNum(p.other_deductions),

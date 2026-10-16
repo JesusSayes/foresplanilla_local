@@ -61,6 +61,10 @@ export default function OvertimeAlertsTab({
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [reviewingApproved, setReviewingApproved] = useState(false);
+  // Destino de HE seleccionado por alerta: "pago" (pagar en planilla) o
+  // "compensacion" (destinar exclusivamente a compensar tardanzas, sin pago).
+  // Se define por jornada/registro, no por empleado.
+  const [alertDestinations, setAlertDestinations] = useState({});
 
   const pendingAlerts = useMemo(
     () => overtimeAlerts.filter((a) => a.status === "Pendiente"),
@@ -144,7 +148,7 @@ export default function OvertimeAlertsTab({
 
   const clearSelection = () => setSelectedAlertIds(new Set());
 
-  const handleAcceptHE = async (alert, record, silent = false) => {
+  const handleAcceptHE = async (alert, record, silent = false, destination = "pago") => {
     // Bloquear autorización si la fecha está cubierta por vacaciones aprobadas
     if (isDateOnVacation(alert.employee_id, alert.alert_date)) {
       const emp = allEmployees.find(e => e.id === alert.employee_id);
@@ -156,11 +160,15 @@ export default function OvertimeAlertsTab({
     // Always update overtime_authorized by ID — the record may not be in
     // todayRecords (e.g. alert date outside the current view), but we still
     // need to set the flag so recalcularAsistencia counts the HE.
+    // destino: "pago" (se pagan en planilla) o "compensacion" (excluidas del
+    // pago, quedan como saldo para compensar tardanzas). Seleccionar "pago"
+    // NO autoriza automáticamente; la autorización es independiente del destino.
     if (alert.attendance_record_id) {
       await base44.entities.AttendanceRecord.update(alert.attendance_record_id, {
         overtime_authorized: true,
+        overtime_destination: destination,
         notes: (record?.notes ? record.notes + " | " : "") +
-          `HE aceptadas: ${alert.overtime_hours.toFixed(2)}h (${alert.alert_date})`,
+          `HE aceptadas (${destination}): ${alert.overtime_hours.toFixed(2)}h (${alert.alert_date})`,
       });
     }
     await base44.entities.OvertimeAlert.update(alert.id, {
@@ -647,15 +655,26 @@ export default function OvertimeAlertsTab({
                             En vacaciones
                           </Badge>
                         ) : (
+                        <>
+                        <select
+                          className="text-xs border border-slate-300 rounded-md px-1.5 py-1 bg-white text-slate-700"
+                          value={alertDestinations[alert.id] || "pago"}
+                          onChange={(e) => setAlertDestinations(prev => ({ ...prev, [alert.id]: e.target.value }))}
+                          title="Destino de las horas extras de esta jornada"
+                        >
+                          <option value="pago">Pago</option>
+                          <option value="compensacion">Compensación</option>
+                        </select>
                         <Button
                           size="sm"
                           variant="outline"
                           className="text-blue-700 border-blue-300 hover:bg-blue-50"
-                          onClick={() => handleAcceptHE(alert, record)}
+                          onClick={() => handleAcceptHE(alert, record, false, alertDestinations[alert.id] || "pago")}
                         >
                           <CheckCircle className="w-3.5 h-3.5 mr-1" />
                           {alert.overtime_hours < 0 ? "Autorizar" : "Aceptar HE"}
                         </Button>
+                        </>
                         )}
                         <Button
                           size="sm"
