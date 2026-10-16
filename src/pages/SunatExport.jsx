@@ -196,6 +196,81 @@ function buildPlameRows(payslips, employees, selectedMonth, selectedYear) {
   return rows;
 }
 
+// ─── Generador Derechohabientes (T-Registro RPAS) ─────────────────────────────
+
+/** Código de vínculo SUNAT para derechohabientes */
+const vinculoRPAS = (rel) => {
+  const map = {
+    "Cónyuge": "01",
+    "Concubino/a": "02",
+    "Hijo/a": "03",
+    "Hijo Menor de Edad": "03",
+    "Padre": "04",
+    "Madre": "05",
+    "Otro": "06",
+  };
+  return map[rel] || "06";
+};
+
+/** Tipo de documento SUNAT para derechohabientes (incluye Partida) */
+const tipoDocRPAS = (type) => {
+  const map = {
+    "DNI": "01", "L.E / DNI": "01", "CE": "04",
+    "Pasaporte": "07", "CPP": "06",
+    "Partida de Nacimiento": "12", "Otro": "13",
+  };
+  return map[type] || "01";
+};
+
+/**
+ * Genera las filas de Derechohabientes en formato T-Registro RPAS.
+ * Cada fila representa un derechohabiente vinculado a un titular (empleado).
+ */
+function buildDerechohabientesRows(derechohabientes, employees) {
+  const rows = [];
+
+  for (const dh of derechohabientes) {
+    if (!dh.is_active && dh.is_active !== undefined) continue;
+    const titular = employees.find(e => e.id === dh.employee_id);
+    if (!titular) continue;
+
+    const paterno = clean(dh.last_name_paterno || (dh.last_name || "").split(" ")[0] || "");
+    const materno = clean(dh.last_name_materno || (dh.last_name || "").split(" ").slice(1).join(" ") || "");
+
+    rows.push({
+      // Titular
+      "Tipo Doc. Titular": tipoDoc(titular.document_type),
+      "Nro. Doc. Titular": clean(titular.document_number),
+      "Apellidos y Nombres Titular": clean(`${titular.last_name} ${titular.first_name}`),
+      // Derechohabiente
+      "Tipo Doc. Derechohab.": tipoDocRPAS(dh.document_type),
+      "Nro. Doc. Derechohab.": clean(dh.document_number),
+      "Apellido Paterno": paterno,
+      "Apellido Materno": materno,
+      "Nombres": clean(dh.first_name),
+      "Vínculo": vinculoRPAS(dh.relationship),
+      "Fecha Nacimiento": fmtDate(dh.birth_date),
+      "Sexo": dh.gender === "M" ? "1" : dh.gender === "F" ? "2" : "",
+      // Ubicación
+      "Ubigeo": clean(dh.ubigeo || ""),
+      "Dirección": clean(dh.address || ""),
+      "Referencia Dirección": clean(dh.address_reference || ""),
+      // Sustento
+      "Tipo Doc. Sustento": clean(dh.document_type_sustento || ""),
+      "Nro. Doc. Sustento": clean(dh.document_number_sustento || ""),
+      "Mes Concepción": clean(dh.conception_month || ""),
+      // Centro asistencial
+      "Ind. Centro Asistencial": clean(dh.health_center_indicator || ""),
+      // Estado
+      "Estado": dh.is_active === false ? "0" : "1",
+      "Fecha Alta": fmtDate(dh.registration_date),
+      "Fecha Baja": fmtDate(dh.deregistration_date),
+    });
+  }
+
+  return rows;
+}
+
 // ─── Exportadores ─────────────────────────────────────────────────────────────
 
 function exportToXLSX(rows, filename, sheetName = "Hoja1") {
@@ -248,6 +323,11 @@ export default function SunatExport() {
     queryFn: () => base44.entities.AFP.list(),
   });
 
+  const { data: derechohabientes = [] } = useQuery({
+    queryKey: ["derechohabientes-sunat"],
+    queryFn: () => base44.entities.Derechohabiente.filter({}),
+  });
+
   const activeEmployees = allEmployees.filter(e => e.status === "Activo" || e.status === "Suspendido");
   const periodLabel = format(new Date(selectedYear, selectedMonth - 1), "MMMM yyyy", { locale: es });
 
@@ -259,6 +339,7 @@ export default function SunatExport() {
 
   const tRegistroRows = buildTRegistroRows(activeEmployees, afps);
   const plameRows = buildPlameRows(plamePayslips, allEmployees, selectedMonth, selectedYear);
+  const derechohabientesRows = buildDerechohabientesRows(derechohabientes, allEmployees);
 
   const handleExportTRegistro = () => {
     const fname = `T-Registro_${selectedYear}${String(selectedMonth).padStart(2,"0")}`;
@@ -274,6 +355,16 @@ export default function SunatExport() {
     const fname = `PLAME_${selectedYear}${String(selectedMonth).padStart(2,"0")}`;
     if (exportFormat === "txt") exportToTXT(plameRows, fname);
     else exportToXLSX(plameRows, fname, "PLAME");
+  };
+
+  const handleExportDerechohabientes = () => {
+    if (derechohabientesRows.length === 0) {
+      toast.error("No hay derechohabientes activos registrados");
+      return;
+    }
+    const fname = `T-Registro_RPAS_Derechohabientes_${selectedYear}${String(selectedMonth).padStart(2,"0")}`;
+    if (exportFormat === "txt") exportToTXT(derechohabientesRows, fname);
+    else exportToXLSX(derechohabientesRows, fname, "Derechohabientes");
   };
 
   return (
@@ -351,12 +442,17 @@ export default function SunatExport() {
             <p className="text-2xl font-bold text-green-600">{tRegistroRows.length}</p>
             <p className="text-xs text-slate-500 mt-1">Filas T-Registro</p>
           </div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 text-center">
+            <p className="text-2xl font-bold text-amber-600">{derechohabientesRows.length}</p>
+            <p className="text-xs text-slate-500 mt-1">Derechohabientes</p>
+          </div>
         </div>
 
         <Tabs defaultValue="tregistro">
           <TabsList className="mb-6">
             <TabsTrigger value="tregistro">T-Registro</TabsTrigger>
             <TabsTrigger value="plame">PLAME</TabsTrigger>
+            <TabsTrigger value="derechohabientes">Derechohabientes</TabsTrigger>
           </TabsList>
 
           {/* ── T-REGISTRO ── */}
@@ -531,6 +627,80 @@ export default function SunatExport() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ── DERECHOHABIENTES (RPAS) ── */}
+          <TabsContent value="derechohabientes">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-lg font-bold">Derechohabientes (T-Registro RPAS) — {periodLabel}</CardTitle>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Registro de Pensionistas y Derechohabientes para EsSalud. Formato T-Registro RPAS.
+                    </p>
+                  </div>
+                  <Button onClick={handleExportDerechohabientes} className="bg-red-600 hover:bg-red-700 shrink-0" disabled={derechohabientesRows.length === 0}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Exportar Derechohabientes
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="flex gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl mb-6">
+                  <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-semibold mb-1">¿Qué incluye el T-Registro RPAS?</p>
+                    <ul className="list-disc ml-4 space-y-0.5 text-blue-700">
+                      <li>Datos del titular (empleado) y del derechohabiente</li>
+                      <li>Vínculo familiar (cónyuge, concubino, hijo, padre, madre)</li>
+                      <li>Fecha de nacimiento y sexo del derechohabiente</li>
+                      <li>Documento de sustento del vínculo</li>
+                      <li>Ubigeo y dirección del derechohabiente</li>
+                      <li>Indicador de centro asistencial EsSalud</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <ValidationPanelDerechohabientes rows={derechohabientesRows} raw={derechohabientes} />
+
+                {derechohabientesRows.length > 0 ? (
+                  <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          {["Doc. Titular", "Doc. Derechohab.", "Apellidos y Nombres", "Vínculo", "F. Nacimiento", "Sexo", "Ubigeo"].map(h => (
+                            <th key={h} className="px-3 py-2 text-left font-semibold text-slate-600 whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {derechohabientesRows.slice(0, 10).map((row, i) => (
+                          <tr key={i} className="hover:bg-slate-50">
+                            <td className="px-3 py-2 font-mono">{row["Nro. Doc. Titular"]}</td>
+                            <td className="px-3 py-2 font-mono">{row["Nro. Doc. Derechohab."]}</td>
+                            <td className="px-3 py-2">{row["Apellido Paterno"]} {row["Apellido Materno"]}, {row["Nombres"]}</td>
+                            <td className="px-3 py-2">{row["Vínculo"]}</td>
+                            <td className="px-3 py-2">{row["Fecha Nacimiento"]}</td>
+                            <td className="px-3 py-2 text-center">{row["Sexo"]}</td>
+                            <td className="px-3 py-2">{row["Ubigeo"]}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {derechohabientesRows.length > 10 && (
+                      <p className="px-3 py-2 text-xs text-slate-500 bg-slate-50 border-t">
+                        Mostrando 10 de {derechohabientesRows.length} registros. El archivo exportado incluye todos.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-12 text-center text-slate-400 text-sm">
+                    No hay derechohabientes activos registrados. Regístralos desde la ficha de cada empleado.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         {/* Nota legal */}
@@ -565,6 +735,48 @@ function ValidationPanel({ employees, type }) {
       <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
         <CheckCircle className="w-4 h-4 shrink-0" />
         Validación correcta. Los datos de trabajadores están completos.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {warnings.map((w, i) => (
+        <div key={i} className={`flex items-center gap-2 p-3 rounded-lg text-sm border ${
+          w.level === "error"
+            ? "bg-red-50 border-red-200 text-red-700"
+            : "bg-amber-50 border-amber-200 text-amber-700"
+        }`}>
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {w.msg}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Panel de Validaciones Derechohabientes ──────────────────────────────────
+
+function ValidationPanelDerechohabientes({ rows, raw }) {
+  const warnings = [];
+
+  const sinDoc = raw.filter(d => !d.document_number);
+  const sinFechaNac = raw.filter(d => !d.birth_date);
+  const sinSexo = raw.filter(d => !d.gender);
+  const sinVinculo = raw.filter(d => !d.relationship);
+  const sinTitular = raw.filter(d => !rows.find(r => r["Nro. Doc. Derechohab."] === clean(d.document_number)));
+
+  if (sinDoc.length) warnings.push({ level: "error", msg: `${sinDoc.length} derechohabiente(s) sin número de documento.` });
+  if (sinFechaNac.length) warnings.push({ level: "warn", msg: `${sinFechaNac.length} derechohabiente(s) sin fecha de nacimiento.` });
+  if (sinSexo.length) warnings.push({ level: "warn", msg: `${sinSexo.length} derechohabiente(s) sin sexo definido.` });
+  if (sinVinculo.length) warnings.push({ level: "error", msg: `${sinVinculo.length} derechohabiente(s) sin vínculo familiar.` });
+  if (sinTitular.length) warnings.push({ level: "error", msg: `${sinTitular.length} derechohabiente(s) sin titular activo vinculado.` });
+
+  if (!warnings.length) {
+    return (
+      <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+        <CheckCircle className="w-4 h-4 shrink-0" />
+        Validación correcta. Los datos de derechohabientes están completos.
       </div>
     );
   }
