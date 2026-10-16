@@ -517,6 +517,100 @@ export const getTotalAdditionalMinutes = (record) => {
 };
 
 /**
+ * Minutos de salida anticipada de un registro: diferencia entre la hora
+ * programada de salida y la última marcación de salida real, descontando
+ * períodos cubiertos por justificaciones aprobadas.
+ *
+ * Reglas:
+ * - Si no hay ninguna marcación de salida (clock_out), retorna 0: NO se
+ *   interpreta una marcación ausente como salida anticipada.
+ * - Soporta turnos nocturnos (cruce de medianoche) y segmentos múltiples.
+ * - Excluye períodos cubiertos por justificaciones aprobadas (parciales o
+ *   de día completo) para evitar descuentos duplicados.
+ * - Si la justificación cubre todo el día (full_day_justification), retorna 0.
+ *
+ * @param {Object} record - Registro de asistencia con clock_in/clock_out y scheduled_end
+ * @param {Array} approvedIncidents - Incidentes aprobados con justificación de tiempo
+ * @returns {number} Minutos de salida anticipada (≥ 0)
+ */
+export const getEarlyDepartureMinutes = (record, approvedIncidents = [], schedule = {}) => {
+  if (!record || !record.scheduled_end) return 0;
+  if (['Vacaciones', 'Permiso sin goce', 'Ausente'].includes(record.status) || record.is_absent || schedule.exempt_from_clocking) return 0;
+  if (['', '_2', '_3', '_4'].some(suffix => record[`clock_in${suffix}`] && !record[`clock_out${suffix}`])) return 0;
+
+  const schedStartMin = toMin(record.scheduled_start || "00:00");
+  const schedEndMin   = toMin(record.scheduled_end);
+  const isNightShift  = schedEndMin < schedStartMin;
+  const fullJornada   = isNightShift
+    ? (schedEndMin - schedStartMin + 1440)
+    : Math.max(0, schedEndMin - schedStartMin);
+  const norm = (t) => isNightShift ? (t - schedStartMin + 1440) % 1440 : t;
+  const normSchedEnd = isNightShift ? fullJornada : schedEndMin;
+
+  // Full-day justification → no hay salida anticipada
+  if (approvedIncidents.some(inc => inc.full_day_justification)) return 0;
+
+  // Encontrar la última marcación de salida entre todos los segmentos
+  const segFields = [
+    ["clock_in", "clock_out"],
+    ["clock_in_2", "clock_out_2"],
+    ["clock_in_3", "clock_out_3"],
+    ["clock_in_4", "clock_out_4"],
+  ];
+  let lastClockOutNorm = null;
+  for (const [inField, outField] of segFields) {
+    const co = record[outField] ? String(record[outField]).slice(0, 5) : null;
+    if (!co) continue;
+    let nOut = norm(toMin(co));
+    const ci = record[inField] ? String(record[inField]).slice(0, 5) : null;
+    if (ci) {
+      let nIn = norm(toMin(ci));
+      if (isNightShift && nIn > fullJornada) nIn = 0;
+      if (nOut < nIn) nOut += 1440; // cruce de medianoche del segmento
+    }
+    if (lastClockOutNorm === null || nOut > lastClockOutNorm) lastClockOutNorm = nOut;
+  }
+
+  // Sin marcación de salida → no interpretar como salida anticipada
+  if (lastClockOutNorm === null) return 0;
+
+  // Si trabajó hasta o después de la hora programada de salida → 0
+  if (lastClockOutNorm >= normSchedEnd) return 0;
+
+  // Minutos brutos de salida anticipada
+  let earlyMin = Math.max(0, normSchedEnd - lastClockOutNorm);
+
+  // Excluir períodos cubiertos por justificaciones aprobadas (parciales)
+  const covered = [];
+  for (const inc of approvedIncidents) {
+    if (inc.full_day_justification) continue;
+    if (!inc.justified_time_start || !inc.justified_time_end) continue;
+    let jStart = norm(toMin(inc.justified_time_start));
+    let jEnd   = norm(toMin(inc.justified_time_end));
+    if (isNightShift && jStart > fullJornada) jStart = 0;
+    if (jEnd < jStart) jEnd += 1440;
+    const oS = Math.max(jStart, lastClockOutNorm);
+    const oE = Math.min(jEnd, normSchedEnd);
+    if (oE > oS) covered.push([oS, oE]);
+  }
+
+  // Restar el refrigerio únicamente cuando su horario está definido.
+  if (schedule.break_start && Number(schedule.break_duration_minutes) > 0) {
+    const start = norm(toMin(schedule.break_start));
+    const end = start + Number(schedule.break_duration_minutes);
+    const from = Math.max(start, lastClockOutNorm), to = Math.min(end, normSchedEnd);
+    if (to > from) covered.push([from, to]);
+  }
+  covered.sort((a, b) => a[0] - b[0]);
+  let justifiedOverlap = 0, previousEnd = lastClockOutNorm;
+  for (const [from, to] of covered) {
+    justifiedOverlap += Math.max(0, to - Math.max(from, previousEnd));
+    previousEnd = Math.max(previousEnd, to);
+  }
+  return Math.max(0, earlyMin - justifiedOverlap);
+};
+
+/**
  * Tardanza efectiva de un registro, descontando los minutos compensados
  * cuando la compensación está activa y la funcionalidad está habilitada.
  * No modifica late_minutes; solo calcula el valor efectivo en el punto de consumo.

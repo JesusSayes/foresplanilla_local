@@ -10,6 +10,15 @@
       "type": "string",
       "description": "ID de la boleta/planilla vinculada (opcional: se completa si la planilla ya existe)"
     },
+    "attendance_record_id": {
+      "type": "string",
+      "description": "ID del registro de asistencia al que corresponden las horas extras manuales (opcional). Identifica la jornada espec\u00edfica, incluso si cruza medianoche."
+    },
+    "attendance_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de la jornada a la que corresponden las horas extras manuales (para identificar la jornada cuando no hay attendance_record_id)"
+    },
     "month": {
       "type": "integer",
       "description": "Mes del per\u00edodo (1-12)"
@@ -47,6 +56,15 @@
       "type": "integer",
       "default": 0,
       "description": "Minutos extras manuales al 35% (0-59)"
+    },
+    "overtime_destination": {
+      "type": "string",
+      "enum": [
+        "pago",
+        "compensacion"
+      ],
+      "default": "pago",
+      "description": "Destino de las horas extras manuales de esta jornada: 'pago' (se pagan en planilla) o 'compensacion' (se destinan exclusivamente a compensar tardanzas, no se pagan). Se define por jornada, no por empleado."
     },
     "reason": {
       "type": "string",

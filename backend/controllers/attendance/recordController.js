@@ -61,6 +61,7 @@ export const create = async (req, res) => {
     console.log('AttendanceRecord.create body:', req.body);
 
     const data = { ...req.body };
+    if (data.overtime_destination !== undefined && !['pago', 'compensacion'].includes(data.overtime_destination)) return res.status(400).json({ error: 'Destino de HE inválido' });
     if (!canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     const employee = await prisma.employee.findUnique({ where: { id: data.employee_id } });
     if (!employee) return res.status(404).json({ error: 'Empleado no encontrado' });
@@ -94,6 +95,7 @@ export const create = async (req, res) => {
         overtime_hours_25: data.overtime_hours_25,
         overtime_hours_35: data.overtime_hours_35,
         overtime_authorized: data.overtime_authorized,
+        overtime_destination: data.overtime_destination ?? "pago",
         is_late: data.is_late ?? false,
         late_minutes: data.late_minutes ?? 0,
         is_absent: data.is_absent ?? false,
@@ -118,6 +120,7 @@ export const create = async (req, res) => {
 export const update = async (req, res) => {
   try {
     const data = { ...req.body, };
+    if (data.overtime_destination !== undefined && !['pago', 'compensacion'].includes(data.overtime_destination)) return res.status(400).json({ error: 'Destino de HE inválido' });
     const existing = await prisma.attendance_record.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Record not found' });
     if (!canAccessEmployee(req, existing.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });

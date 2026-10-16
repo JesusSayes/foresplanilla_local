@@ -26,12 +26,12 @@ for (const [name, changes, schedule, incidents, minutes] of [
   ['considera otros segmentos', { clock_in_2: '07:00', clock_out_2: '08:00' }, {}, [], 0],
   ['turno nocturno', { clock_in: '22:20', clock_out: '06:00', scheduled_start: '22:00', scheduled_end: '06:00' }, { tuesday_start: '22:00', tuesday_end: '06:00' }, [], 20],
 ]) test(name, async () => {
-  assert.deepEqual(await editedAttendanceTardiness(context(schedule, incidents), record, changes), { is_late: minutes > 0, late_minutes: minutes });
+  assert.deepEqual(await editedAttendanceTardiness(context(schedule, incidents), record, changes), { is_late: minutes > 0, late_minutes: minutes, early_departure_minutes: 0 });
 });
 
 test('no recalcula cambios ajenos a marcaciones y conserva vacaciones', async () => {
   assert.deepEqual(await editedAttendanceTardiness({}, record, { notes: 'Nota' }), {});
-  assert.deepEqual(await editedAttendanceTardiness({}, { ...record, status: 'Vacaciones' }, { clock_in: '07:00' }), { is_late: false, late_minutes: 0 });
+  assert.deepEqual(await editedAttendanceTardiness({}, { ...record, status: 'Vacaciones' }, { clock_in: '07:00' }), { is_late: false, late_minutes: 0, early_departure_minutes: 0 });
 });
 
 test('edición directa guarda marcación y tardanza juntas sin cambiar otras métricas', async t => {

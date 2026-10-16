@@ -87,6 +87,15 @@
       "default": false,
       "description": "Horas extras aceptadas/autorizadas para este d\u00eda espec\u00edfico"
     },
+    "overtime_destination": {
+      "type": "string",
+      "enum": [
+        "pago",
+        "compensacion"
+      ],
+      "default": "pago",
+      "description": "Destino de las horas extras de esta jornada: 'pago' (se pagan en planilla, requiere overtime_authorized=true) o 'compensacion' (se destinan exclusivamente a compensar tardanzas, no se pagan ni entran en bases de c\u00e1lculo). Se define por registro/jornada, no por empleado. Un mismo trabajador puede tener jornadas con destino 'pago' y otras con 'compensacion' en el mismo per\u00edodo."
+    },
     "is_late": {
       "type": "boolean",
       "default": false,
@@ -96,6 +105,11 @@
       "type": "integer",
       "default": 0,
       "description": "Minutos de tardanza original (calculados por el motor de asistencia). No se modifica al aplicar compensaci\u00f3n; la tardanza efectiva se calcula en el punto de consumo."
+    },
+    "early_departure_minutes": {
+      "type": "integer",
+      "default": 0,
+      "description": "Minutos de salida anticipada (calculados por el motor de asistencia). Diferencia entre la hora programada de salida y la \u00faltima marcaci\u00f3n de salida real, descontando per\u00edodos cubiertos por justificaciones aprobadas. No interpreta una marcaci\u00f3n de salida ausente como salida anticipada (si no hay clock_out, el valor es 0). Soporta turnos nocturnos y refrigerios."
     },
     "is_absent": {
       "type": "boolean",

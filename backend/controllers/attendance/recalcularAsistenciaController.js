@@ -1,3 +1,4 @@
+import { compensationMinutes } from '../../services/compensationOvertime.js';
 import { normalizeVacationAttendance } from "../../services/vacationAttendance.js";
 import prisma from "../../config/prisma.js";
 import { canAccessEmployee } from "../../middleware/authorization.js";
@@ -82,6 +83,8 @@ const recalcularAsistencia = async (req, res) => {
         full_day_justification: true,
         late_minutes_to_adjust: true,
         hours_to_adjust: true,
+        overtime_minutes_25: true,
+        overtime_minutes_35: true,
       },
     });
 
@@ -146,7 +149,7 @@ const recalcularAsistencia = async (req, res) => {
           0
         );
         let compensatedOvertimeHours = approvedCompensations.reduce(
-          (total, incident) => total + Number(incident.hours_to_adjust || 0),
+          (total, incident) => total + compensationMinutes(incident) / 60,
           0
         );
 
@@ -174,6 +177,7 @@ const recalcularAsistencia = async (req, res) => {
           overtime_hours_35: protectValue(protectedFields, "overtime_hours_35", record.overtime_hours_35, finalOT35),
           is_late: protectValue(protectedFields, "is_late", record.is_late, finalIsLate),
           late_minutes: protectValue(protectedFields, "late_minutes", record.late_minutes, finalLate),
+          early_departure_minutes: metrics.early_departure_minutes,
           is_absent: protectValue(protectedFields, "is_absent", record.is_absent, status === "Ausente" && !!metrics.scheduled_start),
           scheduled_start: metrics.scheduled_start || "",
           scheduled_end: metrics.scheduled_end || "",

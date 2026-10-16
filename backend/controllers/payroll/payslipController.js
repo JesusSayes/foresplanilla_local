@@ -142,6 +142,7 @@ export const bulkCreate = async (req, res) => {
         health_insurance: Number(p.health_insurance || 0),
         income_tax: Number(p.income_tax || 0),
         tardiness_discount: Number(p.tardiness_discount || 0),
+        early_departure_discount: Number(p.early_departure_discount || 0),
         absence_discount: Number(p.absence_discount || 0),
         loan_deduction: Number(p.loan_deduction || 0),
         advance_deduction: Number(p.advance_deduction || 0),

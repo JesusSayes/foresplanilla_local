@@ -5,7 +5,7 @@ import { authenticateToken } from '../../middleware/auth.js';
 import { attachEmployeeScope, loadAccessContext, requireAnyPermission } from '../../middleware/authorization.js';
 
 const CREATE_PERMISSIONS = ['attendance.view_all', 'attendance.view_department', 'attendance.view_own', 'attendance.approve_compensations', 'attendance.manage'];
-const VIEW_PERMISSIONS = [...CREATE_PERMISSIONS, 'attendance.approve_edits', 'attendance.approve_incidents'];
+const VIEW_PERMISSIONS = [...CREATE_PERMISSIONS, 'payroll.create', 'payroll.calculate', 'attendance.approve_edits', 'attendance.approve_incidents'];
 
 router.use(authenticateToken, loadAccessContext);
 

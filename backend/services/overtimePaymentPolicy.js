@@ -21,22 +21,38 @@ const hasOvertimeIncome = payslip => {
   });
 };
 
-// Ejecutar dentro de la misma transacción que persiste las boletas.
-// La lectura SQL permite incorporar la configuración sin modificar Prisma.
+// Validar por jornada; la antigua configuración del empleado ya no decide el pago.
 export async function validateOvertimePaymentPolicy(db, payslips) {
-  const ids = [...new Set(payslips.map(p => p.employee_id).filter(Boolean))].sort();
-  if (!ids.length) return;
-  const employees = await db.$queryRawUnsafe(
-    `SELECT id, overtime_payment_mode FROM employee
-      WHERE id = ANY($1::varchar[]) ORDER BY id FOR SHARE`, ids
-  );
-  const compensationOnly = new Set(employees
-    .filter(employee => employee.overtime_payment_mode === 'compensation_only')
-    .map(employee => employee.id));
-  const invalid = payslips.find(p => compensationOnly.has(p.employee_id) && hasOvertimeIncome(p));
-  if (invalid) {
-    throw Object.assign(new Error(
-      `El empleado ${invalid.employee_id} tiene horas extras solo para compensación. Recalcule la boleta sin pago de HE antes de guardarla o aprobarla.`
-    ), { status: 409, code: 'OVERTIME_COMPENSATION_ONLY' });
+  for (const payslip of payslips) {
+    if (!hasOvertimeIncome(payslip)) continue;
+    const year = Number(payslip.year), month = Number(payslip.month);
+    const date = value => value instanceof Date ? value.toISOString().slice(0, 10) : String(value || '').slice(0, 10);
+    const from = date(payslip.attendance_period_start) || `${year}-${String(month).padStart(2, '0')}-01`;
+    const to = date(payslip.attendance_period_end) || `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
+    if (!payslip.employee_id || !Number.isInteger(year) || year < 1900 || !Number.isInteger(month) || month < 1 || month > 12 || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      throw Object.assign(new Error('La boleta con HE requiere empleado y período válidos'), { status: 400 });
+    }
+    const records = await db.$queryRawUnsafe(
+      `SELECT overtime_hours_25, overtime_hours_35 FROM attendance_record
+        WHERE employee_id = $1 AND date BETWEEN $2::date AND $3::date
+          AND COALESCE(overtime_destination, 'pago') = 'pago' AND overtime_authorized = true
+          AND COALESCE(status, '') <> 'Vacaciones' FOR SHARE`, payslip.employee_id, from, to);
+    const manual = await db.$queryRawUnsafe(
+      `SELECT m.overtime_hours_25, m.overtime_minutes_25, m.overtime_hours_35, m.overtime_minutes_35
+         FROM horasextrasmanual m
+        WHERE m.employee_id = $1 AND m.month = $2 AND m.year = $3 AND m.payroll_type = $4
+          AND m.status = 'Activo' AND COALESCE(m.overtime_destination, 'pago') = 'pago'
+          AND (m.attendance_record_id IS NULL OR EXISTS (
+            SELECT 1 FROM attendance_record a WHERE a.id = m.attendance_record_id
+              AND a.employee_id = m.employee_id AND COALESCE(a.overtime_destination, 'pago') = 'pago'
+              AND a.overtime_authorized = true AND COALESCE(a.status, '') <> 'Vacaciones'))
+        FOR SHARE OF m`, payslip.employee_id, month, year, payslip.payroll_type || 'Mensual');
+    const allowed = rate => [...records, ...manual].reduce((sum, r) => sum + Number(r[`overtime_hours_${rate}`] || 0) + Number(r[`overtime_minutes_${rate}`] || 0) / 60, 0);
+    const h25 = allowed(25), h35 = allowed(35);
+    if (Number(payslip.overtime_hours_25 || 0) > h25 + 0.011 ||
+        Number(payslip.overtime_hours_35 || 0) > h35 + 0.011 ||
+        Number(payslip.overtime_hours || 0) > h25 + h35 + 0.011 || h25 + h35 === 0) {
+      throw Object.assign(new Error('Las HE de la boleta exceden las jornadas autorizadas para pago; excluya las destinadas solo para compensación y recalcule.'), { status: 409, code: 'OVERTIME_COMPENSATION_ONLY' });
+    }
   }
 }

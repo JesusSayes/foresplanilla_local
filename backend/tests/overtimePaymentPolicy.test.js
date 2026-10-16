@@ -7,15 +7,18 @@ import { create, bulkCreate, update, bulkUpdate } from '../controllers/payroll/p
 import { createEmployee, updateEmployee } from '../controllers/employeeController.js';
 
 const response = () => ({ statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } });
-const record = { id: 'p1', employee_id: 'e1', overtime_pay: 100, total_income: 1100, net_pay: 1000, status: 'Calculada' };
+const record = { id: 'p1', employee_id: 'e1', year: 2026, month: 10, overtime_pay: 100, total_income: 1100, net_pay: 1000, status: 'Calculada' };
 const request = body => ({ body, params: { id: 'p1' }, query: {}, accessibleEmployeeIds: ['e1', 'e2'], user: { id: 'u1', email: 'test@example.com' } });
 const model = (t, name, value) => { const original = prisma[name]; prisma[name] = value; t.after(() => { prisma[name] = original; }); };
 const setup = (t, mode = 'compensation_only', currentRecord = record) => {
   const writes = [];
   const db = {
-    $queryRawUnsafe: async (sql, ids) => {
-      assert.match(sql, /FOR SHARE/); assert.deepEqual(ids, [...new Set(ids)].sort());
-      return ids.map(id => ({ id, overtime_payment_mode: id === 'e1' ? mode : 'payment' }));
+    $queryRawUnsafe: async (sql, id) => {
+      assert.match(sql, /FOR SHARE/);
+      if (sql.includes('horasextrasmanual')) return [];
+      assert.match(sql, /overtime_destination/);
+      assert.match(sql, /overtime_authorized = true/);
+      return mode === 'payment' || id === 'e2' ? [{ overtime_hours_25: 2, overtime_hours_35: 1 }] : [];
     },
     payslip: {
       findUnique: async () => currentRecord,
@@ -59,7 +62,7 @@ for (const patch of [
   { calculation_summary: { breakdown: { incomes: { items: [{ formula: 'horas_extras_25 * 10', amount: 50 }] } } } },
 ]) test(`detecta HE aunque overtime_pay sea cero: ${JSON.stringify(patch)}`, async t => {
   const { db } = setup(t);
-  await assert.rejects(validateOvertimePaymentPolicy(db, [{ employee_id: 'e1', overtime_pay: 0, ...patch }]), { status: 409 });
+  await assert.rejects(validateOvertimePaymentPolicy(db, [{ employee_id: 'e1', year: 2026, month: 10, overtime_pay: 0, ...patch }]), { status: 409 });
 });
 
 test('permite corregir una boleta retirando HE sin tocar asistencias', async t => {

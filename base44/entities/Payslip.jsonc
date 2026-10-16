@@ -149,6 +149,11 @@
       "default": 0,
       "description": "Descuento por tardanzas"
     },
+    "early_departure_discount": {
+      "type": "number",
+      "default": 0,
+      "description": "Descuento por salida anticipada (minutos no laborados antes de la hora de salida programada, sin tolerancia). Concepto independiente del descuento por tardanzas y permisos."
+    },
     "absence_discount": {
       "type": "number",
       "default": 0,

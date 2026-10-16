@@ -65,6 +65,16 @@
       "default": 0,
       "description": "Horas calculadas a ajustar (sin incluir extras)"
     },
+    "overtime_minutes_25": {
+      "type": "integer",
+      "default": 0,
+      "description": "Minutos de HE al 25% destinados a compensaci\u00f3n de tardanza. Se descuentan del total de HE al 25% en el c\u00e1lculo de planilla para que no generen pago (solo la parte no destinada a compensaci\u00f3n se paga). Se consumen primero del total disponible al 25%."
+    },
+    "overtime_minutes_35": {
+      "type": "integer",
+      "default": 0,
+      "description": "Minutos de HE al 35% destinados a compensaci\u00f3n de tardanza. Se descuentan del total de HE al 35% en el c\u00e1lculo de planilla para que no generen pago. Se consumen despu\u00e9s de agotar los minutos al 25%."
+    },
     "late_minutes_to_adjust": {
       "type": "integer",
       "default": 0,

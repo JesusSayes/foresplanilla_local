@@ -75,10 +75,11 @@ test('crea horas con identidad del token, nunca la del cliente', async t => {
   let inserted;
   mockTransaction(t, async (sql, params) => {
     if (sql.includes('SELECT id FROM public.employee')) return { rows: [{ id: 'e1' }] };
+    if (sql.includes('FROM attendance_record')) return { rows: [{ id: 'r1', overtime_authorized: true, overtime_destination: 'pago' }] };
     if (sql.startsWith('INSERT')) { inserted = params; return { rows: [{ ...overtime, created_by: 'admin@test.local' }] }; }
     return { rows: [] };
   });
-  const result = await call('/HorasExtrasManual', 'post', request({ ...overtime, created_by: 'spoof@test.local' }));
+  const result = await call('/HorasExtrasManual', 'post', request({ ...overtime, attendance_date: '2026-10-15', created_by: 'spoof@test.local' }));
   assert.equal(result.statusCode, 201);
   assert.ok(inserted.includes('admin@test.local'));
   assert.ok(!inserted.includes('spoof@test.local'));

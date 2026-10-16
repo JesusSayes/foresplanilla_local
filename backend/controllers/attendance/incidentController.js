@@ -1,3 +1,4 @@
+import { compensationMinutes } from '../../services/compensationOvertime.js';
 import { attendanceDateFilter } from '../../utils/attendanceDateFilter.js';
 import prisma from "../../config/prisma.js";
 
@@ -16,7 +17,9 @@ const serializeIncident = (incident) => ({
   ...incident,
   incident_date: toDateString(incident.incident_date),
   review_date: toDateString(incident.review_date),
-  hours_to_adjust: incident.hours_to_adjust != null ? Number(incident.hours_to_adjust) : null,
+  hours_to_adjust: incident.incident_type === 'Compensación de Tardanza'
+    ? compensationMinutes(incident) / 60
+    : incident.hours_to_adjust != null ? Number(incident.hours_to_adjust) : null,
 });
 
 const validateCompensationBalance = async (tx, data, excludeId) => {
@@ -33,10 +36,10 @@ const validateCompensationBalance = async (tx, data, excludeId) => {
       status: 'Pendiente',
       ...(excludeId && { id: { not: excludeId } }),
     },
-    select: { late_minutes_to_adjust: true, hours_to_adjust: true },
+    select: { late_minutes_to_adjust: true, hours_to_adjust: true, overtime_minutes_25: true, overtime_minutes_35: true },
   });
   const reservedLate = reservations.reduce((sum, item) => sum + Number(item.late_minutes_to_adjust || 0), 0);
-  const reservedMinutes = reservations.reduce((sum, item) => sum + Math.round(Number(item.hours_to_adjust || 0) * 60), 0);
+  const reservedMinutes = reservations.reduce((sum, item) => sum + compensationMinutes(item), 0);
   const late = Number(data.late_minutes_to_adjust || 0);
   const hours = Number(data.hours_to_adjust || 0);
   const availableMinutes = Math.round((Number(record.overtime_hours_25 || 0) + Number(record.overtime_hours_35 || 0)) * 60);
@@ -45,6 +48,11 @@ const validateCompensationBalance = async (tx, data, excludeId) => {
       Math.round(hours * 60) > Math.max(0, availableMinutes - reservedMinutes)) {
     throw Object.assign(new Error('Los minutos solicitados exceden el saldo disponible de la asistencia'), { status: 400 });
   }
+  // El servidor asigna primero el saldo al 25%, descontando las reservas pendientes.
+  const requestedMinutes = Math.round(hours * 60);
+  const available25 = Math.max(0, Math.round(Number(record.overtime_hours_25 || 0) * 60) - reservedMinutes);
+  data.overtime_minutes_25 = Math.min(requestedMinutes, available25);
+  data.overtime_minutes_35 = requestedMinutes - data.overtime_minutes_25;
   return record;
 };
 
@@ -220,11 +228,13 @@ export const update = async (req, res) => {
     const needsBalanceCheck = next.incident_type === 'Compensación de Tardanza' &&
       ['Pendiente', 'Aprobada'].includes(next.status) &&
       (!['Pendiente', 'Aprobada'].includes(existing.status) ||
-       ['attendance_record_id', 'employee_id', 'incident_date', 'incident_type', 'late_minutes_to_adjust', 'hours_to_adjust']
+       ['attendance_record_id', 'employee_id', 'incident_date', 'incident_type', 'late_minutes_to_adjust', 'hours_to_adjust', 'overtime_minutes_25', 'overtime_minutes_35']
          .some(field => Object.hasOwn(updateData, field)));
     const incident = needsBalanceCheck
       ? await prisma.$transaction(async tx => {
           await validateCompensationBalance(tx, next, existing.id);
+          updateData.overtime_minutes_25 = next.overtime_minutes_25;
+          updateData.overtime_minutes_35 = next.overtime_minutes_35;
           return tx.attendance_incident.update({ where: { id: req.params.id }, data: updateData });
         }, { isolationLevel: 'Serializable' })
       : await prisma.attendance_incident.update({ where: { id: req.params.id }, data: updateData });

@@ -106,6 +106,12 @@ function buildConceptRows(payslip, conceptsMap = []) {
       }
     }
 
+    const earlyAmt = safePayrollNumber(payslip.early_departure_discount);
+    if (earlyAmt > 0 && !descuentos.some(d => /salida anticipada/i.test(d.label))) {
+      const { code, conceptId } = lookupCode("Descuento por Salida Anticipada", conceptsMap);
+      descuentos.push({ code, label: "DESC. POR SALIDA ANTICIPADA", amount: earlyAmt, conceptId, missingCode: !code });
+    }
+
     // ── Descuento por inasistencias (campo del payslip, no viene en el breakdown) ──
     const absenceAmt = safePayrollNumber(payslip.absence_discount);
     if (absenceAmt > 0) {
@@ -168,6 +174,7 @@ function buildConceptRows(payslip, conceptsMap = []) {
       { field: "advance_deduction",  label: "ADELANTO / PLANILLA QUINCENAL",       lookupName: "Adelanto Quincenal",              worker: false },
       { field: "loan_deduction",     label: "PRÉSTAMOS",                            lookupName: "Préstamos",                        worker: false },
       { field: "tardiness_discount", label: "DESC. POR TARDANZAS",                  lookupName: "Descuento por Tardanzas",          worker: false },
+      { field: "early_departure_discount", label: "DESC. POR SALIDA ANTICIPADA", lookupName: "Descuento por Salida Anticipada", worker: false },
       { field: "absence_discount",   label: "DESC. POR INASISTENCIAS",              lookupName: "Descuento por Inasistencias",      worker: false },
       { field: "other_deductions",   label: "OTROS DESCUENTOS",                     lookupName: "otros descuentos",                 worker: false },
       { field: "pension_deduction",  label: "AFP/ONP - APORTACIÓN OBLIGATORIA",     lookupName: "AFP - Aporte Obligatorio",         worker: true  },
