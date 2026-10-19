@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, AlertCircle, CheckCircle, XCircle, FileText, X } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { downloadTemplate, validateRow } from "@/lib/derechohabienteTemplate";
+import DerechohabienteImportGuide from "./DerechohabienteImportGuide";
 
 // Parsea una línea del archivo TXT con separador |
 function parseLine(line) {
@@ -72,6 +74,8 @@ export default function ImportDerechohabientesModal({ employees, onClose, onSucc
   const [preview, setPreview] = useState([]); // parsed rows
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null); // { imported, skipped }
+  const [validationErrors, setValidationErrors] = useState([]);
+  const [showGuide, setShowGuide] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
@@ -79,6 +83,7 @@ export default function ImportDerechohabientesModal({ employees, onClose, onSucc
     if (!f) return;
     setFile(f);
     setResult(null);
+    setValidationErrors([]);
 
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -86,7 +91,21 @@ export default function ImportDerechohabientesModal({ employees, onClose, onSucc
       const lines = text.split("\n").map(l => l.replace(/\r/g, "").trim()).filter(Boolean);
       // Skip header line
       const dataLines = lines.slice(1);
-      const parsed = dataLines.map(parseLine).filter(r => r.num_titular && r.num_dhabiente);
+      const valErrors = [];
+      const parsed = [];
+      dataLines.forEach((line, idx) => {
+        const parts = line.split("|");
+        const rowErrors = validateRow(parts, idx + 2); // +2: línea 1 = encabezado
+        if (rowErrors.length > 0) {
+          valErrors.push(...rowErrors);
+          return; // no procesar filas con errores estructurales
+        }
+        const row = parseLine(line);
+        if (row.num_titular && row.num_dhabiente) {
+          parsed.push(row);
+        }
+      });
+      setValidationErrors(valErrors);
       setPreview(parsed);
     };
     reader.readAsText(f, "latin1");
@@ -217,6 +236,41 @@ export default function ImportDerechohabientesModal({ employees, onClose, onSucc
                 onChange={handleFileChange}
                 className="hidden"
               />
+              {/* Plantilla y guía */}
+              <div className="flex flex-wrap gap-2 mt-3">
+                <Button type="button" variant="outline" size="sm" onClick={() => downloadTemplate()}>
+                  <FileText className="w-4 h-4 mr-1.5" />
+                  Descargar plantilla TXT
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setShowGuide(!showGuide)}>
+                  {showGuide ? "Ocultar guía de campos" : "Ver guía de campos"}
+                </Button>
+              </div>
+              {showGuide && (
+                <div className="mt-3 border rounded-lg p-4 bg-white">
+                  <DerechohabienteImportGuide />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Errores de validación */}
+          {validationErrors.length > 0 && !result && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-4 h-4 text-red-600" />
+                <h3 className="font-semibold text-red-700 text-sm">
+                  Errores de validación ({validationErrors.length})
+                </h3>
+              </div>
+              <ul className="text-xs text-red-600 space-y-1 max-h-40 overflow-y-auto">
+                {validationErrors.map((err, i) => (
+                  <li key={i} className="font-mono">{err}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-red-500 mt-2">
+                Corrija los errores en el archivo y vuelva a seleccionarlo. Las filas con errores no se importarán.
+              </p>
             </div>
           )}
 
@@ -260,7 +314,7 @@ export default function ImportDerechohabientesModal({ employees, onClose, onSucc
               </div>
 
               <div className="flex gap-3 mt-4">
-                <Button variant="outline" className="flex-1" onClick={() => { setFile(null); setPreview([]); }}>
+                <Button variant="outline" className="flex-1" onClick={() => { setFile(null); setPreview([]); setValidationErrors([]); }}>
                   Cambiar archivo
                 </Button>
                 <Button
