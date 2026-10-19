@@ -1,5 +1,4 @@
 import React, { useState, useRef } from "react";
-import { useAuth } from '@/lib/AuthContext';
 import { entitiesAPI } from '@/api/entitiesClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -82,18 +81,20 @@ export default function ImportDerechohabientesModal({ employees, onClose, onSucc
     const f = e.target.files?.[0];
     if (!f) return;
     setFile(f);
+    setPreview([]);
     setResult(null);
     setValidationErrors([]);
 
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target.result;
-      const lines = text.split("\n").map(l => l.replace(/\r/g, "").trim()).filter(Boolean);
+      const lines = text.split("\n").map(l => l.replace(/\r/g, "").trim());
       // Skip header line
       const dataLines = lines.slice(1);
       const valErrors = [];
       const parsed = [];
       dataLines.forEach((line, idx) => {
+        if (!line) return;
         const parts = line.split("|");
         const rowErrors = validateRow(parts, idx + 2); // +2: línea 1 = encabezado
         if (rowErrors.length > 0) {
@@ -108,6 +109,7 @@ export default function ImportDerechohabientesModal({ employees, onClose, onSucc
       setValidationErrors(valErrors);
       setPreview(parsed);
     };
+    reader.onerror = () => setValidationErrors(["No se pudo leer el archivo. Vuelve a seleccionarlo."]);
     reader.readAsText(f, "latin1");
   };
 
@@ -124,7 +126,14 @@ export default function ImportDerechohabientesModal({ employees, onClose, onSucc
     });
 
     // Cargar derechohabientes existentes para evitar duplicados
-    const existingDH = await entitiesAPI.Derechohabiente.list("-created_date", 2000);
+    let existingDH;
+    try {
+      existingDH = await entitiesAPI.Derechohabiente.list("-created_date", 2000);
+    } catch (error) {
+      toast.error(error.message || "No se pudieron cargar los derechohabientes existentes");
+      setProcessing(false);
+      return;
+    }
     const existingSet = new Set(existingDH.map(d => `${d.employee_id}|${d.document_number}`));
 
     const imported = [];
@@ -175,7 +184,12 @@ export default function ImportDerechohabientesModal({ employees, onClose, onSucc
         is_active:               true,
       };
 
-      await entitiesAPI.Derechohabiente.create(payload);
+      try {
+        await entitiesAPI.Derechohabiente.create(payload);
+      } catch (error) {
+        skipped.push({ row, reason: error.message || "No se pudo guardar el derechohabiente" });
+        continue;
+      }
       existingSet.add(key);
       imported.push(row);
     }

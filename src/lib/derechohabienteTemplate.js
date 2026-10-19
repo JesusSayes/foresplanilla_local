@@ -101,13 +101,17 @@ export function validateRow(parts, lineNumber) {
       `Línea ${lineNumber}, campo "Fecha Nacimiento" (posición 6): formato inválido "${fecNac}", se espera DD/MM/YYYY.`
     );
   }
-  const numTitular = (parts[1] || "").trim();
-  if (!numTitular) {
-    errors.push(`Línea ${lineNumber}, campo "N° Doc. Titular" (posición 2): obligatorio, no puede estar vacío.`);
+  for (const field of FIELD_SPECS) {
+    if (field.req === "Obligatorio" && !parts[field.pos - 1].trim()) {
+      errors.push(`Línea ${lineNumber}, campo "${field.name}" (posición ${field.pos}): obligatorio, no puede estar vacío.`);
+    }
   }
-  const numDhabiente = (parts[3] || "").trim();
-  if (!numDhabiente) {
-    errors.push(`Línea ${lineNumber}, campo "N° Doc. Derechohab." (posición 4): obligatorio, no puede estar vacío.`);
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(fecNac)) {
+    const [day, month, year] = fecNac.split("/").map(Number);
+    const date = new Date(`${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T00:00:00Z`);
+    if (year === 0 || date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) {
+      errors.push(`Línea ${lineNumber}, campo "Fecha Nacimiento" (posición 6): fecha inválida "${fecNac}".`);
+    }
   }
   return errors;
 }
