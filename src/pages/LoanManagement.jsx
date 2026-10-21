@@ -18,10 +18,25 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
-import { format, addMonths } from "date-fns";
+import { format, addMonths, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import PermissionGuard from "../components/PermissionGuard";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
+import LoanInstallmentsEditor from "@/components/loans/LoanInstallmentsEditor";
+
+// Genera cuotas iguales a partir del monto total y el número de cuotas.
+// Distribuye el residuo de centavos para que la suma coincida exactamente con el total.
+const buildEvenInstallments = (amount, count) => {
+  const total = parseFloat(amount);
+  const n = parseInt(count);
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(n) || n <= 0) return [];
+  const cents = Math.round(total * 100);
+  const base = Math.floor(cents / n);
+  const remainder = cents - base * n;
+  return Array.from({ length: n }, (_, i) =>
+    ((base + (i < remainder ? 1 : 0)) / 100).toFixed(2)
+  );
+};
 
 export default function LoanManagement() {
   const { user: currentUser } = useAuth();
@@ -31,6 +46,8 @@ export default function LoanManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [openEmployeeCombobox, setOpenEmployeeCombobox] = useState(false);
+  const [installmentAmounts, setInstallmentAmounts] = useState([]);
+  const [formError, setFormError] = useState("");
   const [loanFormData, setLoanFormData] = useState({
     employee_id: "",
     loan_type_id: "",
@@ -67,11 +84,11 @@ export default function LoanManagement() {
 
       if (types.length === 0) {
         // Crear tipos por defecto
-        await entitiesAPI.LoanType.bulkCreate([
+        await Promise.all([
           { name: "Personal", description: "Préstamo personal" },
           { name: "Escolar", description: "Préstamo escolar" },
           { name: "Vacaciones", description: "Préstamo vacacional" }
-        ]);
+        ].map(item => entitiesAPI.LoanType.create(item)));
         const after = await entitiesAPI.LoanType.list("name");
         console.log('LoanType.list after bulkCreate =>', after);
         return after;
@@ -97,11 +114,12 @@ export default function LoanManagement() {
   const createLoanMutation = useMutation({
     mutationFn: async (data) => {
       const monthlyAmount = parseFloat(data.amount) / parseInt(data.total_installments);
-      const startDate = new Date(data.start_date);
+      const startDate = parseISO(data.start_date);
       const endDate = addMonths(startDate, parseInt(data.total_installments) - 1);
 
+      const { installment_amounts, ...loanFields } = data;
       const loanData = {
-        ...data,
+        ...loanFields,
         amount: parseFloat(data.amount),
         total_installments: parseInt(data.total_installments),
         monthly_amount: monthlyAmount,
@@ -113,7 +131,7 @@ export default function LoanManagement() {
 
       const loan = await entitiesAPI.Loan.create(loanData);
 
-      // Crear las cuotas mensuales
+      // Crear las cuotas mensuales con el monto definido (editable) de cada cuota
       const installmentsToCreate = [];
       for (let i = 0; i < parseInt(data.total_installments); i++) {
         const installmentDate = addMonths(startDate, i);
@@ -121,12 +139,12 @@ export default function LoanManagement() {
           loan_id: loan.id,
           month: installmentDate.getMonth() + 1,
           year: installmentDate.getFullYear(),
-          amount: monthlyAmount,
+          amount: installment_amounts?.[i] ?? monthlyAmount,
           status: "Pendiente",
         });
       }
 
-      await entitiesAPI.LoanInstallment.bulkCreate(installmentsToCreate);
+      await Promise.all(installmentsToCreate.map(item => entitiesAPI.LoanInstallment.create(item)));
 
       return loan;
     },
@@ -137,6 +155,8 @@ export default function LoanManagement() {
       // Cerrar modal inmediatamente
       setShowLoanForm(false);
       setEditingLoan(null);
+      setInstallmentAmounts([]);
+      setFormError("");
       setLoanFormData({
         employee_id: "",
         loan_type_id: "",
@@ -155,11 +175,12 @@ export default function LoanManagement() {
   const updateLoanMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       const monthlyAmount = parseFloat(data.amount) / parseInt(data.total_installments);
-      const startDate = new Date(data.start_date);
+      const startDate = parseISO(data.start_date);
       const endDate = addMonths(startDate, parseInt(data.total_installments) - 1);
 
+      const { installment_amounts, ...loanFields } = data;
       const loanData = {
-        ...data,
+        ...loanFields,
         amount: parseFloat(data.amount),
         total_installments: parseInt(data.total_installments),
         monthly_amount: monthlyAmount,
@@ -173,7 +194,7 @@ export default function LoanManagement() {
       const existingInstallments = installments.filter(i => i.loan_id === id && i.status === "Pendiente");
       await Promise.all(existingInstallments.map(i => entitiesAPI.LoanInstallment.delete(i.id)));
 
-      // Crear nuevas cuotas pendientes
+      // Crear nuevas cuotas pendientes con el monto definido (editable) de cada cuota
       const installmentsToCreate = [];
       for (let i = 0; i < parseInt(data.total_installments); i++) {
         const installmentDate = addMonths(startDate, i);
@@ -181,12 +202,12 @@ export default function LoanManagement() {
           loan_id: loan.id,
           month: installmentDate.getMonth() + 1,
           year: installmentDate.getFullYear(),
-          amount: monthlyAmount,
+          amount: installment_amounts?.[i] ?? monthlyAmount,
           status: "Pendiente",
         });
       }
 
-      await entitiesAPI.LoanInstallment.bulkCreate(installmentsToCreate);
+      await Promise.all(installmentsToCreate.map(item => entitiesAPI.LoanInstallment.create(item)));
 
       return loan;
     },
@@ -197,6 +218,8 @@ export default function LoanManagement() {
       // Cerrar modal inmediatamente
       setShowLoanForm(false);
       setEditingLoan(null);
+      setInstallmentAmounts([]);
+      setFormError("");
       setLoanFormData({
         employee_id: "",
         loan_type_id: "",
@@ -230,41 +253,72 @@ export default function LoanManagement() {
     },
   });
 
+  const handleAmountChange = (value) => {
+    setFormError("");
+    setLoanFormData({ ...loanFormData, amount: value });
+    setInstallmentAmounts(buildEvenInstallments(value, loanFormData.total_installments));
+  };
+
+  const handleInstallmentsCountChange = (value) => {
+    setFormError("");
+    setLoanFormData({ ...loanFormData, total_installments: value });
+    setInstallmentAmounts(buildEvenInstallments(loanFormData.amount, value));
+  };
+
+  const handleInstallmentAmountChange = (index, value) => {
+    setFormError("");
+    setInstallmentAmounts(prev => prev.map((v, i) => (i === index ? value : v)));
+  };
+
+  // Monto total del préstamo y suma (no editable) de las cuotas definidas
+  const totalLoanAmount = parseFloat(loanFormData.amount) || 0;
+  const installmentsSum = installmentAmounts.reduce((s, v) => s + (parseFloat(v) || 0), 0);
+  const installmentsMatchTotal = Math.abs(installmentsSum - totalLoanAmount) < 0.005;
+
   const handleSubmit = () => {
-    // Validaciones específicas con mensajes orientativos
+    setFormError("");
+
+    // Validaciones específicas con mensajes orientativos (alerta dentro del modal)
     if (!loanFormData.employee_id) {
-      toast.error("⚠️ Debes seleccionar un empleado");
-      return;
+      return setFormError("Debes seleccionar un empleado.");
     }
 
     if (!loanFormData.loan_type_id) {
-      toast.error("⚠️ Debes seleccionar el tipo de préstamo (Personal, Escolar o Vacaciones)");
-      return;
+      return setFormError("Debes seleccionar el tipo de préstamo (Personal, Escolar o Vacaciones).");
     }
 
     if (!loanFormData.amount) {
-      toast.error("⚠️ Debes ingresar el monto total del préstamo");
-      return;
+      return setFormError("Debes ingresar el monto total del préstamo.");
     }
 
     if (parseFloat(loanFormData.amount) <= 0) {
-      toast.error("⚠️ El monto del préstamo debe ser mayor a 0");
-      return;
+      return setFormError("El monto del préstamo debe ser mayor a 0.");
     }
 
     if (!loanFormData.total_installments) {
-      toast.error("⚠️ Debes ingresar el número de cuotas mensuales");
-      return;
+      return setFormError("Debes ingresar el número de cuotas mensuales.");
     }
 
     if (parseInt(loanFormData.total_installments) <= 0) {
-      toast.error("⚠️ El número de cuotas debe ser mayor a 0");
-      return;
+      return setFormError("El número de cuotas debe ser mayor a 0.");
     }
 
     if (!loanFormData.start_date) {
-      toast.error("⚠️ Debes seleccionar la fecha de inicio del descuento");
-      return;
+      return setFormError("Debes seleccionar la fecha de inicio del descuento.");
+    }
+
+    if (installmentAmounts.length !== parseInt(loanFormData.total_installments)) {
+      return setFormError("No se pudieron generar las cuotas. Verifica el monto total y el número de cuotas.");
+    }
+
+    if (installmentAmounts.some(v => !(parseFloat(v) > 0))) {
+      return setFormError("Cada cuota debe tener un monto mayor a 0.");
+    }
+
+    if (!installmentsMatchTotal) {
+      return setFormError(
+        `La suma de las cuotas (S/ ${installmentsSum.toFixed(2)}) no coincide con el monto total del préstamo (S/ ${totalLoanAmount.toFixed(2)}). Diferencia: S/ ${Math.abs(installmentsSum - totalLoanAmount).toFixed(2)}.`
+      );
     }
 
     // Validar que no exista un préstamo activo del mismo tipo para el empleado
@@ -278,15 +332,19 @@ export default function LoanManagement() {
       if (existingActiveLoan) {
         const empName = getEmployeeName(loanFormData.employee_id);
         const typeName = getLoanTypeName(loanFormData.loan_type_id);
-        toast.error(`⚠️ ${empName} ya tiene un préstamo ${typeName} activo. Debe estar pagado o cancelado antes de registrar uno nuevo.`);
-        return;
+        return setFormError(`${empName} ya tiene un préstamo ${typeName} activo. Debe estar pagado o cancelado antes de registrar uno nuevo.`);
       }
     }
 
+    const payload = {
+      ...loanFormData,
+      installment_amounts: installmentAmounts.map(v => parseFloat(v)),
+    };
+
     if (editingLoan) {
-      updateLoanMutation.mutate({ id: editingLoan.id, data: loanFormData });
+      updateLoanMutation.mutate({ id: editingLoan.id, data: payload });
     } else {
-      createLoanMutation.mutate(loanFormData);
+      createLoanMutation.mutate(payload);
     }
   };
 
@@ -300,6 +358,17 @@ export default function LoanManagement() {
       start_date: loan.start_date,
       notes: loan.notes || "",
     });
+    // Precargar las cuotas existentes (pendientes) del préstamo; si no coinciden
+    // con el número de cuotas, se vuelven a generar en partes iguales.
+    const pendingInstallments = installments
+      .filter(i => i.loan_id === loan.id && i.status === "Pendiente")
+      .sort((a, b) => (a.year - b.year) || (a.month - b.month));
+    setInstallmentAmounts(
+      pendingInstallments.length === parseInt(loan.total_installments)
+        ? pendingInstallments.map(i => Number(i.amount ?? 0).toFixed(2))
+        : buildEvenInstallments(loan.amount, loan.total_installments)
+    );
+    setFormError("");
     setShowLoanForm(true);
   };
 
@@ -318,6 +387,8 @@ export default function LoanManagement() {
       start_date: format(new Date(), "yyyy-MM-dd"),
       notes: "",
     });
+    setInstallmentAmounts([]);
+    setFormError("");
     setEditingLoan(null);
     setShowLoanForm(false);
   };
@@ -402,7 +473,7 @@ export default function LoanManagement() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl font-bold">Préstamos Registrados</CardTitle>
                 <Button
-                  onClick={() => setShowLoanForm(true)}
+                  onClick={() => { setFormError(""); setShowLoanForm(true); }}
                   className="bg-indigo-600 hover:bg-indigo-700"
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -560,6 +631,12 @@ export default function LoanManagement() {
                 </div>
               </CardHeader>
               <CardContent className="p-6">
+                {formError && (
+                  <div className="mb-5 flex items-center justify-center gap-2 bg-red-50 border border-red-300 rounded-lg px-4 py-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+                    <p className="text-sm font-medium text-red-700 text-center">{formError}</p>
+                  </div>
+                )}
                 <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-semibold text-slate-900 mb-2">
@@ -593,6 +670,7 @@ export default function LoanManagement() {
                                   key={emp.id}
                                   value={`${emp.employee_code} ${emp.first_name} ${emp.last_name}`}
                                   onSelect={() => {
+                                    setFormError("");
                                     setLoanFormData({ ...loanFormData, employee_id: emp.id });
                                     setOpenEmployeeCombobox(false);
                                   }}
@@ -619,7 +697,7 @@ export default function LoanManagement() {
                     </label>
                     <Select
                       value={loanFormData.loan_type_id}
-                      onValueChange={(value) => setLoanFormData({ ...loanFormData, loan_type_id: value })}
+                      onValueChange={(value) => { setFormError(""); setLoanFormData({ ...loanFormData, loan_type_id: value }); }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar tipo" />
@@ -644,7 +722,7 @@ export default function LoanManagement() {
                         step="0.01"
                         placeholder="0.00"
                         value={loanFormData.amount}
-                        onChange={(e) => setLoanFormData({ ...loanFormData, amount: e.target.value })}
+                        onChange={(e) => handleAmountChange(e.target.value)}
                       />
                     </div>
 
@@ -656,18 +734,17 @@ export default function LoanManagement() {
                         type="number"
                         placeholder="12"
                         value={loanFormData.total_installments}
-                        onChange={(e) => setLoanFormData({ ...loanFormData, total_installments: e.target.value })}
+                        onChange={(e) => handleInstallmentsCountChange(e.target.value)}
                       />
                     </div>
                   </div>
 
-                  {loanFormData.amount && loanFormData.total_installments && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-900">
-                        <strong>Cuota mensual:</strong> S/ {(parseFloat(loanFormData.amount) / parseInt(loanFormData.total_installments)).toFixed(2)}
-                      </p>
-                    </div>
-                  )}
+                  <LoanInstallmentsEditor
+                    amounts={installmentAmounts}
+                    startDate={loanFormData.start_date}
+                    totalAmount={totalLoanAmount}
+                    onChange={handleInstallmentAmountChange}
+                  />
 
                   <div>
                     <label className="block text-sm font-semibold text-slate-900 mb-2">
@@ -676,7 +753,7 @@ export default function LoanManagement() {
                     <Input
                       type="date"
                       value={loanFormData.start_date}
-                      onChange={(e) => setLoanFormData({ ...loanFormData, start_date: e.target.value })}
+                      onChange={(e) => { setFormError(""); setLoanFormData({ ...loanFormData, start_date: e.target.value }); }}
                     />
                   </div>
 

@@ -1003,13 +1003,13 @@ model uit {
 model loan {
   installments_paid  Int?
   end_date           DateTime? @db.Date
-  amount             Int?
+  amount             Decimal?  @db.Decimal(18, 2)
   approved_by        String?
   approval_date      DateTime? @db.Date
   notes              String?
   employee_id        String?
   total_installments Int?
-  monthly_amount     Int?
+  monthly_amount     Decimal?  @db.Decimal(18, 2)
   loan_type_id       String?
   start_date         DateTime? @db.Date
   status             String?
@@ -1022,7 +1022,7 @@ model loan {
 }
 
 model loaninstallment {
-  amount        Int?
+  amount        Decimal?  @db.Decimal(18, 2)
   payslip_id    String?
   month         Int?
   year          Int?

@@ -1,3 +1,4 @@
+import { prepareLoanData, serializeLoanData } from "../../utils/loanData.js";
 import prisma from "../../config/prisma.js";
 
 export const getAll = async (req, res) => {
@@ -8,7 +9,7 @@ export const getAll = async (req, res) => {
     const items = await prisma.loantype.findMany({
       orderBy: { [field]: desc ? 'desc' : 'asc' }
     });
-    res.json(items);
+    res.json(serializeLoanData(items));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -20,7 +21,7 @@ export const getById = async (req, res) => {
       where: { id: req.params.id }
     });
     if (!item) return res.status(404).json({ error: 'LoanType not found' });
-    res.json(item);
+    res.json(serializeLoanData(item));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -28,8 +29,8 @@ export const getById = async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const item = await prisma.loantype.create({ data: req.body });
-    res.status(201).json(item);
+    const item = await prisma.loantype.create({ data: prepareLoanData(req.body, true) });
+    res.status(201).json(serializeLoanData(item));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -39,9 +40,9 @@ export const update = async (req, res) => {
   try {
     const item = await prisma.loantype.update({
       where: { id: req.params.id },
-      data: req.body
+      data: prepareLoanData(req.body)
     });
-    res.json(item);
+    res.json(serializeLoanData(item));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -65,7 +66,7 @@ export const filter = async (req, res) => {
       where: filters,
       orderBy: { [field]: desc ? 'desc' : 'asc' }
     });
-    res.json(items);
+    res.json(serializeLoanData(items));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
