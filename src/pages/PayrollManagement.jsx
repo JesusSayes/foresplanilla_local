@@ -336,7 +336,9 @@ export default function PayrollManagement() {
   const activeLoansQuery = useQuery({
     queryKey: ["activeLoans"],
     queryFn: async () => {
-      return await withRetry(() => base44.entities.Loan.filter({ status: "Activo" }));
+      const loans = await withRetry(() => base44.entities.Loan.filter({ status: "Activo" }));
+      // Excluir préstamos eliminados lógicamente: sus cuotas no se descuentan.
+      return loans.filter(l => !l.is_deleted);
     },
     staleTime: 0,
   });

@@ -44,7 +44,7 @@ export const sumLoanDeduction = (deductions = []) =>
 const syncLoans = async (loanIds = []) => {
   for (const loanId of [...new Set(loanIds)]) {
     const loan = await base44.entities.Loan.get(loanId);
-    if (!loan) continue;
+    if (!loan || loan.is_deleted) continue;
     const loanInstallments = await base44.entities.LoanInstallment.filter({ loan_id: loanId });
     const paid = loanInstallments.filter(i => i.status === "Aplicado").length;
     const total = parseInt(loan.total_installments) || loanInstallments.length;
@@ -65,10 +65,12 @@ export const markLoanInstallmentsApplied = async (payslips = []) => {
   if (withLoan.length === 0) return 0;
 
   const { month, year } = withLoan[0];
-  const [pendingInstallments, activeLoans] = await Promise.all([
+  const [pendingInstallments, activeLoansRaw] = await Promise.all([
     base44.entities.LoanInstallment.filter({ month, year, status: "Pendiente" }),
     base44.entities.Loan.filter({ status: "Activo" }),
   ]);
+  // Excluir préstamos eliminados lógicamente (no vuelven a descontarse).
+  const activeLoans = activeLoansRaw.filter(l => !l.is_deleted);
 
   const byEmployee = buildInstallmentsByEmployee(pendingInstallments, activeLoans);
   const appliedAt = new Date().toISOString();

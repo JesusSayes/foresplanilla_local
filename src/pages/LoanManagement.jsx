@@ -239,18 +239,30 @@ export default function LoanManagement() {
     },
   });
 
+  // Eliminación LÓGICA: el préstamo y sus cuotas se conservan en la base de datos.
+  // Solo se marcan como eliminados para que no se muestren ni se descuenten en planilla.
   const deleteLoanMutation = useMutation({
-    mutationFn: async (id) => {
-      // Eliminar cuotas asociadas
-      const loanInstallments = installments.filter(i => i.loan_id === id);
-      await Promise.all(loanInstallments.map(i => base44.entities.LoanInstallment.delete(i.id)));
-      
-      return await base44.entities.Loan.delete(id);
+    mutationFn: async (loan) => {
+      await base44.entities.Loan.update(loan.id, {
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        deleted_by: currentUser?.email || "",
+      });
+
+      // Las cuotas pendientes se anulan (no se borran): quedan como "Omitido".
+      const pendingInstallments = installments.filter(i => i.loan_id === loan.id && i.status === "Pendiente");
+      if (pendingInstallments.length > 0) {
+        await base44.entities.LoanInstallment.bulkUpdate(
+          pendingInstallments.map(i => ({ id: i.id, status: "Omitido" }))
+        );
+      }
+
+      return loan;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["loans"]);
       queryClient.invalidateQueries(["loanInstallments"]);
-      toast.success("Préstamo eliminado correctamente");
+      toast.success("Préstamo eliminado correctamente (eliminación lógica: el registro se conserva)");
     },
     onError: () => {
       toast.error("Error al eliminar el préstamo");
@@ -334,7 +346,7 @@ export default function LoanManagement() {
 
     // Validar que no exista un préstamo activo del mismo tipo para el empleado
     if (!editingLoan) {
-      const existingActiveLoan = loans.find(loan => 
+      const existingActiveLoan = visibleLoans.find(loan => 
         loan.employee_id === loanFormData.employee_id && 
         loan.loan_type_id === loanFormData.loan_type_id && 
         loan.status === "Activo"
@@ -390,8 +402,8 @@ export default function LoanManagement() {
       toast.error(`No se puede eliminar: el préstamo ya tiene ${paidInstallments.length} cuota(s) pagada(s) en planilla.`);
       return;
     }
-    if (confirm("¿Estás seguro de eliminar este préstamo?")) {
-      deleteLoanMutation.mutate(loan.id);
+    if (confirm("¿Eliminar este préstamo? La eliminación es lógica: el registro se conserva en el sistema, pero deja de estar vigente y sus cuotas no se descuentan.")) {
+      deleteLoanMutation.mutate(loan);
     }
   };
 
@@ -424,7 +436,10 @@ export default function LoanManagement() {
     return installments.filter(i => i.loan_id === loanId);
   };
 
-  const filteredLoans = loans.filter(loan => {
+  // Eliminación lógica: los préstamos eliminados no se muestran ni cuentan.
+  const visibleLoans = loans.filter(loan => !loan.is_deleted);
+
+  const filteredLoans = visibleLoans.filter(loan => {
     const emp = allEmployees.find(e => e.id === loan.employee_id);
     const matchesSearch = emp && (
       emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -435,9 +450,11 @@ export default function LoanManagement() {
     return matchesSearch && matchesStatus;
   });
 
-  const activeLoans = loans.filter(l => l.status === "Activo");
+  const activeLoans = visibleLoans.filter(l => l.status === "Activo");
   const totalActiveAmount = activeLoans.reduce((sum, l) => sum + l.amount, 0);
-  const totalPendingInstallments = installments.filter(i => i.status === "Pendiente").length;
+  const visibleLoanIds = new Set(visibleLoans.map(l => l.id));
+  const totalPendingInstallments = installments
+    .filter(i => i.status === "Pendiente" && visibleLoanIds.has(i.loan_id)).length;
 
   if (!employee) {
     return (
