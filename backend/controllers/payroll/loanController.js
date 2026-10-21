@@ -37,6 +37,9 @@ export const create = async (req, res) => {
     if (req.body?.employee_id && !canAccessEmployee(req, req.body.employee_id)) {
       return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
+    if (!Number.isInteger(req.body.total_installments) || req.body.total_installments < 1 || req.body.total_installments > 12) {
+      return res.status(400).json({ error: 'El número de cuotas debe estar entre 1 y 12.' });
+    }
     const item = await prisma.loan.create({ data: prepareLoanData(req.body, true) });
     res.status(201).json(serializeLoanData(item));
   } catch (error) {
@@ -54,10 +57,21 @@ export const update = async (req, res) => {
         (req.body?.employee_id && !canAccessEmployee(req, req.body.employee_id))) {
       return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
-    const item = await prisma.loan.update({
-      where: { id: req.params.id },
-      data: prepareLoanData(req.body)
-    });
+    if (req.body.total_installments != null && (!Number.isInteger(req.body.total_installments) || req.body.total_installments < 1 || req.body.total_installments > 12)) {
+      return res.status(400).json({ error: 'El número de cuotas debe estar entre 1 y 12.' });
+    }
+    const data = prepareLoanData(req.body);
+    if (data.is_deleted === true) {
+      data.deleted_at = new Date();
+      data.deleted_by = req.user?.email || req.access?.employee?.email || '';
+    }
+    const item = await prisma.$transaction(async db => {
+      const updated = await db.loan.update({ where: { id: req.params.id }, data });
+      if (data.is_deleted === true) {
+        await db.loaninstallment.updateMany({ where: { loan_id: current.id, status: 'Pendiente' }, data: { status: 'Omitido' } });
+      }
+      return updated;
+    }, { isolationLevel: 'Serializable' });
     res.json(serializeLoanData(item));
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -73,7 +87,13 @@ export const remove = async (req, res) => {
     if (!canAccessEmployee(req, current.employee_id)) {
       return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
-    await prisma.loan.delete({ where: { id: req.params.id } });
+    await prisma.$transaction(async db => {
+      await db.loan.update({ where: { id: current.id }, data: {
+        is_deleted: true, deleted_at: new Date(),
+        deleted_by: req.user?.email || req.access?.employee?.email || '',
+      } });
+      await db.loaninstallment.updateMany({ where: { loan_id: current.id, status: 'Pendiente' }, data: { status: 'Omitido' } });
+    }, { isolationLevel: 'Serializable' });
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -82,7 +102,8 @@ export const remove = async (req, res) => {
 
 export const filter = async (req, res) => {
   try {
-    const { sort = '-created_date', ...filters } = req.query;
+    const { sort = '-created_date' } = req.query;
+    const filters = req.body || {};
     const desc = sort.startsWith('-');
     const field = sort.replace('-', '');
     const items = await prisma.loan.findMany({

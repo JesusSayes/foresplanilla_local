@@ -19,7 +19,6 @@ import { es } from "date-fns/locale";
 import { parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
-import * as XLSX from "xlsx";
 import ConceptsManager from "../components/payroll/ConceptsManager";
 import AttendancePeriodModal from "../components/payroll/AttendancePeriodModal";
 import PayrollConfigModal from "../components/payroll/PayrollConfigModal";
@@ -38,14 +37,18 @@ import {
   findCalculatedCost,
   findCalculatedFamilyAllowance,
 } from "@/lib/payrollIncomeHelpers";
-import {
-  getCostFromSummary,
-  computeDedupedTotalIncome,
-  getAfpBreakdown,
-  getOvertimePaySplit,
-} from "@/lib/payrollExcelHelpers";
 import { applyQuintaRetentionToResult } from "@/lib/quintaCategoriaPayroll";
 import { getEarlyDepartureMinutes } from "@/lib/attendanceMetrics";
+import {
+  buildInstallmentsByEmployee,
+  sumLoanDeduction,
+} from "@/lib/loanPayroll";
+import {
+  generatePayrollSummaryPDF,
+  generatePayslipPDF,
+  generateMassivePayslipsPDF,
+} from "@/lib/payrollPdfExport";
+import { exportPayslipsToExcel } from "@/lib/payrollExcelExport";
 
 // Rate limiter global + retry con backoff exponencial para errores de rate-limit
 // Garantiza un gap mínimo entre TODAS las llamadas API y reintenta en caso de 429
@@ -296,6 +299,31 @@ export default function PayrollManagement() {
   });
   const { data: manualOvertimeRecords = [] } = manualOvertimeQuery;
 
+  // Cuotas del período: incluir las aplicadas para poder regenerar la planilla.
+  const loanInstallmentsQuery = useQuery({
+    queryKey: ["loanInstallments", selectedMonth, selectedYear],
+    queryFn: async () => {
+      return await withRetry(() => entitiesAPI.LoanInstallment.filter({
+        month: selectedMonth,
+        year: selectedYear,
+      }));
+    },
+    staleTime: 0,
+  });
+  const { data: loanInstallments = [] } = loanInstallmentsQuery;
+
+  // Incluir préstamos pagados para regenerar la boleta de su última cuota.
+  const activeLoansQuery = useQuery({
+    queryKey: ["activeLoans"],
+    queryFn: async () => {
+      const loans = await withRetry(() => entitiesAPI.Loan.list());
+      // Excluir préstamos eliminados lógicamente: sus cuotas no se descuentan.
+      return loans.filter(l => !l.is_deleted);
+    },
+    staleTime: 0,
+  });
+  const { data: activeLoans = [] } = activeLoansQuery;
+
   // Retenciones de Quinta Categoría aprobadas/aplicadas del ejercicio.
   // Se consultan con datos frescos al calcular la planilla para incorporar el
   // importe vigente como descuento (income_tax) en la boleta del empleado.
@@ -319,7 +347,10 @@ export default function PayrollManagement() {
     rmvQuery.isPending ||
     afpsQuery.isPending ||
     payrollConfigQuery.isPending ||
-    vacationsQuery.isPending || manualOvertimeQuery.isPending || quintaCategoriaQuery.isPending;
+    vacationsQuery.isPending || manualOvertimeQuery.isPending ||
+    quintaCategoriaQuery.isPending ||
+    loanInstallmentsQuery.isPending ||
+    activeLoansQuery.isPending;
 
   const payrollDataError =
     employeesQuery.isError ||
@@ -329,7 +360,8 @@ export default function PayrollManagement() {
     rmvQuery.isError ||
     afpsQuery.isError ||
     payrollConfigQuery.isError ||
-    vacationsQuery.isError || manualOvertimeQuery.isError || quintaCategoriaQuery.isError;
+    vacationsQuery.isError || manualOvertimeQuery.isError || quintaCategoriaQuery.isError ||
+    loanInstallmentsQuery.isError || activeLoansQuery.isError;
 
   const createPayslipsMutation = useMutation({
     mutationFn: async (payslips) => {
@@ -355,6 +387,8 @@ export default function PayrollManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payslips"] });
       queryClient.invalidateQueries({ queryKey: ["payrollConcepts"] });
+      queryClient.invalidateQueries({ queryKey: ["loanInstallments"] });
+      queryClient.invalidateQueries({ queryKey: ["activeLoans"] });
       queryClient.invalidateQueries({ queryKey: ["allEmployees"] });
       toast.success("Planilla generada exitosamente");
       setShowPreview(false);
@@ -418,11 +452,14 @@ export default function PayrollManagement() {
   // Eliminar un trabajador individual de una planilla ya generada
   const removeOnePayslipMutation = useMutation({
     mutationFn: async (payslipId) => {
+      // El backend revierte las cuotas junto con la eliminación de la boleta.
       await entitiesAPI.Payslip.delete(payslipId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payslips"] });
       queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
+      queryClient.invalidateQueries({ queryKey: ["loanInstallments"] });
+      queryClient.invalidateQueries({ queryKey: ["activeLoans"] });
       toast.success("Trabajador eliminado de la planilla");
     },
     onError: () => toast.error("Error al eliminar el trabajador"),
@@ -487,6 +524,8 @@ export default function PayrollManagement() {
         ["approvedVacations"],
         ["manualOvertime", selectedMonth, selectedYear, payrollType],
         ["quintaCategoriaCalculos", selectedYear],
+        ["loanInstallments", selectedMonth, selectedYear],
+        ["activeLoans"],
       ];
       await Promise.all(criticalKeys.map(key => queryClient.refetchQueries({ queryKey: key, exact: true })));
 
@@ -508,6 +547,10 @@ export default function PayrollManagement() {
       const approvedVacations = queryClient.getQueryData(["approvedVacations"]) ?? [];
       const manualOvertimeRecords = queryClient.getQueryData(["manualOvertime", selectedMonth, selectedYear, payrollType]) ?? [];
       const quintaCategoriaCalculos = queryClient.getQueryData(["quintaCategoriaCalculos", selectedYear]) ?? [];
+      const loanInstallments = queryClient.getQueryData(["loanInstallments", selectedMonth, selectedYear]) ?? [];
+      const activeLoansData = queryClient.getQueryData(["activeLoans"]) ?? [];
+      // Cuotas del período agrupadas por empleado (solo de préstamos activos)
+      const loanInstallmentsByEmployee = buildInstallmentsByEmployee(loanInstallments, activeLoansData, payrollType);
 
       const payrollNumber = `${payrollType === "Quincenal" ? "Q" : payrollType === "Mensual" ? "M" : payrollType === "SNP" ? "SNP" : "A"}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
 
@@ -883,6 +926,32 @@ export default function PayrollManagement() {
             applies_to_payroll_types: ["Mensual", "Adicional", "SNP"],
           });
         }
+
+        // Cuota de Préstamo: se agrega automáticamente cuando el empleado tiene
+        // cuotas pendientes del período, de modo que cada cuota se descuente en la
+        // planilla mensual sin configurar un concepto manualmente. Si ya existe un
+        // concepto configurado que cubre la lógica loan_installment, se respeta
+        // ese para evitar el doble descuento.
+        const empLoanInstallments = loanInstallmentsByEmployee[emp.id] || [];
+        if (empLoanInstallments.length > 0) {
+          const hasLoanConcept = conceptsForCalc.some(c =>
+            calculator.shouldApplyConcept(c) && (c.system_logic_type === "loan_installment" ||
+            String(c.calculation_formula || "").trim().toLowerCase() === "loan_installment" ||
+            /pr[eé]stamo/i.test(c.concept_name || ""))
+          );
+          if (!hasLoanConcept) {
+            conceptsForCalc.push({
+              employee_id: emp.id,
+              concept_type: "Descuento",
+              concept_category: "Préstamos",
+              concept_name: "Cuota de Préstamo",
+              system_logic_type: "loan_installment",
+              is_dynamic: true,
+              is_recurring: true,
+              applies_to_payroll_types: ["Mensual"],
+            });
+          }
+        }
       }
 
       // Calcular descuentos por asistencia (solo para planillas NO quincenales)
@@ -905,7 +974,6 @@ export default function PayrollManagement() {
 
       const lateRecords = attendanceForDiscounts.filter(r => r.is_late && Number(r.late_minutes || 0) > 10);
       const absentRecords = attendanceForDiscounts.filter(r => r.is_absent);
-
       const earlyDepartureRecords = attendanceForDiscounts.filter(r =>
         r.status !== "Vacaciones" && r.status !== "Permiso sin goce" &&
         r.status !== "Ausente" && !r.is_absent
@@ -919,6 +987,7 @@ export default function PayrollManagement() {
         early_departure_records: earlyDepartureRecords,
         afp: allAfps.find(a => a.id === emp.afp_id) || null,
         enable_tardiness_compensation: enableTardinessCompensation,
+        loan_installments: loanInstallmentsByEmployee[emp.id] || [],
       };
 
       const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1130, extraContext);
@@ -940,11 +1009,8 @@ export default function PayrollManagement() {
       const tardinessDiscount = payrollType === "Quincenal" ? 0 : roundMoney(hourlyRate * (totalLateMinutes / 60));
       // Descuento por inasistencias: un día de salario por cada falta completa.
       const absenceDiscount = payrollType === "Quincenal" ? 0 : roundMoney(absentRecords.length * dailyRate);
-      // ── Descuento por salida anticipada (concepto independiente) ──
-      // Sin tolerancia: descuento desde el primer minuto. Usa el mismo valor
-      // hora que tardanzas (salario diario / 8). Excluye registros justificados,
-      // de vacaciones, compensación, permiso sin goce y ausentes. No interpreta
-      // una marcación de salida ausente como salida anticipada.
+      // ── Descuento por salida anticipada ──
+      // Usa el mismo valor hora que tardanzas (salario diario / 8).
       const totalEarlyDepartureMinutes = earlyDepartureRecords.reduce((sum, r) => {
         const incidents = approvedAttendanceIncidents.filter(i => i.employee_id === emp.id && normDate(i.incident_date) === normDate(r.date));
         const schedules = earlyDepartureSchedules.filter(s =>
@@ -1015,6 +1081,8 @@ export default function PayrollManagement() {
           .filter(d => d.concept_category === "AFP/ONP")
           .reduce((sum, d) => sum + safePayrollNumber(d.calculated_amount), 0)
       );
+      // Cuotas de préstamo descontadas en esta boleta
+      const loanDeductionAmount = sumLoanDeduction(result.deductions);
       // ── Retención de Quinta Categoría ──
       // La retención vigente del módulo reemplaza al descuento de renta basado en conceptos.
       const quintaResult = applyQuintaRetentionToResult(
@@ -1032,7 +1100,7 @@ export default function PayrollManagement() {
       }
       // other_deductions: descuentos del calculador que NO están en campos dedicados (AFP/ONP, Renta)
       const otherDeductionsFromCalc = roundMoney(
-        safePayrollNumber(result.totals.totalDeductions) - pensionDeductionAmount - quintaResult.conceptIncomeTax
+        safePayrollNumber(result.totals.totalDeductions) - pensionDeductionAmount - quintaResult.conceptIncomeTax - loanDeductionAmount
       );
 
       const rawPayslip = {
@@ -1081,7 +1149,7 @@ export default function PayrollManagement() {
         tardiness_discount: tardinessDiscount,
         early_departure_discount: earlyDepartureDiscount,
         absence_discount: absenceDiscount,
-        loan_deduction: 0,
+        loan_deduction: loanDeductionAmount,
         advance_deduction: advanceDeduction,
         other_deductions: otherDeductionsFromCalc,
         total_deductions: adjustedDeductions,
@@ -1130,47 +1198,6 @@ export default function PayrollManagement() {
     } finally {
       setIsCalculating(false);
     }
-  };
-
-  const generatePDF = () => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-
-    doc.setFontSize(18);
-    doc.text("Planilla de Pagos", pageWidth / 2, 20, { align: "center" });
-
-    doc.setFontSize(12);
-    doc.text(`Tipo: ${payrollType}`, 14, 35);
-    doc.text(`Periodo: ${format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}`, 14, 42);
-
-    let yPos = 55;
-    previewData.forEach((payslip, index) => {
-      if (yPos > 270) {
-        doc.addPage();
-        yPos = 20;
-      }
-      const emp = allEmployees.find(e => e.id === payslip.employee_id);
-      const sede = emp?.site ? ` | ${emp.site}` : "";
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'bold');
-      doc.text(`${payslip.employee_code} - ${payslip.employee_name}${sede}`, 14, yPos);
-      doc.setFont(undefined, 'normal');
-
-      doc.text(`Salario Base: S/ ${Number(payslip.base_salary || 0).toFixed(2)}`, 14, yPos + 6);
-      doc.text(`Total Descuentos: S/ ${Number(payslip.total_deductions || 0).toFixed(2)}`, 100, yPos + 6);
-      doc.text(`Neto a Pagar: S/ ${Number(payslip.net_pay || 0).toFixed(2)}`, 14, yPos + 12);
-
-      doc.line(14, yPos + 16, pageWidth - 14, yPos + 16);
-      yPos += 22;
-    });
-
-    const totalNeto = previewData.reduce((sum, p) => sum + Number(p.net_pay || 0), 0);
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text(`Total General: S/ ${Number(totalNeto).toFixed(2)}`, 14, yPos + 5);
-
-    doc.save(`Planilla_${payrollType}_${selectedMonth}_${selectedYear}.pdf`);
-    toast.success("PDF generado exitosamente");
   };
 
   const handleGeneratePayroll = () => {
@@ -1285,9 +1312,12 @@ export default function PayrollManagement() {
     );
 
     try {
+      // Cada eliminación revierte sus cuotas en la misma transacción local.
       await mapWithConcurrency(toDelete, p => entitiesAPI.Payslip.delete(p.id));
       queryClient.invalidateQueries({ queryKey: ["payslips"] });
       queryClient.invalidateQueries({ queryKey: ["allPayslips"] });
+      queryClient.invalidateQueries({ queryKey: ["loanInstallments"] });
+      queryClient.invalidateQueries({ queryKey: ["activeLoans"] });
       toast.success(`${toDelete.length} planilla(s) eliminada(s)`);
       setSelectedPayrollToDelete(null);
     } catch (error) {
@@ -1296,176 +1326,9 @@ export default function PayrollManagement() {
     }
   };
 
-  const generatePayslipPDF = async (payslip, employee) => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-
-    // Header
-    doc.setFontSize(16);
-    doc.text("BOLETA DE PAGO", pageWidth / 2, 20, { align: "center" });
-
-    // Employee Info
-    doc.setFontSize(10);
-    doc.text(`Empleado: ${employee.first_name} ${employee.last_name}`, 14, 35);
-    doc.text(`DNI: ${employee.document_type} ${employee.document_number}`, 14, 42);
-    doc.text(`Periodo: ${payslip.period}`, 14, 49);
-    doc.text(`Tipo: ${payslip.payroll_type}`, 120, 49);
-
-    // Income
-    let yPos = 65;
-    doc.setFont(undefined, 'bold');
-    doc.text("INGRESOS", 14, yPos);
-    doc.setFont(undefined, 'normal');
-    yPos += 7;
-    doc.text(`Salario Base:`, 14, yPos);
-    doc.text(`S/ ${Number(payslip.base_salary || 0).toFixed(2)}`, 160, yPos, { align: "right" });
-    yPos += 7;
-    doc.text(`Total Ingresos:`, 14, yPos);
-    doc.setFont(undefined, 'bold');
-    doc.text(`S/ ${Number(payslip.total_income || 0).toFixed(2)}`, 160, yPos, { align: "right" });
-
-    // Deductions
-    yPos += 15;
-    doc.setFont(undefined, 'bold');
-    doc.text("DESCUENTOS", 14, yPos);
-    doc.setFont(undefined, 'normal');
-    yPos += 7;
-    // AFP/ONP detallado desde el breakdown cuando está disponible; fallback a la línea
-    // agregada pension_deduction para boletas históricas sin breakdown.
-    const breakdownDeductions = payslip?.calculation_summary?.breakdown?.deductions?.items;
-    const pensionItems = Array.isArray(breakdownDeductions)
-      ? breakdownDeductions.filter(d => d.concept_category === "AFP/ONP" || /AFP|ONP/i.test(d.name || ""))
-      : [];
-    if (pensionItems.length > 0) {
-      pensionItems.forEach(item => {
-        if (item.amount > 0) {
-          doc.text(`${item.name}:`, 14, yPos);
-          doc.text(`S/ ${Number(item.amount).toFixed(2)}`, 160, yPos, { align: "right" });
-          yPos += 7;
-        }
-      });
-    } else if (Number(payslip.pension_deduction || 0) > 0) {
-      doc.text(`Pensiones:`, 14, yPos);
-      doc.text(`S/ ${Number(payslip.pension_deduction || 0).toFixed(2)}`, 160, yPos, { align: "right" });
-      yPos += 7;
-    }
-    if (Number(payslip.early_departure_discount || 0) > 0) {
-      doc.text("Salida anticipada:", 14, yPos);
-      doc.text(`S/ ${Number(payslip.early_departure_discount).toFixed(2)}`, 160, yPos, { align: "right" });
-      yPos += 7;
-    }
-    if (Number(payslip.income_tax || 0) > 0) {
-      doc.text(`Renta 5ta:`, 14, yPos);
-      doc.text(`S/ ${Number(payslip.income_tax || 0).toFixed(2)}`, 160, yPos, { align: "right" });
-      yPos += 7;
-    }
-    doc.text(`Total Descuentos:`, 14, yPos);
-    doc.setFont(undefined, 'bold');
-    doc.text(`S/ ${Number(payslip.total_deductions || 0).toFixed(2)}`, 160, yPos, { align: "right" });
-
-    // Net Pay
-    yPos += 15;
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text("NETO A PAGAR:", 14, yPos);
-    doc.text(`S/ ${Number(payslip.net_pay || 0).toFixed(2)}`, 160, yPos, { align: "right" });
-
-    doc.save(`Boleta_${employee.employee_code}_${payslip.period}.pdf`);
-    toast.success("Boleta generada");
-  };
-
   // Helpers de exportación Excel extraídos a @/lib/payrollExcelHelpers
   // (getCostFromSummary, dedupeIncomesByCost, computeDedupedTotalIncome,
   // getAfpBreakdown, getOvertimePaySplit)
-
-  const exportToExcel = (payslipsData, filename, filterType) => {
-    // Si se pasa filterType, filtrar solo las boletas de ese tipo
-    const data = filterType ? payslipsData.filter(p => p.payroll_type === filterType) : payslipsData;
-    if (data.length === 0) { toast.error("No hay datos para exportar"); return; }
-
-    const rows = data.map((p, idx) => {
-      const emp = allEmployees.find(e => e.id === p.employee_id);
-      // Periodo legible: usar los campos month/year de la boleta (no del estado global)
-      const periodoLabel = p.period && p.period.trim()
-        ? p.period
-        : (p.month && p.year ? format(new Date(p.year, p.month - 1), 'MMMM yyyy', { locale: es }) : "");
-      // Total de ingresos deduplicado (consistente con la boleta) y neto recalculado
-      const dedupedTotalIncome = computeDedupedTotalIncome(p);
-      const totalIngresos = dedupedTotalIncome != null ? dedupedTotalIncome : safeNum(p.total_income);
-      const netoPagar = dedupedTotalIncome != null
-        ? dedupedTotalIncome - safeNum(p.total_deductions)
-        : safeNum(p.net_pay);
-      // Desglose AFP/ONP desde el breakdown (coincide con el PDF de la boleta)
-      const afp = getAfpBreakdown(p);
-      // Desglose de pago de horas extras al 25% y 35% (si está disponible en el breakdown)
-      const hePay = getOvertimePaySplit(p);
-      return {
-        "N°": idx + 1,
-        "Tipo Doc": emp?.document_type || "",
-        "DNI": emp?.document_number || "",
-        "Apellidos y Nombres": p.employee_name || (emp ? `${emp.first_name} ${emp.last_name}` : ""),
-        "Sede": emp?.site || "",
-        "Área / Departamento": p.department || emp?.department_name || "",
-        "Cargo": emp?.position || "",
-        "Tipo Contrato": emp?.contract_type || "",
-        "Periodo": periodoLabel,
-        "Tipo Planilla": p.payroll_type || "",
-        "Días Trabajados": safeNum(p.worked_days),
-        "Salario Base": safeNum(p.base_salary),
-        "Costo Actividad": safeNum(p.activity_cost_amount ?? getCostFromSummary(p, "activity_cost", ["actividad", "costo actividad"])),
-        "Costo Alimento": safeNum(p.food_cost_amount ?? getCostFromSummary(p, "food_cost", ["alimentación", "costo alimentación", "costo alimento"])),
-        "Costo Movilidad": safeNum(p.transport_cost_amount ?? getCostFromSummary(p, "transport_cost", ["movilidad", "costo movilidad"])),
-        "Bonificaciones": safeNum(p.bonuses),
-        "Asignación familiar": safeNum(p.family_allowance),
-        "HE 25%": safeNum(p.overtime_hours_25),
-        "HE 35%": safeNum(p.overtime_hours_35),
-        "Horas Extra": safeNum(p.overtime_hours),
-        "Pago HE 25%": hePay ? hePay.pay25 : 0,
-        "Pago HE 35%": hePay ? hePay.pay35 : 0,
-        "Pago Horas Extra": hePay && (safeNum(hePay.pay25) + safeNum(hePay.pay35)) > 0
-          ? roundMoney(safeNum(hePay.pay25) + safeNum(hePay.pay35))
-          : safeNum(p.overtime_pay),
-        "Total Ingresos": totalIngresos,
-        "AFP Aporte Obligatorio": afp ? afp.aporte : 0,
-        "AFP Prima de Seguro": afp ? afp.prima : 0,
-        "AFP Comisión": afp ? afp.comision : 0,
-        "ONP": afp ? afp.onp : 0,
-        "AFP/ONP Total": safeNum(p.pension_deduction),
-        "Impuesto Renta": safeNum(p.income_tax),
-        "Desc. Tardanzas": safeNum(p.tardiness_discount),
-        "Desc. Salida Anticipada": safeNum(p.early_departure_discount),
-        "Desc. Faltas": safeNum(p.absence_discount),
-        "Desc. Adelanto": safeNum(p.advance_deduction),
-        "Otros Descuentos": safeNum(p.other_deductions),
-        "Total Descuentos": safeNum(p.total_deductions),
-        "Neto a Pagar": netoPagar,
-        "Estado": p.status || "Calculada",
-      };
-    });
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    // Ajustar anchos de columna automáticamente
-    const colWidths = Object.keys(rows[0] || {}).map(key => ({
-      wch: Math.max(key.length, ...rows.map(r => String(r[key] ?? "").length)) + 2
-    }));
-    ws["!cols"] = colWidths;
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Planilla");
-    XLSX.writeFile(wb, `${filename}.xlsx`);
-    toast.success("Excel exportado correctamente");
-  };
-
-  const generateMassivePayslipsPDF = async (payslips) => {
-    for (const payslip of payslips) {
-      const emp = allEmployees.find(e => e.id === payslip.employee_id);
-      if (emp) {
-        await generatePayslipPDF(payslip, emp);
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
-    }
-    toast.success(`${payslips.length} boletas generadas`);
-  };
 
   if (permissionsLoading) {
     return (
@@ -1684,7 +1547,13 @@ export default function PayrollManagement() {
                 <CardContent className="p-6">
                   <div className="mb-6 flex gap-3 flex-wrap">
                     <Button
-                      onClick={generatePDF}
+                      onClick={() => generatePayrollSummaryPDF({
+                        payrollType,
+                        month: selectedMonth,
+                        year: selectedYear,
+                        payslips: previewData,
+                        allEmployees,
+                      })}
                       variant="outline"
                       className="flex-1"
                     >
@@ -1692,7 +1561,7 @@ export default function PayrollManagement() {
                       Descargar PDF
                     </Button>
                     <Button
-                      onClick={() => exportToExcel(previewData, `Planilla_${payrollType}_${selectedMonth}_${selectedYear}`, payrollType)}
+                      onClick={() => exportPayslipsToExcel(previewData, allEmployees, `Planilla_${payrollType}_${selectedMonth}_${selectedYear}`, payrollType)}
                       variant="outline"
                       className="flex-1 border-green-300 text-green-700 hover:bg-green-50"
                     >
@@ -1833,6 +1702,12 @@ export default function PayrollManagement() {
                           {Number(payslip.advance_deduction || 0) > 0 && (
                             <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
                               Adelanto descontado: S/ {Number(payslip.advance_deduction || 0).toFixed(2)}
+                            </div>
+                          )}
+
+                          {payslip.loan_deduction > 0 && (
+                            <div className="mt-3 p-2 bg-purple-50 border border-purple-200 rounded text-sm text-purple-800">
+                              Cuota de préstamo descontada: S/ {payslip.loan_deduction.toFixed(2)}
                             </div>
                           )}
 
@@ -2020,8 +1895,9 @@ export default function PayrollManagement() {
                                       size="sm"
                                       variant="outline"
                                       className="border-green-300 text-green-700 hover:bg-green-50"
-                                      onClick={() => exportToExcel(
+                                      onClick={() => exportPayslipsToExcel(
                                         planillasDelTipo,
+                                        allEmployees,
                                         `Planilla_${tipo}_${selectedMonth}_${selectedYear}`,
                                         tipo
                                       )}
@@ -2291,8 +2167,9 @@ export default function PayrollManagement() {
                                       size="sm"
                                       variant="outline"
                                       className="border-green-300 text-green-700 hover:bg-green-50"
-                                      onClick={() => exportToExcel(
+                                      onClick={() => exportPayslipsToExcel(
                                         allGroupPayslips,
+                                        allEmployees,
                                         `Planilla_${group.payroll_type}_${group.year}_${String(group.month).padStart(2,'0')}`
                                       )}
                                     >
@@ -2313,7 +2190,7 @@ export default function PayrollManagement() {
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      onClick={() => generateMassivePayslipsPDF(allGroupPayslips)}
+                                      onClick={() => generateMassivePayslipsPDF(allGroupPayslips, allEmployees)}
                                     >
                                       <Download className="w-3 h-3 mr-1" />
                                       Todas las Boletas

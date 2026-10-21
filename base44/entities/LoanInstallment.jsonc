@@ -70,6 +70,16 @@
           "user_condition": {
             "data.can_view_loans": true
           }
+        },
+        {
+          "user_condition": {
+            "data.can_view_all_payroll": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_create_payroll": true
+          }
         }
       ]
     },
@@ -83,6 +93,16 @@
         {
           "user_condition": {
             "data.can_manage_loans": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_create_payroll": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_edit_payroll": true
           }
         }
       ]

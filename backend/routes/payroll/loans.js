@@ -10,7 +10,7 @@ import {
 
 router.use(authenticateToken, loadAccessContext);
 
-const VIEW_PERMISSIONS = ['system.admin', 'loans.view', 'loans.manage', 'payroll.view_all'];
+const VIEW_PERMISSIONS = ['system.admin', 'loans.view', 'loans.manage', 'payroll.view_all', 'payroll.create', 'payroll.calculate', 'payroll.edit'];
 const MANAGE_PERMISSIONS = ['system.admin', 'loans.manage'];
 
 router.get('/', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.getAll);

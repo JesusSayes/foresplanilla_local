@@ -1,3 +1,4 @@
+import { applyLoanInstallments, revertLoanInstallments } from "../../services/loanPayroll.js";
 import prisma from "../../config/prisma.js";
 import { validateOvertimePaymentPolicy } from "../../services/overtimePaymentPolicy.js";
 import { canAccessEmployee, employeeScopeWhere } from "../../middleware/authorization.js";
@@ -5,6 +6,8 @@ import { canAccessEmployee, employeeScopeWhere } from "../../middleware/authoriz
 import { generate24HexId } from '../../utils/idGenerator.js'
 
 const MODEL = prisma.payslip;
+const changesLoanSchedule = data => ['loan_deduction', 'employee_id', 'month', 'year', 'payroll_type']
+  .some(field => Object.hasOwn(data, field));
 
 export const getAll = async (req, res) => {
   try {
@@ -55,8 +58,10 @@ export const create = async (req, res) => {
 
     const payslip = await prisma.$transaction(async db => {
       await validateOvertimePaymentPolicy(db, [req.body]);
-      return db.payslip.create({ data: req.body });
-    });
+      const created = await db.payslip.create({ data: req.body });
+      await applyLoanInstallments(db, [created]);
+      return created;
+    }, { isolationLevel: "Serializable" });
 
     res.status(201).json(payslip);
 
@@ -181,7 +186,7 @@ export const bulkCreate = async (req, res) => {
           return groups;
         }, {}));
 
-        await db.payslip.deleteMany({
+        const stale = await db.payslip.findMany({
           where: {
             OR: replacementGroups.map(group => ({
               month: group.month,
@@ -191,17 +196,20 @@ export const bulkCreate = async (req, res) => {
             }))
           }
         });
+        await revertLoanInstallments(db, stale.map(p => p.id));
+        await db.payslip.deleteMany({ where: { id: { in: stale.map(p => p.id) } } });
       }
 
       for (let i = 0; i < formattedPayslips.length; i += chunkSize) {
         const chunk = formattedPayslips.slice(i, i + chunkSize);
         console.log(`insertando chunk ${i} - ${i + chunk.length}`);
-        await db.payslip.createMany({ data: chunk, skipDuplicates: true });
+        await db.payslip.createMany({ data: chunk });
       }
+      await applyLoanInstallments(db, formattedPayslips);
     };
 
     // Validar todo el lote antes de borrar o insertar; nunca guardar un lote parcial.
-    await prisma.$transaction(persistPayslips);
+    await prisma.$transaction(persistPayslips, { isolationLevel: "Serializable" });
 
     console.log("bulkCreate terminado");
 
@@ -246,7 +254,10 @@ export const update = async (req, res) => {
         throw Object.assign(new Error('Acceso denegado al empleado'), { status: 403 });
       }
       await validateOvertimePaymentPolicy(db, [{ ...latest, ...req.body }]);
-      return db.payslip.update({ where: { id: req.params.id }, data: req.body });
+      if (changesLoanSchedule(req.body)) await revertLoanInstallments(db, [latest.id]);
+      const updated = await db.payslip.update({ where: { id: req.params.id }, data: req.body });
+      if (changesLoanSchedule(req.body)) await applyLoanInstallments(db, [updated]);
+      return updated;
     }, { isolationLevel: 'Serializable' });
 
     res.json(payslip);
@@ -332,7 +343,10 @@ export const bulkUpdate = async (req, res) => {
       await validateOvertimePaymentPolicy(db, updates.map(p => ({ ...byId.get(p.id), ...p })));
       const result = [];
       for (const { id, ...data } of updates) {
-        result.push(await db.payslip.update({ where: { id }, data }));
+        if (changesLoanSchedule(data)) await revertLoanInstallments(db, [id]);
+        const updated = await db.payslip.update({ where: { id }, data });
+        if (changesLoanSchedule(data)) await applyLoanInstallments(db, [updated]);
+        result.push(updated);
       }
       return result;
     }, { isolationLevel: 'Serializable' });
@@ -354,9 +368,10 @@ export const remove = async (req, res) => {
       return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
 
-    await prisma.payslip.delete({
-      where: { id: req.params.id }
-    });
+    await prisma.$transaction(async db => {
+      await revertLoanInstallments(db, [req.params.id]);
+      await db.payslip.delete({ where: { id: req.params.id } });
+    }, { isolationLevel: "Serializable" });
 
     res.status(204).send();
 

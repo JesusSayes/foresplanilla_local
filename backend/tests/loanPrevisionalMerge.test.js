@@ -68,3 +68,15 @@ test('respuesta conserva números decimales y fechas sin zona horaria', () => {
   assert.deepEqual(serializeLoanData([{ amount: '33.34', monthly_amount: '33.33', start_date: new Date('2026-11-01') }]),
     [{ amount: 33.34, monthly_amount: 33.33, start_date: '2026-11-01' }]);
 });
+
+
+test('cuota de préstamo decimal reduce el neto y no altera la base previsional', async () => {
+  const calculator = new PayrollCalculator({ pension_system: 'Ninguno' }, 10, 2026);
+  const result = await calculator.calculatePayroll([
+    income('Remuneración Básica', 1000),
+    { concept_name: 'Cuota', concept_type: 'Descuento', system_logic_type: 'loan_installment' },
+  ], {}, 1130, { loan_installments: [{ amount: '33.34' }] });
+  assert.equal(result.totals.totalDeductions, 33.34);
+  assert.equal(result.totals.netPay, 966.66);
+  assert.equal(result.context.remuneracion_afecta, 1000);
+});

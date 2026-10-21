@@ -1019,6 +1019,9 @@ model loan {
   created_by_id      String?
   created_by         String?
   is_sample          Boolean?
+  is_deleted         Boolean   @default(false)
+  deleted_at         DateTime? @db.Timestamptz(3)
+  deleted_by         String?
 }
 
 model loaninstallment {

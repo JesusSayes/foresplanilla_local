@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 export function prepareLoanData(body, creating = false) {
   const { installment_amounts, ...data } = body;
-  for (const field of ['start_date', 'end_date', 'approval_date']) {
+  for (const field of ['start_date', 'end_date', 'approval_date', 'deleted_at']) {
     if (data[field]) data[field] = new Date(data[field]);
   }
   if (creating) {

@@ -2,15 +2,17 @@ import express from 'express';
 const router = express.Router();
 import controller from '../../controllers/payroll/loanInstallmentController.js';
 import { authenticateToken } from '../../middleware/auth.js';
-import { loadAccessContext, requireAnyPermission } from '../../middleware/authorization.js';
+import { loadAccessContext, requireAnyPermission, attachEmployeeScope } from '../../middleware/authorization.js';
 
 router.use(authenticateToken, loadAccessContext);
+const VIEW_PERMISSIONS = ['system.admin', 'loans.view', 'loans.manage', 'payroll.view_all', 'payroll.create', 'payroll.calculate', 'payroll.edit'];
+const MANAGE_PERMISSIONS = ['system.admin', 'loans.manage'];
 
-router.get('/', requireAnyPermission('system.admin', 'loans.view', 'loans.manage', 'payroll.view_all'), controller.getAll);
-router.get('/:id', requireAnyPermission('system.admin', 'loans.view', 'loans.manage', 'payroll.view_all'), controller.getById);
-router.post('/', requireAnyPermission('system.admin', 'loans.manage'), controller.create);
-router.put('/:id', requireAnyPermission('system.admin', 'loans.manage'), controller.update);
-router.delete('/:id', requireAnyPermission('system.admin', 'loans.manage'), controller.delete);
-router.post('/filter', requireAnyPermission('system.admin', 'loans.view', 'loans.manage', 'payroll.view_all'), controller.filter);
+router.get('/', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.getAll);
+router.get('/:id', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.getById);
+router.post('/', requireAnyPermission(...MANAGE_PERMISSIONS), attachEmployeeScope(...MANAGE_PERMISSIONS), controller.create);
+router.put('/:id', requireAnyPermission(...MANAGE_PERMISSIONS), attachEmployeeScope(...MANAGE_PERMISSIONS), controller.update);
+router.delete('/:id', requireAnyPermission(...MANAGE_PERMISSIONS), attachEmployeeScope(...MANAGE_PERMISSIONS), controller.delete);
+router.post('/filter', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.filter);
 
 export default router;

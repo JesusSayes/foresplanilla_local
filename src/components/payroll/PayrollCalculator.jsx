@@ -234,9 +234,13 @@ export class PayrollCalculator {
         }
 
         case "loan_installment": {
-          // Cuota de préstamo: suma de cuotas pendientes del mes
+          // Cuota de préstamo: suma de las cuotas pendientes del período.
+          // Se devuelve en POSITIVO, igual que los demás descuentos que alimentan
+          // los totales de la boleta (montos fijos y aportes AFP/ONP): el llamador
+          // acumula la magnitud de los descuentos y luego la resta de los ingresos.
+          // Un valor negativo aumentaría el neto a pagar en lugar de reducirlo.
           const installments = context.loan_installments || [];
-          result = -(installments.reduce((sum, i) => sum + (i.amount || 0), 0));
+          result = installments.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
           detail = `${installments.length} cuota(s) de préstamo`;
           break;
         }
