@@ -1919,6 +1919,11 @@ export default function PayrollConcepts() {
                   <p className="text-xs text-slate-500 mt-1">
                     Variables: <span className="font-mono">base_salary, worked_days, rmv, horas_extras_25, horas_extras_35, horas_nocturnas</span>
                   </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Base previsional AFP/ONP: <span className="font-mono font-semibold">remuneracion_afecta</span> = remuneración mensual + remuneración vacacional + asignación familiar + horas extras − descuentos de asistencia (faltas, tardanzas, permisos y salidas anticipadas).
+                    <br />
+                    Componentes: <span className="font-mono">remuneracion_mensual, remuneracion_vacacional, asignacion_familiar, horas_extras, descuentos_asistencia</span>
+                  </p>
                 </div>
               ) : (
                 <div>
