@@ -5,6 +5,7 @@
 
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 import { isLegacyAutoPensionConcept, hasManualPensionOverride } from "@/lib/pensionConcepts";
+import { computePrevisionalVariables } from "@/lib/previsionalBase";
 
 // Catálogo de lógicas del sistema disponibles
 export const SYSTEM_LOGIC_TYPES = {
@@ -85,6 +86,13 @@ export class PayrollCalculator {
         transport_cost: context.transport_cost || 0,
         food_cost: context.food_cost || 0,
         activity_cost: context.activity_cost || 0,
+        // Base previsional y sus componentes (variables derivadas de los conceptos ejecutados)
+        remuneracion_mensual: context.remuneracion_mensual || 0,
+        remuneracion_vacacional: context.remuneracion_vacacional || 0,
+        asignacion_familiar: context.asignacion_familiar || 0,
+        horas_extras: context.horas_extras || 0,
+        descuentos_asistencia: context.descuentos_asistencia || 0,
+        remuneracion_afecta: context.remuneracion_afecta || 0,
       };
 
       // Reemplazar variables en la fórmula (con límites de palabra para evitar sustituciones parciales)
@@ -268,8 +276,8 @@ export class PayrollCalculator {
   /**
    * Calcula el descuento automático al sistema de pensiones (AFP u ONP)
    * según la configuración del empleado y su AFP asignada.
-   * @param {number} pensionBase - Base pensionaria = remuneración básica ejecutada
-   *   (según días trabajados) + asignación familiar. NO incluye el total de ingresos.
+   * @param {number} pensionBase - Remuneración afecta calculada a partir de ingresos
+   *   y descuentos de asistencia ejecutados.
    * @param {Object} context - Contexto de cálculo (incluye afp)
    */
   calculatePensionContribution(pensionBase, context) {
@@ -373,39 +381,31 @@ export class PayrollCalculator {
    */
   async calculatePayroll(concepts, attendanceData, rmvAmount, extraContext = {}) {
     const context = this.buildContext(attendanceData, rmvAmount, extraContext);
-    
-    // Separar conceptos por tipo
-    const incomes = [];
-    const deductions = [];
-    const contributions = [];
 
-    for (const concept of concepts) {
-      // Verificar si el concepto aplica según su periodicidad y fechas
-      if (!this.shouldApplyConcept(concept)) {
-        continue;
-      }
+    // Primera pasada: calcular todos los conceptos con el contexto base.
+    let groups = this.calculateConceptGroups(concepts, context);
 
-      // Este concepto depende de la base pensionaria y se calcula después del bucle.
-      const formula = String(concept.calculation_formula || "").trim().toLowerCase();
-      // Ignorar conceptos pensionarios autogenerados heredados (AFP - ..., ONP sin
-      // categoría): el cálculo centralizado los reemplaza para evitar duplicidad y
-      // garantizar que los cambios de AFP/porcentajes se reflejen automáticamente.
-      if (concept.system_logic_type === "pension_contribution" ||
-          formula === "pension_contribution" ||
-          isLegacyAutoPensionConcept(concept)) {
-        continue;
-      }
+    // Variables derivadas — base previsional (remuneración afecta a AFP/ONP):
+    // remuneración mensual + remuneración vacacional + asignación familiar
+    // + horas extras − descuentos de asistencia (faltas, tardanzas, permisos y
+    // salidas anticipadas). Se calculan sobre los conceptos ya ejecutados.
+    let derived = computePrevisionalVariables(groups.incomes, groups.deductions);
+    Object.assign(context, derived);
 
-      const calculatedConcept = this.calculateConcept(concept, context);
-      
-      if (calculatedConcept.concept_type === "Ingreso") {
-        incomes.push(calculatedConcept);
-      } else if (calculatedConcept.concept_type === "Descuento") {
-        deductions.push(calculatedConcept);
-      } else if (calculatedConcept.concept_type === "Aportación") {
-        contributions.push(calculatedConcept);
-      }
+    // Segunda pasada: si alguna fórmula dinámica referencia las variables derivadas,
+    // recalcular para que reciban sus valores reales en lugar de evaluarse en 0.
+    const usesDerived = (concepts || []).some(c =>
+      c.is_dynamic && c.calculation_formula &&
+      Object.keys(derived).some(k => new RegExp('\\b' + k + '\\b').test(c.calculation_formula))
+    );
+    if (usesDerived) {
+      this.calculationLog = [];
+      groups = this.calculateConceptGroups(concepts, context);
+      derived = computePrevisionalVariables(groups.incomes, groups.deductions);
+      Object.assign(context, derived);
     }
+
+    const { incomes, deductions, contributions } = groups;
 
     // Calcular totales — sanitizar cada acumulador para evitar Infinity/NaN propagado
     const safe = (v) => (Number.isFinite(v) && Math.abs(v) <= 500_000 ? v : 0);
@@ -417,23 +417,11 @@ export class PayrollCalculator {
       return this.shouldApplyConcept(c) &&
         (c.system_logic_type === "pension_contribution" || formula === "pension_contribution");
     });
-    // Base pensionaria: ÚNICAMENTE la remuneración básica ejecutada (según días trabajados)
-    // + asignación familiar. NO se usa el total de ingresos (movilidad, costos, etc. no son
-    // remuneración asegurable). Según normativa peruana la AFP/ONP se calcula sobre la
-    // remuneración asegurable = remuneración básica + asignación familiar.
-    const executedBaseSalary = safe(
-      incomes.find(c =>
-        c.concept_category === "Remuneración Base" ||
-        /remuneraci[oó]n\s*b[aá]sica/i.test(c.concept_name || "")
-      )?.calculated_amount || 0
-    );
-    const executedFamilyAllowance = safe(
-      incomes.find(c =>
-        c.system_logic_type === "family_allowance" ||
-        /asignaci[oó]n\s*familiar/i.test(c.concept_name || "")
-      )?.calculated_amount || 0
-    );
-    const pensionBase = safe(executedBaseSalary + executedFamilyAllowance);
+    // Base pensionaria = remuneración afecta (variables derivadas, ver src/lib/previsionalBase.js):
+    // remuneración mensual + remuneración vacacional + asignación familiar + horas extras
+    // − descuentos de asistencia. Es la base sobre la que se calculan automáticamente los
+    // aportes AFP/ONP según los porcentajes configurados para el sistema de pensiones.
+    const pensionBase = safe(derived.remuneracion_afecta);
 
     // Auto-calcular descuento de AFP/ONP de forma centralizada (única fuente automática).
     // Se calcula DESPUÉS de procesar todos los ingresos para usar la base pensionaria real.
@@ -532,6 +520,13 @@ export class PayrollCalculator {
       transport_cost: this.employee.transport_cost || 0,
       food_cost: this.employee.food_cost || 0,
       activity_cost: this.employee.activity_cost || 0,
+      // Base previsional (variables derivadas): se completan tras ejecutar los conceptos.
+      remuneracion_mensual: 0,
+      remuneracion_vacacional: 0,
+      asignacion_familiar: 0,
+      horas_extras: 0,
+      descuentos_asistencia: 0,
+      remuneracion_afecta: 0,
       // Datos adicionales para lógica del sistema
       derechohabientes: extraContext.derechohabientes || [],
       late_records: extraContext.late_records || [],
@@ -541,6 +536,42 @@ export class PayrollCalculator {
       afp: extraContext.afp || null,
       enable_tardiness_compensation: extraContext.enable_tardiness_compensation || false,
     };
+  }
+
+  /**
+   * Recorre los conceptos y los agrupa por tipo (Ingreso / Descuento / Aportación).
+   * Ignora los conceptos pensionarios autogenerados heredados (AFP - ..., ONP sin
+   * categoría): el cálculo centralizado los reemplaza para evitar duplicidad y
+   * garantizar que los cambios de AFP/porcentajes se reflejen automáticamente.
+   */
+  calculateConceptGroups(concepts, context) {
+    const incomes = [];
+    const deductions = [];
+    const contributions = [];
+
+    for (const concept of concepts || []) {
+      if (!this.shouldApplyConcept(concept)) {
+        continue;
+      }
+      const formula = String(concept.calculation_formula || "").trim().toLowerCase();
+      if (concept.system_logic_type === "pension_contribution" ||
+          formula === "pension_contribution" ||
+          isLegacyAutoPensionConcept(concept)) {
+        continue;
+      }
+
+      const calculatedConcept = this.calculateConcept(concept, context);
+
+      if (calculatedConcept.concept_type === "Ingreso") {
+        incomes.push(calculatedConcept);
+      } else if (calculatedConcept.concept_type === "Descuento") {
+        deductions.push(calculatedConcept);
+      } else if (calculatedConcept.concept_type === "Aportación") {
+        contributions.push(calculatedConcept);
+      }
+    }
+
+    return { incomes, deductions, contributions };
   }
 
   /**

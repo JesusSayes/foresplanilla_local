@@ -1,3 +1,4 @@
+import { prepareLoanData, serializeLoanData } from "../../utils/loanData.js";
 import prisma from "../../config/prisma.js";
 import { canAccessEmployee, employeeScopeWhere } from "../../middleware/authorization.js";
 
@@ -10,7 +11,7 @@ export const getAll = async (req, res) => {
       where: employeeScopeWhere(req),
       orderBy: { [field]: desc ? 'desc' : 'asc' }
     });
-    res.json(items);
+    res.json(serializeLoanData(items));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -25,7 +26,7 @@ export const getById = async (req, res) => {
     if (!canAccessEmployee(req, item.employee_id)) {
       return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
-    res.json(item);
+    res.json(serializeLoanData(item));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -36,8 +37,8 @@ export const create = async (req, res) => {
     if (req.body?.employee_id && !canAccessEmployee(req, req.body.employee_id)) {
       return res.status(403).json({ error: 'Acceso denegado al empleado' });
     }
-    const item = await prisma.loan.create({ data: req.body });
-    res.status(201).json(item);
+    const item = await prisma.loan.create({ data: prepareLoanData(req.body, true) });
+    res.status(201).json(serializeLoanData(item));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -55,9 +56,9 @@ export const update = async (req, res) => {
     }
     const item = await prisma.loan.update({
       where: { id: req.params.id },
-      data: req.body
+      data: prepareLoanData(req.body)
     });
-    res.json(item);
+    res.json(serializeLoanData(item));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -91,7 +92,7 @@ export const filter = async (req, res) => {
       },
       orderBy: { [field]: desc ? 'desc' : 'asc' }
     });
-    res.json(items);
+    res.json(serializeLoanData(items));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
