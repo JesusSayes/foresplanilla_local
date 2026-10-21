@@ -59,6 +59,20 @@
       "type": "string",
       "format": "date",
       "description": "Fecha de aprobaci\u00f3n"
+    },
+    "is_deleted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Eliminaci\u00f3n l\u00f3gica: si es true, el pr\u00e9stamo se conserva en la base de datos pero deja de mostrarse en la gesti\u00f3n y sus cuotas no se descuentan en planilla"
+    },
+    "deleted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de la eliminaci\u00f3n l\u00f3gica"
+    },
+    "deleted_by": {
+      "type": "string",
+      "description": "Email del usuario que realiz\u00f3 la eliminaci\u00f3n l\u00f3gica"
     }
   },
   "required": [
@@ -111,6 +125,16 @@
         {
           "user_condition": {
             "data.can_manage_loans": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_create_payroll": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_edit_payroll": true
           }
         }
       ]
