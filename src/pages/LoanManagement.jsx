@@ -21,6 +21,7 @@ import { format, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import PermissionGuard from "../components/PermissionGuard";
 import LoanInstallmentsEditor from "@/components/loans/LoanInstallmentsEditor";
+import { MAX_LOAN_INSTALLMENTS } from "@/lib/loanPayroll";
 
 // Genera cuotas iguales a partir del monto total y el número de cuotas.
 // Distribuye el residuo de centavos para que la suma coincida exactamente con el total.
@@ -264,8 +265,11 @@ export default function LoanManagement() {
 
   const handleInstallmentsCountChange = (value) => {
     setFormError("");
-    setLoanFormData({ ...loanFormData, total_installments: value });
-    setInstallmentAmounts(buildEvenInstallments(loanFormData.amount, value));
+    // Tope máximo de cuotas: 12 meses. El excedente se recorta automáticamente.
+    const digits = String(value).replace(/\D/g, "");
+    const capped = digits === "" ? "" : String(Math.min(MAX_LOAN_INSTALLMENTS, parseInt(digits, 10)));
+    setLoanFormData({ ...loanFormData, total_installments: capped });
+    setInstallmentAmounts(buildEvenInstallments(loanFormData.amount, capped));
   };
 
   const handleInstallmentAmountChange = (index, value) => {
@@ -304,6 +308,10 @@ export default function LoanManagement() {
 
     if (parseInt(loanFormData.total_installments) <= 0) {
       return setFormError("El número de cuotas debe ser mayor a 0.");
+    }
+
+    if (parseInt(loanFormData.total_installments) > MAX_LOAN_INSTALLMENTS) {
+      return setFormError(`El número de cuotas no puede superar ${MAX_LOAN_INSTALLMENTS} (plazo máximo de 12 meses).`);
     }
 
     if (!loanFormData.start_date) {
@@ -375,9 +383,15 @@ export default function LoanManagement() {
     setShowLoanForm(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = (loan) => {
+    // Un préstamo con cuotas ya descontadas en planilla no se puede eliminar.
+    const paidInstallments = installments.filter(i => i.loan_id === loan.id && i.status === "Aplicado");
+    if (paidInstallments.length > 0) {
+      toast.error(`No se puede eliminar: el préstamo ya tiene ${paidInstallments.length} cuota(s) pagada(s) en planilla.`);
+      return;
+    }
     if (confirm("¿Estás seguro de eliminar este préstamo?")) {
-      deleteLoanMutation.mutate(id);
+      deleteLoanMutation.mutate(loan.id);
     }
   };
 
@@ -575,7 +589,11 @@ export default function LoanManagement() {
                               size="sm"
                               variant="outline"
                               className="text-red-600 border-red-200 hover:bg-red-50"
-                              onClick={() => handleDelete(loan.id)}
+                              onClick={() => handleDelete(loan)}
+                              disabled={paidInstallments > 0}
+                              title={paidInstallments > 0
+                                ? "No se puede eliminar: el préstamo ya tiene cuotas pagadas en planilla"
+                                : "Eliminar préstamo"}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -594,6 +612,13 @@ export default function LoanManagement() {
                             />
                           </div>
                         </div>
+
+                        {paidInstallments > 0 && (
+                          <p className="text-xs text-red-600 mt-3 flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            Con {paidInstallments} cuota(s) pagada(s): este préstamo ya no se puede eliminar.
+                          </p>
+                        )}
 
                         {loan.notes && (
                           <p className="text-sm text-slate-600 mt-3 p-2 bg-slate-50 rounded">
@@ -735,10 +760,13 @@ export default function LoanManagement() {
                       </label>
                       <Input
                         type="number"
+                        min="1"
+                        max={MAX_LOAN_INSTALLMENTS}
                         placeholder="12"
                         value={loanFormData.total_installments}
                         onChange={(e) => handleInstallmentsCountChange(e.target.value)}
                       />
+                      <p className="text-xs text-slate-500 mt-1">Máximo {MAX_LOAN_INSTALLMENTS} cuotas (12 meses)</p>
                     </div>
                   </div>
 
