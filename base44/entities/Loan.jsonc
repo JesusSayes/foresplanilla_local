@@ -112,6 +112,16 @@
           "user_condition": {
             "data.can_manage_loans": true
           }
+        },
+        {
+          "user_condition": {
+            "data.can_create_payroll": true
+          }
+        },
+        {
+          "user_condition": {
+            "data.can_edit_payroll": true
+          }
         }
       ]
     },
