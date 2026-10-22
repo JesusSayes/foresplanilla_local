@@ -21,6 +21,11 @@ import {
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const YEARS = [2024, 2025, 2026, 2027];
 
+// Límite de filas dibujadas por pestaña: un mes puede tener miles de jornadas
+// detectadas y la vista previa debe seguir siendo navegable. El total detectado
+// siempre se informa.
+const MAX_VISIBLE_ROWS = 300;
+
 const dateStringsOfMonth = (month, year) => {
   const last = new Date(year, month, 0).getDate();
   const pad = (n) => String(n).padStart(2, "0");
@@ -131,7 +136,17 @@ export default function ReconciliationModal({ onClose, accessibleEmployeeIds = n
         valid.sort((a, b) => String(b.effective_from || "0000-01-01").localeCompare(String(a.effective_from || "0000-01-01")));
         const chosen = valid[0];
         if (!chosen) return null;
-        return getScheduleForDate(chosen, new Date(dateStr + "T00:00:00"));
+        const day = getScheduleForDate(chosen, new Date(dateStr + "T00:00:00"));
+        if (!day) return null;
+        // getScheduleForDate devuelve solo inicio/fin: se añaden la tolerancia y el
+        // refrigerio del horario elegido, que son los que usa asistencia y planilla.
+        return {
+          start: day.start,
+          end: day.end,
+          tolerance_minutes: chosen.tolerance_minutes ?? 10,
+          breakMinutes: chosen.break_duration_minutes ?? 0,
+          breakStart: chosen.break_start || null,
+        };
       };
       const own = pickValid(schedules.filter((ws) => ws.employee_id === employeeId && isActive(ws)));
       if (own) return own;
@@ -279,13 +294,11 @@ export default function ReconciliationModal({ onClose, accessibleEmployeeIds = n
       for (const row of rows) {
         if (confirm) {
           if (row.recordId) {
-            await base44.entities.AttendanceRecord.update(row.recordId, {
-              is_absent: true,
-              status: "Ausente",
-              notes: (row.isAbsent && row.recordStatus === "Ausente")
-                ? undefined
-                : "Falta confirmada en la regularización de inasistencias",
-            });
+            const payload = { is_absent: true, status: "Ausente" };
+            if (!(row.isAbsent && row.recordStatus === "Ausente")) {
+              payload.notes = "Falta confirmada en la regularización de inasistencias";
+            }
+            await base44.entities.AttendanceRecord.update(row.recordId, payload);
           } else {
             await base44.entities.AttendanceRecord.create({
               employee_id: row.employeeId,
@@ -319,6 +332,9 @@ export default function ReconciliationModal({ onClose, accessibleEmployeeIds = n
   const actionableAbsence = absenceRows.filter(
     (r) => r.kind === ABSENCE_KIND.CONFIRMED || r.kind === ABSENCE_KIND.REVIEW
   );
+
+  const visibleLateRows = lateRows.slice(0, MAX_VISIBLE_ROWS);
+  const visibleAbsenceRows = absenceRows.slice(0, MAX_VISIBLE_ROWS);
 
   const checkboxFor = (checked, onChange) => (
     <Checkbox checked={checked} onCheckedChange={onChange} />
@@ -388,7 +404,7 @@ export default function ReconciliationModal({ onClose, accessibleEmployeeIds = n
                         </tr>
                       </thead>
                       <tbody>
-                        {lateRows.map((row) => (
+                        {visibleLateRows.map((row) => (
                           <tr key={row.recordId} className="border-t">
                             <td className="p-2">
                               {row.needsReview
@@ -424,6 +440,11 @@ export default function ReconciliationModal({ onClose, accessibleEmployeeIds = n
                       </tbody>
                     </table>
                   </div>
+                  {lateRows.length > MAX_VISIBLE_ROWS && (
+                    <p className="text-xs text-amber-700">
+                      Se muestran las primeras {MAX_VISIBLE_ROWS} de {lateRows.length} jornadas detectadas.
+                    </p>
+                  )}
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs text-slate-500">
                       Se regularizan <strong>is_late</strong> y <strong>late_minutes</strong> juntos, con el
@@ -465,7 +486,7 @@ export default function ReconciliationModal({ onClose, accessibleEmployeeIds = n
                         </tr>
                       </thead>
                       <tbody>
-                        {absenceRows.map((row) => {
+                        {visibleAbsenceRows.map((row) => {
                           const key = `${row.employeeId}|${row.date}`;
                           const actionable = row.kind === ABSENCE_KIND.CONFIRMED || row.kind === ABSENCE_KIND.REVIEW;
                           return (
@@ -503,6 +524,11 @@ export default function ReconciliationModal({ onClose, accessibleEmployeeIds = n
                       </tbody>
                     </table>
                   </div>
+                  {absenceRows.length > MAX_VISIBLE_ROWS && (
+                    <p className="text-xs text-amber-700">
+                      Se muestran las primeras {MAX_VISIBLE_ROWS} de {absenceRows.length} jornadas detectadas.
+                    </p>
+                  )}
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <p className="text-xs text-slate-500">
                       Confirme solo las faltas reales. Los casos de {actionableAbsence.length} jornada(s)
