@@ -80,3 +80,54 @@ test('cuota de préstamo decimal reduce el neto y no altera la base previsional'
   assert.equal(result.totals.netPay, 966.66);
   assert.equal(result.context.remuneracion_afecta, 1000);
 });
+
+for (const manual of [false, true]) {
+  test(`asistencia externa reduce base ONP sin duplicar el neto (manual=${manual})`, async () => {
+    const items = [income('Remuneración Básica', 1000)];
+    if (manual) items.push({ concept_name: 'ONP configurada', concept_type: 'Descuento', concept_category: 'AFP/ONP', is_dynamic: true, calculation_formula: 'remuneracion_afecta * 0.13' });
+    items.push({ concept_name: 'ESSALUD configurado', concept_type: 'Aportación', is_dynamic: true, calculation_formula: 'remuneracion_afecta * 0.09' });
+    const result = await new PayrollCalculator({ pension_system: 'ONP' }, 10, 2026)
+      .calculatePayroll(items, {}, 1130, { attendance_discount_amount: 20 });
+    assert.equal(result.context.descuentos_asistencia, 20);
+    assert.equal(result.context.remuneracion_afecta, 980);
+    assert.equal(result.totals.totalDeductions, 127.40);
+    assert.equal(result.totals.totalContributions, 88.20);
+    assert.equal(result.totals.netPay - 20, 852.60);
+    assert.equal(result.deductions.length, 1);
+    assert.deepEqual(result.errors, []);
+  });
+}
+
+test('AFP usa porcentajes configurados sobre la base con asistencia externa', async () => {
+  const result = await new PayrollCalculator({ pension_system: 'AFP', afp_commission_type: 'Flujo' }, 10, 2026)
+    .calculatePayroll([income('Remuneración Básica', 1000)], {}, 1130, {
+      attendance_discount_amount: 50,
+      afp: { name: 'Prueba', obligatory_contribution_percentage: 10, insurance_percentage: 1, commission_percentage: 2 },
+    });
+  assert.equal(result.context.remuneracion_afecta, 950);
+  assert.deepEqual(result.deductions.map(c => c.calculated_amount), [95, 9.5, 19]);
+  assert.equal(result.totals.netPay - 50, 826.5);
+});
+
+test('descuentos externos y permisos ejecutados se acumulan sin mutar los conceptos', async () => {
+  const items = [income('Remuneración Básica', 1000), { concept_name: 'Permiso', concept_type: 'Descuento', amount: 10 }];
+  const original = structuredClone(items);
+  const result = await new PayrollCalculator({ pension_system: 'ONP' }, 10, 2026)
+    .calculatePayroll(items, {}, 1130, { attendance_discount_amount: 20 + 30 + 40 });
+  assert.equal(result.context.descuentos_asistencia, 100);
+  assert.equal(result.context.remuneracion_afecta, 900);
+  assert.equal(result.totals.totalDeductions, 127);
+  assert.deepEqual(items, original);
+});
+
+test('sin descuentos externos mantiene compatibilidad y quincenal sin descuentos', async () => {
+  for (const type of ['Mensual', 'Quincenal']) {
+    const run = extra => new PayrollCalculator({ pension_system: 'ONP' }, 10, 2026, type)
+      .calculatePayroll([income('Remuneración Básica', 1000)], {}, 1130, extra);
+    const legacy = await run({});
+    const zero = await run({ attendance_discount_amount: 0 });
+    assert.deepEqual(legacy.totals, zero.totals);
+    assert.equal(zero.context.remuneracion_afecta, 1000);
+    if (type === 'Quincenal') assert.equal(zero.totals.totalDeductions, 0);
+  }
+});

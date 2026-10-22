@@ -979,26 +979,14 @@ export default function PayrollManagement() {
         r.status !== "Ausente" && !r.is_absent
       );
 
-      // Datos adicionales para lógica del sistema (derechohabientes, tardanzas, inasistencias)
-      const extraContext = {
-        derechohabientes: empDerechohabientes,
-        late_records: lateRecords,
-        absent_records: absentRecords,
-        early_departure_records: earlyDepartureRecords,
-        afp: allAfps.find(a => a.id === emp.afp_id) || null,
-        enable_tardiness_compensation: enableTardinessCompensation,
-        loan_installments: loanInstallmentsByEmployee[emp.id] || [],
-      };
-
-      const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1130, extraContext);
-
-      const baseSalaryForCalc = safePayrollNumber(emp.base_salary); // Siempre usar el salario del contrato
-      const dailyRate = baseSalaryForCalc > 0 ? roundMoney(baseSalaryForCalc / 30) : 0;
-      // Regla quincenal: NO aplicar descuentos por inasistencias/tardanzas
+      // ── Descuentos por asistencia (se calculan AQUÍ, antes de invocar el motor) ──
+      // Regla quincenal: NO aplicar descuentos por inasistencias/tardanzas.
       // Descuento por tardanzas: (salario_diario / 8) * (minutos_tardanza / 60).
       // Se descuenta únicamente el tiempo de tardanza (en horas) sobre el valor hora,
       // NO un día completo por cada tardanza. Los registros con tardanza ≤ 10 minutos
       // (tolerancia) ya fueron excluidos al construir lateRecords.
+      const baseSalaryForCalc = safePayrollNumber(emp.base_salary); // Siempre usar el salario del contrato
+      const dailyRate = baseSalaryForCalc > 0 ? roundMoney(baseSalaryForCalc / 30) : 0;
       const totalLateMinutes = lateRecords.reduce((sum, r) => {
         const compMin = enableTardinessCompensation && r.tardiness_compensation_status === "Activa"
           ? (r.tardiness_compensation_minutes || 0)
@@ -1022,6 +1010,24 @@ export default function PayrollManagement() {
         return sum + getEarlyDepartureMinutes(r, incidents, schedule || {});
       }, 0);
       const earlyDepartureDiscount = payrollType === "Quincenal" ? 0 : roundMoney(hourlyRate * (totalEarlyDepartureMinutes / 60));
+
+      // Datos adicionales para lógica del sistema (derechohabientes, tardanzas, inasistencias)
+      const extraContext = {
+        derechohabientes: empDerechohabientes,
+        late_records: lateRecords,
+        absent_records: absentRecords,
+        early_departure_records: earlyDepartureRecords,
+        afp: allAfps.find(a => a.id === emp.afp_id) || null,
+        enable_tardiness_compensation: enableTardinessCompensation,
+        loan_installments: loanInstallmentsByEmployee[emp.id] || [],
+        // Total de descuentos de asistencia que este módulo aplica por separado al neto.
+        // Se entrega al motor para que reduzcan la base previsional (remuneracion_afecta)
+        // antes de evaluar las fórmulas dinámicas y el aporte AFP/ONP. El motor NO los
+        // suma a sus propios descuentos: se aplican una sola vez al neto, más abajo.
+        attendance_discount_amount: roundMoney(tardinessDiscount + earlyDepartureDiscount + absenceDiscount),
+      };
+
+      const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1130, extraContext);
 
       // Buscar adelanto quincenal si es mensual.
       // Solo se descuenta a empleados que fueron elegibles para la quincenal

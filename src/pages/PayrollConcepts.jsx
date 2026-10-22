@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
 import * as XLSX from "xlsx";
 import { SYSTEM_LOGIC_TYPES } from "../components/payroll/PayrollCalculator";
+import AvailableConceptsColumn from "@/components/payroll/AvailableConceptsColumn";
 
 const parseSpreadsheetFile = async (file) => {
   const buffer = await file.arrayBuffer();
@@ -201,6 +202,7 @@ export default function PayrollConcepts() {
   const employee = currentUser?.employee || null;
   const [activeTab, setActiveTab] = useState("general");
   const [incorporatedFilter, setIncorporatedFilter] = useState("Todos");
+  const [incorporatedSearch, setIncorporatedSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -702,9 +704,16 @@ export default function PayrollConcepts() {
   );
 
   const generalConcepts = payrollConcepts.filter(c => c.employee_id === "general");
-  const filteredIncorporatedConcepts = incorporatedFilter === "Todos"
-    ? generalConcepts
-    : generalConcepts.filter(c => c.concept_type === incorporatedFilter);
+
+  // ── Búsqueda de conceptos incorporados (columna derecha): una sola búsqueda
+  // que abarca todas las pestañas (Todos, Ingresos, Descuentos, Aportaciones, Otros) ──
+  const incorporatedTerm = incorporatedSearch.trim().toLowerCase();
+  const filteredIncorporatedConcepts = generalConcepts
+    .filter(c => incorporatedFilter === "Todos" || c.concept_type === incorporatedFilter)
+    .filter(c => !incorporatedTerm ||
+      [c.concept_name, c.concept_code, c.concept_category, c.description, c.calculation_formula, c.notes, c.system_logic_type]
+        .filter(Boolean).join(" ").toLowerCase().includes(incorporatedTerm)
+    );
   const individualConcepts = selectedEmployee
     ? payrollConcepts.filter(c => c.employee_id === selectedEmployee)
     : [];
@@ -819,221 +828,12 @@ export default function PayrollConcepts() {
               <CardContent className="p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
                   {/* Columna Izquierda: Conceptos No Incorporados */}
-                  <div className="space-y-4">
-                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                      <h3 className="font-bold text-slate-900 mb-1 flex items-center gap-2">
-                        <Plus className="w-5 h-5 text-slate-600" />
-                        Conceptos Disponibles
-                      </h3>
-                      <p className="text-xs text-slate-600 mb-4">Haz clic en (+) para incorporar</p>
-
-                      <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-                        {/* Ingresos */}
-                        <div>
-                          <h4 className="font-semibold text-sm text-green-700 mb-2 flex items-center gap-2">
-                            <TrendingUp className="w-4 h-4" />
-                            Ingresos
-                          </h4>
-                          <div className="space-y-2">
-                            {PREDEFINED_CONCEPTS.ingresos
-                              .filter(concept => !generalConcepts.find(c => c.concept_name === concept.name))
-                              .map((concept, idx) => (
-                                <div key={idx} className="p-2 bg-white border border-slate-200 rounded hover:shadow-sm transition-all">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <h5 className="font-medium text-slate-900 text-xs truncate">{concept.name}</h5>
-                                      {concept.description && (
-                                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{concept.description}</p>
-                                      )}
-                                    </div>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleAddPredefined(concept, "ingresos")}
-                                      className="h-7 w-7 p-0 flex-shrink-0"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-
-                        {/* Descuentos - AFPs */}
-                        <div>
-                          <h4 className="font-semibold text-sm text-red-700 mb-2 flex items-center gap-2">
-                            <TrendingDown className="w-4 h-4" />
-                            Descuentos AFP
-                          </h4>
-                          {afps.length === 0 ? (
-                            <p className="text-xs text-slate-500 italic p-2">
-                              No hay AFPs registradas. Configúralas en Datos Maestros.
-                            </p>
-                          ) : (
-                            <div className="space-y-3">
-                              {afps.map(afp => (
-                                <div key={afp.id} className="p-2 bg-red-50 border border-red-200 rounded">
-                                  <h5 className="font-semibold text-xs text-slate-900 mb-2">{afp.name}</h5>
-                                  <div className="space-y-1">
-                                    <div className="flex items-center justify-between p-1 bg-white rounded hover:shadow-sm transition-all">
-                                      <div className="flex-1">
-                                        <p className="text-xs font-medium text-slate-800">Comisión</p>
-                                        <p className="text-xs text-slate-500">{afp.commission_percentage}%</p>
-                                      </div>
-                                      <Button
-                                        size="sm"
-                                        onClick={() => handleAddPredefined(
-                                          { name: "AFP - Comisión", is_dynamic: true },
-                                          "descuentos",
-                                          afp
-                                        )}
-                                        className="h-6 w-6 p-0"
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                    <div className="flex items-center justify-between p-1 bg-white rounded hover:shadow-sm transition-all">
-                                      <div className="flex-1">
-                                        <p className="text-xs font-medium text-slate-800">Aporte Obligatorio</p>
-                                        <p className="text-xs text-slate-500">{afp.obligatory_contribution_percentage}%</p>
-                                      </div>
-                                      <Button
-                                        size="sm"
-                                        onClick={() => handleAddPredefined(
-                                          { name: "AFP - Aporte Obligatorio", is_dynamic: true },
-                                          "descuentos",
-                                          afp
-                                        )}
-                                        className="h-6 w-6 p-0"
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                    <div className="flex items-center justify-between p-1 bg-white rounded hover:shadow-sm transition-all">
-                                      <div className="flex-1">
-                                        <p className="text-xs font-medium text-slate-800">Seguro</p>
-                                        <p className="text-xs text-slate-500">{afp.insurance_percentage}%</p>
-                                      </div>
-                                      <Button
-                                        size="sm"
-                                        onClick={() => handleAddPredefined(
-                                          { name: "AFP - Seguro", is_dynamic: true },
-                                          "descuentos",
-                                          afp
-                                        )}
-                                        className="h-6 w-6 p-0"
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Otros Descuentos */}
-                        <div>
-                          <h4 className="font-semibold text-sm text-red-700 mb-2 flex items-center gap-2">
-                            <TrendingDown className="w-4 h-4" />
-                            Otros Descuentos
-                          </h4>
-                          <div className="space-y-2">
-                            {PREDEFINED_CONCEPTS.descuentos
-                              .filter(concept => !generalConcepts.find(c => c.concept_name === concept.name))
-                              .map((concept, idx) => (
-                                <div key={idx} className="p-2 bg-white border border-slate-200 rounded hover:shadow-sm transition-all">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <h5 className="font-medium text-slate-900 text-xs truncate">{concept.name}</h5>
-                                      {concept.description && (
-                                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{concept.description}</p>
-                                      )}
-                                      {concept.percentage && (
-                                        <Badge className="bg-red-100 text-red-700 text-xs mt-1">{concept.percentage}%</Badge>
-                                      )}
-                                    </div>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleAddPredefined(concept, "descuentos")}
-                                      className="h-7 w-7 p-0 flex-shrink-0"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-
-                        {/* Aportaciones */}
-                        <div>
-                          <h4 className="font-semibold text-sm text-blue-700 mb-2 flex items-center gap-2">
-                            <Users className="w-4 h-4" />
-                            Aportaciones
-                          </h4>
-                          <div className="space-y-2">
-                            {PREDEFINED_CONCEPTS.aportaciones
-                              .filter(concept => !generalConcepts.find(c => c.concept_name === concept.name))
-                              .map((concept, idx) => (
-                                <div key={idx} className="p-2 bg-blue-50 border border-blue-200 rounded hover:shadow-sm transition-all">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <h5 className="font-medium text-slate-900 text-xs truncate">{concept.name}</h5>
-                                      {concept.description && (
-                                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{concept.description}</p>
-                                      )}
-                                      {concept.percentage && (
-                                        <Badge className="bg-blue-100 text-blue-700 text-xs mt-1">{concept.percentage}%</Badge>
-                                      )}
-                                    </div>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleAddPredefined(concept, "aportaciones")}
-                                      className="h-7 w-7 p-0 flex-shrink-0"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-
-                        {/* Otros */}
-                        <div>
-                          <h4 className="font-semibold text-sm text-purple-700 mb-2 flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4" />
-                            Otros
-                          </h4>
-                          <div className="space-y-2">
-                            {PREDEFINED_CONCEPTS.otros
-                              .filter(concept => !generalConcepts.find(c => c.concept_name === concept.name))
-                              .map((concept, idx) => (
-                                <div key={idx} className="p-2 bg-white border border-slate-200 rounded hover:shadow-sm transition-all">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <h5 className="font-medium text-slate-900 text-xs truncate">{concept.name}</h5>
-                                      {concept.description && (
-                                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{concept.description}</p>
-                                      )}
-                                    </div>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleAddPredefined(concept, "ingresos")}
-                                      className="h-7 w-7 p-0 flex-shrink-0"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <AvailableConceptsColumn
+                    predefined={PREDEFINED_CONCEPTS}
+                    afps={afps}
+                    configuredNames={generalConcepts.map(c => c.concept_name)}
+                    onAdd={handleAddPredefined}
+                  />
 
                   {/* Columna Derecha: Conceptos Incorporados */}
                   <div className="space-y-4">
@@ -1043,6 +843,22 @@ export default function PayrollConcepts() {
                         Conceptos Incorporados (Todos los Empleados)
                       </h3>
                       <p className="text-xs text-slate-600 mb-4">Estos conceptos se aplican a todos los empleados</p>
+
+                      {/* Búsqueda única: filtra los conceptos incorporados en todas las pestañas */}
+                      <div className="relative mb-4">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                        <Input
+                          placeholder="Buscar en conceptos incorporados (todas las pestañas)..."
+                          value={incorporatedSearch}
+                          onChange={(e) => setIncorporatedSearch(e.target.value)}
+                          className="pl-9 bg-white"
+                        />
+                        {incorporatedTerm && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            {filteredIncorporatedConcepts.length} coincidencia(s) en "{incorporatedFilter}"
+                          </p>
+                        )}
+                      </div>
 
                       {/* Pestañas por tipo de concepto */}
                       <div className="flex flex-wrap gap-1.5 mb-4 border-b border-green-200 pb-3">
@@ -1077,11 +893,15 @@ export default function PayrollConcepts() {
                             <p className="text-sm">
                               {generalConcepts.length === 0
                                 ? "No hay conceptos incorporados aún"
+                                : incorporatedTerm
+                                ? `No se encontraron coincidencias para "${incorporatedSearch.trim()}"`
                                 : `No hay conceptos en "${incorporatedFilter}"`}
                             </p>
                             <p className="text-xs mt-1">
                               {generalConcepts.length === 0
                                 ? "Agrega conceptos desde la columna izquierda"
+                                : incorporatedTerm
+                                ? "La búsqueda abarca todas las pestañas"
                                 : "Selecciona otra pestaña o agrega más conceptos"}
                             </p>
                           </div>

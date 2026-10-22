@@ -69,12 +69,18 @@ export const sumAttendanceDiscounts = (deductions = []) => {
 };
 
 // Calcula la base previsional y sus componentes a partir de los conceptos ejecutados.
-export const computePrevisionalVariables = (incomes = [], deductions = []) => {
+// externalAttendanceDiscounts: descuentos de asistencia calculados FUERA del motor de
+// conceptos (tardanzas, inasistencias y salidas anticipadas que el llamador aplica por
+// separado al neto para evitar duplicados). Se restan de la base una sola vez, aquí,
+// para que las fórmulas dinámicas y el aporte AFP/ONP usen la base ya ajustada.
+export const computePrevisionalVariables = (incomes = [], deductions = [], externalAttendanceDiscounts = 0) => {
   const remuneracion_mensual = sumBaseRemuneration(incomes);
   const remuneracion_vacacional = sumVacationIncomes(incomes);
   const asignacion_familiar = sumFamilyAllowance(incomes);
   const horas_extras = roundMoney(sumOvertimeIncomes(incomes));
-  const descuentos_asistencia = sumAttendanceDiscounts(deductions);
+  const descuentos_asistencia = roundMoney(
+    sumAttendanceDiscounts(deductions) + Math.max(0, safePayrollNumber(externalAttendanceDiscounts))
+  );
   const remuneracion_afecta = roundMoney(
     remuneracion_mensual +
     remuneracion_vacacional +
