@@ -366,10 +366,15 @@ export default function CompensationPanel({
         );
       }
 
-      queryClient.invalidateQueries(["compensationIncidents"]);
-      queryClient.invalidateQueries(["compensationRecords"]);
-      queryClient.invalidateQueries(["allIncidents"]);
-      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries({ queryKey: ["compensationIncidents"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationPrevMonthRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      // Datos usados para recalcular la planilla y los saldos de HE/tardanza
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allRecordsForCompMetrics"] });
+      queryClient.invalidateQueries({ queryKey: ["manualOvertime"] });
 
       toast.success(
         `✓ Compensación registrada para ${selectedList.length} día(s)`
@@ -417,10 +422,14 @@ export default function CompensationPanel({
         );
       }
 
-      queryClient.invalidateQueries(["compensationIncidents"]);
-      queryClient.invalidateQueries(["compensationRecords"]);
-      queryClient.invalidateQueries(["allIncidents"]);
-      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries({ queryKey: ["compensationIncidents"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationPrevMonthRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allRecordsForCompMetrics"] });
+      queryClient.invalidateQueries({ queryKey: ["manualOvertime"] });
 
       toast.success(
         `✓ Compensación actualizada (${selectedList.length} día(s))`

@@ -67,6 +67,13 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
 
   const activeRecords = existingRecords.filter(r => r.status === "Activo");
 
+  // Destinos ya registrados en el período. Si el nuevo registro usa un destino
+  // distinto se avisa explícitamente: el sistema nunca cambia el destino por su
+  // cuenta (ni de compensación a pago ni al revés).
+  const existingDestinations = [...new Set(activeRecords.map(r => r.overtime_destination || "pago"))];
+  const destinationMismatch = existingDestinations.length > 0 && !existingDestinations.includes(destination);
+  const destinationLabel = (d) => (d === "compensacion" ? "Compensación" : "Pago");
+
   // Validation: check if any payslip for this period is closed/paid
   const closedPayslip = payslips.find(p => p.status === "Aprobada" || p.status === "Pagada");
   const isClosed = !!closedPayslip;
@@ -301,6 +308,22 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
                   </SelectContent>
                 </Select>
               </div>
+              {destinationMismatch && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-amber-800 space-y-1">
+                    <p>
+                      Este período ya tiene horas extras manuales con destino{" "}
+                      <strong>{existingDestinations.map(destinationLabel).join(", ")}</strong>. Va a registrar con
+                      destino <strong>{destinationLabel(destination)}</strong>: confirme que es el destino correcto,
+                      el sistema no lo cambia automáticamente.
+                    </p>
+                    <p>
+                      El registro manual se asocia al período y a la jornada de asistencia indicada.
+                    </p>
+                  </div>
+                </div>
+              )}
               <div>
                 <Label className="text-xs font-semibold text-slate-600 mb-1 block">Motivo / Nota <span className="text-red-500">*</span></Label>
                 <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Describa el motivo del registro manual de horas extras..." rows={2} />

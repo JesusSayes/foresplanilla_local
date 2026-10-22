@@ -351,7 +351,7 @@ export default function AttendanceManagement() {
       for (const empId of affectedEmployeeIds) {
         await recalcularAsistenciaService.recalculate(empId, dateStr, dateStr);
       }
-      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
       hideLoading();
       toast.success(`✓ ${result.imported} marcaciones importadas y métricas recalculadas. ${result.errors} errores.`);
     },
@@ -539,8 +539,13 @@ export default function AttendanceManagement() {
         }
       }
 
-      queryClient.invalidateQueries(["todayAttendance"]);
-      queryClient.invalidateQueries(["overtimeAlerts"]);
+      // Refrescar asistencia (incluye la consulta que alimenta el cálculo de planilla),
+      // alertas de HE y registros manuales afectados por el recálculo.
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allRecordsForCompMetrics"] });
+      queryClient.invalidateQueries({ queryKey: ["manualOvertime"] });
       toast.success("Registro actualizado y métricas recalculadas");
       setShowEditModal(false);
       setEditingRecord(null);
@@ -616,8 +621,13 @@ export default function AttendanceManagement() {
     setIsApproving(true);
     try {
       await executeApprove(incident, reviewComments || "Aprobada");
-      queryClient.invalidateQueries(["allIncidents"]);
-      queryClient.invalidateQueries(["todayAttendance"]);
+      // La aprobación recalcula tardanzas y HE: se refresca también la consulta que
+      // usa el cálculo de planilla y los saldos de compensación.
+      queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allRecordsForCompMetrics"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationIncidents"] });
       toast.success("Justificación aprobada correctamente");
       setShowIncidentModal(false);
       setReviewingIncident(null);
@@ -671,8 +681,8 @@ export default function AttendanceManagement() {
         errors++;
       }
     }
-    queryClient.invalidateQueries(["allIncidents"]);
-    queryClient.invalidateQueries(["todayAttendance"]);
+    queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
+    queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
     setPeriodLoading(false);
     setPeriodAction(null);
     const verb = mode === "approve" ? "aprobada(s)" : "rechazada(s)";
@@ -907,7 +917,7 @@ export default function AttendanceManagement() {
       if (attendanceFilter === "all") return true;
       if (attendanceFilter === "sin_entrada") return !emp.record?.clock_in;
       if (attendanceFilter === "sin_salida") return emp.record?.clock_in && !emp.record?.clock_out;
-      if (attendanceFilter === "con_tardanza") return (emp.record?.late_minutes ?? 0) > 0;
+      // El filtro de tardanza se aplica después, con las métricas efectivas.
       return true;
     });
   } else {
@@ -927,7 +937,7 @@ export default function AttendanceManagement() {
       if (attendanceFilter === "all") return true;
       if (attendanceFilter === "sin_entrada") return !emp.record.clock_in;
       if (attendanceFilter === "sin_salida") return emp.record.clock_in && !emp.record.clock_out;
-      if (attendanceFilter === "con_tardanza") return (emp.record?.late_minutes ?? 0) > 0;
+      // El filtro de tardanza se aplica después, con las métricas efectivas.
       return true;
     });
     } // end else (fecha no futura)
@@ -999,8 +1009,8 @@ export default function AttendanceManagement() {
       await syncOvertimeAlertsBatch(updatedRecords || [], pendingAlerts, currentUser, (r) => hasScheduledDay(r.employee_id, r.date));
     } catch (e) { console.error("Error sincronizando alertas HE:", e); }
 
-    queryClient.invalidateQueries(["todayAttendance"]);
-    queryClient.invalidateQueries(["overtimeAlerts"]);
+    queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+    queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
     toast.success(`✓ Recálculo completado para ${done} empleados`);
   };
 
@@ -1026,13 +1036,13 @@ export default function AttendanceManagement() {
           updateLoadingMessage(`Revisando registros de asistencia... ${p.done}/${p.total}`);
         },
       });
-      queryClient.invalidateQueries(["overtimeAlerts"]);
+      queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
 
       // Corregir vacaciones en fines de semana (sábados/domingos → 0 horas)
       updateLoadingMessage("Corrigiendo vacaciones en fines de semana...");
       const { data: vacResult } = await localClient.post('/api/attendance/records/corregir-vacaciones-fin-de-semana', date ? { date } : {});
-      queryClient.invalidateQueries(["todayAttendance"]);
-      queryClient.invalidateQueries(["allAttendanceRecords"]);
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["allAttendanceRecords"] });
 
       toast.success(`✓ Revisión completada: ${result.pending} alerta(s) pendiente(s). Vacaciones corregidas: ${vacResult?.corrected ?? 0}`);
     } catch (error) {
@@ -1252,6 +1262,34 @@ export default function AttendanceManagement() {
     }
     return { pendingLateMin, approvedLateMin, pendingOTHours, hasPending };
   };
+
+  // Filtro "Con tardanza": se aplica con los MISMOS minutos que muestra la tabla
+  // (métricas efectivas calculadas desde las marcaciones + tolerancia del horario +
+  // ajustes por compensaciones). Antes usaba el late_minutes almacenado, por lo que
+  // un registro con tardanza ya compensada, dentro de la tolerancia o sin tardanza
+  // respaldada por sus marcaciones aparecía en el filtro mostrando 0 min.
+  if (attendanceFilter === "con_tardanza") {
+    employeesWithRecords = employeesWithRecords.filter((emp) => {
+      const rowDate = emp.displayDate || dateToStringLima(selectedDate);
+      const metrics = getRowMetrics(emp, rowDate);
+      const adjustedLate = applyLateTolerance(
+        metrics.remainingLateMinutes,
+        metrics.toleranceMinutes
+      );
+      const compAdj = getCompensationAdjustments(emp.id, rowDate);
+      const recordCompMin =
+        enableTardinessCompensation &&
+        emp.record?.tardiness_compensation_status === "Activa"
+          ? emp.record.tardiness_compensation_minutes || 0
+          : 0;
+      return (
+        Math.max(
+          0,
+          adjustedLate - compAdj.pendingLateMin - compAdj.approvedLateMin - recordCompMin
+        ) > 0
+      );
+    });
+  }
 
   // Obtener horario programado de entrada/salida para mostrar en vacaciones
   const getScheduledTimes = (empId, rowDate) => {
@@ -2246,8 +2284,8 @@ export default function AttendanceManagement() {
             initialDate={schedulingEmployee._rowDate ? new Date(schedulingEmployee._rowDate + "T00:00:00") : new Date()}
             onClose={() => { setShowScheduleModal(false); setSchedulingEmployee(null); }}
             onSuccess={() => {
-              queryClient.invalidateQueries(["workSchedules"]);
-              queryClient.invalidateQueries(["todayAttendance"]);
+              queryClient.invalidateQueries({ queryKey: ["workSchedules"] });
+              queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
             }}
           />
         )}
@@ -2313,7 +2351,7 @@ export default function AttendanceManagement() {
               setShowCompensationModal(false);
               setCompensationRecord(null);
               setCompensationEmployee(null);
-              queryClient.invalidateQueries(["todayAttendance"]);
+              queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
             }}
           />
         )}
