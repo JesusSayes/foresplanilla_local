@@ -70,6 +70,10 @@
       "type": "string",
       "description": "Motivo/nota obligatoria del registro manual de horas extras"
     },
+    "replaces_record_id": {
+      "type": "string",
+      "description": "ID del registro manual que este reemplaza. Se completa cuando una correcci\u00f3n se hace por reversi\u00f3n y reemplazo: el registro reemplazado queda en estado 'Revertido' y deja de sumarse, por lo que nunca se contabilizan los dos."
+    },
     "status": {
       "type": "string",
       "enum": [

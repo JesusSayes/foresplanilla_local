@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import PaginationBar from "@/components/ui/PaginationBar";
+import { isCompensableOvertime } from "@/lib/attendanceReconciliation";
 import {
   Clock,
   TrendingUp,
@@ -189,14 +190,19 @@ export default function CompensationPanel({
     return map;
   }, [workSchedules, allEmployees]);
 
-  // Minutos de horas extras ya utilizados en compensaciones APROBADAS (por empleado)
-  const approvedOvertimeByEmployee = useMemo(() => {
+  // Minutos de HE RESERVADOS por solicitudes que aún no se aplicaron al registro
+  // (pendientes, y aprobadas que no quedaron vinculadas a un registro). Las
+  // aprobadas ya aplicadas al registro no se restan: el registro ya tiene esas
+  // horas descontadas y volver a restarlas duplicaría el consumo.
+  // Las solicitudes rechazadas liberan su reserva.
+  const reservedOvertimeByEmployee = useMemo(() => {
     const map = new Map();
     for (const c of existingCompensations) {
-      if (c.status === "Aprobada") {
-        const mins = Math.round((c.hours_to_adjust || 0) * 60);
-        map.set(c.employee_id, (map.get(c.employee_id) || 0) + mins);
-      }
+      if (c.status === "Rechazada") continue;
+      const appliedToRecord = !!c.attendance_record_id;
+      if (c.status !== "Pendiente" && !(c.status === "Aprobada" && !appliedToRecord)) continue;
+      const mins = Math.round((c.hours_to_adjust || 0) * 60);
+      map.set(c.employee_id, (map.get(c.employee_id) || 0) + mins);
     }
     return map;
   }, [existingCompensations]);
@@ -227,7 +233,8 @@ export default function CompensationPanel({
         totalScheduledHours: 0,
         totalRegularHours: 0,
         totalOvertimeHours: 0,
-        usedOvertimeMinutes: approvedOvertimeByEmployee.get(emp.id) || 0,
+        totalCompensableHours: 0,
+        usedOvertimeMinutes: reservedOvertimeByEmployee.get(emp.id) || 0,
         compensatedLateMinutes: approvedLateCompensatedByEmployee.get(emp.id) || 0,
         totalLateMinutes: 0,
         lateDays: 0,
@@ -252,6 +259,13 @@ export default function CompensationPanel({
       const overtimeMin = Math.round(
         ((rec.overtime_hours_25 ?? 0) + (rec.overtime_hours_35 ?? 0)) * 60
       );
+      // Misma regla de compensabilidad que el modal: minutos no reservados y no
+      // pendientes de autorización.
+      const availableCompMin = Math.max(
+        0,
+        overtimeMin - (reservedOvertimeByEmployee.get(rec.employee_id) || 0)
+      );
+      stat.totalCompensableHours += isCompensableOvertime(rec, availableCompMin) / 60;
       if ((rec.late_minutes ?? 0) > 0) {
         stat.totalLateMinutes += rec.late_minutes;
         stat.lateDays++;
@@ -296,7 +310,7 @@ export default function CompensationPanel({
       if (filterType === "late" && stat.totalLateMinutes === 0) return false;
       if (
         filterType === "overtime" &&
-        stat.totalOvertimeHours - (stat.usedOvertimeMinutes || 0) / 60 <= 0
+        stat.totalCompensableHours - (stat.usedOvertimeMinutes || 0) / 60 <= 0
       )
         return false;
 
@@ -476,7 +490,7 @@ export default function CompensationPanel({
         regular: acc.regular + s.totalRegularHours,
         overtime:
           acc.overtime +
-          Math.max(0, s.totalOvertimeHours - (s.usedOvertimeMinutes || 0) / 60),
+          Math.max(0, s.totalCompensableHours - (s.usedOvertimeMinutes || 0) / 60),
         late: acc.late + s.totalLateMinutes,
       }),
       { scheduled: 0, regular: 0, overtime: 0, late: 0 }
@@ -786,7 +800,7 @@ export default function CompensationPanel({
                     );
                     const overtimeMin = Math.max(
                       0,
-                      Math.round(stat.totalOvertimeHours * 60) -
+                      Math.round(stat.totalCompensableHours * 60) -
                         (stat.usedOvertimeMinutes || 0)
                     );
                     const balanceMin = overtimeMin - stat.totalLateMinutes;

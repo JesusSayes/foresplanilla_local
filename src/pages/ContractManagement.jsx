@@ -93,20 +93,31 @@ export default function ContractManagement() {
 
   const defaultTemplate = contractTemplates.find(t => t.is_default) || contractTemplates[0] || null;
 
-  // Sincroniza los costos (actividad/alimento/movilidad) a la ficha del empleado
-  // cuando el contrato guardado queda en estado "Vigente".
-  const syncEmployeeCostsFromContract = async (employeeId, status, costs) => {
-    if (!employeeId || status !== "Vigente") return;
+  // Sincroniza sueldo básico y bonos a la ficha del empleado SOLO desde el contrato
+  // efectivo (el que rige hoy). Un contrato futuro o vencido --aunque esté marcado
+  // como "Vigente"-- no sobrescribe la remuneración actual. Se consultan los
+  // contratos frescos para no depender del estado ni del orden de la tabla.
+  const syncEffectiveContractToEmployee = async (employeeId) => {
+    if (!employeeId) return;
     try {
+      const res = await base44.entities.Contract.filter({ employee_id: employeeId }, "-start_date", 200);
+      const contracts = Array.isArray(res) ? res : (res?.items || []);
+      const { contract, hasConflict } = pickEffectiveContract(contracts, todayLima());
+      if (hasConflict) {
+        toast.warning(
+          "Este trabajador tiene contratos superpuestos que rigen hoy: revise las fechas antes de confiar en la remuneración actual."
+        );
+      }
+      if (!contract) return;
       await base44.entities.Employee.update(employeeId, {
-        base_salary: costs.base_salary ?? 0,
-        activity_cost: costs.activity_cost ?? 0,
-        food_cost: costs.food_cost ?? 0,
-        transport_cost: costs.transport_cost ?? 0,
+        base_salary: contract.salary ?? 0,
+        activity_cost: contract.activity_cost ?? 0,
+        food_cost: contract.food_cost ?? 0,
+        transport_cost: contract.transport_cost ?? 0,
       });
       queryClient.invalidateQueries(["allEmployees"]);
     } catch (e) {
-      console.error("Error sincronizando costos al empleado:", e);
+      console.error("Error sincronizando el contrato efectivo al empleado:", e);
     }
   };
 
@@ -122,12 +133,7 @@ export default function ContractManagement() {
     },
     onSuccess: (newContract) => {
       queryClient.invalidateQueries(["contracts"]);
-      syncEmployeeCostsFromContract(newContract.employee_id, newContract.status, {
-        base_salary: newContract.salary ?? 0,
-        activity_cost: newContract.activity_cost ?? 0,
-        food_cost: newContract.food_cost ?? 0,
-        transport_cost: newContract.transport_cost ?? 0,
-      });
+      syncEffectiveContractToEmployee(newContract.employee_id);
       toast.success(`Contrato ${newContract.contract_number} creado correctamente`);
       resetForm();
     },
@@ -139,12 +145,9 @@ export default function ContractManagement() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries(["contracts"]);
       const savedData = variables?.data || {};
-      syncEmployeeCostsFromContract(savedData.employee_id, savedData.status, {
-        base_salary: savedData.salary ?? 0,
-        activity_cost: savedData.activity_cost ?? 0,
-        food_cost: savedData.food_cost ?? 0,
-        transport_cost: savedData.transport_cost ?? 0,
-      });
+      // Se resincroniza desde el contrato efectivo del día: si el contrato guardado
+      // no es el aplicable (futuro o vencido), el sueldo actual no se sobrescribe.
+      syncEffectiveContractToEmployee(savedData.employee_id);
       toast.success("Contrato actualizado correctamente");
       resetForm();
     },
