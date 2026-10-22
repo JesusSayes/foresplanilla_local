@@ -27,6 +27,7 @@ import { useNavigate } from "react-router-dom";
 import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
 import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/lib/payrollUtils";
+import { calcEffectiveMetrics } from "@/lib/attendanceMetrics";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 import {
   _normStr,
@@ -601,10 +602,25 @@ export default function PayrollManagement() {
     const periodStart = new Date(selectedYear, selectedMonth - 1, 1);
     const periodEnd = new Date(selectedYear, selectedMonth, 0); // último día del mes
 
+      // Datos actualizados antes de calcular: se relee el maestro de empleados para no
+      // trabajar con una copia en caché desactualizada tras crear, editar, renovar o
+      // cambiar el estado de un contrato. Si la lectura fresca no devuelve datos, se
+      // conserva la copia local para no dejar la planilla sin empleados.
+      let employeesForCalc = allEmployees;
+      try {
+        const freshEmployees = await base44.entities.Employee.filter({});
+        if (freshEmployees && freshEmployees.length > 0) {
+          employeesForCalc = freshEmployees;
+        }
+      } catch (error) {
+        // Si falla la lectura fresca se usa la copia local; el cálculo continúa.
+        employeesForCalc = allEmployees;
+      }
+
       // Filtrar empleados según búsqueda y departamento (usando datos frescos locales)
       let filteredEmployees = canViewAllDepartments
-        ? allEmployees
-        : allEmployees.filter(emp => canAccessDepartment(emp.department_name));
+        ? employeesForCalc
+        : employeesForCalc.filter(emp => canAccessDepartment(emp.department_name));
     
     // Validación general de superposición del vínculo laboral con el período:
     //   - Excluir Suspendidos (comportamiento existente).
@@ -695,8 +711,19 @@ export default function PayrollManagement() {
 
       if (empContracts.length === 0) return null;
 
+      // Un contrato rescindido/anulado no representa el vínculo del período: solo se
+      // considera si no existe ningún otro contrato aplicable. Esto evita que una
+      // boleta tome el sueldo de un contrato rescindido por el simple hecho de ser
+      // el de fecha de inicio más reciente.
+      const isCancelled = (c) => {
+        const s = String(c.status || "").toLowerCase();
+        return s.includes("rescind") || s.includes("anulad") || s.includes("cancelad");
+      };
+      const activeContracts = empContracts.filter(c => !isCancelled(c));
+      const candidates = activeContracts.length > 0 ? activeContracts : empContracts;
+
       // 1. Contrato que solapa el período exactamente
-      const overlapping = empContracts.find(c => {
+      const overlapping = candidates.find(c => {
         if (!c.start_date) return false;
         const startDate = new Date(c.start_date.split("T")[0]);
         const endDate = c.end_date ? new Date(c.end_date.split("T")[0]) : null;
@@ -705,14 +732,19 @@ export default function PayrollManagement() {
       if (overlapping) return overlapping;
 
       // 2. Más reciente cuyo inicio fue antes o durante el período (regularización post-cese)
-      const closestBefore = empContracts.find(c => {
+      const closestBefore = candidates.find(c => {
         if (!c.start_date) return false;
         return new Date(c.start_date.split("T")[0]) <= periodEnd;
       });
       if (closestBefore) return closestBefore;
 
-      // 3. Último recurso: el más reciente sin restricción de fecha
-      return empContracts[0];
+      // 3. Último recurso: el más reciente que ya inició. Nunca se usa un contrato
+      // con fecha de inicio posterior al período (no rige para esta planilla).
+      const alreadyStarted = candidates.find(c => {
+        if (!c.start_date) return false;
+        return new Date(c.start_date.split("T")[0]) <= periodEnd;
+      });
+      return alreadyStarted || null;
     };
 
     // Enriquecer SIEMPRE con el sueldo del contrato vigente del período.
@@ -1024,7 +1056,45 @@ export default function PayrollManagement() {
         record => !isCoveredByApprovedVacation(emp.id, record.date)
       );
 
-      const lateRecords = attendanceForDiscounts.filter(r => r.is_late && Number(r.late_minutes || 0) > 10);
+      // Minutos de tardanza respaldados por las marcaciones reales del registro.
+      // Se recalculan desde las horas de entrada del propio registro (no desde textos
+      // formateados ni desde la presentación de la tabla): si la marcación ya no
+      // presenta tardanza, un late_minutes residual no respalda ningún minuto
+      // descontable. Devuelve null cuando el registro no permite el cálculo (sin
+      // marcación de entrada o sin horario), caso en el que se conserva el valor
+      // almacenado para no alterar casos no verificables.
+      const markedLateMinutes = (record) => {
+        const clockIn = record.clock_in;
+        const schedStart = record.scheduled_start;
+        if (!clockIn || !schedStart) return null;
+        const metrics = calcEffectiveMetrics({
+          record,
+          approvedIncidents: [],
+          schedStart,
+          schedEnd: record.scheduled_end || schedStart,
+          breakMinutes: 0,
+          breakStart: null,
+          isUnscheduledDay: false,
+        });
+        return Math.max(0, Math.round(metrics.remainingLateMinutes || 0));
+      };
+
+      // Tardanza efectiva descontable: el menor entre lo almacenado y lo que respaldan
+      // las marcaciones, descontando una sola vez la compensación vigente (estado
+      // "Activa"). Las compensaciones Pendientes no se descuentan aquí porque todavía
+      // no son efectivas. Se conserva la regla de tolerancia existente (> 10 min).
+      const effectiveLateMinutes = (record) => {
+        const stored = Number(record.late_minutes || 0);
+        if (!record.is_late || stored <= 0) return 0;
+        const marked = markedLateMinutes(record);
+        const base = marked === null ? stored : Math.min(stored, marked);
+        const compMin = enableTardinessCompensation && record.tardiness_compensation_status === "Activa"
+          ? (record.tardiness_compensation_minutes || 0)
+          : 0;
+        return Math.max(0, base - compMin);
+      };
+
+      const lateRecords = attendanceForDiscounts.filter(r => effectiveLateMinutes(r) > 10);
       const absentRecords = attendanceForDiscounts.filter(r => r.is_absent);
       // ── Descuento por salida anticipada (concepto independiente) ──
       // Sin tolerancia: descuento desde el primer minuto. Excluye registros
@@ -1044,12 +1114,9 @@ export default function PayrollManagement() {
       // (tolerancia) ya fueron excluidos al construir lateRecords.
       const baseSalaryForCalc = safePayrollNumber(emp.base_salary); // Siempre usar el salario del contrato
       const dailyRate = baseSalaryForCalc > 0 ? roundMoney(baseSalaryForCalc / 30) : 0;
-      const totalLateMinutes = lateRecords.reduce((sum, r) => {
-        const compMin = enableTardinessCompensation && r.tardiness_compensation_status === "Activa"
-          ? (r.tardiness_compensation_minutes || 0)
-          : 0;
-        return sum + Math.max(0, (r.late_minutes || 0) - compMin);
-      }, 0);
+      // Suma de la tardanza efectiva ya calculada: la compensación vigente se descuenta
+      // una sola vez, dentro de effectiveLateMinutes (no se resta de nuevo aquí).
+      const totalLateMinutes = lateRecords.reduce((sum, r) => sum + effectiveLateMinutes(r), 0);
       const hourlyRate = dailyRate > 0 ? roundMoney(dailyRate / 8) : 0;
       const tardinessDiscount = payrollType === "Quincenal" ? 0 : roundMoney(hourlyRate * (totalLateMinutes / 60));
       // Descuento por inasistencias: un día de salario por cada falta completa.

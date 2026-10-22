@@ -380,8 +380,13 @@ export default function CompensationPanel({
 
       queryClient.invalidateQueries(["compensationIncidents"]);
       queryClient.invalidateQueries(["compensationRecords"]);
+      queryClient.invalidateQueries(["compensationPrevMonthRecords"]);
       queryClient.invalidateQueries(["allIncidents"]);
       queryClient.invalidateQueries(["todayAttendance"]);
+      // Datos usados para recalcular la planilla y los saldos de HE/tardanza
+      queryClient.invalidateQueries(["attendanceRecords"]);
+      queryClient.invalidateQueries(["allRecordsForCompMetrics"]);
+      queryClient.invalidateQueries(["manualOvertime"]);
 
       toast.success(
         `✓ Compensación registrada para ${selectedList.length} día(s)`
@@ -436,8 +441,12 @@ export default function CompensationPanel({
 
       queryClient.invalidateQueries(["compensationIncidents"]);
       queryClient.invalidateQueries(["compensationRecords"]);
+      queryClient.invalidateQueries(["compensationPrevMonthRecords"]);
       queryClient.invalidateQueries(["allIncidents"]);
       queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries(["attendanceRecords"]);
+      queryClient.invalidateQueries(["allRecordsForCompMetrics"]);
+      queryClient.invalidateQueries(["manualOvertime"]);
 
       toast.success(
         `✓ Compensación actualizada (${selectedList.length} día(s))`

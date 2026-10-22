@@ -495,8 +495,13 @@ export default function AttendanceManagement() {
         }
       }
 
+      // Refrescar asistencia (incluye la consulta que alimenta el cálculo de planilla),
+      // alertas de HE y registros manuales afectados por el recálculo.
       queryClient.invalidateQueries(["todayAttendance"]);
       queryClient.invalidateQueries(["overtimeAlerts"]);
+      queryClient.invalidateQueries(["attendanceRecords"]);
+      queryClient.invalidateQueries(["allRecordsForCompMetrics"]);
+      queryClient.invalidateQueries(["manualOvertime"]);
       toast.success("Registro actualizado y métricas recalculadas");
       setShowEditModal(false);
       setEditingRecord(null);
@@ -572,8 +577,13 @@ export default function AttendanceManagement() {
     setIsApproving(true);
     try {
       await executeApprove(incident, reviewComments || "Aprobada");
+      // La aprobación recalcula tardanzas y HE: se refresca también la consulta que
+      // usa el cálculo de planilla y los saldos de compensación.
       queryClient.invalidateQueries(["allIncidents"]);
       queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries(["attendanceRecords"]);
+      queryClient.invalidateQueries(["allRecordsForCompMetrics"]);
+      queryClient.invalidateQueries(["compensationIncidents"]);
       toast.success("Justificación aprobada correctamente");
       setShowIncidentModal(false);
       setReviewingIncident(null);
@@ -1218,6 +1228,34 @@ export default function AttendanceManagement() {
     }
     return { pendingLateMin, approvedLateMin, pendingOTHours, hasPending };
   };
+
+  // Filtro "Con tardanza": se aplica con los MISMOS minutos que muestra la tabla
+  // (métricas efectivas calculadas desde las marcaciones + tolerancia del horario +
+  // ajustes por compensaciones). Antes usaba el late_minutes almacenado, por lo que
+  // un registro con tardanza ya compensada, dentro de la tolerancia o sin tardanza
+  // respaldada por sus marcaciones aparecía en el filtro mostrando 0 min.
+  if (attendanceFilter === "con_tardanza") {
+    employeesWithRecords = employeesWithRecords.filter((emp) => {
+      const rowDate = emp.displayDate || dateToStringLima(selectedDate);
+      const metrics = getRowMetrics(emp, rowDate);
+      const adjustedLate = applyLateTolerance(
+        metrics.remainingLateMinutes,
+        metrics.toleranceMinutes
+      );
+      const compAdj = getCompensationAdjustments(emp.id, rowDate);
+      const recordCompMin =
+        enableTardinessCompensation &&
+        emp.record?.tardiness_compensation_status === "Activa"
+          ? emp.record.tardiness_compensation_minutes || 0
+          : 0;
+      return (
+        Math.max(
+          0,
+          adjustedLate - compAdj.pendingLateMin - compAdj.approvedLateMin - recordCompMin
+        ) > 0
+      );
+    });
+  }
 
   // Obtener horario programado de entrada/salida para mostrar en vacaciones
   const getScheduledTimes = (empId) => {

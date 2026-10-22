@@ -519,11 +519,68 @@ export default function CompensationModal({
     0
   );
 
+  // ── Validaciones separadas ──
+  // El equilibrio de minutos (tardanza = HE) NO implica que la solicitud sea válida:
+  // disponibilidad de HE, elegibilidad de fechas, autorizador y motivo se verifican
+  // por separado, y cada bloqueo se comunica con su motivo y sus valores concretos.
+  // Se conservan las restricciones comunicadas por los servicios (fechas ya
+  // compensadas y HE ya utilizadas), sin relajarlas.
+  const selectionIssues = useMemo(() => {
+    const issues = [];
+    for (const item of selectedList) {
+      const day = allScheduledDays.find((d) => d.date === item.date);
+
+      if (compensatedDates.has(item.date)) {
+        const existing = existingCompensations.find(
+          (c) => c.employee_id === employee?.id && c.incident_date === item.date
+        );
+        const estado = existing?.status === "Aprobada" ? "aprobada" : "pendiente de aprobación";
+        issues.push(
+          `Fecha no elegible: el ${item.date} ya tiene una compensación ${estado}; ese día no puede volver a compensarse.`
+        );
+      }
+
+      if (item.overtimeMinutes > 0) {
+        const available = day?.overtimeMinutes || 0;
+        if (item.overtimeMinutes > available) {
+          issues.push(
+            `Disponibilidad insuficiente: el ${item.date} se solicitan ${item.overtimeMinutes} min de HE y quedan ${available} min disponibles (ya se descontaron las HE comprometidas).`
+          );
+        }
+      }
+
+      if (item.lateMinutes > 0) {
+        const registered = day?.lateMinutes || 0;
+        if (item.lateMinutes > registered) {
+          issues.push(
+            `Tardanza excedida: el ${item.date} se solicitan ${item.lateMinutes} min de tardanza y la tardanza registrada es de ${registered} min.`
+          );
+        }
+      }
+    }
+    return issues;
+  }, [selectedList, allScheduledDays, compensatedDates, existingCompensations, employee]);
+
+  // El resumen informa el estado de los minutos; no certifica la validez de la solicitud.
+  const minutesBalanced =
+    totalLateToCompensate > 0 && totalLateToCompensate === totalOvertimeToCompensate;
+  const minutesDifference = Math.abs(totalLateToCompensate - totalOvertimeToCompensate);
+
+  // Distinguir el período evaluado del mes calendario actual
+  const periodMonth = periodStart ? periodStart.slice(0, 7) : null;
+  const currentMonth = format(new Date(), "yyyy-MM");
+
   const handleSubmit = async () => {
     setSubmitError(null);
     setStatusMessage(null);
     if (selectedList.length === 0) {
       setStatusMessage("Seleccione al menos un día en la tabla para compensar.");
+      return;
+    }
+    if (selectionIssues.length > 0) {
+      setStatusMessage(
+        "Corrija los motivos señalados antes de registrar la solicitud."
+      );
       return;
     }
     if (!compensationReason.trim()) {
@@ -672,6 +729,23 @@ export default function CompensationModal({
                   (incluyendo cambio de año), consumiéndose primero las del mes
                   anterior. No se reutilizan horas ya compensadas ni se permiten
                   saldos negativos.
+                </p>
+                <p className="mt-2 font-medium">
+                  Período evaluado:{" "}
+                  {periodStart ? format(parseDateLima(periodStart), "dd/MM/yyyy") : "—"} →{" "}
+                  {periodEnd ? format(parseDateLima(periodEnd), "dd/MM/yyyy") : "—"}
+                  {periodMonth && (
+                    <>
+                      {" · "}Mes seleccionado:{" "}
+                      {format(parseDateLima(`${periodMonth}-01`), "MMMM yyyy", { locale: es })}
+                      {periodMonth !== currentMonth && (
+                        <>
+                          {" · "}Mes actual:{" "}
+                          {format(parseDateLima(`${currentMonth}-01`), "MMMM yyyy", { locale: es })}
+                        </>
+                      )}
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -1018,14 +1092,40 @@ export default function CompensationModal({
                   <span className="font-medium">Fechas seleccionadas:</span>{" "}
                   {selectedList.length}
                 </div>
-                {totalLateToCompensate === totalOvertimeToCompensate &&
-                  totalLateToCompensate > 0 && (
-                    <Badge className="bg-green-100 text-green-700 text-xs">
-                      <ArrowRightLeft className="w-3 h-3 mr-1" />
-                      Compensación equilibrada
-                    </Badge>
-                  )}
+                {minutesBalanced && (
+                  <Badge className="bg-blue-100 text-blue-700 text-xs">
+                    <ArrowRightLeft className="w-3 h-3 mr-1" />
+                    Minutos equilibrados
+                  </Badge>
+                )}
+                {totalLateToCompensate > 0 && !minutesBalanced && (
+                  <Badge className="bg-amber-100 text-amber-700 text-xs">
+                    Diferencia de {minutesDifference} min
+                  </Badge>
+                )}
               </div>
+
+              {/* Bloqueos de la solicitud, con su motivo específico. El equilibrio de
+                  minutos no sustituye estas validaciones de disponibilidad y fechas. */}
+              {selectionIssues.length > 0 && (
+                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-semibold text-red-700 mb-1">
+                        La solicitud no se puede registrar todavía:
+                      </p>
+                      <ul className="space-y-0.5">
+                        {selectionIssues.map((message, index) => (
+                          <li key={index} className="text-xs text-red-600">
+                            • {message}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
               {authorizer && (
                 <p className="text-xs text-indigo-700 mt-2 pt-2 border-t border-indigo-100">
                   <UserCheck className="w-3 h-3 inline mr-1" />
@@ -1068,7 +1168,8 @@ export default function CompensationModal({
                 submitting ||
                 selectedList.length === 0 ||
                 !compensationReason.trim() ||
-                !authorizer
+                !authorizer ||
+                selectionIssues.length > 0
               }
             >
               {submitting
