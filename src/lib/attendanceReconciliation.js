@@ -283,3 +283,122 @@ export const isCompensableOvertime = (record, availableMinutes) => {
 /** Registros cuya falta está confirmada (is_absent y estado coherentes). */
 export const isConfirmedAbsence = (record) =>
   !!record?.is_absent && record?.status === "Ausente";
+
+// ── Detección de inconsistencias históricas (vista previa) ───────────────────
+
+/**
+ * Registros cuya tardanza almacenada no coincide con el cálculo desde las
+ * marcaciones (tolerancia del horario y compensación aprobada incluidas).
+ * Devuelve filas listas para la vista previa de regularización.
+ */
+export const findLateInconsistencies = ({
+  records = [],
+  getScheduleDay,
+  approvedIncidentsByKey = new Map(),
+  approvedCompensationByKey = new Map(),
+  employeeNameById = new Map(),
+  enableCompensation = false,
+  payslipStatusByEmployee = new Map(),
+}) => {
+  const rows = [];
+  for (const record of records) {
+    const dateStr = String(record.date || "").slice(0, 10);
+    const scheduleDay = getScheduleDay ? getScheduleDay(record.employee_id, dateStr) : null;
+    const state = recomputeLateState({
+      record,
+      scheduleDay,
+      approvedIncidents: approvedIncidentsByKey.get(`${record.employee_id}|${dateStr}`) || [],
+      approvedCompensationMinutes:
+        approvedCompensationByKey.get(`${record.employee_id}|${dateStr}`) || 0,
+      recordActiveCompensationMinutes:
+        enableCompensation && record.tardiness_compensation_status === "Activa"
+          ? record.tardiness_compensation_minutes || 0
+          : 0,
+    });
+    if (!state) continue;
+
+    const payslipStatus = payslipStatusByEmployee.get(record.employee_id) || "";
+    const isClosed = payslipStatus === "Aprobada" || payslipStatus === "Pagada";
+    if (!state.isInconsistent && !state.needsReview) continue;
+
+    rows.push({
+      recordId: record.id,
+      employeeId: record.employee_id,
+      employeeName: employeeNameById.get(record.employee_id) || record.employee_id,
+      date: dateStr,
+      status: record.status || "",
+      storedMinutes: state.storedMinutes,
+      storedIsLate: state.storedIsLate,
+      markedMinutes: state.markedMinutes,
+      effectiveMinutes: state.effectiveMinutes,
+      toleranceMinutes: state.toleranceMinutes,
+      appliedCompensationMinutes: state.appliedCompensationMinutes,
+      needsReview: state.needsReview,
+      reason: state.reason,
+      requiresManualRecalc: isClosed,
+      payslipStatus,
+    });
+  }
+  return rows.sort((a, b) => a.date.localeCompare(b.date) || a.employeeName.localeCompare(b.employeeName));
+};
+
+/**
+ * Analiza las jornadas del período y clasifica cada día (detalle por fecha).
+ * Incluye jornadas laborables sin registro dentro de las fechas indicadas.
+ */
+export const findAbsenceFindings = ({
+  employees = [],
+  records = [],
+  getScheduleDay,
+  approvedIncidentsByKey = new Map(),
+  employeeNameById = new Map(),
+  periodStart,
+  periodEnd,
+  isHoliday = () => false,
+  isVacation = () => false,
+}) => {
+  const rows = [];
+  const recordIndex = new Map();
+  for (const record of records) {
+    recordIndex.set(`${record.employee_id}|${String(record.date || "").slice(0, 10)}`, record);
+  }
+
+  const dates = [];
+  if (periodStart && periodEnd) {
+    for (let d = new Date(periodStart + "T00:00:00"); d <= new Date(periodEnd + "T00:00:00"); d.setDate(d.getDate() + 1)) {
+      dates.push(d.toISOString().slice(0, 10));
+    }
+  }
+
+  for (const employee of employees) {
+    for (const dateStr of dates) {
+      if (employee.hire_date && String(employee.hire_date).slice(0, 10) > dateStr) continue;
+      if (employee.termination_date && String(employee.termination_date).slice(0, 10) < dateStr) continue;
+      const scheduleDay = getScheduleDay ? getScheduleDay(employee.id, dateStr) : null;
+      const record = recordIndex.get(`${employee.id}|${dateStr}`) || null;
+      const classification = classifyAbsenceDay({
+        date: dateStr,
+        record,
+        scheduleDay,
+        approvedIncidents: approvedIncidentsByKey.get(`${employee.id}|${dateStr}`) || [],
+        hasRecord: !!record,
+        isVacation: isVacation(employee.id, dateStr),
+        isHoliday: isHoliday(dateStr),
+      });
+      if (classification.kind === ABSENCE_KIND.NONE || classification.kind === ABSENCE_KIND.NOT_WORKABLE) continue;
+      rows.push({
+        employeeId: employee.id,
+        employeeName: employeeNameById.get(employee.id) || `${employee.first_name || ""} ${employee.last_name || ""}`.trim(),
+        employeeCode: employee.employee_code || "",
+        date: dateStr,
+        kind: classification.kind,
+        reason: classification.reason,
+        recordId: record?.id || null,
+        recordStatus: record?.status || "",
+        isAbsent: !!record?.is_absent,
+        hasRecord: !!record,
+      });
+    }
+  }
+  return rows.sort((a, b) => a.date.localeCompare(b.date) || a.employeeName.localeCompare(b.employeeName));
+};
