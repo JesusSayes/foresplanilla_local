@@ -393,7 +393,7 @@ export class PayrollCalculator {
     // remuneración mensual + remuneración vacacional + asignación familiar
     // + horas extras − descuentos de asistencia (faltas, tardanzas, permisos y
     // salidas anticipadas). Se calculan sobre los conceptos ya ejecutados.
-    let derived = computePrevisionalVariables(groups.incomes, groups.deductions);
+    let derived = computePrevisionalVariables(groups.incomes, groups.deductions, context.attendance_discount_amount);
     Object.assign(context, derived);
 
     // Segunda pasada: si alguna fórmula dinámica referencia las variables derivadas,
@@ -405,7 +405,7 @@ export class PayrollCalculator {
     if (usesDerived) {
       this.calculationLog = [];
       groups = this.calculateConceptGroups(concepts, context);
-      derived = computePrevisionalVariables(groups.incomes, groups.deductions);
+      derived = computePrevisionalVariables(groups.incomes, groups.deductions, context.attendance_discount_amount);
       Object.assign(context, derived);
     }
 
@@ -531,6 +531,11 @@ export class PayrollCalculator {
       horas_extras: 0,
       descuentos_asistencia: 0,
       remuneracion_afecta: 0,
+      // Descuentos de asistencia calculados fuera del motor (tardanzas, inasistencias y
+      // salidas anticipadas que el llamador aplica por separado). Reducen la base
+      // previsional antes de evaluar las fórmulas dinámicas y el aporte AFP/ONP, pero
+      // NO se suman a los descuentos del motor (el llamador ya los descuenta del neto).
+      attendance_discount_amount: Math.max(0, Number(extraContext.attendance_discount_amount) || 0),
       // Datos adicionales para lógica del sistema
       derechohabientes: extraContext.derechohabientes || [],
       late_records: extraContext.late_records || [],
