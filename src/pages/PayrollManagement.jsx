@@ -783,6 +783,9 @@ export default function PayrollManagement() {
     // Trabajadores cuya boleta no se puede generar: datos de afiliación AFP/ONP
     // incompletos o conceptos pensionarios ambiguos (se informa el motivo).
     const pensionBlockedWorkers = [];
+    // Conceptos AFP/ONP ignorados por el motor (generales o duplicados del cálculo
+    // automático): se informa para que no parezcan descuentos perdidos.
+    const ignoredPensionConcepts = new Set();
     // Detalle de las faltas descontadas, para que RR. HH. pueda verificarlas.
     const absenceDiscountSummary = [];
 
@@ -1316,6 +1319,7 @@ export default function PayrollManagement() {
 
       // Validación pensionaria: si faltan datos de afiliación o hay ajustes AFP/ONP
       // ambiguos, la boleta NO se genera (no se descuenta un aporte incorrecto).
+      (result.pensionValidation?.ignoredConcepts || []).forEach(i => ignoredPensionConcepts.add(i.name));
       const pensionIssues = result.pensionValidation?.issues || [];
       if (pensionIssues.length > 0) {
         pensionBlockedWorkers.push({
@@ -1507,6 +1511,13 @@ export default function PayrollManagement() {
         toast.warning(
           `⚠️ ${absenceReviewWarnings.length} trabajador(es) con jornadas por regularizar: no se descontaron como falta (marcación incompleta o cobertura pendiente). Use "Regularizar asistencia" para revisarlas. ${absenceReviewWarnings.slice(0, 3).join(" | ")}`,
           { duration: 12000 }
+        );
+      }
+      if (ignoredPensionConcepts.size > 0) {
+        const names = [...ignoredPensionConcepts];
+        toast.info(
+          `ℹ️ Se ignoraron ${names.length} concepto(s) de planilla AFP/ONP (generales o duplicados del cálculo automático): ${names.slice(0, 3).join(", ")}${names.length > 3 ? "…" : ""}. El aporte de cada trabajador se calcula según su afiliación.`,
+          { duration: 20000 }
         );
       }
       if (pensionBlockedWorkers.length > 0) {
