@@ -19,6 +19,10 @@ export const isCancelledContract = (contract) => {
   return s.includes("rescind") || s.includes("anulad") || s.includes("cancelad");
 };
 
+/** Contrato aprobado: el estado "Vigente" es el único que autoriza la remuneración. */
+export const isApprovedContract = (contract) =>
+  String(contract?.status || "").trim().toLowerCase() === "vigente";
+
 const sortByStartDesc = (contracts) =>
   [...contracts].sort((a, b) => String(startOf(b) || "1900-01-01").localeCompare(String(startOf(a) || "1900-01-01")));
 
@@ -47,15 +51,26 @@ export const pickEffectiveContract = (contracts, dateStr) => {
 
 /**
  * Contrato aplicable al período liquidado (histórico o actual).
- * 1. Contratos que solapan el período.
- * 2. Si no hay, el más reciente que ya había iniciado al cierre del período.
- * Nunca se usa un contrato cuya fecha de inicio es posterior al período.
+ * Primero se buscan contratos que solapan el período, priorizando los aprobados.
+ * Si ninguno solapa, se usa el último iniciado antes del cierre. El estado actual
+ * no debe ocultar contratos históricos ni introducir renovaciones futuras.
+ * La falta de aprobación se informa mediante `missingApprovedContract`.
  */
 export const pickContractForPeriod = (contracts, periodStartStr, periodEndStr) => {
-  const list = [...(contracts || [])].sort((a, b) => String(startOf(b) || "1900-01-01").localeCompare(String(startOf(a) || "1900-01-01")));
-  const usable = list.filter((c) => !isCancelledContract(c));
-  const candidates = usable;
-  if (candidates.length === 0) return { contract: null, overlaps: [], hasConflict: false };
+  const list = (contracts || []).filter((c) => !isCancelledContract(c));
+
+  if (list.length === 0) {
+    return {
+      contract: null,
+      overlaps: [],
+      hasConflict: false,
+      contractApproved: false,
+      missingApprovedContract: true,
+    };
+  }
+
+  // Las fechas del período prevalecen sobre el estado actual del historial.
+  const candidates = sortByStartDesc(list);
 
   const periodStart = normDate(periodStartStr);
   const periodEnd = normDate(periodEndStr);
@@ -70,10 +85,14 @@ export const pickContractForPeriod = (contracts, periodStartStr, periodEndStr) =
   });
 
   if (overlapping.length > 0) {
+    const contract = overlapping.find(isApprovedContract) || overlapping[0];
+    const contractApproved = isApprovedContract(contract);
     return {
-      contract: overlapping[0],
-      overlaps: overlapping.slice(1),
+      contract,
+      overlaps: overlapping.filter(c => c !== contract),
       hasConflict: overlapping.length > 1,
+      contractApproved,
+      missingApprovedContract: !contractApproved,
     };
   }
 
@@ -81,7 +100,15 @@ export const pickContractForPeriod = (contracts, periodStartStr, periodEndStr) =
     const start = startOf(c);
     return start && periodEnd && start <= periodEnd;
   });
-  return { contract: alreadyStarted[0] || null, overlaps: [], hasConflict: false };
+  const contract = alreadyStarted[0] || null;
+  const contractApproved = isApprovedContract(contract);
+  return {
+    contract,
+    overlaps: [],
+    hasConflict: false,
+    contractApproved,
+    missingApprovedContract: !contractApproved,
+  };
 };
 
 /** Descripción corta para mensajes y avisos. */

@@ -424,7 +424,7 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
                       )}
                     </div>
                     <p className="text-xs text-slate-600 mt-1"><strong>Nota:</strong> {r.reason}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Destino: {r.overtime_destination === "compensacion" ? "Compensación" : "Pago"} · Registrado por {r.created_by}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Jornada del {r.attendance_date || "—"} · Destino: {r.overtime_destination === "compensacion" ? "Compensación" : "Pago"} · Registrado por {r.created_by}</p>
                   </div>
                 );
               })}
@@ -487,7 +487,9 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
                       el sistema no lo cambia automáticamente.
                     </p>
                     <p>
-                      El registro manual se asocia al período y a la jornada de asistencia indicada.
+                      Cada registro manual queda vinculado a la jornada de la fecha indicada (empleado, fecha y jornada
+                      de asistencia) y solo se aplica a ese día; el mes y el tipo de planilla únicamente agrupan los
+                      registros que se suman a la planilla.
                     </p>
                   </div>
                 </div>
