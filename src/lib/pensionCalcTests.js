@@ -20,6 +20,7 @@ const makeEmployee = (overrides = {}) => ({
   last_name: "Empleado",
   base_salary: 3000,
   pension_system: "AFP",
+  afp_id: "afp-test",
   afp_commission_type: "Flujo",
   ...overrides,
 });
@@ -146,8 +147,9 @@ test("Conceptos AFP heredados: no duplican descuentos", async () => {
   assert(pensionDeds.length === 3, `Se esperaban 3 ítems AFP centralizados (sin duplicar), vino ${pensionDeds.length}`);
 });
 
-// 7. Sobrescritura manual explícita: reemplaza el cálculo automático
-test("Sobrescritura manual explícita: reemplaza el cálculo automático", async () => {
+// 7. Concepto AFP/ONP del trabajador con importe propio (no corresponde al cálculo
+//    automático): bloquea la boleta en lugar de reemplazar el cálculo en silencio.
+test("Concepto AFP/ONP con importe propio: bloquea la boleta", async () => {
   const emp = makeEmployee();
   const afp = makeAFP();
   const manualConcept = {
@@ -157,9 +159,80 @@ test("Sobrescritura manual explícita: reemplaza el cálculo automático", async
   const income = { employee_id: "x", concept_type: "Ingreso", concept_category: "Remuneración Base", concept_name: "Remuneración", is_dynamic: false, amount: 3000, is_recurring: true };
   const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
   const result = await calc.calculatePayroll([income, manualConcept], { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp });
+  assert(result.pensionValidation.blocked, "Debe bloquear la boleta");
+  assert(result.pensionValidation.issues.length > 0, "Debe informar el motivo del bloqueo");
   const pensionDeds = result.deductions.filter(d => d.concept_category === "AFP/ONP");
-  assert(pensionDeds.length === 1, `Se esperaba 1 ítem (manual), vino ${pensionDeds.length}`);
-  assert(pensionDeds[0].calculated_amount === 500, `Monto manual esperado 500, vino ${pensionDeds[0].calculated_amount}`);
+  assert(pensionDeds.length === 0, `No debe aplicar descuentos AFP/ONP, vino ${pensionDeds.length}`);
+});
+
+// 11b. Concepto GENERAL AFP/ONP: se ignora y NO desactiva el cálculo automático
+test("Concepto general AFP/ONP: se ignora y el cálculo automático sigue vigente", async () => {
+  const emp = makeEmployee({ id: "emp-1" });
+  const afp = makeAFP();
+  const concepts = [
+    { employee_id: "emp-1", concept_type: "Ingreso", concept_category: "Remuneración Base", concept_name: "Remuneración", is_dynamic: false, amount: 3000, is_recurring: true },
+    { employee_id: "general", concept_type: "Descuento", concept_category: "AFP/ONP", concept_name: "ONP", is_dynamic: true, calculation_formula: "base_salary * 0.13", is_recurring: true },
+  ];
+  const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
+  const result = await calc.calculatePayroll(concepts, { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp });
+  assert(!result.pensionValidation.blocked, "Un concepto general no debe bloquear la boleta del trabajador AFP");
+  const pensionDeds = result.deductions.filter(d => d.concept_category === "AFP/ONP");
+  assert(pensionDeds.length === 3, `Se esperaban los 3 ítems AFP automáticos, vino ${pensionDeds.length}`);
+  assert(!pensionDeds.some(d => /^onp$/i.test(d.concept_name)), "No debe aplicarse ONP a un trabajador AFP");
+});
+
+// 11c. Concepto ONP del trabajador afiliado a AFP: bloquea la boleta
+test("Concepto ONP en trabajador AFP: bloquea la boleta", async () => {
+  const emp = makeEmployee({ id: "emp-1" });
+  const afp = makeAFP();
+  const concepts = [
+    { employee_id: "emp-1", concept_type: "Ingreso", concept_category: "Remuneración Base", concept_name: "Remuneración", is_dynamic: false, amount: 3000, is_recurring: true },
+    { employee_id: "emp-1", concept_type: "Descuento", concept_category: "AFP/ONP", concept_name: "Descuento ONP mensual", amount: 390, is_recurring: true },
+  ];
+  const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
+  const result = await calc.calculatePayroll(concepts, { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp });
+  assert(result.pensionValidation.blocked, "Debe bloquear la boleta por régimen incompatible");
+  assert(result.pensionValidation.issues.some(i => /ONP/i.test(i)), "El motivo debe mencionar ONP");
+});
+
+// 11d. Comisión Mixta: usa el % de comisión mixta configurado en la AFP
+test("Comisión Mixta: usa el % de comisión mixta de la AFP", () => {
+  const emp = makeEmployee({ afp_commission_type: "Mixta" });
+  const afp = makeAFP({ commission_percentage: 1.69, mixed_commission_percentage: 1.25 });
+  const base = 3000;
+  const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
+  const res = calc.calculatePensionContribution(base, { afp });
+  const comision = res.items.find(i => /comisi[oó]n/i.test(i.name));
+  assert(comision, "Debe existir el ítem de comisión");
+  assert(comision.amount === round2(base * 0.0125), `Comisión mixta esperada ${round2(base * 0.0125)}, vino ${comision.amount}`);
+  assert(/mixta/i.test(comision.name), `El nombre debe indicar comisión mixta, vino "${comision.name}"`);
+});
+
+// 11e. Comisión Mixta sin % configurado en la AFP: bloquea la boleta
+test("Comisión Mixta sin % configurado: bloquea la boleta", async () => {
+  const emp = makeEmployee({ id: "emp-1", afp_commission_type: "Mixta" });
+  const afp = makeAFP();
+  const concepts = [
+    { employee_id: "emp-1", concept_type: "Ingreso", concept_category: "Remuneración Base", concept_name: "Remuneración", is_dynamic: false, amount: 3000, is_recurring: true },
+  ];
+  const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
+  const result = await calc.calculatePayroll(concepts, { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp });
+  assert(result.pensionValidation.blocked, "Debe bloquear la boleta sin % de comisión mixta");
+  assert(result.pensionValidation.issues.some(i => /comisión mixta/i.test(i)), "El motivo debe mencionar la comisión mixta");
+});
+
+// 11f. Datos de afiliación incompletos: sistema de pensiones sin definir o AFP sin asignar
+test("Afiliación incompleta: bloquea la boleta", async () => {
+  const concepts = [
+    { employee_id: "emp-1", concept_type: "Ingreso", concept_category: "Remuneración Base", concept_name: "Remuneración", is_dynamic: false, amount: 3000, is_recurring: true },
+  ];
+  const sinSistema = new PayrollCalculator(makeEmployee({ id: "emp-1", pension_system: null }), 1, 2026, "Mensual");
+  const resA = await sinSistema.calculatePayroll(concepts, { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp: null });
+  assert(resA.pensionValidation.blocked, "Sin sistema de pensiones debe bloquear");
+
+  const afpSinAsignar = new PayrollCalculator(makeEmployee({ id: "emp-1", afp_id: "" }), 1, 2026, "Mensual");
+  const resB = await afpSinAsignar.calculatePayroll(concepts, { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp: null });
+  assert(resB.pensionValidation.blocked, "AFP sin AFP asignada debe bloquear");
 });
 
 test("Concepto pension_contribution explícito ejecuta el cálculo centralizado", async () => {
@@ -275,3 +348,14 @@ export const runPensionContributionTests = async () => {
   }
   return { passed, failed, results };
 };
+
+
+test("Cero días trabajados conserva cero en contexto y remuneración", async () => {
+  const calc = new PayrollCalculator(makeEmployee(), 10, 2026, "Mensual");
+  const result = await calc.calculatePayroll([{
+    concept_type: "Ingreso", concept_name: "Remuneración Básica", is_recurring: true,
+    is_dynamic: true, calculation_formula: "base_salary / 30 * worked_days",
+  }], { worked_days: 0 }, 1130, { afp: makeAFP() });
+  assert(result.context.worked_days === 0, "Debe conservar cero días");
+  assert(result.totals.totalIncome === 0, "No debe reponer el sueldo mensual");
+});

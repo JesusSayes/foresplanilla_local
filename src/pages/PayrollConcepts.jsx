@@ -19,6 +19,7 @@ import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUp
 import * as XLSX from "xlsx";
 import { SYSTEM_LOGIC_TYPES } from "../components/payroll/PayrollCalculator";
 import AvailableConceptsColumn from "@/components/payroll/AvailableConceptsColumn";
+import { isPensionConcept } from "@/lib/pensionConcepts";
 
 const parseSpreadsheetFile = async (file) => {
   const buffer = await file.arrayBuffer();
@@ -1634,6 +1635,18 @@ export default function PayrollConcepts() {
                   </Select>
                 </div>
               </div>
+
+              {isPensionConcept(formData) && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800 space-y-1">
+                  <p className="font-semibold">El aporte AFP/ONP se calcula automáticamente por trabajador</p>
+                  <p>
+                    Según su afiliación (AFP asignada con comisión Flujo o Mixta, u ONP) y sobre la base
+                    previsional. {activeTab === "general"
+                      ? "Un concepto general AFP/ONP no se aplica en las planillas: elimínelo y configure la afiliación de cada trabajador."
+                      : "Este concepto se ignora cuando duplica el cálculo automático; si tiene un importe propio o no corresponde al régimen del trabajador, su boleta no se generará hasta corregirlo."}
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

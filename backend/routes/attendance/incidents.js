@@ -12,6 +12,7 @@ router.use(authenticateToken, loadAccessContext);
 router.get('/', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.getAll);
 router.get('/:id', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScope(...VIEW_PERMISSIONS), controller.getById);
 router.post('/', requireAnyPermission(...CREATE_PERMISSIONS), attachEmployeeScope(...CREATE_PERMISSIONS), controller.create);
+router.post('/compensation', requireAnyPermission(...CREATE_PERMISSIONS), attachEmployeeScope(...CREATE_PERMISSIONS), controller.saveCompensation);
 router.put('/:id', requireAnyPermission('attendance.edit', 'attendance.approve_incidents', 'attendance.approve_compensations', 'attendance.manage'), attachEmployeeScope('attendance.edit', 'attendance.approve_incidents', 'attendance.approve_compensations', 'attendance.manage'), controller.update);
 router.delete('/:id', requireAnyPermission('attendance.edit', 'attendance.approve_compensations', 'attendance.manage'), attachEmployeeScope('attendance.edit', 'attendance.approve_compensations', 'attendance.manage'), controller.delete);
 

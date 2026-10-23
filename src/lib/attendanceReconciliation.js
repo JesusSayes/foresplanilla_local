@@ -187,6 +187,22 @@ const FULL_DAY_COVERING_TYPES = [
   "Onomástico",
 ];
 
+/** Incidente aprobado que cubre la jornada completa (día completo o tipo que cubre el día). */
+const findFullDayCover = (approvedIncidents = []) =>
+  (approvedIncidents || []).find(
+    (i) => i.full_day_justification || FULL_DAY_COVERING_TYPES.includes(i.incident_type)
+  );
+
+/** ¿La jornada está cubierta por una justificación aprobada? */
+export const isCoveredByApprovedIncident = (approvedIncidents = []) =>
+  !!findFullDayCover(approvedIncidents);
+
+/** ¿La jornada tiene alguna marcación real (entrada o salida)? */
+export const hasClockMarkings = (record) => {
+  const { firstClockIn, lastClockOut } = getSegmentClockTimes(record);
+  return !!(firstClockIn || lastClockOut);
+};
+
 /**
  * Clasifica una jornada del trabajador dentro del período de asistencia.
  * No escribe nada: devuelve el tipo y el motivo concreto.
@@ -209,9 +225,7 @@ export const classifyAbsenceDay = ({
     return { kind: ABSENCE_KIND.COVERED, reason: "Vacaciones aprobadas" };
   }
 
-  const fullDayCover = approvedIncidents.find(
-    (i) => i.full_day_justification || FULL_DAY_COVERING_TYPES.includes(i.incident_type)
-  );
+  const fullDayCover = findFullDayCover(approvedIncidents);
   if (fullDayCover) {
     return { kind: ABSENCE_KIND.COVERED, reason: `Cubierta por ${fullDayCover.incident_type}` };
   }

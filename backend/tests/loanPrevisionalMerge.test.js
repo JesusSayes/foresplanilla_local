@@ -44,7 +44,7 @@ for (const logic of [{ system_logic_type: 'pension_contribution' }, { is_dynamic
     assert.deepEqual(result.errors, []);
   });
 }
-test('fórmula manual recibe base derivada y reemplaza el cálculo automático', async () => {
+test('fórmula pensionaria general se ignora y conserva el cálculo automático', async () => {
   const result = await calculate([{ concept_name: 'Pensión manual', concept_type: 'Descuento', concept_category: 'AFP/ONP', is_dynamic: true, calculation_formula: 'remuneracion_afecta * 0.13' }]);
   assert.equal(result.deductions.at(-1).calculated_amount, 177.19);
   assert.equal(result.deductions.filter(c => c.concept_category === 'AFP/ONP').length, 1);
@@ -99,7 +99,7 @@ for (const manual of [false, true]) {
 }
 
 test('AFP usa porcentajes configurados sobre la base con asistencia externa', async () => {
-  const result = await new PayrollCalculator({ pension_system: 'AFP', afp_commission_type: 'Flujo' }, 10, 2026)
+  const result = await new PayrollCalculator({ pension_system: 'AFP', afp_id: 'afp-test', afp_commission_type: 'Flujo' }, 10, 2026)
     .calculatePayroll([income('Remuneración Básica', 1000)], {}, 1130, {
       attendance_discount_amount: 50,
       afp: { name: 'Prueba', obligatory_contribution_percentage: 10, insurance_percentage: 1, commission_percentage: 2 },

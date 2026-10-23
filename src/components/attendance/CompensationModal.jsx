@@ -119,14 +119,16 @@ export default function CompensationModal({
     return prevMonthRecords.filter((r) => r.employee_id === employee.id);
   }, [employee, prevMonthRecords]);
 
-  // Minutos de HE RESERVADOS: solicitudes pendientes (aún no aplicadas al registro)
-  // y aprobadas que no quedaron vinculadas a un registro. Las compensaciones ya
-  // aplicadas al registro no se restan aquí: el propio registro ya tiene esas horas
-  // descontadas, y restarlas otra vez duplicaría el consumo.
-  // Las solicitudes RECHAZADAS liberan su reserva. Las que se están editando se
+  // Saldo comprometido por fecha, calculado POR SEPARADO para tardanza y para HE:
+  //  - Pendiente: la solicitud existe pero todavía no se aplicó al registro → reserva.
+  //  - Aprobada sin registro vinculado: tampoco se aplicó → reserva.
+  //  - Aprobada aplicada: la aprobación ya descontó tardanza y HE del registro, y
+  //    volver a restarlo duplicaría el consumo.
+  // Las RECHAZADAS liberan su reserva y las solicitudes que se están editando se
   // excluyen porque esta solicitud las reemplaza.
-  const reservedUsedByDate = useMemo(() => {
-    const map = {};
+  const reservedByDate = useMemo(() => {
+    const late = {};
+    const overtime = {};
     const editingIds = new Set((pendingCompensations || []).map((c) => c.id));
     for (const c of existingCompensations) {
       if (c.employee_id !== employee?.id) continue;
@@ -134,10 +136,12 @@ export default function CompensationModal({
       if (c.status === "Rechazada") continue;
       const appliedToRecord = !!c.attendance_record_id;
       if (c.status !== "Pendiente" && !(c.status === "Aprobada" && !appliedToRecord)) continue;
-      const mins = Math.round((c.hours_to_adjust || 0) * 60);
-      map[c.incident_date] = (map[c.incident_date] || 0) + mins;
+      const lateMin = Number(c.late_minutes_to_adjust || 0);
+      const overtimeMin = Math.round((c.hours_to_adjust || 0) * 60);
+      if (lateMin > 0) late[c.incident_date] = (late[c.incident_date] || 0) + lateMin;
+      if (overtimeMin > 0) overtime[c.incident_date] = (overtime[c.incident_date] || 0) + overtimeMin;
     }
-    return map;
+    return { late, overtime };
   }, [existingCompensations, employee, pendingCompensations]);
 
   // Generar TODOS los días del período (con y sin registro de asistencia)
@@ -162,7 +166,7 @@ export default function CompensationModal({
             0,
             Math.round(
               (Number(record?.overtime_hours_25 ?? 0) + Number(record?.overtime_hours_35 ?? 0)) * 60
-            ) - (reservedUsedByDate[dateStr] || 0)
+            ) - (reservedByDate.overtime[dateStr] || 0)
           );
           days.push({
             date: dateStr,
@@ -200,7 +204,7 @@ export default function CompensationModal({
           0,
           Math.round(
             (Number(record?.overtime_hours_25 ?? 0) + Number(record?.overtime_hours_35 ?? 0)) * 60
-          ) - (reservedUsedByDate[dateStr] || 0)
+          ) - (reservedByDate.overtime[dateStr] || 0)
         );
         days.push({
           date: dateStr,
@@ -208,7 +212,12 @@ export default function CompensationModal({
           record,
           hasRecord: !!record,
           workedHours: record?.worked_hours ?? 0,
-          lateMinutes: record?.late_minutes || 0,
+          // Tardanza DISPONIBLE: la registrada menos lo ya comprometido por solicitudes
+          // vigentes de esa fecha (lo aprobado ya se descontó del propio registro).
+          lateMinutes: Math.max(
+            0,
+            (record?.late_minutes || 0) - (reservedByDate.late[dateStr] || 0)
+          ),
           overtimeMinutes: isCompensableOvertime(record, heMinutes),
           rawOvertimeMinutes: heMinutes,
           overtimeDestination: record?.overtime_destination || "pago",
@@ -221,7 +230,7 @@ export default function CompensationModal({
     for (const record of nextPeriodRecords) {
       const date = String(record.date || "").slice(0, 10);
       if (record.employee_id !== employee.id || date <= periodEnd || date > overtimeWindowEnd) continue;
-      const available = Math.max(0, Math.round((Number(record.overtime_hours_25 || 0) + Number(record.overtime_hours_35 || 0)) * 60) - (reservedUsedByDate[date] || 0));
+      const available = Math.max(0, Math.round((Number(record.overtime_hours_25 || 0) + Number(record.overtime_hours_35 || 0)) * 60) - (reservedByDate.overtime[date] || 0));
       days.push({
         date, record, hasRecord: true, scheduleTimes: null,
         workedHours: Number(record.worked_hours || 0), lateMinutes: 0,
@@ -253,7 +262,7 @@ export default function CompensationModal({
     }
 
     return days.sort((a, b) => a.date.localeCompare(b.date));
-  }, [employee, employeeSchedule, periodStart, periodEnd, allEmployeeRecords, editMode, pendingCompensations, reservedUsedByDate, prevMonthStart, prevMonthEnd, prevMonthEmployeeRecords, nextPeriodRecords, overtimeWindowEnd]);
+  }, [employee, employeeSchedule, periodStart, periodEnd, allEmployeeRecords, editMode, pendingCompensations, reservedByDate, prevMonthStart, prevMonthEnd, prevMonthEmployeeRecords, nextPeriodRecords, overtimeWindowEnd]);
 
   const summary = useMemo(() => {
     const scheduledHours = employeeSchedule
@@ -263,7 +272,7 @@ export default function CompensationModal({
       (s, r) => s + Number(r.regular_hours ?? 0),
       0
     );
-    const reservedUsedTotalMin = Object.entries(reservedUsedByDate).filter(([date]) => date >= periodStart && date <= periodEnd).reduce(
+    const reservedUsedTotalMin = Object.entries(reservedByDate.overtime).filter(([date]) => date >= periodStart && date <= periodEnd).reduce(
       (a, [, b]) => a + b,
       0
     );
@@ -279,7 +288,7 @@ export default function CompensationModal({
       0
     );
     return { scheduledHours, regularHours, overtimeHours, lateMinutes };
-  }, [allEmployeeRecords, employeeSchedule, periodStart, periodEnd, reservedUsedByDate]);
+  }, [allEmployeeRecords, employeeSchedule, periodStart, periodEnd, reservedByDate]);
 
   // Resumen mensual de compensación: tardanzas, compensable, compensado, saldo
   const monthlySummary = useMemo(() => {
@@ -290,18 +299,6 @@ export default function CompensationModal({
     return { totalLateMin, totalCompensableMin, totalCompensatedMin, pendingBalanceMin };
   }, [allEmployeeRecords, allScheduledDays, selectedDays]);
 
-  const compensatedDates = useMemo(() => {
-    // En edición se excluyen únicamente las filas de la solicitud editada.
-    // En modo nuevo: bloquear Pendientes y Aprobadas, pero NO Rechazadas
-    // (un rechazo previo no debe impedir una nueva solicitud si hay saldo disponible).
-    return new Set(
-      existingCompensations
-        .filter((c) => c.employee_id === employee?.id)
-        .filter(c => c.status === "Pendiente" || c.status === "Aprobada")
-        .filter((c) => (editMode ? !pendingCompensations.some(p => p.id === c.id) : true))
-        .map((c) => c.incident_date)
-    );
-  }, [existingCompensations, employee, editMode, pendingCompensations]);
 
   const filteredAuthorizers = useMemo(() => {
     if (!authorizerSearch.trim()) {
@@ -370,13 +367,13 @@ export default function CompensationModal({
   const selectAllCompensable = () => {
     setSubmitError(null);
     const tardanzaDays = allScheduledDays
-      .filter((d) => d.lateMinutes > 0 && !d.isPrevMonth && !compensatedDates.has(d.date))
+      .filter((d) => d.lateMinutes > 0 && !d.isPrevMonth)
       .map((d) => ({ date: d.date, lateMinutes: d.lateMinutes }));
     const compensableDays = allScheduledDays
-      .filter((d) => d.overtimeMinutes > 0 && !d.isPrevMonth && !compensatedDates.has(d.date))
+      .filter((d) => d.overtimeMinutes > 0 && !d.isPrevMonth)
       .map((d) => ({ date: d.date, overtimeMinutes: d.overtimeMinutes }));
     const prevMonthCompensable = allScheduledDays
-      .filter((d) => d.overtimeMinutes > 0 && d.isPrevMonth && !compensatedDates.has(d.date))
+      .filter((d) => d.overtimeMinutes > 0 && d.isPrevMonth)
       .map((d) => ({ date: d.date, overtimeMinutes: d.overtimeMinutes }));
 
     if (tardanzaDays.length === 0 && compensableDays.length === 0 && prevMonthCompensable.length === 0) {
@@ -431,7 +428,7 @@ export default function CompensationModal({
 
     // Días de tardanza seleccionados (usar valor manual si existe, si no el del registro)
     const tardanzaDays = allScheduledDays
-      .filter((d) => !compensatedDates.has(d.date) && selectedDays[d.date] && (selectedDays[d.date].lateMinutes > 0 || ((targetDate === null || targetDate === d.date) && d.lateMinutes > 0)))
+      .filter((d) => selectedDays[d.date] && (selectedDays[d.date].lateMinutes > 0 || ((targetDate === null || targetDate === d.date) && d.lateMinutes > 0)))
       .map((d) => ({
         date: d.date,
         lateMinutes: Math.min(d.lateMinutes, selectedDays[d.date].lateMinutes > 0 ? selectedDays[d.date].lateMinutes : d.lateMinutes),
@@ -439,10 +436,10 @@ export default function CompensationModal({
 
     // Días compensables de TODO el período + mes anterior (no solo los seleccionados)
     const compensableDays = allScheduledDays
-      .filter((d) => d.overtimeMinutes > 0 && !d.isPrevMonth && !compensatedDates.has(d.date))
+      .filter((d) => d.overtimeMinutes > 0 && !d.isPrevMonth)
       .map((d) => ({ date: d.date, overtimeMinutes: d.overtimeMinutes }));
     const prevMonthCompensable = allScheduledDays
-      .filter((d) => d.overtimeMinutes > 0 && d.isPrevMonth && !compensatedDates.has(d.date))
+      .filter((d) => d.overtimeMinutes > 0 && d.isPrevMonth)
       .map((d) => ({ date: d.date, overtimeMinutes: d.overtimeMinutes }));
 
     if (tardanzaDays.length === 0) {
@@ -505,24 +502,15 @@ export default function CompensationModal({
 
   // ── Validaciones separadas ──
   // El equilibrio de minutos (tardanza = HE) NO implica que la solicitud sea válida:
-  // disponibilidad de HE, elegibilidad de fechas, autorizador y motivo se verifican
-  // por separado, y cada bloqueo se comunica con su motivo y sus valores concretos.
-  // Se conservan las restricciones comunicadas por los servicios (fechas ya
-  // compensadas y HE ya utilizadas), sin relajarlas.
+  // disponibilidad de tardanza y de HE, ventana de emparejamiento, autorizador y motivo
+  // se verifican por separado, y cada bloqueo se comunica con su motivo y sus valores
+  // concretos. Se valida contra el SALDO DISPONIBLE de cada fecha (no contra la fecha
+  // completa), por lo que una fecha usada parcialmente sigue siendo elegible por su
+  // saldo restante.
   const selectionIssues = useMemo(() => {
     const issues = [];
     for (const item of selectedList) {
       const day = allScheduledDays.find((d) => d.date === item.date);
-
-      if (compensatedDates.has(item.date)) {
-        const existing = existingCompensations.find(
-          (c) => c.employee_id === employee?.id && c.incident_date === item.date
-        );
-        const estado = existing?.status === "Aprobada" ? "aprobada" : "pendiente de aprobación";
-        issues.push(
-          `Fecha no elegible: el ${item.date} ya tiene una compensación ${estado}; ese día no puede volver a compensarse.`
-        );
-      }
 
       if (item.overtimeMinutes > 0) {
         const available = day?.overtimeMinutes || 0;
@@ -534,10 +522,10 @@ export default function CompensationModal({
       }
 
       if (item.lateMinutes > 0) {
-        const registered = day?.lateMinutes || 0;
-        if (item.lateMinutes > registered) {
+        const availableLate = day?.lateMinutes || 0;
+        if (item.lateMinutes > availableLate) {
           issues.push(
-            `Tardanza excedida: el ${item.date} se solicitan ${item.lateMinutes} min de tardanza y la tardanza registrada es de ${registered} min.`
+            `Tardanza excedida: el ${item.date} se solicitan ${item.lateMinutes} min de tardanza y el saldo de tardanza disponible es de ${availableLate} min (ya se descontaron las compensaciones vigentes de esa fecha).`
           );
         }
       }
@@ -567,7 +555,7 @@ export default function CompensationModal({
       }
     }
     return issues;
-  }, [selectedList, allScheduledDays, compensatedDates, existingCompensations, employee]);
+  }, [selectedList, allScheduledDays]);
 
   // Avisos (no bloquean el guardado): jornadas cuya HE está destinada a pago y que
   // además se usaría para compensar, por lo que se pagarían y compensarían a la vez.
@@ -629,7 +617,7 @@ export default function CompensationModal({
     );
     const invalidDay = selectedList.some(item => {
       const day = allScheduledDays.find(d => d.date === item.date);
-      return !item.recordId || !day || compensatedDates.has(item.date) || item.lateMinutes > day.lateMinutes || item.overtimeMinutes > day.overtimeMinutes;
+      return !item.recordId || !day || item.lateMinutes > day.lateMinutes || item.overtimeMinutes > day.overtimeMinutes;
     });
     if (invalidDay || totalLateToCompensate <= 0 || totalLateToCompensate !== totalOvertimeToCompensate || matched.totalCompensated !== totalLateToCompensate) {
       setSubmitError("Seleccione minutos de tardanza y HE disponibles en cantidades iguales, del mismo día o hasta 30 días después o de los últimos 6 días del mes anterior.");
@@ -637,7 +625,15 @@ export default function CompensationModal({
     }
     setSubmitting(true);
     try {
-      await onSubmit(selectedList, compensationReason, authorizer);
+      const result = await onSubmit(selectedList, compensationReason, authorizer);
+      // El registro quedó completo. En modo nuevo el modal permanece abierto con los
+      // saldos actualizados, para poder usar el saldo restante sin cerrarlo.
+      if (result?.registered && !editMode) {
+        setSelectedDays({});
+        setStatusMessage(
+          `✓ Solicitud registrada para ${result.registered} día(s). Los saldos se actualizaron: puede usar el saldo restante de las jornadas usadas parcialmente sin cerrar esta ventana.`
+        );
+      }
     } catch (error) {
       setSubmitError(error?.response?.data?.error || error?.message || "Ocurrió un error al registrar la compensación.");
     } finally {
@@ -771,7 +767,8 @@ export default function CompensationModal({
                   dentro del mismo mes. Además, se pueden usar las HE de los{" "}
                   <span className="font-medium">últimos 6 días del mes anterior</span>{" "}
                   (incluyendo cambio de año), consumiéndose primero las del mes
-                  anterior. No se reutilizan horas ya compensadas ni se permiten
+                  anterior. Tardanza y HE se controlan por separado: una fecha usada
+                  parcialmente conserva disponible su saldo restante y no se permiten
                   saldos negativos.
                 </p>
                 <p className="mt-2 font-medium">
@@ -932,10 +929,10 @@ export default function CompensationModal({
                         Hrs. Trab.
                       </th>
                       <th className="text-center px-2 py-2 text-xs font-semibold text-orange-600">
-                        Tardanza
+                        Tardanza disp.
                       </th>
                       <th className="text-center px-2 py-2 text-xs font-semibold text-blue-600">
-                        HE (min)
+                        HE disp. (min)
                       </th>
                       <th className="text-center px-2 py-2 text-xs font-semibold text-slate-600">
                         Compensar
@@ -945,21 +942,24 @@ export default function CompensationModal({
                   <tbody>
                     {allScheduledDays.map((day) => {
                       const isSelected = !!selectedDays[day.date];
-                      const isAlreadyCompensated = compensatedDates.has(day.date);
+                      // Una fecha se bloquea solo si no le queda ningún saldo: si se usó
+                      // parte de su tardanza o de sus HE, el saldo restante sigue disponible.
+                      const hasBalance = day.lateMinutes > 0 || day.overtimeMinutes > 0;
+                      const reservedToday =
+                        (reservedByDate.late[day.date] || 0) +
+                        (reservedByDate.overtime[day.date] || 0);
                       return (
                         <tr
                           key={day.date}
                           className={`border-t border-slate-100 ${
                             isSelected ? "bg-indigo-50" : "hover:bg-slate-50"
-                          } ${isAlreadyCompensated ? "opacity-50" : ""}`}
+                          } ${hasBalance ? "" : "opacity-50"}`}
                         >
                           <td className="px-3 py-2">
                             <Checkbox
                               checked={isSelected}
-                              disabled={isAlreadyCompensated}
-                              onCheckedChange={() =>
-                                !isAlreadyCompensated && toggleDay(day)
-                              }
+                              disabled={!hasBalance}
+                              onCheckedChange={() => hasBalance && toggleDay(day)}
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -984,9 +984,11 @@ export default function CompensationModal({
                                   Sin registro
                                 </Badge>
                               )}
-                              {isAlreadyCompensated && (
+                              {reservedToday > 0 && (
                                 <Badge className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0">
-                                  Ya compensado
+                                  {hasBalance
+                                    ? `Usado ${reservedToday} min · queda saldo`
+                                    : "Saldo agotado"}
                                 </Badge>
                               )}
                             </div>
