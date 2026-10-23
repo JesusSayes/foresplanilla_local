@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { transformSync } from 'esbuild';
+import * as reconciliation from '../../src/lib/attendanceReconciliation.js';
 import * as metrics from '../../src/lib/attendanceMetrics.js';
 import * as dates from '../../src/lib/dateUtils.js';
 import * as dateFns from 'date-fns';
@@ -36,8 +37,8 @@ const authorizers = [
 const fixture = () => ({
   employee, periodStart: '2026-09-25', periodEnd: '2026-09-26',
   periodRecords: [
-    { id: 'r1', employee_id: 'e1', date: '2026-09-25', late_minutes: 12, overtime_hours_25: 0, overtime_hours_35: 0 },
-    { id: 'r2', employee_id: 'e1', date: '2026-09-26', late_minutes: 0, overtime_hours_25: '0.20', overtime_hours_35: '0.00' },
+    { id: 'r1', employee_id: 'e1', overtime_authorized: true, date: '2026-09-25', late_minutes: 12, overtime_hours_25: 0, overtime_hours_35: 0 },
+    { id: 'r2', employee_id: 'e1', overtime_authorized: true, date: '2026-09-26', late_minutes: 0, overtime_hours_25: '0.20', overtime_hours_35: '0.00' },
   ], allEmployees: authorizers,
   editMode: true, pendingCompensations: [{ authorizer_id: 'a1', justification: 'Prueba' }],
   onClose() {}, onSubmit() {},
@@ -55,7 +56,7 @@ function harness(overrides = {}) {
   };
   const dependencies = {
     react: { __esModule: true, default: react, ...react },
-    '@/lib/attendanceMetrics': metrics, '@/lib/dateUtils': dates,
+    '@/lib/attendanceReconciliation': reconciliation, '@/lib/attendanceMetrics': metrics, '@/lib/dateUtils': dates,
     'date-fns': dateFns, 'date-fns/locale': { es },
   };
   const module = { exports: {} };
@@ -145,7 +146,7 @@ test('muestra error del servidor y permite reintentar después del envío', asyn
   assert.match(h.text(), /Permiso insuficiente/); assert.equal(h.button('Actualizar compensación').props.disabled, false);
 });
 
-for (const [lateDate, overtimeDate, allowed] of [['2026-09-30', '2026-09-01', false], ['2026-09-01', '2026-09-30', false], ['2026-09-01', '2026-09-16', true], ['2026-09-01', '2026-09-17', false]]) {
+for (const [lateDate, overtimeDate, allowed] of [['2026-09-30', '2026-09-01', false], ['2026-09-01', '2026-09-30', true], ['2026-09-01', '2026-09-16', true], ['2026-09-01', '2026-09-17', true]]) {
   for (const action of ['Seleccionar días con compensación', 'Auto-completar todo']) {
     test(`regla de main limita fechas con ${action}: ${lateDate} / ${overtimeDate}`, async () => {
       let submitted;
@@ -179,10 +180,10 @@ test('compensación cruza diciembre y enero y consume primero el saldo anterior'
     periodStart: '2027-01-01', periodEnd: '2027-01-02',
     prevMonthStart: '2026-12-26', prevMonthEnd: '2026-12-31',
     periodRecords: [
-      { id: 'r1', employee_id: 'e1', date: '2027-01-01', late_minutes: 30 },
-      { id: 'r2', employee_id: 'e1', date: '2027-01-02', overtime_hours_25: 1 },
+      { id: 'r1', employee_id: 'e1', overtime_authorized: true, date: '2027-01-01', late_minutes: 30 },
+      { id: 'r2', employee_id: 'e1', overtime_authorized: true, date: '2027-01-02', overtime_hours_25: 1 },
     ],
-    prevMonthRecords: [{ id: 'prev', employee_id: 'e1', date: '2026-12-31', overtime_hours_25: '0.25', overtime_hours_35: '0.00' }],
+    prevMonthRecords: [{ id: 'prev', employee_id: 'e1', overtime_authorized: true, date: '2026-12-31', overtime_hours_25: '0.25', overtime_hours_35: '0.00' }],
     onSubmit: async list => { submitted = list; },
   });
   await h.click('Seleccionar días con compensación');
@@ -202,4 +203,41 @@ test('matching anterior limita seis días, respeta cambio de año y no reutiliza
   assert.equal(result.totalCompensated, 25);
   assert.equal(result.assignments[0].compensableDate, '2026-12-26');
   assert.equal(result.assignments.filter(a => a.compensableDate === '2026-12-26').reduce((s, a) => s + a.minutes, 0), 15);
+});
+
+for (const [lateDate, otDate] of [['2026-09-30', '2026-10-30'], ['2026-12-31', '2027-01-30']]) {
+  test(`carga posterior permite guardar a 30 días: ${lateDate} → ${otDate}`, async () => {
+    let submitted;
+    const h = harness({
+      periodStart: lateDate.slice(0, 7) + '-01', periodEnd: lateDate,
+      overtimeWindowEnd: otDate,
+      periodRecords: [{ id: 'late', employee_id: 'e1', date: lateDate, late_minutes: 12 }],
+      nextPeriodRecords: [{ id: 'later', employee_id: 'e1', date: otDate, late_minutes: 90, overtime_hours_25: '0.20', overtime_authorized: true }],
+      onSubmit: async list => { submitted = list; },
+    });
+    await h.click('Seleccionar días con compensación');
+    await h.click('Actualizar compensación');
+    assert.equal(submitted.find(r => r.recordId === 'later').overtimeMinutes, 12);
+    assert.equal(submitted.find(r => r.recordId === 'later').lateMinutes, 0);
+    assert.equal(submitted.reduce((sum, r) => sum + r.lateMinutes, 0), 12);
+  });
+}
+
+test('HE posteriores reservadas no se reutilizan y carga incompleta no permite enviar', async () => {
+  let submitted;
+  const props = {
+    periodStart: '2026-09-01', periodEnd: '2026-09-30', overtimeWindowEnd: '2026-10-30',
+    periodRecords: [{ id: 'late', employee_id: 'e1', date: '2026-09-30', late_minutes: 12 }],
+    nextPeriodRecords: [{ id: 'later', employee_id: 'e1', date: '2026-10-10', overtime_hours_25: 0.2, overtime_authorized: true }],
+    onSubmit: async list => { submitted = list; },
+  };
+  const reserved = harness({ ...props, existingCompensations: [{ id: 'reserved', employee_id: 'e1', incident_date: '2026-10-10', status: 'Pendiente', hours_to_adjust: 0.2 }] });
+  await reserved.click('Seleccionar días con compensación');
+  await reserved.click('Actualizar compensación');
+  assert.equal(submitted, undefined);
+  const loading = harness({ ...props, dataUnavailable: true });
+  await loading.click('Seleccionar días con compensación');
+  assert.equal(loading.button('Actualizar compensación').props.disabled, true);
+  await loading.click('Actualizar compensación');
+  assert.equal(submitted, undefined);
 });

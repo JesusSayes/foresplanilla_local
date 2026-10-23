@@ -76,10 +76,9 @@ for (const [handler, model, body] of [
 }
 
 test('histórico conserva varios trabajadores y filtra boletas e importes por búsqueda', () => {
-  const source = readFileSync(new URL('../../src/pages/PayrollManagement.jsx', import.meta.url), 'utf8');
-  const grouping = source.slice(source.indexOf('  const getAllPayslipsByMonth ='), source.indexOf('  const handleDeletePayroll'));
-  const filtering = source.slice(source.indexOf('                    const allGroups = getAllPayslipsByMonth();'), source.indexOf('                    return groups.length === 0'));
-  const history = new Function('allPayslips', 'allEmployees', 'historySearchTerm', `const historyYearFilter = 2026, historyMonthFilter = 'all', historyTypeFilter = 'all'; ${grouping} ${filtering} return groups;`);
+  const source = readFileSync(new URL('../../src/components/payroll/PayrollHistoryTab.jsx', import.meta.url), 'utf8');
+  const code = source.slice(source.indexOf('  const getAllPayslipsByMonth ='), source.indexOf('  return (\n    <Card'));
+  const history = new Function('allPayslips', 'allEmployees', 'searchTerm', `const yearFilter = 2026, monthFilter = 'all', typeFilter = 'all'; ${code} return groups;`);
   const slips = [
     { id: 'p1', employee_id: 'e1', year: 2026, month: 10, payroll_type: 'Quincenal', net_pay: 500 },
     { id: 'p2', employee_id: 'e2', year: 2026, month: 10, payroll_type: 'Quincenal', net_pay: 600 },

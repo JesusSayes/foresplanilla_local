@@ -107,3 +107,22 @@ test('permiso de solo lectura no habilita modificaciones', () => {
   guard({ access: { permissions: new Set(['attendance.view_all']) } }, { status(status) { code = status; return this; }, json() {} }, () => assert.fail('No debe autorizar'));
   assert.equal(code, 403);
 });
+
+for (const failInsert of [false, true]) test(`reemplazo de HE es atómico; falla de inserción=${failInsert}`, async t => {
+  const commands = mockTransaction(t, async (sql, params) => {
+    if (sql.includes('SELECT id FROM public.employee')) return { rows: [{ id: 'e1' }] };
+    if (sql.includes('FROM attendance_record')) return { rows: [{ id: 'a1', overtime_authorized: true, overtime_destination: 'pago' }] };
+    if (sql.includes('SELECT * FROM public.horasextrasmanual')) return { rows: [{ ...overtime, id: 'old', status: 'Activo' }] };
+    if (sql.startsWith('UPDATE public.horasextrasmanual')) assert.equal(params[0], 'old');
+    if (sql.startsWith('INSERT')) {
+      if (failInsert) throw new Error('Falla simulada');
+      return { rows: [{ ...overtime, replaces_record_id: 'old', id: 'new' }] };
+    }
+    return { rows: [] };
+  });
+  const action = () => call('/HorasExtrasManual', 'post', request({ ...overtime, attendance_date: '2026-10-15', replaces_record_id: 'old' }, { access: { permissions: new Set(['attendance.manage']) } }));
+  if (failInsert) await assert.rejects(action, /Falla simulada/);
+  else assert.equal((await action()).statusCode, 201);
+  assert.equal(commands.at(-1), failInsert ? 'ROLLBACK' : 'COMMIT');
+  assert.ok(commands.some(sql => sql.includes('FOR UPDATE')));
+});

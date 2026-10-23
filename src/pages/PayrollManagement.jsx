@@ -18,7 +18,6 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
 import ConceptsManager from "../components/payroll/ConceptsManager";
 import AttendancePeriodModal from "../components/payroll/AttendancePeriodModal";
 import PayrollConfigModal from "../components/payroll/PayrollConfigModal";
@@ -27,8 +26,15 @@ import { useNavigate } from "react-router-dom";
 import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
 import { updateEmployeeStatuses } from "../components/employees/EmployeeStatusUpdater";
+import PayrollHistoryTab from "../components/payroll/PayrollHistoryTab";
 import { safePayrollNumber, roundMoney, sanitizePayslip } from "@/lib/payrollUtils";
-import { calcEffectiveMetrics } from "@/lib/attendanceMetrics";
+import { pickContractForPeriod, describeContract } from "@/lib/contractSelection";
+import {
+  computeMarkedLateMinutes,
+  resolveDiscountLateMinutes,
+  isConfirmedAbsence,
+  DEFAULT_LATE_TOLERANCE_MINUTES,
+} from "@/lib/attendanceReconciliation";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 import { isEmploymentDateValid } from "@/lib/employmentDate";
 import {
@@ -46,8 +52,6 @@ import {
 } from "@/lib/loanPayroll";
 import {
   generatePayrollSummaryPDF,
-  generatePayslipPDF,
-  generateMassivePayslipsPDF,
 } from "@/lib/payrollPdfExport";
 import { exportPayslipsToExcel } from "@/lib/payrollExcelExport";
 
@@ -300,7 +304,36 @@ export default function PayrollManagement() {
   });
   const { data: manualOvertimeRecords = [] } = manualOvertimeQuery;
 
-  // Cuotas del período: incluir las aplicadas para poder regenerar la planilla.
+  // Horarios de trabajo: tolerancia y refrigerio aplicables al cálculo de tardanzas.
+  // Asistencia y planilla deben usar la misma tolerancia para dar el mismo resultado.
+  const workSchedulesQuery = useQuery({
+    queryKey: ["allWorkSchedules"],
+    queryFn: async () => {
+      const res = await withRetry(() => entitiesAPI.WorkSchedule.list("schedule_name", 1000));
+      return Array.isArray(res) ? res : (res?.items || []);
+    },
+    staleTime: 0,
+  });
+  const workSchedules = workSchedulesQuery.data || [];
+
+  // Compensaciones de tardanza aprobadas: se descuentan UNA sola vez del descuento
+  // de planilla (mismo resultado que asistencia). Consulta no bloqueante.
+  const compensationIncidentsQuery = useQuery({
+    queryKey: ["payrollCompensationIncidents", selectedMonth, selectedYear],
+    queryFn: async () => {
+      const res = await withRetry(() => entitiesAPI.AttendanceIncident.filter(
+        { incident_type: "Compensación de Tardanza" },
+        "-incident_date",
+        2000
+      ));
+      return Array.isArray(res) ? res : (res?.items || []);
+    },
+    staleTime: 0,
+  });
+  const compensationIncidents = compensationIncidentsQuery.data || [];
+
+  // Cuotas de préstamo pendientes del período: se descuentan automáticamente en
+  // la planilla mensual (una cuota por mes y por préstamo activo).
   const loanInstallmentsQuery = useQuery({
     queryKey: ["loanInstallments", selectedMonth, selectedYear],
     queryFn: async () => {
@@ -516,6 +549,8 @@ export default function PayrollManagement() {
       // incluso tras recargar o limpiar la caché.
       const criticalKeys = [
         ["allEmployees"],
+        ["allWorkSchedules"],
+        ["payrollCompensationIncidents", selectedMonth, selectedYear],
         ["attendanceRecords", selectedMonth, selectedYear],
         ["payrollConcepts", selectedMonth, selectedYear],
         ["rmv"],
@@ -538,6 +573,8 @@ export default function PayrollManagement() {
       }
 
       // Leer datos frescos desde la caché y sombrear las variables del closure
+      const workSchedules = queryClient.getQueryData(["allWorkSchedules"]) ?? [];
+      const compensationIncidents = queryClient.getQueryData(["payrollCompensationIncidents", selectedMonth, selectedYear]) ?? [];
       const allEmployees = queryClient.getQueryData(["allEmployees"]) ?? [];
       const attendanceRecords = queryClient.getQueryData(["attendanceRecords", selectedMonth, selectedYear]) ?? [];
       const payrollConcepts = queryClient.getQueryData(["payrollConcepts", selectedMonth, selectedYear]) ?? [];
@@ -635,57 +672,38 @@ export default function PayrollManagement() {
       ? await withRetry(() => entitiesAPI.Contract.list("-start_date"))
       : [];
 
-    // Prioridad: contrato solapado, contrato más reciente antes del periodo,
-    // y como ultimo recurso el contrato mas reciente disponible.
-    const getContractForPeriod = (employeeId) => {
-      const empContracts = allContracts
-        .filter(contract => contract.employee_id === employeeId)
-        .sort((a, b) => {
-          const da = new Date((a.start_date || "1900-01-01").split("T")[0] + "T00:00:00");
-          const db = new Date((b.start_date || "1900-01-01").split("T")[0] + "T00:00:00");
-          return db - da;
-        });
+    // Inconsistencias detectadas durante el cálculo, para informarlas al usuario
+    // sin modificar nada de forma automática.
+    const contractConflicts = [];
+    const salaryConceptWarnings = [];
+    const absenceReviewWarnings = [];
 
-      if (empContracts.length === 0) return null;
-
-      // Un contrato rescindido/anulado no representa el vínculo del período: solo se
-      // considera si no existe ningún otro contrato aplicable. Esto evita que una
-      // boleta tome el sueldo de un contrato rescindido por el simple hecho de ser
-      // el de fecha de inicio más reciente.
-      const isCancelled = (c) => {
-        const s = String(c.status || "").toLowerCase();
-        return s.includes("rescind") || s.includes("anulad") || s.includes("cancelad");
-      };
-      const activeContracts = empContracts.filter(c => !isCancelled(c));
-      const candidates = activeContracts.length > 0 ? activeContracts : empContracts;
-
-      // 1. Contrato que solapa el período exactamente
-      const overlapping = candidates.find(c => {
-        if (!c.start_date) return false;
-        const startDate = new Date(c.start_date.split("T")[0] + "T00:00:00");
-        const endDate = c.end_date ? new Date(c.end_date.split("T")[0] + "T00:00:00") : null;
-        return startDate <= periodEnd && (!endDate || endDate >= periodStart);
-      });
-      if (overlapping) return overlapping;
-
-      // 2. Más reciente cuyo inicio fue antes o durante el período (regularización post-cese)
-      const closestBefore = candidates.find(c => {
-        if (!c.start_date) return false;
-        return new Date(c.start_date.split("T")[0] + "T00:00:00") <= periodEnd;
-      });
-      if (closestBefore) return closestBefore;
-
-      // 3. Último recurso: el más reciente que ya inició. Nunca se usa un contrato
-      // con fecha de inicio posterior al período (no rige para esta planilla).
-      const alreadyStarted = candidates.find(c => {
-        if (!c.start_date) return false;
-        return new Date(c.start_date.split("T")[0] + "T00:00:00") <= periodEnd;
-      });
-      return alreadyStarted || null;
+    // Helper: encuentra el contrato con sueldo vigente exacto para el período de planilla.
+    // Estrategia de prioridad:
+    //   1. Contrato que solapa el período (start_date ≤ fin mes, end_date ≥ inicio mes o nulo)
+    //   2. Si ninguno solapa (cese/liquidación post-período): el más reciente cuyo inicio ≤ fin del período
+    //   3. Último recurso: el contrato más reciente disponible
+    const getContractForPeriod = (employeeId, employeeCode) => {
+      const empContracts = allContracts.filter(c => c.employee_id === employeeId);
+      const { contract, overlaps, hasConflict } = pickContractForPeriod(
+        empContracts,
+        periodStartStr,
+        periodEndStr
+      );
+      // Contratos superpuestos: se muestra la inconsistencia en lugar de resolverla
+      // de forma arbitraria (puede haber varios registros con estado "Vigente",
+      // incluso con fecha de fin ya pasada).
+      if (hasConflict) {
+        contractConflicts.push(
+          `${employeeCode || employeeId}: ${describeContract(contract)} · superpuesto con ${overlaps.map(describeContract).join(" / ")}`
+        );
+      }
+      return contract;
     };
 
     const enrichedEmployees = await mapWithConcurrency(filteredEmployees, async (emp) => {
-      const periodContract = getContractForPeriod(emp.id);
+      const periodContract = getContractForPeriod(emp.id, emp.employee_code);
+
       if (periodContract && periodContract.salary != null && parseFloat(periodContract.salary) > 0) {
         const contractSalary = parseFloat(periodContract.salary);
         return {
@@ -887,6 +905,22 @@ export default function PayrollManagement() {
       });
       const allEmpConcepts = [...generalConcepts, ...specificConcepts, ...fixedConceptsForMonth];
 
+      // Concepto fijo de Remuneración Base: si conserva un importe anterior distinto
+      // al sueldo del contrato aplicable, se informa (el contrato del período es la
+      // fuente del sueldo base) para que se corrija en Conceptos de Planilla.
+      const fixedBaseConcept = [...generalConcepts, ...specificConcepts].find(
+        (c) => c.concept_category === "Remuneración Base" && c.is_dynamic === false
+      );
+      if (fixedBaseConcept) {
+        const fixedAmount = safePayrollNumber(fixedBaseConcept.amount);
+        const contractAmount = safePayrollNumber(emp.base_salary);
+        if (fixedAmount > 0 && Math.abs(fixedAmount - contractAmount) > 0.01) {
+          salaryConceptWarnings.push(
+            `${emp.employee_code} ${emp.first_name} ${emp.last_name}: el concepto "${fixedBaseConcept.concept_name}" mantiene S/ ${fixedAmount.toFixed(2)} y el contrato del período S/ ${contractAmount.toFixed(2)}`
+          );
+        }
+      }
+
       // Porcentaje quincenal desde la configuración (decimal, ej: 0.40)
       const quincenalPct = (payrollConfig?.quincenal_percentage ?? 40) / 100;
 
@@ -992,46 +1026,98 @@ export default function PayrollManagement() {
         record => !isCoveredByApprovedVacation(emp.id, record.date)
       );
 
-      // Minutos de tardanza respaldados por las marcaciones reales del registro.
-      // Se recalculan desde las horas de entrada del propio registro (no desde textos
-      // formateados ni desde la presentación de la tabla): si la marcación ya no
-      // presenta tardanza, un late_minutes residual no respalda ningún minuto
-      // descontable. Devuelve null cuando el registro no permite el cálculo (sin
-      // marcación de entrada o sin horario), caso en el que se conserva el valor
-      // almacenado para no alterar casos no verificables.
-      const markedLateMinutes = (record) => {
-        const clockIn = record.clock_in;
-        const schedStart = record.scheduled_start;
-        if (!clockIn || !schedStart) return null;
-        const metrics = calcEffectiveMetrics({
-          record,
-          approvedIncidents: [],
-          schedStart,
-          schedEnd: record.scheduled_end || schedStart,
-          breakMinutes: 0,
-          breakStart: null,
-          isUnscheduledDay: false,
-        });
-        return Math.max(0, Math.round(metrics.remainingLateMinutes || 0));
+      // Horario aplicable del empleado en una fecha: tolerancia, refrigerio y turnos
+      // nocturnos, igual que en el control de asistencia. El horario del empleado
+      // tiene prioridad sobre el de departamento y se respeta su vigencia.
+      const scheduleDayFor = (dateStr) => {
+        const isActive = (ws) => ws.is_active !== false;
+        const pickValid = (list) => {
+          const valid = list.filter(ws => {
+            const from = normDate(ws.effective_from) || "0000-01-01";
+            const to = normDate(ws.effective_to) || "9999-12-31";
+            return from <= dateStr && to >= dateStr;
+          });
+          valid.sort((a, b) => String(b.effective_from || "0000-01-01").localeCompare(String(a.effective_from || "0000-01-01")));
+          return valid[0] || null;
+        };
+        const schedule =
+          pickValid(workSchedules.filter(ws => ws.employee_id === emp.id && isActive(ws))) ||
+          pickValid(workSchedules.filter(ws => !ws.employee_id && isActive(ws) &&
+            (ws.department_name === emp.department_name || (ws.departments || []).includes(emp.department_name))));
+        if (!schedule) return null;
+        const dow = new Date(dateStr + "T00:00:00").getDay();
+        const stMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
+        const enMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
+        return {
+          start: schedule[stMap[dow]] || null,
+          end: schedule[enMap[dow]] || null,
+          tolerance_minutes: schedule.tolerance_minutes ?? DEFAULT_LATE_TOLERANCE_MINUTES,
+          breakMinutes: schedule.break_duration_minutes ?? 0,
+          breakStart: schedule.break_start || null,
+        };
       };
 
-      // Tardanza efectiva descontable: el menor entre lo almacenado y lo que respaldan
-      // las marcaciones, descontando una sola vez la compensación vigente (estado
-      // "Activa"). Las compensaciones Pendientes no se descuentan aquí porque todavía
-      // no son efectivas. Se conserva la regla de tolerancia existente (> 10 min).
+      // Minutos de tardanza respaldados por las marcaciones reales, aplicando la
+      // tolerancia del horario vigente. Devuelve null si el registro no permite el
+      // cálculo (sin marcación de entrada o sin horario): en ese caso se conserva el
+      // valor almacenado por el motor.
+      const markedLateMinutes = (record) =>
+        computeMarkedLateMinutes({
+          record,
+          scheduleDay: scheduleDayFor(normDate(record.date)),
+          approvedIncidents: [],
+        }).markedMinutes;
+
+      // Compensación aprobada por fecha (una sola lectura por empleado).
+      const approvedCompensationByDate = new Map();
+      for (const incident of compensationIncidents) {
+        if (incident.employee_id !== emp.id) continue;
+        if (incident.status !== "Aprobada") continue;
+        if (incident.incident_type !== "Compensación de Tardanza") continue;
+        const day = normDate(incident.incident_date);
+        approvedCompensationByDate.set(
+          day,
+          (approvedCompensationByDate.get(day) || 0) + (incident.late_minutes_to_adjust || 0)
+        );
+      }
+
+      // Tardanza descontable con el MISMO resultado que asistencia y sus filtros:
+      // marcaciones + tolerancia del horario, con la compensación aprobada descontada
+      // una sola vez (si el registro ya la refleja, no se resta de nuevo). Una entrada
+      // regularizada y puntual deja cero minutos descontables aunque el registro
+      // conserve is_late = true.
       const effectiveLateMinutes = (record) => {
-        const stored = Number(record.late_minutes || 0);
-        if (!record.is_late || stored <= 0) return 0;
-        const marked = markedLateMinutes(record);
-        const base = marked === null ? stored : Math.min(stored, marked);
-        const compMin = enableTardinessCompensation && record.tardiness_compensation_status === "Activa"
+        const recordCompMin = enableTardinessCompensation && record.tardiness_compensation_status === "Activa"
           ? (record.tardiness_compensation_minutes || 0)
           : 0;
-        return Math.max(0, base - compMin);
+        return resolveDiscountLateMinutes({
+          storedMinutes: record.late_minutes,
+          storedIsLate: record.is_late,
+          markedMinutes: markedLateMinutes(record),
+          appliedCompensationMinutes:
+            (approvedCompensationByDate.get(normDate(record.date)) || 0),
+          recordActiveCompensationMinutes: recordCompMin,
+        });
       };
 
-      const lateRecords = attendanceForDiscounts.filter(r => effectiveLateMinutes(r) > 10);
-      const absentRecords = attendanceForDiscounts.filter(r => r.is_absent);
+      // La tolerancia ya está aplicada: cualquier minuto efectivo es descontable.
+      const lateRecords = attendanceForDiscounts.filter(r => effectiveLateMinutes(r) > 0);
+      // Inasistencias: solo se descuenta la falta CONFIRMADA (is_absent y estado
+      // "Ausente" coherentes). Un día cubierto, un descanso o una marcación
+      // incompleta no generan descuento por falta injustificada.
+      const absentRecords = attendanceForDiscounts.filter(r => isConfirmedAbsence(r));
+      const absenceReviewRecords = attendanceForDiscounts.filter(r =>
+        (r.is_absent || r.status === "Ausente") && !isConfirmedAbsence(r)
+      );
+      if (absenceReviewRecords.length > 0) {
+        absenceReviewWarnings.push(
+          `${emp.employee_code} ${emp.first_name} ${emp.last_name}: ${absenceReviewRecords.length} día(s) con datos de falta contradictorios (${absenceReviewRecords.slice(0, 3).map(r => normDate(r.date)).join(", ")})`
+        );
+      }
+      // ── Descuento por salida anticipada (concepto independiente) ──
+      // Sin tolerancia: descuento desde el primer minuto. Excluye registros
+      // justificados, de vacaciones, compensación, permiso sin goce y ausentes.
+      // No interpreta una marcación de salida ausente como salida anticipada.
       const earlyDepartureRecords = attendanceForDiscounts.filter(r =>
         r.status !== "Vacaciones" && r.status !== "Permiso sin goce" &&
         r.status !== "Ausente" && !r.is_absent
@@ -1233,6 +1319,27 @@ export default function PayrollManagement() {
 
       setPreviewData(payslipsData);
       setShowPreview(true);
+
+      // Inconsistencias detectadas: se informan sin bloquear el cálculo (nada se
+      // modifica automáticamente y las boletas ya guardadas se conservan).
+      if (contractConflicts.length > 0) {
+        toast.warning(
+          `⚠️ ${contractConflicts.length} trabajador(es) con contratos superpuestos en el período. Depure los contratos y vuelva a calcular. ${contractConflicts.slice(0, 3).join(" | ")}`,
+          { duration: 15000 }
+        );
+      }
+      if (salaryConceptWarnings.length > 0) {
+        toast.warning(
+          `⚠️ ${salaryConceptWarnings.length} concepto(s) fijo(s) de Remuneración Base conservan un importe distinto al contrato del período. ${salaryConceptWarnings.slice(0, 3).join(" | ")}`,
+          { duration: 12000 }
+        );
+      }
+      if (absenceReviewWarnings.length > 0) {
+        toast.warning(
+          `⚠️ ${absenceReviewWarnings.length} trabajador(es) con días de ausencia inconsistentes: no se descontaron. Use "Regularizar asistencia" para revisarlos. ${absenceReviewWarnings.slice(0, 3).join(" | ")}`,
+          { duration: 12000 }
+        );
+      }
       if (autoGenerate) {
         const payslipsToCreate = payslipsData.map(p => {
           const { employee_name, employee_code, department, ...rest } = p;
@@ -1343,25 +1450,7 @@ export default function PayrollManagement() {
     total: filteredPayslips.reduce((sum, p) => sum + safeNum(p.net_pay), 0),
   };
 
-  // Agrupa TODAS las boletas por año-mes-tipo (sin deduplicar a una por grupo).
-  // Reemplaza a getLatestPayslipsByMonth que mantenía solo una boleta por período,
-  // ocultando el resto de trabajadores del histórico.
-  const getAllPayslipsByMonth = () => {
-    const grouped = {};
-    allPayslips.forEach(p => {
-      const key = `${p.year}-${p.month}-${p.payroll_type}`;
-      if (!grouped[key]) {
-        grouped[key] = {
-          year: p.year,
-          month: p.month,
-          payroll_type: p.payroll_type,
-          payslips: [],
-        };
-      }
-      grouped[key].payslips.push(p);
-    });
-    return Object.values(grouped);
-  };
+  // El agrupamiento del histórico se movió a PayrollHistoryTab (mismo cálculo).
 
   const handleDeletePayroll = async () => {
     if (!selectedPayrollToDelete) return;
@@ -2111,232 +2200,22 @@ export default function PayrollManagement() {
             </TabsContent>
 
             <TabsContent value="history">
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="border-b">
-                  <CardTitle className="text-xl font-bold">Histórico de Planillas</CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="flex gap-4 mb-6 flex-wrap">
-                    <div className="flex-1 min-w-[200px] relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                      <Input
-                        placeholder="Buscar empleado..."
-                        value={historySearchTerm}
-                        onChange={(e) => setHistorySearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                    <Select value={String(historyYearFilter)} onValueChange={(v) => setHistoryYearFilter(parseInt(v))}>
-                      <SelectTrigger className="w-28">
-                        <SelectValue placeholder="Año" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[2023, 2024, 2025, 2026].map(year => (
-                          <SelectItem key={year} value={String(year)}>{year}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={historyMonthFilter} onValueChange={setHistoryMonthFilter}>
-                      <SelectTrigger className="w-36">
-                        <SelectValue placeholder="Mes" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos los meses</SelectItem>
-                        {Array.from({ length: 12 }, (_, i) => (
-                          <SelectItem key={i + 1} value={String(i + 1)}>
-                            {format(new Date(2024, i), 'MMMM', { locale: es })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={historyTypeFilter} onValueChange={setHistoryTypeFilter}>
-                      <SelectTrigger className="w-36">
-                        <SelectValue placeholder="Tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="Quincenal">Quincenal</SelectItem>
-                        <SelectItem value="Mensual">Mensual</SelectItem>
-                        <SelectItem value="Adicional">Adicional</SelectItem>
-                        <SelectItem value="SNP">SNP</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {(() => {
-                    // Agrupar TODAS las boletas por año-mes-tipo (sin deduplicar)
-                    const allGroups = getAllPayslipsByMonth();
-                    const filteredGroups = allGroups.filter(g => {
-                      if (Number(g.year) !== historyYearFilter) return false;
-                      if (historyMonthFilter !== "all" && Number(g.month) !== parseInt(historyMonthFilter)) return false;
-                      return historyTypeFilter === "all" || g.payroll_type === historyTypeFilter;
-                    }).map(g => ({
-                      ...g,
-                      payslips: g.payslips.filter(p => {
-                        if (!historySearchTerm.trim()) return true;
-                        const emp = allEmployees.find(e => e.id === p.employee_id);
-                        const searchLower = historySearchTerm.trim().toLowerCase();
-                        return [emp?.first_name, emp?.last_name, emp?.employee_code, emp?.document_number, p.employee_name]
-                          .some(value => String(value || "").toLowerCase().includes(searchLower));
-                      }),
-                    })).filter(g => g.payslips.length > 0);
-
-                    const groups = filteredGroups.sort((a, b) => {
-                      if (a.year !== b.year) return b.year - a.year;
-                      if (a.month !== b.month) return b.month - a.month;
-                      return a.payroll_type.localeCompare(b.payroll_type);
-                    });
-
-                    return groups.length === 0 ? (
-                      <div className="text-center py-12">
-                        <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                        <p className="text-slate-600">No se encontraron planillas</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {groups.map((group, idx) => {
-                          const allGroupPayslips = group.payslips;
-                          const payrollPayslipCount = allPayslips.filter(p => Number(p.year) === Number(group.year) && Number(p.month) === Number(group.month) && p.payroll_type === group.payroll_type).length;
-                          const total = allGroupPayslips.reduce((sum, p) => sum + safeNum(p.net_pay), 0);
-                          const isSelected = selectedPayrollToDelete?.year === group.year &&
-                                            selectedPayrollToDelete?.month === group.month &&
-                                            selectedPayrollToDelete?.type === group.payroll_type;
-
-                          return (
-                            <Card key={`${group.year}-${group.month}-${group.payroll_type}`} className={`border-2 ${isSelected ? 'border-red-400 bg-red-50' : ''}`}>
-                              <CardContent className="p-5">
-                                <div className="flex items-center justify-between mb-4">
-                                  <div className="flex items-center gap-3">
-                                    <input
-                                      type="checkbox"
-                                      checked={isSelected}
-                                      onChange={() => setSelectedPayrollToDelete(isSelected ? null : { ...group, type: group.payroll_type })}
-                                      className="w-5 h-5 rounded border-slate-300"
-                                    />
-                                    <div>
-                                      <h3 className="text-lg font-bold text-slate-900">
-                                        {format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })} - {group.payroll_type}
-                                      </h3>
-                                      <p className="text-sm text-slate-600">
-                                        {allGroupPayslips.length} empleado(s)
-                                        {canViewAmounts && ` • Total: S/ ${Number(total || 0).toFixed(2)}`}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex gap-2 flex-wrap">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="border-green-300 text-green-700 hover:bg-green-50"
-                                      onClick={() => exportPayslipsToExcel(
-                                        allGroupPayslips,
-                                        allEmployees,
-                                        `Planilla_${group.payroll_type}_${group.year}_${String(group.month).padStart(2,'0')}`
-                                      )}
-                                    >
-                                      <Download className="w-3 h-3 mr-1" />
-                                      Excel
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => {
-                                        const emp = allEmployees.find(e => e.id === allGroupPayslips[0].employee_id);
-                                        if (emp) generatePayslipPDF(allGroupPayslips[0], emp);
-                                      }}
-                                    >
-                                      <Download className="w-3 h-3 mr-1" />
-                                      Boleta Individual
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => generateMassivePayslipsPDF(allGroupPayslips, allEmployees)}
-                                    >
-                                      <Download className="w-3 h-3 mr-1" />
-                                      Todas las Boletas
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => {
-                                       const doc = new jsPDF();
-                                       doc.text(`Planilla ${group.payroll_type}`, 14, 20);
-                                       doc.text(`${format(new Date(group.year, group.month - 1), 'MMMM yyyy', { locale: es })}`, 14, 28);
-                                       let y = 40;
-                                       allGroupPayslips.forEach(p => {
-                                          const emp = allEmployees.find(e => e.id === p.employee_id);
-                                            if (emp) {
-                                              const sede = emp.site ? ` | ${emp.site}` : "";
-                                              doc.text(`${emp.document_type} ${emp.document_number} - ${emp.first_name} ${emp.last_name}${sede}`, 14, y);
-                                            doc.text(`S/ ${safePayrollNumber(p.net_pay).toFixed(2)}`, 195, y, { align: "right" });
-                                            y += 7;
-                                            if (y > 270) { doc.addPage(); y = 20; }
-                                          }
-                                        });
-                                       doc.save(`Planilla_${group.payroll_type}_${group.year}_${group.month}.pdf`);
-                                      }}
-                                    >
-                                      <FileText className="w-3 h-3 mr-1" />
-                                      Resumen PDF
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                {isSelected && (
-                                  <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg flex items-center justify-between gap-3">
-                                    <p className="text-sm font-semibold text-red-800">
-                                      ⚠️ ¿Eliminar esta planilla? ({payrollPayslipCount} boleta(s))
-                                    </p>
-                                    <div className="flex gap-2 shrink-0">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setSelectedPayrollToDelete(null)}
-                                      >
-                                        Cancelar
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        className="bg-red-600 hover:bg-red-700"
-                                        onClick={handleDeletePayroll}
-                                      >
-                                        Confirmar Eliminación
-                                      </Button>
-                                    </div>
-                                  </div>
-                                )}
-
-                                <div className="space-y-2">
-                                  {allGroupPayslips.slice(0, 5).map(p => {
-                                    const emp = allEmployees.find(e => e.id === p.employee_id);
-                                    return emp ? (
-                                      <div key={p.id} className="flex items-center justify-between text-sm p-2 bg-slate-50 rounded">
-                                          <span>{emp.document_type} {emp.document_number} - {emp.first_name} {emp.last_name}</span>
-                                        {canViewAmounts ? (
-                                          <span className="font-semibold">S/ {Number(p.net_pay || 0).toFixed(2)}</span>
-                                        ) : (
-                                          <span className="text-slate-400">🔒</span>
-                                        )}
-                                      </div>
-                                    ) : null;
-                                  })}
-                                  {allGroupPayslips.length > 5 && (
-                                    <p className="text-xs text-slate-500 text-center">
-                                      y {allGroupPayslips.length - 5} más...
-                                    </p>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-
-                </CardContent>
-              </Card>
+              <PayrollHistoryTab
+                allPayslips={allPayslips}
+                allEmployees={allEmployees}
+                canViewAmounts={canViewAmounts}
+                selectedPayrollToDelete={selectedPayrollToDelete}
+                onSelectPayrollToDelete={setSelectedPayrollToDelete}
+                onDeletePayroll={handleDeletePayroll}
+                searchTerm={historySearchTerm}
+                onSearchTermChange={setHistorySearchTerm}
+                yearFilter={historyYearFilter}
+                onYearFilterChange={setHistoryYearFilter}
+                monthFilter={historyMonthFilter}
+                onMonthFilterChange={setHistoryMonthFilter}
+                typeFilter={historyTypeFilter}
+                onTypeFilterChange={setHistoryTypeFilter}
+              />
             </TabsContent>
           </Tabs>
             )}

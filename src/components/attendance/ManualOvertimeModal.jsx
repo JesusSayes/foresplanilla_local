@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { entitiesAPI } from "@/api/entitiesClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Clock, Plus, RotateCcw } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Pencil, Plus, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -30,10 +30,19 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
   const [hours35, setHours35] = useState(0);
   const [minutes35, setMinutes35] = useState(0);
   const [reason, setReason] = useState("");
-  const [attendanceDate, setAttendanceDate] = useState("");
   const [destination, setDestination] = useState("pago");
   const [saving, setSaving] = useState(false);
   const [revertingId, setRevertingId] = useState(null);
+  // Fecha de la jornada a la que corresponden las horas manuales. Es obligatoria:
+  // el destino y la autorización se toman de la jornada de asistencia de esa fecha.
+  const [journeyDate, setJourneyDate] = useState(() => {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  });
+  const [selectedRecordId, setSelectedRecordId] = useState(null);
+  // Registro manual que esta operación reemplaza (corrección por reversión y reemplazo).
+  const [replacingRecordId, setReplacingRecordId] = useState(null);
 
   // Fetch existing manual OT records for this employee/period/type
   const { data: existingRecords = [], refetch } = useQuery({
@@ -65,6 +74,64 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
     enabled: !!employee?.id,
   });
 
+  // Jornada de asistencia del empleado en la fecha indicada: define el destino y la
+  // autorización de las horas extras manuales.
+  const { data: journeyRecords = [] } = useQuery({
+    queryKey: ["manualOvertimeJourney", employee?.id, journeyDate],
+    queryFn: async () => {
+      if (!employee?.id || !journeyDate) return [];
+      const res = await entitiesAPI.AttendanceRecord.filter(
+        { employee_id: employee.id, date: journeyDate },
+        "-date",
+        10
+      );
+      return Array.isArray(res) ? res : (res?.items || []);
+    },
+    enabled: !!employee?.id && !!journeyDate,
+  });
+
+  // Selección de la jornada: automática si hay una sola coincidencia; con varias
+  // coincidencias se exige elegir antes de guardar.
+  useEffect(() => {
+    if (journeyRecords.length === 1) {
+      setSelectedRecordId(journeyRecords[0].id);
+    } else if (journeyRecords.length === 0) {
+      setSelectedRecordId(null);
+    } else {
+      setSelectedRecordId((prev) => (journeyRecords.some((r) => r.id === prev) ? prev : null));
+    }
+  }, [journeyRecords]);
+
+  const journey = journeyRecords.find((r) => r.id === selectedRecordId) || null;
+
+  // El destino del registro manual se inicializa con el de la jornada seleccionada.
+  useEffect(() => {
+    if (!journey) return;
+    setDestination(journey.overtime_destination === "compensacion" ? "compensacion" : "pago");
+  }, [journey?.id, journey?.overtime_destination]);
+
+  // Motivos por los que no se puede guardar todavía (se muestran antes de guardar).
+  const journeyIssues = [];
+  if (!journeyDate) {
+    journeyIssues.push("Indique la fecha de la jornada.");
+  } else if (journeyRecords.length === 0) {
+    journeyIssues.push(
+      `No existe una jornada de asistencia para el ${journeyDate}. Genere o regularice la jornada antes de registrar horas extras manuales.`
+    );
+  } else if (!journey) {
+    journeyIssues.push(
+      `Hay ${journeyRecords.length} registros de asistencia para el ${journeyDate}: seleccione la jornada correcta.`
+    );
+  } else if (destination !== (journey.overtime_destination || "pago")) {
+    journeyIssues.push(
+      "La jornada está destinada a compensación: no se pueden registrar esas horas para pago. Cambie el destino de la jornada mediante una acción explícita si corresponde."
+    );
+  } else if (destination === "pago" && journey?.overtime_authorized !== true) {
+    journeyIssues.push(
+      "La jornada no está autorizada para pago: revise la autorización y el destino de la jornada antes de guardar."
+    );
+  }
+
   const activeRecords = existingRecords.filter(r => r.status === "Activo");
 
   // Destinos ya registrados en el período. Si el nuevo registro usa un destino
@@ -89,6 +156,11 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
       toast.error(`No se puede registrar: la planilla está ${closedStatus.toLowerCase()}.`);
       return;
     }
+    // El destino y la autorización se validan contra la jornada de asistencia.
+    if (journeyIssues.length > 0) {
+      toast.error(journeyIssues[0]);
+      return;
+    }
     if (hours25 === 0 && minutes25 === 0 && hours35 === 0 && minutes35 === 0) {
       toast.error("Debe ingresar al menos horas o minutos para 25% o 35%.");
       return;
@@ -107,6 +179,8 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
       await entitiesAPI.HorasExtrasManual.create({
         employee_id: employee.id,
         payslip_id: closedPayslip?.id || "",
+        attendance_record_id: journey?.id || "",
+        attendance_date: journeyDate,
         month: month,
         year: year,
         payroll_type: payrollType,
@@ -115,15 +189,25 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
         overtime_hours_35: Number(hours35) || 0,
         overtime_minutes_35: Number(minutes35) || 0,
         overtime_destination: destination,
-        attendance_date: attendanceDate,
+        replaces_record_id: replacingRecordId || "",
         reason: reason.trim(),
         status: "Activo",
         created_by: currentUser?.email || "",
       });
-      toast.success("Horas extras manuales registradas correctamente.");
-      setHours25(0); setMinutes25(0); setHours35(0); setMinutes35(0); setReason(""); setDestination("pago");
+      toast.success(
+        replacingRecordId
+          ? "Registro corregido: el anterior quedó revertido y no se suma."
+          : "Horas extras manuales registradas correctamente."
+      );
+      setHours25(0); setMinutes25(0); setHours35(0); setMinutes35(0); setReason("");
+      setReplacingRecordId(null);
+      setDestination(journey?.overtime_destination === "compensacion" ? "compensacion" : "pago");
       refetch();
       queryClient.invalidateQueries({ queryKey: ["manualOvertime"] });
+      // Refrescar asistencia, saldos de compensación y cálculo de planilla.
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allRecordsForCompMetrics"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
       if (onSuccess) onSuccess();
     } catch (error) {
       toast.error("Error al registrar: " + (error.message || ""));
@@ -153,6 +237,21 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
     }
   };
 
+  // Corrección controlada: carga el registro en el formulario. Al guardar se revierte
+  // el original y se crea el reemplazo, conservando la trazabilidad.
+  const handleEdit = (record) => {
+    if (isClosed) return;
+    setReplacingRecordId(record.id);
+    if (record.attendance_date) setJourneyDate(String(record.attendance_date).slice(0, 10));
+    if (record.attendance_record_id) setSelectedRecordId(record.attendance_record_id);
+    setHours25(record.overtime_hours_25 || 0);
+    setMinutes25(record.overtime_minutes_25 || 0);
+    setHours35(record.overtime_hours_35 || 0);
+    setMinutes35(record.overtime_minutes_35 || 0);
+    setDestination(record.overtime_destination === "compensacion" ? "compensacion" : "pago");
+    setReason(record.reason || "");
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-3 sm:p-6 overflow-y-auto" onClick={onClose}>
       <Card className="max-w-2xl w-full my-4" onClick={(e) => e.stopPropagation()}>
@@ -172,7 +271,7 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
         </CardHeader>
         <CardContent className="p-6 space-y-5">
           {/* Period selector */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <Label className="text-xs font-semibold text-slate-600 mb-1 block">Mes</Label>
               <Select value={String(month)} onValueChange={(v) => setMonth(parseInt(v))}>
@@ -209,7 +308,57 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label className="text-xs font-semibold text-slate-600 mb-1 block">Fecha de la jornada</Label>
+              <Input
+                type="date"
+                value={journeyDate}
+                onChange={(e) => setJourneyDate(e.target.value)}
+              />
+            </div>
           </div>
+
+          {/* Jornada de asistencia consultada: define destino y autorización */}
+          {journeyRecords.length === 1 && journey && (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-slate-500 shrink-0" />
+                  <span className="text-sm text-slate-700">
+                    Jornada del <strong>{journeyDate}</strong>: {journey.scheduled_start || "--:--"}–{journey.scheduled_end || "--:--"} · estado {journey.status || "sin estado"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={journey.overtime_destination === "compensacion" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}>
+                    {destinationLabel(journey.overtime_destination)}
+                  </Badge>
+                  <Badge className={journey.overtime_authorized ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}>
+                    {journey.overtime_authorized ? "HE autorizadas" : "HE sin autorizar"}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          )}
+          {journeyRecords.length > 1 && (
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg space-y-2">
+              <p className="text-sm text-amber-800">
+                Hay {journeyRecords.length} jornadas para el {journeyDate}. Seleccione la correcta:
+              </p>
+              <div className="space-y-1">
+                {journeyRecords.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setSelectedRecordId(r.id)}
+                    className={`w-full text-left px-3 py-2 rounded border text-xs ${selectedRecordId === r.id ? "border-indigo-400 bg-white font-semibold" : "border-amber-200 bg-white/60"}`}
+                  >
+                    {r.scheduled_start || "--:--"}–{r.scheduled_end || "--:--"} · {destinationLabel(r.overtime_destination)} ·{" "}
+                    {r.overtime_authorized ? "autorizada" : "sin autorizar"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Validation warning */}
           {isClosed ? (
@@ -225,6 +374,21 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
               <p className="text-sm text-green-700">
                 Período abierto. Las horas manuales se sumarán al cálculo de la planilla {payrollType}.
               </p>
+            </div>
+          )}
+
+          {/* Motivos por los que todavía no se puede guardar */}
+          {journeyIssues.length > 0 && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-red-700 mb-1">No se puede registrar todavía:</p>
+                <ul className="space-y-0.5">
+                  {journeyIssues.map((message, index) => (
+                    <li key={index} className="text-xs text-red-600">• {message}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
 
@@ -247,10 +411,16 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
                         </span>
                       </div>
                       {!isClosed && (
-                        <Button size="sm" variant="outline" className="text-red-600 hover:bg-red-50 h-7 px-2" onClick={() => handleRevert(r)} disabled={revertingId === r.id}>
-                          <RotateCcw className="w-3 h-3 mr-1" />
-                          {revertingId === r.id ? "..." : "Revertir"}
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button size="sm" variant="outline" className="text-indigo-600 hover:bg-indigo-50 h-7 px-2" onClick={() => handleEdit(r)}>
+                            <Pencil className="w-3 h-3 mr-1" />
+                            Editar
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-red-600 hover:bg-red-50 h-7 px-2" onClick={() => handleRevert(r)} disabled={revertingId === r.id}>
+                            <RotateCcw className="w-3 h-3 mr-1" />
+                            {revertingId === r.id ? "..." : "Revertir"}
+                          </Button>
+                        </div>
                       )}
                     </div>
                     <p className="text-xs text-slate-600 mt-1"><strong>Nota:</strong> {r.reason}</p>
@@ -297,8 +467,6 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
                 </div>
               </div>
               <div>
-                <Label>Fecha de la jornada</Label>
-                <Input type="date" value={attendanceDate} onChange={e => setAttendanceDate(e.target.value)} />
                 <Label className="text-xs font-semibold text-slate-600 mb-1 block">Destino de las horas <span className="text-red-500">*</span></Label>
                 <Select value={destination} onValueChange={setDestination}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -328,9 +496,17 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
                 <Label className="text-xs font-semibold text-slate-600 mb-1 block">Motivo / Nota <span className="text-red-500">*</span></Label>
                 <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Describa el motivo del registro manual de horas extras..." rows={2} />
               </div>
-              <Button onClick={handleSave} disabled={saving} className="w-full bg-red-600 hover:bg-red-700">
+              {replacingRecordId && (
+                <div className="p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 flex items-center justify-between gap-2">
+                  <span>Está corrigiendo un registro existente: al guardar, el anterior queda revertido y solo se suma el nuevo.</span>
+                  <Button size="sm" variant="ghost" className="h-6 px-2 text-indigo-700" onClick={() => setReplacingRecordId(null)}>
+                    Cancelar corrección
+                  </Button>
+                </div>
+              )}
+              <Button onClick={handleSave} disabled={saving || journeyIssues.length > 0} className="w-full bg-red-600 hover:bg-red-700">
                 <Plus className="w-4 h-4 mr-2" />
-                {saving ? "Guardando..." : "Registrar Horas Extras Manuales"}
+                {saving ? "Guardando..." : replacingRecordId ? "Guardar corrección" : "Registrar Horas Extras Manuales"}
               </Button>
             </div>
           )}

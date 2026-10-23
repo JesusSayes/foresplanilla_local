@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import PaginationBar from "@/components/ui/PaginationBar";
+import { COMPENSATION_MATCH_WINDOW_DAYS } from "@/lib/attendanceMetrics";
+import { isCompensableOvertime } from "@/lib/attendanceReconciliation";
 import {
   Clock,
   TrendingUp,
@@ -112,6 +114,12 @@ export default function CompensationPanel({
       ? format(today, "yyyy-MM-dd")
       : format(selectedMonthEnd, "yyyy-MM-dd");
 
+  const overtimeWindowEnd = useMemo(() => {
+    const end = new Date(periodEnd + "T00:00:00");
+    end.setDate(end.getDate() + COMPENSATION_MATCH_WINDOW_DAYS);
+    return format(end, "yyyy-MM-dd");
+  }, [periodEnd]);
+
   // Últimos 6 días del mes inmediatamente anterior (incluye cambio de año)
   const { prevMonthStart, prevMonthEnd } = useMemo(() => {
     const pStart = new Date(periodStart + "T00:00:00");
@@ -125,11 +133,11 @@ export default function CompensationPanel({
     };
   }, [periodStart]);
 
-  const { data: periodRecords = [], isLoading } = useQuery({
-    queryKey: ["compensationRecords", periodStart, periodEnd],
+  const { data: loadedRecords = [], isLoading, isFetching: recordsFetching, isError: recordsError } = useQuery({
+    queryKey: ["compensationRecords", periodStart, overtimeWindowEnd],
     queryFn: async () => {
       const records = await entitiesAPI.AttendanceRecord.filter(
-        { date: { $gte: periodStart, $lte: periodEnd } },
+        { date: { $gte: periodStart, $lte: overtimeWindowEnd } },
         "-date"
       );
       return records;
@@ -137,8 +145,11 @@ export default function CompensationPanel({
     staleTime: 60000,
   });
 
+  const periodRecords = useMemo(() => loadedRecords.filter(r => String(r.date).slice(0, 10) <= periodEnd), [loadedRecords, periodEnd]);
+  const nextPeriodRecords = useMemo(() => loadedRecords.filter(r => String(r.date).slice(0, 10) > periodEnd), [loadedRecords, periodEnd]);
+
   // Registros de asistencia de los últimos 6 días del mes anterior
-  const { data: prevMonthRecords = [] } = useQuery({
+  const { data: prevMonthRecords = [], isFetching: previousFetching, isError: previousError } = useQuery({
     queryKey: ["compensationPrevMonthRecords", prevMonthStart, prevMonthEnd],
     queryFn: async () => {
       const records = await entitiesAPI.AttendanceRecord.filter(
@@ -150,13 +161,13 @@ export default function CompensationPanel({
     staleTime: 60000,
   });
 
-  const { data: existingCompensations = [] } = useQuery({
-    queryKey: ["compensationIncidents", periodStart, periodEnd, prevMonthStart, prevMonthEnd],
+  const { data: existingCompensations = [], isFetching: incidentsFetching, isError: incidentsError } = useQuery({
+    queryKey: ["compensationIncidents", periodStart, overtimeWindowEnd, prevMonthStart, prevMonthEnd],
     queryFn: async () => {
       const records = await entitiesAPI.AttendanceIncident.filter(
         {
           incident_type: "Compensación de Tardanza",
-          incident_date: { $gte: prevMonthStart, $lte: periodEnd },
+          incident_date: { $gte: prevMonthStart, $lte: overtimeWindowEnd },
         },
         "-incident_date"
       );
@@ -197,6 +208,24 @@ export default function CompensationPanel({
     return map;
   }, [workSchedules, allEmployees]);
 
+  // Minutos de HE RESERVADOS por solicitudes que aún no se aplicaron al registro
+  // (pendientes, y aprobadas que no quedaron vinculadas a un registro). Las
+  // aprobadas ya aplicadas al registro no se restan: el registro ya tiene esas
+  // horas descontadas y volver a restarlas duplicaría el consumo.
+  // Las solicitudes rechazadas liberan su reserva.
+  const reservedOvertimeByEmployee = useMemo(() => {
+    const map = new Map();
+    for (const c of existingCompensations) {
+      if (c.incident_date < periodStart || c.incident_date > periodEnd) continue;
+      if (c.status === "Rechazada") continue;
+      const appliedToRecord = !!c.attendance_record_id;
+      if (c.status !== "Pendiente" && !(c.status === "Aprobada" && !appliedToRecord)) continue;
+      const mins = Math.round((c.hours_to_adjust || 0) * 60);
+      map.set(c.employee_id, (map.get(c.employee_id) || 0) + mins);
+    }
+    return map;
+  }, [existingCompensations, periodStart, periodEnd]);
+
   // Minutos de tardanza ya compensados (aprobados) por empleado
   const approvedLateCompensatedByEmployee = useMemo(() => {
     const map = new Map();
@@ -223,7 +252,8 @@ export default function CompensationPanel({
         totalScheduledHours: 0,
         totalRegularHours: 0,
         totalOvertimeHours: 0,
-        usedOvertimeMinutes: 0, // El backend local ya descontó las HE aprobadas.
+        totalCompensableHours: 0,
+        usedOvertimeMinutes: reservedOvertimeByEmployee.get(emp.id) || 0,
         compensatedLateMinutes: approvedLateCompensatedByEmployee.get(emp.id) || 0,
         totalLateMinutes: 0,
         lateDays: 0,
@@ -248,6 +278,13 @@ export default function CompensationPanel({
       const overtimeMin = Math.round(
         ((rec.overtime_hours_25 ?? 0) + (rec.overtime_hours_35 ?? 0)) * 60
       );
+      // Misma regla de compensabilidad que el modal: minutos no reservados y no
+      // pendientes de autorización.
+      const availableCompMin = Math.max(
+        0,
+        overtimeMin - (reservedOvertimeByEmployee.get(rec.employee_id) || 0)
+      );
+      stat.totalCompensableHours += isCompensableOvertime(rec, availableCompMin) / 60;
       if ((rec.late_minutes ?? 0) > 0) {
         stat.totalLateMinutes += rec.late_minutes;
         stat.lateDays++;
@@ -268,7 +305,7 @@ export default function CompensationPanel({
     }
 
     return Array.from(map.values());
-  }, [periodRecords, allEmployees, accessibleEmployeeIds, scheduleByEmployee, periodStart, periodEnd, approvedLateCompensatedByEmployee]);
+  }, [periodRecords, allEmployees, accessibleEmployeeIds, scheduleByEmployee, periodStart, periodEnd, approvedLateCompensatedByEmployee, reservedOvertimeByEmployee]);
 
   const filteredStats = useMemo(() => {
     return employeeStats.filter((stat) => {
@@ -292,7 +329,7 @@ export default function CompensationPanel({
       if (filterType === "late" && stat.totalLateMinutes === 0) return false;
       if (
         filterType === "overtime" &&
-        stat.totalOvertimeHours - (stat.usedOvertimeMinutes || 0) / 60 <= 0
+        stat.totalCompensableHours - (stat.usedOvertimeMinutes || 0) / 60 <= 0
       )
         return false;
 
@@ -458,7 +495,7 @@ export default function CompensationPanel({
         regular: acc.regular + s.totalRegularHours,
         overtime:
           acc.overtime +
-          Math.max(0, s.totalOvertimeHours - (s.usedOvertimeMinutes || 0) / 60),
+          Math.max(0, s.totalCompensableHours - (s.usedOvertimeMinutes || 0) / 60),
         late: acc.late + s.totalLateMinutes,
       }),
       { scheduled: 0, regular: 0, overtime: 0, late: 0 }
@@ -768,7 +805,7 @@ export default function CompensationPanel({
                     );
                     const overtimeMin = Math.max(
                       0,
-                      Math.round(stat.totalOvertimeHours * 60) -
+                      Math.round(stat.totalCompensableHours * 60) -
                         (stat.usedOvertimeMinutes || 0)
                     );
                     const balanceMin = overtimeMin - stat.totalLateMinutes;
@@ -956,6 +993,9 @@ export default function CompensationPanel({
           periodStart={periodStart}
           periodEnd={periodEnd}
           periodRecords={periodRecords}
+          nextPeriodRecords={nextPeriodRecords}
+          overtimeWindowEnd={overtimeWindowEnd}
+          dataUnavailable={recordsFetching || previousFetching || incidentsFetching || recordsError || previousError || incidentsError}
           prevMonthRecords={prevMonthRecords}
           prevMonthStart={prevMonthStart}
           prevMonthEnd={prevMonthEnd}

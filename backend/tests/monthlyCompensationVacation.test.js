@@ -93,10 +93,10 @@ test('automatización local limita actualizaciones al empleado y rango aprobado'
 });
 
 for (const [lateDate, overtimeDate, expected] of [
-  ['2026-09-30', '2026-09-01', 30],
+  ['2026-09-30', '2026-09-01', 0],
   ['2026-09-01', '2026-09-30', 30],
   ['2026-09-01', '2026-08-31', 0],
-  ['2026-09-30', '2026-10-01', 0],
+  ['2026-09-30', '2026-10-01', 30],
 ]) {
   test(`apertura mensual: tardanza ${lateDate}, HE ${overtimeDate}`, () => {
     const result = computeCrossDayCompensation(

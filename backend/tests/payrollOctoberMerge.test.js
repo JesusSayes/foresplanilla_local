@@ -1,13 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { calcEffectiveMetrics } from '../../src/lib/attendanceMetrics.js';
+import { computeMarkedLateMinutes, resolveDiscountLateMinutes } from '../../src/lib/attendanceReconciliation.js';
 
 const source = readFileSync(new URL('../../src/pages/PayrollManagement.jsx', import.meta.url), 'utf8');
 const start = source.indexOf('      const markedLateMinutes =');
-const end = source.indexOf('      const lateRecords =', start);
-const effective = new Function('calcEffectiveMetrics', 'enableTardinessCompensation',
-  source.slice(start, end) + '\nreturn effectiveLateMinutes;')(calcEffectiveMetrics, true);
+const end = source.indexOf('      // La tolerancia ya está aplicada', start);
+const effective = new Function('computeMarkedLateMinutes', 'resolveDiscountLateMinutes', 'enableTardinessCompensation',
+ 'scheduleDayFor', 'normDate', 'compensationIncidents', 'emp',
+ source.slice(start, end) + '\nreturn effectiveLateMinutes;')(
+ computeMarkedLateMinutes, resolveDiscountLateMinutes, true, () => null, v => String(v || '').slice(0, 10), [], { id: 'e1' });
 
 test('planilla elimina tardanza residual tras corregir entrada y conserva datos sin marcación', () => {
   const record = { is_late: true, late_minutes: 30, scheduled_start: '08:00', scheduled_end: '17:00', clock_in: '08:00', clock_out: '17:00' };

@@ -93,6 +93,7 @@
   "HorasExtrasManual": {
     "type": "object",
     "properties": {
+      "replaces_record_id": { "type": "string" },
       "employee_id": {
         "type": "string"
       },

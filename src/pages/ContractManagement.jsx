@@ -112,8 +112,8 @@ export default function ContractManagement() {
       return await entitiesAPI.Contract.create(data);
     },
     onSuccess: (newContract) => {
-      queryClient.invalidateQueries(["contracts"]);
-      queryClient.invalidateQueries(["allEmployees"]);
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["allEmployees"] });
       toast.success(`Contrato ${newContract.contract_number} creado correctamente`);
       resetForm();
     },
@@ -125,8 +125,8 @@ export default function ContractManagement() {
       return await entitiesAPI.Contract.update(id, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["contracts"]);
-      queryClient.invalidateQueries(["allEmployees"]);
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["allEmployees"] });
       toast.success("Contrato actualizado correctamente");
       resetForm();
     },
@@ -138,8 +138,8 @@ export default function ContractManagement() {
       return await entitiesAPI.Contract.update(id, { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["contracts"]);
-      queryClient.invalidateQueries(["allEmployees"]);
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["allEmployees"] });
       toast.success("Estado actualizado");
     },
   });
@@ -152,7 +152,7 @@ export default function ContractManagement() {
       digital_signature_name: companyInfo?.legal_representative || (employee ? `${employee.first_name} ${employee.last_name}` : ""),
       digital_signature_image_url: companyInfo?.legal_representative_signature_url || signatureImageUrl || "",
     }),
-    onSuccess: () => queryClient.invalidateQueries(["contracts"]),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["contracts"] }),
   });
 
   const initializeForm = (contract = null, emp = null) => {

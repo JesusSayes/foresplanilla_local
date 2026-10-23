@@ -647,9 +647,35 @@ export const getEffectiveOvertime = (record, enableCompensation) => {
 };
 
 /**
+ * Ventana de emparejamiento de compensación: una tardanza puede compensarse con
+ * horas extras del mismo día o de hasta 30 días calendario posteriores.
+ * Regla única para selección de días, autocompletado, resumen y guardado.
+ * El cambio de mes o de año NO bloquea el emparejamiento: la ventana se mide en
+ * días calendario reales, no por pertenencia al mismo mes.
+ */
+export const COMPENSATION_MATCH_WINDOW_DAYS = 30;
+
+/**
+ * Indica si las horas extras de overtimeDate pueden compensar la tardanza de
+ * tardanzaDate: mismo día o hasta maxDaysAfter días calendario posteriores.
+ * Devuelve false si las HE son anteriores a la tardanza (no se compensa hacia atrás).
+ */
+export const isWithinCompensationWindow = (
+  tardanzaDate,
+  overtimeDate,
+  maxDaysAfter = COMPENSATION_MATCH_WINDOW_DAYS
+) => {
+  if (!tardanzaDate || !overtimeDate) return false;
+  const t = new Date(String(tardanzaDate).slice(0, 10) + "T00:00:00");
+  const o = new Date(String(overtimeDate).slice(0, 10) + "T00:00:00");
+  const diff = Math.round((o - t) / 86400000);
+  return diff >= 0 && diff <= maxDaysAfter;
+};
+
+/**
  * Calcula la compensación cruzada entre días: asigna minutos compensables
- * (HE) a tardanzas de cualquier fecha, dentro del mismo
- * mes. Si maxDaysAfter es numérico, limita las HE a los días posteriores.
+ * (HE) de días posteriores a tardanzas de días anteriores, hasta maxDaysAfter
+ * días calendario después de la tardanza (cruce de mes y año permitido).
  *
  * Algoritmo voraz: para cada día de tardanza (de más antiguo a más reciente),
  * usa minutos compensables del día elegible más antiguo que tenga saldo
@@ -657,11 +683,10 @@ export const getEffectiveOvertime = (record, enableCompensation) => {
  *
  * @param {Array} tardanzaDays - [{ date, lateMinutes }] días con tardanza > 0
  * @param {Array} compensableDays - [{ date, overtimeMinutes }] días con HE > 0
- * @param {number|null} maxDaysAfter - null permite todo el mes; 15 restaura el límite anterior.
+ * @param {number} maxDaysAfter - máx. días después de la tardanza (default 30)
  * @returns {Object} { assignments, remainingTardanza, remainingCompensable, totalCompensated }
  */
-// Apertura temporal: restaurar el valor por defecto a 15 al cerrar la carga inicial.
-export const computeCrossDayCompensation = (tardanzaDays, compensableDays, maxDaysAfter = null) => {
+export const computeCrossDayCompensation = (tardanzaDays, compensableDays, maxDaysAfter = COMPENSATION_MATCH_WINDOW_DAYS) => {
   const tDays = [...tardanzaDays]
     .filter(d => d.lateMinutes > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -677,15 +702,12 @@ export const computeCrossDayCompensation = (tardanzaDays, compensableDays, maxDa
 
   for (const tDay of tDays) {
     let remaining = tDay.lateMinutes;
-    const tDate = new Date(tDay.date + "T00:00:00");
-    const tYM = tDay.date.slice(0, 7);
-
     const eligible = [...compMap.values()]
       .filter(c => {
         if (c.available - c.used <= 0) return false;
-        const cDate = new Date(c.date + "T00:00:00");
-        const diff = Math.round((cDate - tDate) / 86400000);
-        return c.date.slice(0, 7) === tYM && (maxDaysAfter === null || (diff >= 0 && diff <= maxDaysAfter));
+        // Ventana de 30 días calendario (mismo día incluido). Sin restricción de
+        // mismo mes: un emparejamiento válido que cruza mes o año se permite.
+        return isWithinCompensationWindow(tDay.date, c.date, maxDaysAfter);
       })
       .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -716,18 +738,19 @@ export const computeCrossDayCompensation = (tardanzaDays, compensableDays, maxDa
 
 /**
  * Matching cruzado de compensación que incluye horas extras de los últimos
- * 6 días del mes inmediatamente anterior. Consume PRIMERO las horas del mes
- * anterior (cualquier día, sin restricción de "15 días después") y luego las
- * horas del mes actual (mismo mes, hasta maxDaysAfter días después de la tardanza).
+ * días del mes inmediatamente anterior. Consume PRIMERO las horas del mes
+ * anterior (saldo permitido, sin restricción de cercanía) y luego las horas del
+ * período (mismo día o hasta maxDaysAfter días calendario después de la tardanza,
+ * permitiendo cruces de mes y año).
  * No reutiliza horas ya compensadas ni permite saldos negativos.
  *
  * @param {Array} tardanzaDays - [{ date, lateMinutes }] días con tardanza > 0 (mes actual)
  * @param {Array} compensableDays - [{ date, overtimeMinutes }] días con HE > 0 (mes actual)
  * @param {Array} prevMonthDays - [{ date, overtimeMinutes }] días con HE > 0 (mes anterior)
- * @param {number} maxDaysAfter - máx. días después de la tardanza (default 15)
+ * @param {number} maxDaysAfter - máx. días después de la tardanza (default 30)
  * @returns {Object} { assignments, totalCompensated }
  */
-export const computeCrossDayCompensationWithPrevMonth = (tardanzaDays, compensableDays, prevMonthDays, maxDaysAfter = 15) => {
+export const computeCrossDayCompensationWithPrevMonth = (tardanzaDays, compensableDays, prevMonthDays, maxDaysAfter = COMPENSATION_MATCH_WINDOW_DAYS) => {
   const tDays = [...tardanzaDays]
     .filter(d => d.lateMinutes > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -777,14 +800,13 @@ export const computeCrossDayCompensationWithPrevMonth = (tardanzaDays, compensab
       remaining -= use;
     }
 
-    // Fase 2: Consumir HE del mes actual (mismo mes, hasta maxDaysAfter después)
+    // Fase 2: Consumir HE del período (mismo día o hasta maxDaysAfter días después).
+    // Sin restricción de mismo mes: el cruce de mes/año se permite dentro de la ventana.
     if (remaining > 0) {
       const eligible = [...compMap.values()]
         .filter(c => {
           if (c.available - c.used <= 0) return false;
-          const cDate = new Date(c.date + "T00:00:00");
-          const diff = Math.round((cDate - tDate) / 86400000);
-          return diff >= 0 && diff <= maxDaysAfter && c.date.slice(0, 7) === tYM;
+          return isWithinCompensationWindow(tDay.date, c.date, maxDaysAfter);
         })
         .sort((a, b) => a.date.localeCompare(b.date));
 
