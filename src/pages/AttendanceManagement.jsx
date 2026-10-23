@@ -1676,10 +1676,15 @@ export default function AttendanceManagement() {
                           const hasPendingEdit = emp.record && pendingEditRequests.some(r => r.attendance_record_id === emp.record?.id);
                           const compAdj = getCompensationAdjustments(emp.id, rowDate);
                           const { firstClockIn, lastClockOut } = getSegmentClockTimes(emp.record);
-                          // HE manuales del período (mes/año de la fecha en vista)
-                          const empManualOT = manualOvertimeRecords.filter(r =>
-                            r.employee_id === emp.id && r.month === Number(rowDate.slice(5, 7)) && r.year === Number(rowDate.slice(0, 4))
-                          );
+                          // HE manuales de ESTA jornada: cada registro manual pertenece a un día y
+                          // a una jornada concretos, así que el indicador solo aparece en su fila
+                          // (nunca en todas las fechas del mes). Se identifica por la jornada
+                          // (attendance_record_id) y, si el registro no la tiene, por la fecha.
+                          const empManualOT = manualOvertimeRecords.filter(r => {
+                            if (r.employee_id !== emp.id) return false;
+                            if (r.attendance_record_id) return r.attendance_record_id === emp.record?.id;
+                            return String(r.attendance_date || "").slice(0, 10) === rowDate;
+                          });
                           const empManualOT25 = empManualOT.reduce((sum, r) =>
                             sum + (r.overtime_hours_25 || 0) + (r.overtime_minutes_25 || 0) / 60, 0);
                           const empManualOT35 = empManualOT.reduce((sum, r) =>
