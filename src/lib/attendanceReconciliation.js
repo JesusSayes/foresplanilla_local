@@ -376,6 +376,9 @@ export const findAbsenceFindings = ({
       if (employee.termination_date && String(employee.termination_date).slice(0, 10) < dateStr) continue;
       const scheduleDay = getScheduleDay ? getScheduleDay(employee.id, dateStr) : null;
       const record = recordIndex.get(`${employee.id}|${dateStr}`) || null;
+      // Marcaciones reales de la jornada: permiten distinguir una falta completa
+      // (sin ninguna marcación) de una marcación incompleta por regularizar.
+      const markings = getSegmentClockTimes(record);
       const classification = classifyAbsenceDay({
         date: dateStr,
         record,
