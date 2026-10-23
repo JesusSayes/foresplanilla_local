@@ -1735,7 +1735,7 @@ export default function MasterDataManagement() {
                         placeholder="Ej: INTEGRA"
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-4 gap-4">
                       <div>
                         <Label>% Comisión *</Label>
                         <Input
@@ -1745,6 +1745,17 @@ export default function MasterDataManagement() {
                           onChange={(e) => setFormData({ ...formData, commission_percentage: parseFloat(e.target.value) })}
                           placeholder="Ej: 1.47"
                         />
+                      </div>
+                      <div>
+                        <Label>% Comisión Mixta</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={formData.mixed_commission_percentage ?? ""}
+                          onChange={(e) => setFormData({ ...formData, mixed_commission_percentage: e.target.value === "" ? null : parseFloat(e.target.value) })}
+                          placeholder="Ej: 1.25"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Solo comisión Mixta</p>
                       </div>
                       <div>
                         <Label>% Aporte Obligatorio *</Label>

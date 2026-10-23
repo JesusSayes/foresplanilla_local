@@ -4,7 +4,13 @@
  */
 
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
-import { isLegacyAutoPensionConcept, hasManualPensionOverride } from "@/lib/pensionConcepts";
+import {
+  isLegacyAutoPensionConcept,
+  classifyPensionConcepts,
+  getPensionAffiliationIssues,
+  isMixtaCommission,
+  pensionConceptKey,
+} from "@/lib/pensionConcepts";
 import { computePrevisionalVariables } from "@/lib/previsionalBase";
 
 // Catálogo de lógicas del sistema disponibles
@@ -63,6 +69,9 @@ export class PayrollCalculator {
     this.quincenalPct = quincenalPct;
     this.calculationLog = [];
     this.errors = [];
+    // Validación pensionaria: motivos que impiden generar la boleta (afiliación
+    // incompleta o conceptos AFP/ONP ambiguos) y conceptos pensionarios ignorados.
+    this.pensionValidation = { blocked: false, issues: [], ignoredConcepts: [] };
   }
 
   /**
@@ -319,7 +328,13 @@ export class PayrollCalculator {
       // Fallback a 10% únicamente si el aporte obligatorio no está configurado.
       const obligatory = afp.obligatory_contribution_percentage ?? 10;
       const insurance = afp.insurance_percentage || 0;
-      const commission = afp.commission_percentage || 0;
+      // Comisión según el tipo de comisión del trabajador (Flujo / Mixta):
+      // Flujo → % de comisión por flujo de la AFP; Mixta → % de comisión mixta
+      // configurado en la AFP (el componente sobre el saldo no lo retiene el empleador).
+      const commissionType = isMixtaCommission(employee) ? "Mixta" : "Flujo";
+      const commission = commissionType === "Mixta"
+        ? (Number(afp.mixed_commission_percentage) || 0)
+        : (afp.commission_percentage || 0);
       const round2 = (v) => Math.round(v * 100) / 100;
 
       const items = [];
@@ -341,15 +356,15 @@ export class PayrollCalculator {
           detail: `Prima de seguro ${insurance}% de S/${base.toFixed(2)}`,
         });
       }
-      // 3) Comisión (solo si commission_percentage > 0). AFP configuradas con
-      // comisión 0 (p.ej. régimen mixto sin comisión sobre el flujo) no generan este ítem.
+      // 3) Comisión (solo si el porcentaje vigente es mayor que cero). AFP configuradas
+      // con comisión 0 no generan este ítem.
       if (commission > 0) {
         const comisionAmount = round2(base * (commission / 100));
         items.push({
-          name: `Comisión AFP ${afp.name}`,
+          name: `Comisión ${commissionType === "Mixta" ? "Mixta " : ""}AFP ${afp.name}`,
           code: "0601",
           amount: comisionAmount,
-          detail: `Comisión ${commission}% de S/${base.toFixed(2)}`,
+          detail: `Comisión ${commissionType.toLowerCase()} ${commission}% de S/${base.toFixed(2)}`,
         });
       }
 
@@ -384,8 +399,13 @@ export class PayrollCalculator {
   async calculatePayroll(concepts, attendanceData, rmvAmount, extraContext = {}) {
     const context = this.buildContext(attendanceData, rmvAmount, extraContext);
 
+    // Clasificación pensionaria: los conceptos generales y los que duplican el cálculo
+    // automático se ignoran (el aporte se calcula por trabajador según su afiliación).
+    const pensionPlan = classifyPensionConcepts(this.employee, concepts);
+    const ignoredPensionKeys = new Set(pensionPlan.ignored.map(({ concept }) => pensionConceptKey(concept)));
+
     // Primera pasada: calcular todos los conceptos con el contexto base.
-    let groups = this.calculateConceptGroups(concepts, context);
+    let groups = this.calculateConceptGroups(concepts, context, ignoredPensionKeys);
 
     // Variables derivadas — base previsional (remuneración afecta a AFP/ONP):
     // remuneración mensual + remuneración vacacional + asignación familiar
@@ -402,7 +422,7 @@ export class PayrollCalculator {
     );
     if (usesDerived) {
       this.calculationLog = [];
-      groups = this.calculateConceptGroups(concepts, context);
+      groups = this.calculateConceptGroups(concepts, context, ignoredPensionKeys);
       derived = computePrevisionalVariables(groups.incomes, groups.deductions, context.attendance_discount_amount);
       Object.assign(context, derived);
     }
@@ -419,12 +439,32 @@ export class PayrollCalculator {
     // aportes AFP/ONP según los porcentajes configurados para el sistema de pensiones.
     const pensionBase = safe(derived.remuneracion_afecta);
 
+    // Validación pensionaria: si faltan datos de afiliación (sistema de pensiones, AFP
+    // asignada, % de comisión mixta) o existen conceptos AFP/ONP ambiguos, la boleta NO
+    // se genera y se informa el motivo (el llamador la excluye de la planilla).
+    this.pensionValidation = {
+      blocked: false,
+      // En planilla quincenal no se descuentan aportes: la afiliación no condiciona la boleta.
+      issues: this.payrollType === "Quincenal"
+        ? []
+        : [...getPensionAffiliationIssues(this.employee, context.afp), ...pensionPlan.issues.map((i) => i.reason)],
+      ignoredConcepts: pensionPlan.ignored.map((i) => ({ name: i.name, reason: i.reason })),
+    };
+    this.pensionValidation.blocked = this.pensionValidation.issues.length > 0;
+    this.pensionValidation.ignoredConcepts.forEach(({ name, reason }) =>
+      this.logCalculation({
+        concept: name,
+        system_logic_type: "pension_contribution",
+        status: "ignored",
+        detail: reason,
+      })
+    );
+
     // Auto-calcular descuento de AFP/ONP de forma centralizada (única fuente automática).
     // Se calcula DESPUÉS de procesar todos los ingresos para usar la base pensionaria real.
-    // Se omite si existe una sobrescritura manual explícita (concept_category === "AFP/ONP"),
-    // en planillas quincenales, o si la base pensionaria es cero o negativa.
-    const hasManualOverride = hasManualPensionOverride(concepts);
-    if (!hasManualOverride && this.payrollType !== "Quincenal" && pensionBase > 0) {
+    // Solo se aplica el régimen del trabajador (AFP con su AFP/comisión, u ONP), y se omite
+    // en planillas quincenales (sin descuentos) o si la base pensionaria es cero o negativa.
+    if (!this.pensionValidation.blocked && this.payrollType !== "Quincenal" && pensionBase > 0) {
       const pensionCalc = this.calculatePensionContribution(pensionBase, context);
       // Agregar cada componente (aporte obligatorio, prima de seguro, comisión) como
       // un descuento independiente, según la ley peruana.
@@ -472,6 +512,7 @@ export class PayrollCalculator {
       },
       calculationLog: this.calculationLog,
       errors: this.errors,
+      pensionValidation: this.pensionValidation,
       summary: this.generateSummary(incomes, deductions, contributions, totalIncome, totalDeductions, netPay)
     };
   }
@@ -541,12 +582,17 @@ export class PayrollCalculator {
    * categoría): el cálculo centralizado los reemplaza para evitar duplicidad y
    * garantizar que los cambios de AFP/porcentajes se reflejen automáticamente.
    */
-  calculateConceptGroups(concepts, context) {
+  calculateConceptGroups(concepts, context, ignoredPensionKeys) {
     const incomes = [];
     const deductions = [];
     const contributions = [];
 
     for (const concept of concepts || []) {
+      // Conceptos pensionarios ignorados por la clasificación (generales, heredados o
+      // duplicados del cálculo automático): no se aplican ni alteran el neto.
+      if (ignoredPensionKeys && ignoredPensionKeys.has(pensionConceptKey(concept))) {
+        continue;
+      }
       if (!this.shouldApplyConcept(concept)) {
         continue;
       }

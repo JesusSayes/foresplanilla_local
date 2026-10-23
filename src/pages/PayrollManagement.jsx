@@ -27,6 +27,7 @@ import { PayrollCalculator } from "../components/payroll/PayrollCalculator";
 import PayslipPreview from "../components/payroll/PayslipPreview";
 import PayrollHistoryTab from "../components/payroll/PayrollHistoryTab";
 import ContractAlertBanner from "../components/payroll/ContractAlertBanner";
+import PensionBlockedBanner from "../components/payroll/PensionBlockedBanner";
 import ContractAlertModal from "../components/payroll/ContractAlertModal";
 import PayrollPreviewCard from "../components/payroll/PayrollPreviewCard";
 import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/lib/payrollUtils";
@@ -160,6 +161,9 @@ export default function PayrollManagement() {
   // Inconsistencias de contrato detectadas en el cálculo: trabajadores sin contrato
   // aprobado (Vigente) aplicable al período y contratos superpuestos.
   const [contractAlerts, setContractAlerts] = useState({ noApproved: [], conflicts: [] });
+  // Trabajadores sin boleta por validación AFP/ONP (afiliación incompleta o conceptos
+  // pensionarios ambiguos): se muestra el motivo y no se genera su planilla.
+  const [pensionBlockedWorkers, setPensionBlockedWorkers] = useState([]);
   // Boletas calculadas que esperan la confirmación explícita del usuario.
   const [pendingGeneration, setPendingGeneration] = useState(null);
   const [showContractAlert, setShowContractAlert] = useState(false);
@@ -776,6 +780,9 @@ export default function PayrollManagement() {
     const contractConflicts = [];
     const noApprovedContractWorkers = [];
     const absenceReviewWarnings = [];
+    // Trabajadores cuya boleta no se puede generar: datos de afiliación AFP/ONP
+    // incompletos o conceptos pensionarios ambiguos (se informa el motivo).
+    const pensionBlockedWorkers = [];
     // Detalle de las faltas descontadas, para que RR. HH. pueda verificarlas.
     const absenceDiscountSummary = [];
 
@@ -1307,6 +1314,19 @@ export default function PayrollManagement() {
 
       const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1130, extraContext);
 
+      // Validación pensionaria: si faltan datos de afiliación o hay ajustes AFP/ONP
+      // ambiguos, la boleta NO se genera (no se descuenta un aporte incorrecto).
+      const pensionIssues = result.pensionValidation?.issues || [];
+      if (pensionIssues.length > 0) {
+        pensionBlockedWorkers.push({
+          employee_id: emp.id,
+          employee_code: emp.employee_code,
+          employee_name: `${emp.first_name} ${emp.last_name}`,
+          detail: pensionIssues.join(" · "),
+        });
+        return null;
+      }
+
       // Buscar adelanto quincenal si es mensual.
       // Solo se descuenta a empleados que fueron elegibles para la quincenal
       // (mismo filtro de cutoff que se usa al generar la planilla quincenal).
@@ -1454,7 +1474,11 @@ export default function PayrollManagement() {
       return { ...sanitized, employee_name: rawPayslip.employee_name, employee_code: rawPayslip.employee_code, department: rawPayslip.department };
     });
 
-      setPreviewData(payslipsData);
+      // Solo las boletas válidas entran a la vista previa y a la generación: los
+      // trabajadores bloqueados por validación pensionaria (null) quedan fuera.
+      const calculatedPayslips = payslipsData.filter(Boolean);
+      setPensionBlockedWorkers(pensionBlockedWorkers);
+      setPreviewData(calculatedPayslips);
       setShowPreview(true);
       setContractAlerts({ noApproved: noApprovedContractWorkers, conflicts: contractConflicts });
 
@@ -1485,8 +1509,14 @@ export default function PayrollManagement() {
           { duration: 12000 }
         );
       }
+      if (pensionBlockedWorkers.length > 0) {
+        toast.error(
+          `⛔ ${pensionBlockedWorkers.length} trabajador(es) sin boleta por validación AFP/ONP: ${pensionBlockedWorkers.slice(0, 3).map(w => `${w.employee_code} ${w.employee_name} (${w.detail})`).join(" | ")}`,
+          { duration: 25000 }
+        );
+      }
       if (autoGenerate) {
-        const payslipsToCreate = payslipsData.map(p => {
+        const payslipsToCreate = calculatedPayslips.map(p => {
           const { employee_name, employee_code, department, ...rest } = p;
           return rest;
         });
@@ -1502,7 +1532,7 @@ export default function PayrollManagement() {
       // ── Validación de sanity post-cálculo: registrar días laborados para depuración ──
       // Si un empleado ingresa a mitad de mes, los días laborados deben ser
       // (30 - día_ingreso + 1), NO el conteo de registros de asistencia.
-      payslipsData.forEach(p => {
+      calculatedPayslips.forEach(p => {
         const empDebug = enrichedEmployees.find(e => e.id === p.employee_id);
         if (empDebug?.hire_date && p.worked_days != null) {
           const [hY, hM, hD] = empDebug.hire_date.split("T")[0].split("-").map(Number);
@@ -1864,6 +1894,7 @@ export default function PayrollManagement() {
                     noApproved={contractAlerts.noApproved}
                     conflicts={contractAlerts.conflicts}
                   />
+                  <PensionBlockedBanner workers={pensionBlockedWorkers} />
                   <div className="mb-6 flex gap-3 flex-wrap">
                     <Button
                       onClick={() => generatePayrollSummaryPDF({
