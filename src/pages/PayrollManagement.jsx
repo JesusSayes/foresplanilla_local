@@ -28,6 +28,7 @@ import PayslipPreview from "../components/payroll/PayslipPreview";
 import PayrollHistoryTab from "../components/payroll/PayrollHistoryTab";
 import ContractAlertBanner from "../components/payroll/ContractAlertBanner";
 import PensionBlockedBanner from "../components/payroll/PensionBlockedBanner";
+import AbsenceReviewBanner from "../components/payroll/AbsenceReviewBanner";
 import ContractAlertModal from "../components/payroll/ContractAlertModal";
 import PayrollPreviewCard from "../components/payroll/PayrollPreviewCard";
 import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/lib/payrollUtils";
@@ -38,9 +39,13 @@ import {
   computeMarkedLateMinutes,
   resolveDiscountLateMinutes,
   isConfirmedAbsence,
+  isCoveredByApprovedIncident,
+  hasClockMarkings,
 } from "@/lib/attendanceReconciliation";
 import { createScheduleDayResolver } from "@/lib/workScheduleResolver";
 import { buildPayrollAbsenceDays } from "@/lib/scheduledAbsence";
+import { applyAbsenceDays } from "@/lib/payrollDays";
+import { fetchAttendanceRecordsForPeriod, toDateStr } from "@/lib/attendancePeriodFetch";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 import {
   _normStr,
@@ -164,6 +169,8 @@ export default function PayrollManagement() {
   // Trabajadores sin boleta por validación AFP/ONP (afiliación incompleta o conceptos
   // pensionarios ambiguos): se muestra el motivo y no se genera su planilla.
   const [pensionBlockedWorkers, setPensionBlockedWorkers] = useState([]);
+  // Jornadas del período pendientes de regularización (no se descuentan como falta).
+  const [absenceReviewDetails, setAbsenceReviewDetails] = useState([]);
   // Boletas calculadas que esperan la confirmación explícita del usuario.
   const [pendingGeneration, setPendingGeneration] = useState(null);
   const [showContractAlert, setShowContractAlert] = useState(false);
@@ -223,16 +230,14 @@ export default function PayrollManagement() {
   const attendanceQuery = useQuery({
     queryKey: ["attendanceRecords", selectedMonth, selectedYear],
     queryFn: async () => {
-      // Ampliar el rango 15 días antes del inicio del mes para cubrir el ajuste
-      // del período de cómputo de asistencias (ej: 26 del mes anterior al 24 del mes actual)
+      // Rango ampliado 15 días antes del inicio del mes para cubrir el ajuste del
+      // período de cómputo de asistencias (ej: 26 del mes anterior al 24 del mes actual).
+      // Se leen TODOS los registros del rango con paginación: antes se truncaba a los
+      // 2000 más recientes, por lo que los meses anteriores quedaban sin asistencia
+      // (sin faltas ni tardanzas) al calcular su planilla.
       const startDate = new Date(selectedYear, selectedMonth - 1, -14);
       const endDate = new Date(selectedYear, selectedMonth, 0);
-      
-      const records = await withRetry(() => base44.entities.AttendanceRecord.list("-date", 2000));
-      return records.filter(r => {
-        const recordDate = new Date(r.date);
-        return recordDate >= startDate && recordDate <= endDate;
-      });
+      return await fetchAttendanceRecordsForPeriod(toDateStr(startDate), toDateStr(endDate));
     },
   });
   const { data: attendanceRecords = [] } = attendanceQuery;
@@ -608,6 +613,7 @@ export default function PayrollManagement() {
     // Resetear vista previa para forzar recálculo con datos frescos
     setShowPreview(false);
     setPreviewData([]);
+    setAbsenceReviewDetails([]);
     setPendingAction(action);
     setShowPeriodModal(true);
   };
@@ -660,7 +666,22 @@ export default function PayrollManagement() {
 
       // Leer datos frescos desde la caché y sombrear las variables del closure
       const allEmployees = queryClient.getQueryData(["allEmployees"]) ?? [];
-      const attendanceRecords = queryClient.getQueryData(["attendanceRecords", selectedMonth, selectedYear]) ?? [];
+      // Período de cómputo de asistencias: si no se indicó uno (recalcular desde la
+      // vista previa) se usa el mes completo.
+      const defaultPeriod = getDefaultPeriod();
+      const attendanceFrom = periodFrom || defaultPeriod.dateFrom;
+      const attendanceTo = periodTo || defaultPeriod.dateTo;
+
+      // Asistencia COMPLETA del período de cómputo, paginada y sin truncar: el período
+      // puede abarcar dos meses (ej: 16/09 → 15/10) y una lectura parcial dejaría fuera
+      // faltas y tardanzas. Si la lectura falla se conserva la copia en caché para no
+      // dejar la planilla sin asistencia.
+      let attendanceRecords = queryClient.getQueryData(["attendanceRecords", selectedMonth, selectedYear]) ?? [];
+      try {
+        attendanceRecords = await fetchAttendanceRecordsForPeriod(attendanceFrom, attendanceTo);
+      } catch (error) {
+        console.warn("[Planilla] No se pudo leer la asistencia del período completo; se usa la copia en caché.", error);
+      }
       const payrollConcepts = queryClient.getQueryData(["payrollConcepts", selectedMonth, selectedYear]) ?? [];
       const rmvData = queryClient.getQueryData(["rmv"]) ?? { amount: 1130 };
       const allAfps = queryClient.getQueryData(["allAfps"]) ?? [];
@@ -878,12 +899,9 @@ export default function PayrollManagement() {
       }));
     }
 
-    // ── Período de asistencia y faltas por jornadas programadas sin marcaciones ──
-    // El descuento por faltas y tardanzas se calcula SIEMPRE dentro del período de
-    // asistencia: si no se indicó uno (recalcular desde la vista previa) se usa el mes.
-    const defaultPeriod = getDefaultPeriod();
-    const attendanceFrom = periodFrom || defaultPeriod.dateFrom;
-    const attendanceTo = periodTo || defaultPeriod.dateTo;
+    // ── Faltas por jornadas programadas sin marcaciones ──
+    // El período de cómputo (attendanceFrom / attendanceTo) y la lectura completa de la
+    // asistencia de ese período ya quedaron resueltos arriba.
 
     // Horario aplicable por trabajador y fecha (misma resolución que el control de
     // asistencia): horario del empleado vigente a esa fecha, con respaldo del de su
@@ -929,6 +947,59 @@ export default function PayrollManagement() {
         if (r.date > attendanceTo) return false;
         return true;
       });
+
+      // ── Faltas del período (se resuelven antes de los días trabajados) ──
+      // Un día de vacaciones aprobadas no genera descuento por tardanza ni por
+      // inasistencia, aunque el registro conserve valores residuales (is_late,
+      // late_minutes, is_absent) por haberse aprobado la vacación después.
+      const normDate = (d) => (d ? String(d).split("T")[0].slice(0, 10) : "");
+      const isCoveredByApprovedVacation = (employeeId, recordDate) => {
+        const d = normDate(recordDate);
+        return approvedVacations.some(vacation =>
+          vacation.employee_id === employeeId &&
+          normDate(vacation.start_date) <= d &&
+          normDate(vacation.end_date) >= d
+        );
+      };
+      const attendanceForDiscounts = empAttendance.filter(
+        record => !isCoveredByApprovedVacation(emp.id, record.date)
+      );
+
+      // Falta confirmada por el propio registro: exige el indicador de falta y el
+      // estado "Ausente", que la jornada NO tenga ninguna marcación (una marcación
+      // incompleta se regulariza, no se descuenta) y que no esté cubierta por una
+      // justificación aprobada (la justificación manda sobre el indicador).
+      const coveredIncidentsFor = (dateStr) => approvedIncidentsByKey.get(`${emp.id}|${dateStr}`) || [];
+      const absentRecords = attendanceForDiscounts.filter(r =>
+        isConfirmedAbsence(r) &&
+        !hasClockMarkings(r) &&
+        !isCoveredByApprovedIncident(coveredIncidentsFor(normDate(r.date)))
+      );
+      const absenceInfo = absenceDaysByEmployee.get(emp.id) || { absenceDays: [], reviewDays: [] };
+      // Los días ya contados como falta confirmada por registro se excluyen de la
+      // detección por jornada para que ese día se descuente una sola vez.
+      const confirmedAbsenceDates = new Set(absentRecords.map(r => normDate(r.date)));
+      const scheduledAbsenceDays = absenceInfo.absenceDays.filter(day => !confirmedAbsenceDates.has(day.date));
+      const absenceDaysToDiscount = [...absentRecords, ...scheduledAbsenceDays];
+      if (absenceInfo.reviewDays.length > 0) {
+        absenceReviewWarnings.push(
+          `${emp.employee_code} ${emp.first_name} ${emp.last_name}: ${absenceInfo.reviewDays.length} día(s) por regularizar (${absenceInfo.reviewDays.slice(0, 3).map(d => d.date).join(", ")})`
+        );
+        absenceReviewDetails.push({
+          employee_id: emp.id,
+          employee_code: emp.employee_code || "",
+          employee_name: `${emp.first_name} ${emp.last_name}`,
+          days: absenceInfo.reviewDays,
+        });
+      }
+      if (absenceDaysToDiscount.length > 0) {
+        absenceDiscountSummary.push({
+          employee_code: emp.employee_code || "",
+          employee_name: `${emp.first_name} ${emp.last_name}`,
+          days: absenceDaysToDiscount.length,
+          dates: absenceDaysToDiscount.map(d => normDate(d.date)).filter(Boolean),
+        });
+      }
       // ── DÍAS LABORADOS (convención Perú: el mes se computa como 30 días) ──
       // El periodo de asistencia seleccionado (periodFrom/periodTo) SOLO se usa para
       // descontar faltas y tardanzas, NO para el cómputo de días laborados.
@@ -976,7 +1047,18 @@ export default function PayrollManagement() {
       const sinGoceFullDays = payrollType === "Quincenal"
         ? 0
         : empAttendance.filter(r => r.status === "Permiso sin goce" && (r.notes || "").includes("día completo")).length;
-      workedDays = Math.max(0, workedDays - sinGoceFullDays);
+      // Días trabajados y no laborados coherentes con las faltas descontables del
+      // período: cada falta descuenta un día de los días trabajados, y el prorrateo de
+      // la remuneración básica (base_salary / 30 × worked_days) es el ÚNICO descuento
+      // de ese día, para no cobrar dos veces la misma falta.
+      const daysResult = applyAbsenceDays({
+        baseWorkedDays: workedDays,
+        payrollType,
+        absenceDays: absenceDaysToDiscount.length,
+        sinGoceFullDays,
+      });
+      workedDays = daysResult.workedDays;
+      const nonWorkedDays = daysResult.nonWorkedDays;
       // Días subsidiados: justificaciones aprobadas que cubren el día completo (descanso médico, etc.)
       const subsidizedDays = payrollType === "Quincenal"
         ? 0
@@ -1169,23 +1251,10 @@ export default function PayrollManagement() {
         conceptsForCalc = applyContractSalaryToBaseConcepts(conceptsForCalc, emp.base_salary);
       }
 
-      // Calcular descuentos por asistencia (solo para planillas NO quincenales)
-      // Excluir los registros cubiertos por vacaciones aprobadas: un día de
-      // vacaciones no debe generar descuento por tardanza ni por inasistencia,
-      // incluso si el AttendanceRecord tiene valores residuales (is_late,
-      // late_minutes, is_absent) por haberse aprobado la vacación después.
-      const normDate = (d) => (d ? String(d).split("T")[0].slice(0, 10) : "");
-      const isCoveredByApprovedVacation = (employeeId, recordDate) => {
-        const d = normDate(recordDate);
-        return approvedVacations.some(vacation =>
-          vacation.employee_id === employeeId &&
-          normDate(vacation.start_date) <= d &&
-          normDate(vacation.end_date) >= d
-        );
-      };
-      const attendanceForDiscounts = empAttendance.filter(
-        record => !isCoveredByApprovedVacation(emp.id, record.date)
-      );
+      // Calcular descuentos por asistencia (solo para planillas NO quincenales).
+      // `attendanceForDiscounts` (asistencia del período sin los días cubiertos por
+      // vacaciones aprobadas) y las faltas del período ya se resolvieron al inicio
+      // del cálculo del empleado.
 
       // Horario aplicable del empleado en una fecha (tolerancia, refrigerio y turnos
       // nocturnos), resuelto por el helper compartido con la detección de faltas:
@@ -1241,26 +1310,9 @@ export default function PayrollManagement() {
       // tienen registro de asistencia generado. Un día cubierto (feriado, vacación,
       // justificación, permiso sin goce) o con marcación incompleta no se descuenta
       // como falta completa: queda para regularización.
-      const absentRecords = attendanceForDiscounts.filter(r => isConfirmedAbsence(r));
-      const absenceInfo = absenceDaysByEmployee.get(emp.id) || { absenceDays: [], reviewDays: [] };
-      // Los días ya contados como falta confirmada por registro se excluyen de la
-      // detección por jornada para que ese día se descuente una sola vez.
-      const confirmedAbsenceDates = new Set(absentRecords.map(r => normDate(r.date)));
-      const scheduledAbsenceDays = absenceInfo.absenceDays.filter(day => !confirmedAbsenceDates.has(day.date));
-      const absenceDaysToDiscount = [...absentRecords, ...scheduledAbsenceDays];
-      if (absenceInfo.reviewDays.length > 0) {
-        absenceReviewWarnings.push(
-          `${emp.employee_code} ${emp.first_name} ${emp.last_name}: ${absenceInfo.reviewDays.length} día(s) por regularizar (${absenceInfo.reviewDays.slice(0, 3).map(d => d.date).join(", ")})`
-        );
-      }
-      if (absenceDaysToDiscount.length > 0) {
-        absenceDiscountSummary.push({
-          employee_code: emp.employee_code || "",
-          employee_name: `${emp.first_name} ${emp.last_name}`,
-          days: absenceDaysToDiscount.length,
-          dates: absenceDaysToDiscount.map(d => normDate(d.date)).filter(Boolean),
-        });
-      }
+      // Las faltas descontables del período (absenceDaysToDiscount) y las jornadas
+      // pendientes de regularización ya se calcularon al inicio del empleado, antes
+      // de los días trabajados.
       // ── Descuento por salida anticipada (concepto independiente) ──
       // Sin tolerancia: descuento desde el primer minuto. Excluye registros
       // justificados, de vacaciones, compensación, permiso sin goce y ausentes.
@@ -1284,9 +1336,9 @@ export default function PayrollManagement() {
       const totalLateMinutes = lateRecords.reduce((sum, r) => sum + effectiveLateMinutes(r), 0);
       const hourlyRate = dailyRate > 0 ? roundMoney(dailyRate / 8) : 0;
       const tardinessDiscount = payrollType === "Quincenal" ? 0 : roundMoney(hourlyRate * (totalLateMinutes / 60));
-      // Descuento por inasistencias: un día de salario por cada falta completa
-      // (falta confirmada o jornada programada sin marcaciones).
-      const absenceDiscount = payrollType === "Quincenal" ? 0 : roundMoney(absenceDaysToDiscount.length * dailyRate);
+      // Descuento por inasistencias: NO se aplica un descuento monetario separado.
+      // Cada falta ya descontó su día en worked_days (prorrateo de la remuneración
+      // básica), y descontarlo además aquí cobraría dos veces la misma falta.
       // ── Descuento por salida anticipada ──
       // Usa el mismo valor hora que tardanzas (salario diario / 8).
       const totalEarlyDepartureMinutes = earlyDepartureRecords.reduce((sum, r) => {
@@ -1312,7 +1364,9 @@ export default function PayrollManagement() {
         // Se entrega al motor para que reduzcan la base previsional (remuneracion_afecta)
         // antes de evaluar las fórmulas dinámicas y el aporte AFP/ONP. El motor NO los
         // suma a sus propios descuentos: se aplican una sola vez al neto, más abajo.
-        attendance_discount_amount: roundMoney(tardinessDiscount + earlyDepartureDiscount + absenceDiscount),
+        // Las faltas no entran aquí: ya redujeron la remuneración básica prorrateada
+        // (worked_days), así que restarlas otra vez bajaría dos veces la base.
+        attendance_discount_amount: roundMoney(tardinessDiscount + earlyDepartureDiscount),
       };
 
       const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1130, extraContext);
@@ -1399,7 +1453,7 @@ export default function PayrollManagement() {
       const incomeTaxAmount = quintaResult.finalIncomeTax;
       // Ajustar totales con descuentos adicionales — sanitizar cada término
       const adjustedDeductions = roundMoney(
-        safePayrollNumber(result.totals.totalDeductions) + tardinessDiscount + earlyDepartureDiscount + absenceDiscount + advanceDeduction + quintaResult.adjustment
+        safePayrollNumber(result.totals.totalDeductions) + tardinessDiscount + earlyDepartureDiscount + advanceDeduction + quintaResult.adjustment
       );
       const adjustedNetPay = roundMoney(safePayrollNumber(result.totals.totalIncome) - adjustedDeductions);
       if (quintaResult.hasQuintaCalc && result.summary?.result) {
@@ -1426,7 +1480,7 @@ export default function PayrollManagement() {
         advance_payment_id: advancePaymentId,
         worked_days: workedDays,
         subsidized_days: subsidizedDays,
-        non_worked_days: payrollType === "Quincenal" ? 0 : absenceDaysToDiscount.length,
+        non_worked_days: nonWorkedDays,
         regular_hours: attendanceData.regular_hours,
         overtime_hours: roundMoney(overtimeHours25 + overtimeHours35),
         overtime_hours_25: roundMoney(overtimeHours25),
@@ -1456,7 +1510,9 @@ export default function PayrollManagement() {
         income_tax: incomeTaxAmount,
         tardiness_discount: tardinessDiscount,
         early_departure_discount: earlyDepartureDiscount,
-        absence_discount: absenceDiscount,
+        // Sin descuento monetario separado por inasistencia: cada falta ya descontó su
+        // día en worked_days (prorrateo). El detalle queda en non_worked_days.
+        absence_discount: 0,
         loan_deduction: loanDeductionAmount,
         advance_deduction: advanceDeduction,
         other_deductions: otherDeductionsFromCalc,
@@ -1482,6 +1538,7 @@ export default function PayrollManagement() {
       // trabajadores bloqueados por validación pensionaria (null) quedan fuera.
       const calculatedPayslips = payslipsData.filter(Boolean);
       setPensionBlockedWorkers(pensionBlockedWorkers);
+      setAbsenceReviewDetails(absenceReviewDetails);
       setPreviewData(calculatedPayslips);
       setShowPreview(true);
       setContractAlerts({ noApproved: noApprovedContractWorkers, conflicts: contractConflicts });
@@ -1548,7 +1605,9 @@ export default function PayrollManagement() {
         if (empDebug?.hire_date && p.worked_days != null) {
           const [hY, hM, hD] = empDebug.hire_date.split("T")[0].split("-").map(Number);
           if (hY === selectedYear && hM === selectedMonth && hD > 1) {
-            const expected = 30 - hD + 1;
+            // Días esperados: prorrateo por ingreso en el mes menos los días no
+            // laborados descontados (faltas y permisos sin goce de día completo).
+            const expected = 30 - hD + 1 - (p.non_worked_days || 0);
             if (p.worked_days !== expected) {
               console.warn(`[Días Laborados] ${p.employee_name}: calculado=${p.worked_days}, esperado=${expected} (ingreso ${empDebug.hire_date})`);
             }
@@ -1906,6 +1965,7 @@ export default function PayrollManagement() {
                     conflicts={contractAlerts.conflicts}
                   />
                   <PensionBlockedBanner workers={pensionBlockedWorkers} />
+                  <AbsenceReviewBanner pending={absenceReviewDetails} />
                   <div className="mb-6 flex gap-3 flex-wrap">
                     <Button
                       onClick={() => generatePayrollSummaryPDF({

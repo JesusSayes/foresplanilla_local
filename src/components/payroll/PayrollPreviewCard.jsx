@@ -155,8 +155,8 @@ export default function PayrollPreviewCard({
 
       {payslip.non_worked_days > 0 && (
         <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
-          <strong>Descuento por faltas:</strong> {payslip.non_worked_days} día(s) sin marcaciones
-          {canViewAmounts ? ` — S/ ${(payslip.absence_discount || 0).toFixed(2)}` : ""}
+          <strong>Faltas del período:</strong> {payslip.non_worked_days} día(s) no laborado(s)
+          {" "}(ya descontados en los días trabajados)
         </div>
       )}
 
