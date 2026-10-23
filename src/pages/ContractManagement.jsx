@@ -155,11 +155,33 @@ export default function ContractManagement() {
     onError: () => toast.error("Error al actualizar el contrato"),
   });
 
+  // Al APROBAR un contrato (estado "Vigente"), su remuneración y bonos se sincronizan
+  // con la ficha del trabajador: el sueldo aprobado es el que rige en el perfil.
+  const syncApprovedContractToEmployee = async (contract) => {
+    if (!contract?.employee_id) return;
+    try {
+      await base44.entities.Employee.update(contract.employee_id, {
+        base_salary: contract.salary ?? 0,
+        activity_cost: contract.activity_cost ?? 0,
+        food_cost: contract.food_cost ?? 0,
+        transport_cost: contract.transport_cost ?? 0,
+      });
+      queryClient.invalidateQueries(["allEmployees"]);
+    } catch (e) {
+      console.error("Error sincronizando el contrato aprobado al empleado:", e);
+    }
+  };
+
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }) => base44.entities.Contract.update(id, { status }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries(["contracts"]);
-      toast.success("Estado actualizado");
+      if (variables?.status === "Vigente" && variables?.contract) {
+        syncApprovedContractToEmployee(variables.contract);
+        toast.success("Contrato aprobado — sueldo del trabajador sincronizado con el contrato");
+      } else {
+        toast.success("Estado actualizado");
+      }
     },
   });
 
@@ -273,7 +295,7 @@ export default function ContractManagement() {
   };
 
   const handleResolveConflict = (newStatus) => {
-    updateStatusMutation.mutate({ id: conflictingContract.id, status: newStatus }, {
+    updateStatusMutation.mutate({ id: conflictingContract.id, status: newStatus, contract: conflictingContract }, {
       onSuccess: () => {
         setConflictingContract(null);
         createContractMutation.mutate(formData);
@@ -695,7 +717,7 @@ export default function ContractManagement() {
                         <div className="flex flex-wrap gap-1.5 ml-2 shrink-0">
                           <Select
                             value={contract.status}
-                            onValueChange={(s) => updateStatusMutation.mutate({ id: contract.id, status: s })}
+                            onValueChange={(s) => updateStatusMutation.mutate({ id: contract.id, status: s, contract })}
                           >
                             <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>

@@ -19,6 +19,10 @@ export const isCancelledContract = (contract) => {
   return s.includes("rescind") || s.includes("anulad") || s.includes("cancelad");
 };
 
+/** Contrato aprobado: el estado "Vigente" es el único que autoriza la remuneración. */
+export const isApprovedContract = (contract) =>
+  String(contract?.status || "").trim().toLowerCase() === "vigente";
+
 const sortByStartDesc = (contracts) =>
   [...contracts].sort((a, b) => String(startOf(b) || "1900-01-01").localeCompare(String(startOf(a) || "1900-01-01")));
 
@@ -47,15 +51,30 @@ export const pickEffectiveContract = (contracts, dateStr) => {
 
 /**
  * Contrato aplicable al período liquidado (histórico o actual).
- * 1. Contratos que solapan el período.
- * 2. Si no hay, el más reciente que ya había iniciado al cierre del período.
- * Nunca se usa un contrato cuya fecha de inicio es posterior al período.
+ * La remuneración básica toma SIEMPRE el contrato APROBADO (estado "Vigente"):
+ *   1. Contrato aprobado que solapa el período.
+ *   2. Si ninguno solapa, el aprobado más reciente ya iniciado al cierre del período
+ *      (último contrato aprobado, nunca uno cuya vigencia empiece después).
+ * Si no existe ningún contrato aprobado aplicable, se informa mediante
+ * `missingApprovedContract` para que la generación de planilla pida confirmación.
  */
 export const pickContractForPeriod = (contracts, periodStartStr, periodEndStr) => {
-  const list = (contracts || []).sort((a, b) => String(startOf(b) || "1900-01-01").localeCompare(String(startOf(a) || "1900-01-01")));
-  const usable = list.filter((c) => !isCancelledContract(c));
-  const candidates = usable.length > 0 ? usable : list;
-  if (candidates.length === 0) return { contract: null, overlaps: [], hasConflict: false };
+  const list = (contracts || []).filter((c) => !isCancelledContract(c));
+  const approved = list.filter(isApprovedContract);
+
+  if (list.length === 0) {
+    return {
+      contract: null,
+      overlaps: [],
+      hasConflict: false,
+      contractApproved: false,
+      missingApprovedContract: true,
+    };
+  }
+
+  // Se prioriza el contrato aprobado; solo si no hay ninguno se considera el resto
+  // del historial (se informará la falta de contrato aprobado del período).
+  const candidates = sortByStartDesc(approved.length > 0 ? approved : list);
 
   const periodStart = normDate(periodStartStr);
   const periodEnd = normDate(periodEndStr);
@@ -70,10 +89,14 @@ export const pickContractForPeriod = (contracts, periodStartStr, periodEndStr) =
   });
 
   if (overlapping.length > 0) {
+    const contract = overlapping[0];
+    const contractApproved = isApprovedContract(contract);
     return {
-      contract: overlapping[0],
+      contract,
       overlaps: overlapping.slice(1),
       hasConflict: overlapping.length > 1,
+      contractApproved,
+      missingApprovedContract: !contractApproved,
     };
   }
 
@@ -81,7 +104,15 @@ export const pickContractForPeriod = (contracts, periodStartStr, periodEndStr) =
     const start = startOf(c);
     return start && periodEnd && start <= periodEnd;
   });
-  return { contract: alreadyStarted[0] || null, overlaps: [], hasConflict: false };
+  const contract = alreadyStarted[0] || null;
+  const contractApproved = isApprovedContract(contract);
+  return {
+    contract,
+    overlaps: [],
+    hasConflict: false,
+    contractApproved,
+    missingApprovedContract: !contractApproved,
+  };
 };
 
 /** Descripción corta para mensajes y avisos. */
