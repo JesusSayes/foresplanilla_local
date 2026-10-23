@@ -191,11 +191,17 @@ export default function PendingCompensationsApproval({
         });
       }
 
-      queryClient.invalidateQueries(["pendingCompsForApproval"]);
-      queryClient.invalidateQueries(["compensationIncidents"]);
-      queryClient.invalidateQueries(["compensationRecords"]);
-      queryClient.invalidateQueries(["allIncidents"]);
-      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries({ queryKey: ["pendingCompsForApproval"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationIncidents"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationPrevMonthRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      // La aprobación descuenta tardanza y HE del registro: refrescar los datos que
+      // alimentan el recálculo de planilla y los saldos de compensación.
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allRecordsForCompMetrics"] });
+      queryClient.invalidateQueries({ queryKey: ["manualOvertime"] });
 
       toast.success("✓ Compensación aprobada y descuentos aplicados");
     } catch (error) {
@@ -259,11 +265,15 @@ export default function PendingCompensationsApproval({
         }
       }
 
-      queryClient.invalidateQueries(["pendingCompsForApproval"]);
-      queryClient.invalidateQueries(["compensationIncidents"]);
-      queryClient.invalidateQueries(["compensationRecords"]);
-      queryClient.invalidateQueries(["allIncidents"]);
-      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries({ queryKey: ["pendingCompsForApproval"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationIncidents"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationPrevMonthRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allRecordsForCompMetrics"] });
+      queryClient.invalidateQueries({ queryKey: ["manualOvertime"] });
 
       toast.success(
         `✓ ${employeeGroup.compensations.length} compensación(es) aprobadas`
@@ -296,8 +306,10 @@ export default function PendingCompensationsApproval({
         review_comments: rejectComment,
       });
 
-      queryClient.invalidateQueries(["pendingCompsForApproval"]);
-      queryClient.invalidateQueries(["compensationIncidents"]);
+      queryClient.invalidateQueries({ queryKey: ["pendingCompsForApproval"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationIncidents"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
 
       toast.success("Compensación rechazada");
       setRejectingId(null);

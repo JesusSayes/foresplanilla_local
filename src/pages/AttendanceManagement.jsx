@@ -39,6 +39,7 @@ import JustifyModal from "../components/attendance/JustifyModal";
 import AssignScheduleModal from "../components/attendance/AssignScheduleModal";
 import AttendanceValidationModal from "../components/attendance/AttendanceValidationModal";
 import AttendanceEditRequestModal from "../components/attendance/AttendanceEditRequestModal";
+import ReconciliationButton from "../components/attendance/ReconciliationButton";
 import AttendanceEditRequestsPanel from "../components/attendance/AttendanceEditRequestsPanel";
 import localClient from '@/api/localClient';
 import recalcularAsistenciaService from '@/services/recalcularAsistenciaService';
@@ -351,7 +352,7 @@ export default function AttendanceManagement() {
       for (const empId of affectedEmployeeIds) {
         await recalcularAsistenciaService.recalculate(empId, dateStr, dateStr);
       }
-      queryClient.invalidateQueries(["todayAttendance"]);
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
       hideLoading();
       toast.success(`✓ ${result.imported} marcaciones importadas y métricas recalculadas. ${result.errors} errores.`);
     },
@@ -539,8 +540,13 @@ export default function AttendanceManagement() {
         }
       }
 
-      queryClient.invalidateQueries(["todayAttendance"]);
-      queryClient.invalidateQueries(["overtimeAlerts"]);
+      // Refrescar asistencia (incluye la consulta que alimenta el cálculo de planilla),
+      // alertas de HE y registros manuales afectados por el recálculo.
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allRecordsForCompMetrics"] });
+      queryClient.invalidateQueries({ queryKey: ["manualOvertime"] });
       toast.success("Registro actualizado y métricas recalculadas");
       setShowEditModal(false);
       setEditingRecord(null);
@@ -616,8 +622,13 @@ export default function AttendanceManagement() {
     setIsApproving(true);
     try {
       await executeApprove(incident, reviewComments || "Aprobada");
-      queryClient.invalidateQueries(["allIncidents"]);
-      queryClient.invalidateQueries(["todayAttendance"]);
+      // La aprobación recalcula tardanzas y HE: se refresca también la consulta que
+      // usa el cálculo de planilla y los saldos de compensación.
+      queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allRecordsForCompMetrics"] });
+      queryClient.invalidateQueries({ queryKey: ["compensationIncidents"] });
       toast.success("Justificación aprobada correctamente");
       setShowIncidentModal(false);
       setReviewingIncident(null);
@@ -671,8 +682,8 @@ export default function AttendanceManagement() {
         errors++;
       }
     }
-    queryClient.invalidateQueries(["allIncidents"]);
-    queryClient.invalidateQueries(["todayAttendance"]);
+    queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
+    queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
     setPeriodLoading(false);
     setPeriodAction(null);
     const verb = mode === "approve" ? "aprobada(s)" : "rechazada(s)";
@@ -907,7 +918,7 @@ export default function AttendanceManagement() {
       if (attendanceFilter === "all") return true;
       if (attendanceFilter === "sin_entrada") return !emp.record?.clock_in;
       if (attendanceFilter === "sin_salida") return emp.record?.clock_in && !emp.record?.clock_out;
-      if (attendanceFilter === "con_tardanza") return (emp.record?.late_minutes ?? 0) > 0;
+      // El filtro de tardanza se aplica después, con las métricas efectivas.
       return true;
     });
   } else {
@@ -927,7 +938,7 @@ export default function AttendanceManagement() {
       if (attendanceFilter === "all") return true;
       if (attendanceFilter === "sin_entrada") return !emp.record.clock_in;
       if (attendanceFilter === "sin_salida") return emp.record.clock_in && !emp.record.clock_out;
-      if (attendanceFilter === "con_tardanza") return (emp.record?.late_minutes ?? 0) > 0;
+      // El filtro de tardanza se aplica después, con las métricas efectivas.
       return true;
     });
     } // end else (fecha no futura)
@@ -999,8 +1010,8 @@ export default function AttendanceManagement() {
       await syncOvertimeAlertsBatch(updatedRecords || [], pendingAlerts, currentUser, (r) => hasScheduledDay(r.employee_id, r.date));
     } catch (e) { console.error("Error sincronizando alertas HE:", e); }
 
-    queryClient.invalidateQueries(["todayAttendance"]);
-    queryClient.invalidateQueries(["overtimeAlerts"]);
+    queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+    queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
     toast.success(`✓ Recálculo completado para ${done} empleados`);
   };
 
@@ -1026,13 +1037,13 @@ export default function AttendanceManagement() {
           updateLoadingMessage(`Revisando registros de asistencia... ${p.done}/${p.total}`);
         },
       });
-      queryClient.invalidateQueries(["overtimeAlerts"]);
+      queryClient.invalidateQueries({ queryKey: ["overtimeAlerts"] });
 
       // Corregir vacaciones en fines de semana (sábados/domingos → 0 horas)
       updateLoadingMessage("Corrigiendo vacaciones en fines de semana...");
       const { data: vacResult } = await localClient.post('/api/attendance/records/corregir-vacaciones-fin-de-semana', date ? { date } : {});
-      queryClient.invalidateQueries(["todayAttendance"]);
-      queryClient.invalidateQueries(["allAttendanceRecords"]);
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["allAttendanceRecords"] });
 
       toast.success(`✓ Revisión completada: ${result.pending} alerta(s) pendiente(s). Vacaciones corregidas: ${vacResult?.corrected ?? 0}`);
     } catch (error) {
@@ -1181,7 +1192,7 @@ export default function AttendanceManagement() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) { toast.error('Por favor, permite las ventanas emergentes para imprimir'); return; }
     const filterText = attendanceFilter === "all" ? "Todos los empleados" : attendanceFilter === "sin_entrada" ? "Sin marcar entrada" : attendanceFilter === "sin_salida" ? "Sin marcar salida" : "Con tardanza";
-    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>DNI</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const rowDate = emp.displayDate || format(selectedDate, 'yyyy-MM-dd'); const ct = getSegmentClockTimes(emp.record); const pm = getRowMetrics(emp, rowDate); const pwh = Math.round(pm.rawWorkedHours * 60) / 60; const paLate = applyLateTolerance(pm.remainingLateMinutes, pm.toleranceMinutes); const pca = getCompensationAdjustments(emp.id, rowDate); const pnc = enableTardinessCompensation && emp.record?.tardiness_compensation_status === 'Activa' ? (emp.record.tardiness_compensation_minutes || 0) : 0; const pLate = Math.max(0, paLate - pca.pendingLateMin - pca.approvedLateMin - pnc); let pOT = pca.pendingOTHours; let p25 = emp.record?.overtime_hours_25 ?? 0; let p35 = emp.record?.overtime_hours_35 ?? 0; if (pOT > 0 && p25 > 0) { const d = Math.min(p25, pOT); p25 -= d; pOT -= d; } if (pOT > 0 && p35 > 0) { const d = Math.min(p35, pOT); p35 -= d; pOT -= d; } return `<tr><td>${emp.document_number}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${ct.firstClockIn || '--:--'}</td><td>${ct.lastClockOut || '--:--'}</td><td>${pwh.toFixed(2)}h</td><td class="${pLate > 0 ? 'late' : ''}">${pLate} min</td><td>${p25.toFixed(2)}h</td><td>${p35.toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
+    const printContent = `<!DOCTYPE html><html><head><title>Reporte de Asistencia</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}.header{text-align:center;margin-bottom:30px;border-bottom:2px solid #333;padding-bottom:15px}.header h1{margin:5px 0;font-size:24px}.header p{margin:3px 0;color:#666}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background-color:#4f46e5;color:white;font-weight:bold}tr:nth-child(even){background-color:#f9fafb}.late{color:#ea580c;font-weight:bold}.absent{color:#dc2626;font-weight:bold}.complete{color:#16a34a;font-weight:bold}.footer{margin-top:30px;text-align:center;font-size:11px;color:#666}@media print{body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>Reporte de Asistencia</h1><p><strong>Fecha:</strong> ${format(parseDateLima(dateToStringLima(selectedDate)), "dd 'de' MMMM, yyyy", { locale: es })}</p><p><strong>Filtro aplicado:</strong> ${filterText}</p><p><strong>Total de empleados:</strong> ${employeesWithRecords.length}</p></div><table><thead><tr><th>DNI</th><th>Empleado</th><th>Cargo</th><th>Departamento</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Tardanza</th><th>HE 25%</th><th>HE 35%</th><th>Estado</th></tr></thead><tbody>${employeesWithRecords.map(emp => { const rowDate = emp.displayDate || format(selectedDate, 'yyyy-MM-dd'); const ct = getSegmentClockTimes(emp.record); const pm = getRowMetrics(emp, rowDate); const pwh = Math.round(pm.rawWorkedHours * 60) / 60; const paLate = applyLateTolerance(pm.remainingLateMinutes, pm.toleranceMinutes); const pca = getCompensationAdjustments(emp.id, rowDate); const pnc = enableTardinessCompensation && emp.record?.tardiness_compensation_status === 'Activa' ? (emp.record.tardiness_compensation_minutes || 0) : 0; const pLate = Math.max(0, paLate - pca.approvedLateMin - pnc); let pOT = pca.pendingOTHours; let p25 = emp.record?.overtime_hours_25 ?? 0; let p35 = emp.record?.overtime_hours_35 ?? 0; if (pOT > 0 && p25 > 0) { const d = Math.min(p25, pOT); p25 -= d; pOT -= d; } if (pOT > 0 && p35 > 0) { const d = Math.min(p35, pOT); p35 -= d; pOT -= d; } return `<tr><td>${emp.document_number}</td><td>${emp.first_name} ${emp.last_name}</td><td>${emp.position}</td><td>${emp.department_name}</td><td>${ct.firstClockIn || '--:--'}</td><td>${ct.lastClockOut || '--:--'}</td><td>${pwh.toFixed(2)}h</td><td class="${pLate > 0 ? 'late' : ''}">${pLate} min</td><td>${p25.toFixed(2)}h</td><td>${p35.toFixed(2)}h</td><td class="${emp.record?.status === 'Completo' ? 'complete' : emp.record?.status === 'Ausente' ? 'absent' : ''}">${emp.record?.status || 'Sin marcar'}</td></tr>`; }).join('')}</tbody></table><div class="footer"><p>Generado el ${format(new Date(), "dd/MM/yyyy 'a las' HH:mm")} - Sistema de Recursos Humanos</p></div><script>window.onload=function(){window.print()}</script></body></html>`;
     printWindow.document.write(printContent);
     printWindow.document.close();
   };
@@ -1252,6 +1263,34 @@ export default function AttendanceManagement() {
     }
     return { pendingLateMin, approvedLateMin, pendingOTHours, hasPending };
   };
+
+  // Filtro "Con tardanza": se aplica con los MISMOS minutos que muestra la tabla
+  // (métricas efectivas calculadas desde las marcaciones + tolerancia del horario +
+  // ajustes por compensaciones). Antes usaba el late_minutes almacenado, por lo que
+  // un registro con tardanza ya compensada, dentro de la tolerancia o sin tardanza
+  // respaldada por sus marcaciones aparecía en el filtro mostrando 0 min.
+  if (attendanceFilter === "con_tardanza") {
+    employeesWithRecords = employeesWithRecords.filter((emp) => {
+      const rowDate = emp.displayDate || dateToStringLima(selectedDate);
+      const metrics = getRowMetrics(emp, rowDate);
+      const adjustedLate = applyLateTolerance(
+        metrics.remainingLateMinutes,
+        metrics.toleranceMinutes
+      );
+      const compAdj = getCompensationAdjustments(emp.id, rowDate);
+      const recordCompMin =
+        enableTardinessCompensation &&
+        emp.record?.tardiness_compensation_status === "Activa"
+          ? emp.record.tardiness_compensation_minutes || 0
+          : 0;
+      return (
+        Math.max(
+          0,
+          adjustedLate - compAdj.approvedLateMin - recordCompMin
+        ) > 0
+      );
+    });
+  }
 
   // Obtener horario programado de entrada/salida para mostrar en vacaciones
   const getScheduledTimes = (empId, rowDate) => {
@@ -1500,6 +1539,8 @@ export default function AttendanceManagement() {
                         <SelectItem value="con_tardanza"><div className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-orange-600" />Con tardanza</div></SelectItem>
                       </SelectContent>
                     </Select>
+
+                    {canEditAttendance && <ReconciliationButton accessibleEmployeeIds={accessibleEmployeeIds} />}
 
                     {/* Selector de fecha única */}
                     {!isRangeMode && (
@@ -1782,22 +1823,31 @@ export default function AttendanceManagement() {
                                    // y la nueva compensación manual de tardanza (tardiness_compensation)
                                    const newCompMin = enableTardinessCompensation && emp.record?.tardiness_compensation_status === "Activa"
                                      ? (emp.record.tardiness_compensation_minutes || 0) : 0;
-                                   const totalCompLate = compAdj.pendingLateMin + compAdj.approvedLateMin + newCompMin;
-                                   const netLate = Math.max(0, adjustedLate - totalCompLate);
+                                   // Solo se descuentan las compensaciones APLICADAS (aprobadas y la
+                                   // compensación manual activa). Las solicitudes pendientes aún no son
+                                   // efectivas y la planilla tampoco las descuenta: mismo resultado que
+                                   // el descuento de planilla. El pendiente se muestra como indicador.
+                                   const appliedCompLate = compAdj.approvedLateMin + newCompMin;
+                                   const netLate = Math.max(0, adjustedLate - appliedCompLate);
                                    const lh = Math.floor(netLate / 60);
                                    const lm = netLate % 60;
                                    const lateStr = lh > 0 ? `${lh}h ${lm}m` : `${lm}m`;
                                    return (
                                      <span className="flex flex-col items-center">
                                        <span className={`text-xs font-bold ${netLate > 0 ? 'text-orange-600' : 'text-slate-400'}`}>{lateStr}</span>
-                                       {totalCompLate > 0 && (
-                                         <span className="text-[9px] text-indigo-500 whitespace-nowrap" title={`Compensado: ${totalCompLate} min`}>
-                                           ↓{totalCompLate}m
+                                       {appliedCompLate > 0 && (
+                                         <span className="text-[9px] text-indigo-500 whitespace-nowrap" title={`Compensación aplicada: ${appliedCompLate} min`}>
+                                           ↓{appliedCompLate}m
                                          </span>
                                        )}
                                        {newCompMin > 0 && (
                                          <span className="text-[9px] text-green-600 whitespace-nowrap" title={`Compensación manual: ${newCompMin} min`}>
                                            ✓{newCompMin}m
+                                         </span>
+                                       )}
+                                       {compAdj.pendingLateMin > 0 && (
+                                         <span className="text-[9px] text-amber-600 whitespace-nowrap" title={`Solicitud pendiente de aprobación: ${compAdj.pendingLateMin} min (no aplicada todavía)`}>
+                                           ⏳{compAdj.pendingLateMin}m
                                          </span>
                                        )}
                                      </span>
@@ -2246,8 +2296,8 @@ export default function AttendanceManagement() {
             initialDate={schedulingEmployee._rowDate ? new Date(schedulingEmployee._rowDate + "T00:00:00") : new Date()}
             onClose={() => { setShowScheduleModal(false); setSchedulingEmployee(null); }}
             onSuccess={() => {
-              queryClient.invalidateQueries(["workSchedules"]);
-              queryClient.invalidateQueries(["todayAttendance"]);
+              queryClient.invalidateQueries({ queryKey: ["workSchedules"] });
+              queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
             }}
           />
         )}
@@ -2313,7 +2363,7 @@ export default function AttendanceManagement() {
               setShowCompensationModal(false);
               setCompensationRecord(null);
               setCompensationEmployee(null);
-              queryClient.invalidateQueries(["todayAttendance"]);
+              queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
             }}
           />
         )}

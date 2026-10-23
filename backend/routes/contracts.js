@@ -19,7 +19,7 @@ const UPDATE_PERMISSIONS = ['system.admin', 'contracts.edit'];
 const DELETE_PERMISSIONS = ['system.admin', 'contracts.delete'];
 
 const syncEmployeeCosts = async (client, contract) => {
-  if (!contract?.employee_id || contract.status !== 'Vigente') return;
+  if (!contract?.employee_id) return;
 
   // Elegir el contrato efectivo evita que una renovación futura o un contrato
   // histórico sobrescriban la remuneración actual del trabajador.
@@ -33,7 +33,8 @@ const syncEmployeeCosts = async (client, contract) => {
        FROM (
          SELECT salary, activity_cost, food_cost, transport_cost
            FROM contract
-          WHERE employee_id = $1 AND status = 'Vigente'
+          WHERE employee_id = $1
+            AND COALESCE(lower(status), '') NOT SIMILAR TO '%(rescind|anulad|cancelad)%'
             AND (start_date IS NULL OR start_date <= (NOW() AT TIME ZONE 'America/Lima')::date)
             AND (end_date IS NULL OR end_date >= (NOW() AT TIME ZONE 'America/Lima')::date)
           ORDER BY start_date DESC NULLS LAST, created_date DESC NULLS LAST, id DESC

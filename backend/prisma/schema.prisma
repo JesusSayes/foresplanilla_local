@@ -1467,6 +1467,7 @@ model horasextrasmanual {
   attendance_record_id String?   @db.VarChar(255)
   attendance_date      DateTime? @db.Date
   overtime_destination String?   @default("pago")
+  replaces_record_id   String?
 
   @@index([employee_id], map: "horasextrasmanual_employee_idx")
 }

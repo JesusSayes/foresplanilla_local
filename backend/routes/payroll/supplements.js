@@ -1,7 +1,7 @@
 import express from 'express';
 import pool from '../../config/database.js';
 import { authenticateToken } from '../../middleware/auth.js';
-import { loadAccessContext, requireAnyPermission, attachEmployeeScope, requireEmployeeAccess } from '../../middleware/authorization.js';
+import { loadAccessContext, requireAnyPermission, attachEmployeeScope, requireEmployeeAccess, hasPermission } from '../../middleware/authorization.js';
 import { generate24HexId } from '../../utils/idGenerator.js';
 import { schemas, badRequest, validateSupplement, serializeSupplement, calculateQuinta } from '../../services/payrollSupplements.js';
 
@@ -120,6 +120,16 @@ for (const name of Object.keys(schemas)) {
         if ((record.overtime_destination || 'pago') !== data.overtime_destination) throw badRequest('El destino debe coincidir con la jornada de asistencia');
         if (data.overtime_destination === 'pago' && record.overtime_authorized !== true) throw badRequest('La jornada no tiene HE autorizadas para pago');
         data.attendance_record_id = record.id;
+        if (data.replaces_record_id) {
+          if (!permissions.HorasExtrasManual.update.some(permission => hasPermission(req.access, permission))) throw Object.assign(new Error("No tiene permiso para corregir horas manuales"), { status: 403 });
+          const original = (await db.query('SELECT * FROM public.horasextrasmanual WHERE id = $1 FOR UPDATE', [data.replaces_record_id])).rows[0];
+          if (!original || original.employee_id !== data.employee_id || original.status !== 'Activo') throw badRequest('El registro a reemplazar no está activo o no pertenece al empleado');
+          await assertOpen(db, original);
+          await db.query("UPDATE public.horasextrasmanual SET status = 'Revertido', reverted_by = $2, reverted_date = CURRENT_TIMESTAMP, revert_reason = 'Reemplazado por corrección', updated_date = CURRENT_TIMESTAMP WHERE id = $1", [original.id, req.user.email]);
+        } else {
+          delete data.replaces_record_id;
+        }
+
       }
       return insert(db, name, data);
     });

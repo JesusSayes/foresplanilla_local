@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { entitiesAPI } from "@/api/entitiesClient";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ export default function TardinessCompensationModal({
   );
   const [reason, setReason] = useState(record?.tardiness_compensation_reason || "");
   const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
 
   const originalLate = record?.late_minutes || 0;
   const additionalMinutes = useMemo(() => getAdditionalMinutes(record), [record]);
@@ -66,6 +68,10 @@ export default function TardinessCompensationModal({
         tardiness_compensation_reason: reason.trim(),
         tardiness_compensation_status: "Activa",
       });
+      // Refrescar asistencia y las consultas que alimentan el recálculo de planilla
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["allRecordsForCompMetrics"] });
       toast.success(`Compensación aplicada: ${parsedMinutes} min. Tardanza efectiva: ${previewEffectiveLate} min.`);
       onSuccess();
       onClose();
@@ -83,6 +89,9 @@ export default function TardinessCompensationModal({
         tardiness_compensation_status: "Revertida",
         tardiness_compensation_reason: `${record.tardiness_compensation_reason || ""} [REVERTIDA por ${authorizer?.work_email || authorizer?.email || ""} el ${new Date().toISOString()}]`,
       });
+      queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["allRecordsForCompMetrics"] });
       toast.success("Compensación revertida. La tardanza efectiva vuelve al valor original.");
       onSuccess();
       onClose();
