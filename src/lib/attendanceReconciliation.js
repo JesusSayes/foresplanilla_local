@@ -400,6 +400,7 @@ export const findAbsenceFindings = ({
         recordStatus: record?.status || "",
         isAbsent: !!record?.is_absent,
         hasRecord: !!record,
+        hasMarkings: !!(markings.firstClockIn || markings.lastClockOut),
       });
     }
   }

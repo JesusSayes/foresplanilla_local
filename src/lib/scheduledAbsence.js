@@ -14,7 +14,9 @@ const NO_DISCOUNT_STATUSES = ["Justificado", "Vacaciones", "Compensación", "Per
  * vigente del trabajador y NO tiene ninguna marcación, sin justificación
  * aprobada, vacación, feriado ni permiso sin goce. Incluye las jornadas en las
  * que ni siquiera se generó el registro de asistencia: antes no generaban
- * descuento aunque el trabajador estuviera programado y no haya asistido.
+ * descuento aunque el trabajador estuviera programado y no haya asistido. Una
+ * jornada sin registro solo se descuenta si el trabajador tiene asistencia
+ * registrada en el período.
  *
  * No se descuentan como falta completa las jornadas con marcación incompleta
  * (una entrada sin salida) ni los registros que declaran una falta con
@@ -49,6 +51,19 @@ export const buildPayrollAbsenceDays = ({
     isVacation,
   });
 
+  // Trabajadores con asistencia registrada en el período: solo para ellos se puede
+  // atribuir una falta a una jornada sin registro. Si el trabajador no tiene ningún
+  // registro en el período, la ausencia de registros puede deberse a que las
+  // marcaciones no se generaron, así que no se descuenta de forma automática.
+  const trackedEmployees = new Set(
+    records
+      .filter((record) => {
+        const day = String(record.date || "").slice(0, 10);
+        return day && day >= periodStart && day <= periodEnd;
+      })
+      .map((record) => record.employee_id)
+  );
+
   const result = new Map();
   const addDay = (employeeId, bucket, row) => {
     if (!result.has(employeeId)) result.set(employeeId, { absenceDays: [], reviewDays: [] });
@@ -61,7 +76,8 @@ export const buildPayrollAbsenceDays = ({
 
     const discountable =
       !NO_DISCOUNT_STATUSES.includes(row.recordStatus) &&
-      (row.kind === ABSENCE_KIND.CONFIRMED || !row.hasMarkings);
+      (row.kind === ABSENCE_KIND.CONFIRMED || !row.hasMarkings) &&
+      (row.hasRecord || trackedEmployees.has(row.employeeId));
 
     addDay(row.employeeId, discountable ? "absenceDays" : "reviewDays", row);
   }

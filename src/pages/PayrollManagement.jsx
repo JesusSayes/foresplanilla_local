@@ -37,8 +37,9 @@ import {
   computeMarkedLateMinutes,
   resolveDiscountLateMinutes,
   isConfirmedAbsence,
-  DEFAULT_LATE_TOLERANCE_MINUTES,
 } from "@/lib/attendanceReconciliation";
+import { createScheduleDayResolver } from "@/lib/workScheduleResolver";
+import { buildPayrollAbsenceDays } from "@/lib/scheduledAbsence";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 import {
   _normStr,
@@ -363,6 +364,30 @@ export default function PayrollManagement() {
   });
   const compensationIncidents = compensationIncidentsQuery.data || [];
 
+  // Feriados y justificaciones aprobadas: evitan descontar como falta las jornadas
+  // sin marcaciones que ya están cubiertas (feriado, descanso médico, comisión, etc.).
+  const holidaysQuery = useQuery({
+    queryKey: ["payrollHolidays"],
+    queryFn: async () => {
+      const res = await withRetry(() => base44.entities.Holiday.list("-date", 500));
+      return Array.isArray(res) ? res : (res?.items || []);
+    },
+    staleTime: 0,
+  });
+
+  const approvedIncidentsQuery = useQuery({
+    queryKey: ["payrollApprovedIncidents"],
+    queryFn: async () => {
+      const res = await withRetry(() => base44.entities.AttendanceIncident.filter(
+        { status: "Aprobada" },
+        "-incident_date",
+        2000
+      ));
+      return Array.isArray(res) ? res : (res?.items || []);
+    },
+    staleTime: 0,
+  });
+
   // Cuotas de préstamo pendientes del período: se descuentan automáticamente en
   // la planilla mensual (una cuota por mes y por préstamo activo).
   const loanInstallmentsQuery = useQuery({
@@ -615,6 +640,9 @@ export default function PayrollManagement() {
         ["quintaCategoriaCalculos", selectedYear],
         ["loanInstallments", selectedMonth, selectedYear],
         ["activeLoans"],
+        ["allWorkSchedules"],
+        ["payrollHolidays"],
+        ["payrollApprovedIncidents"],
       ];
       await Promise.all(criticalKeys.map(key => queryClient.refetchQueries({ queryKey: key, exact: true })));
 
@@ -639,6 +667,9 @@ export default function PayrollManagement() {
       const quintaCategoriaCalculos = queryClient.getQueryData(["quintaCategoriaCalculos", selectedYear]) ?? [];
       const loanInstallments = queryClient.getQueryData(["loanInstallments", selectedMonth, selectedYear]) ?? [];
       const activeLoansData = queryClient.getQueryData(["activeLoans"]) ?? [];
+      const workSchedules = queryClient.getQueryData(["allWorkSchedules"]) ?? [];
+      const holidayRecords = queryClient.getQueryData(["payrollHolidays"]) ?? [];
+      const approvedIncidents = queryClient.getQueryData(["payrollApprovedIncidents"]) ?? [];
       // Cuotas del período agrupadas por empleado (solo de préstamos activos)
       const loanInstallmentsByEmployee = buildInstallmentsByEmployee(loanInstallments, activeLoansData);
 
@@ -745,6 +776,8 @@ export default function PayrollManagement() {
     const contractConflicts = [];
     const noApprovedContractWorkers = [];
     const absenceReviewWarnings = [];
+    // Detalle de las faltas descontadas, para que RR. HH. pueda verificarlas.
+    const absenceDiscountSummary = [];
 
     // Helper: contrato APROBADO (estado "Vigente") que corresponde al período.
     //   1. Contrato aprobado que solapa el período (inicio ≤ fin mes, fin ≥ inicio mes o nulo)
@@ -835,12 +868,55 @@ export default function PayrollManagement() {
       }));
     }
 
+    // ── Período de asistencia y faltas por jornadas programadas sin marcaciones ──
+    // El descuento por faltas y tardanzas se calcula SIEMPRE dentro del período de
+    // asistencia: si no se indicó uno (recalcular desde la vista previa) se usa el mes.
+    const defaultPeriod = getDefaultPeriod();
+    const attendanceFrom = periodFrom || defaultPeriod.dateFrom;
+    const attendanceTo = periodTo || defaultPeriod.dateTo;
+
+    // Horario aplicable por trabajador y fecha (misma resolución que el control de
+    // asistencia): horario del empleado vigente a esa fecha, con respaldo del de su
+    // departamento. Fuente única para tardanzas y faltas.
+    const employeeById = new Map(enrichedEmployees.map(e => [e.id, e]));
+    const resolveScheduleDay = createScheduleDayResolver({
+      workSchedules,
+      getEmployee: (id) => employeeById.get(id),
+    });
+
+    const holidayDates = new Set(
+      holidayRecords.map(h => String(h.date || "").slice(0, 10)).filter(Boolean)
+    );
+    const approvedIncidentsByKey = new Map();
+    for (const incident of approvedIncidents) {
+      const key = `${incident.employee_id}|${String(incident.incident_date || "").slice(0, 10)}`;
+      if (!approvedIncidentsByKey.has(key)) approvedIncidentsByKey.set(key, []);
+      approvedIncidentsByKey.get(key).push(incident);
+    }
+
+    // Jornadas programadas del período sin ninguna marcación: se descuentan como
+    // inasistencia, incluidos los días en que no se generó registro de asistencia.
+    const absenceDaysByEmployee = buildPayrollAbsenceDays({
+      employees: enrichedEmployees,
+      records: attendanceRecords,
+      getScheduleDay: resolveScheduleDay,
+      approvedIncidentsByKey,
+      periodStart: attendanceFrom,
+      periodEnd: attendanceTo,
+      isHoliday: (dateStr) => holidayDates.has(dateStr),
+      isVacation: (employeeId, dateStr) => approvedVacations.some(vacation =>
+        vacation.employee_id === employeeId &&
+        String(vacation.start_date || "").slice(0, 10) <= dateStr &&
+        String(vacation.end_date || "").slice(0, 10) >= dateStr
+      ),
+    });
+
     const payslipsData = await mapWithConcurrency(enrichedEmployees, async (emp) => {
       // Preparar datos de asistencia
       const empAttendance = attendanceRecords.filter(r => {
         if (r.employee_id !== emp.id) return false;
-        if (periodFrom && r.date < periodFrom) return false;
-        if (periodTo && r.date > periodTo) return false;
+        if (r.date < attendanceFrom) return false;
+        if (r.date > attendanceTo) return false;
         return true;
       });
       // ── DÍAS LABORADOS (convención Perú: el mes se computa como 30 días) ──
@@ -1101,36 +1177,10 @@ export default function PayrollManagement() {
         record => !isCoveredByApprovedVacation(emp.id, record.date)
       );
 
-      // Horario aplicable del empleado en una fecha: tolerancia, refrigerio y turnos
-      // nocturnos, igual que en el control de asistencia. El horario del empleado
-      // tiene prioridad sobre el de departamento y se respeta su vigencia.
-      const scheduleDayFor = (dateStr) => {
-        const isActive = (ws) => ws.is_active !== false;
-        const pickValid = (list) => {
-          const valid = list.filter(ws => {
-            const from = ws.effective_from || "0000-01-01";
-            const to = ws.effective_to || "9999-12-31";
-            return from <= dateStr && to >= dateStr;
-          });
-          valid.sort((a, b) => String(b.effective_from || "0000-01-01").localeCompare(String(a.effective_from || "0000-01-01")));
-          return valid[0] || null;
-        };
-        const schedule =
-          pickValid(workSchedules.filter(ws => ws.employee_id === emp.id && isActive(ws))) ||
-          pickValid(workSchedules.filter(ws => !ws.employee_id && isActive(ws) &&
-            (ws.department_name === emp.department_name || (ws.departments || []).includes(emp.department_name))));
-        if (!schedule) return null;
-        const dow = new Date(dateStr + "T00:00:00").getDay();
-        const stMap = ["sunday_start","monday_start","tuesday_start","wednesday_start","thursday_start","friday_start","saturday_start"];
-        const enMap = ["sunday_end","monday_end","tuesday_end","wednesday_end","thursday_end","friday_end","saturday_end"];
-        return {
-          start: schedule[stMap[dow]] || null,
-          end: schedule[enMap[dow]] || null,
-          tolerance_minutes: schedule.tolerance_minutes ?? DEFAULT_LATE_TOLERANCE_MINUTES,
-          breakMinutes: schedule.break_duration_minutes ?? 0,
-          breakStart: schedule.break_start || null,
-        };
-      };
+      // Horario aplicable del empleado en una fecha (tolerancia, refrigerio y turnos
+      // nocturnos), resuelto por el helper compartido con la detección de faltas:
+      // horario del empleado vigente a esa fecha, con respaldo del departamento.
+      const scheduleDayFor = (dateStr) => resolveScheduleDay(emp.id, dateStr);
 
       // Minutos de tardanza respaldados por las marcaciones reales, aplicando la
       // tolerancia del horario vigente. Devuelve null si el registro no permite el
@@ -1176,17 +1226,30 @@ export default function PayrollManagement() {
 
       // La tolerancia ya está aplicada: cualquier minuto efectivo es descontable.
       const lateRecords = attendanceForDiscounts.filter(r => effectiveLateMinutes(r) > 0);
-      // Inasistencias: solo se descuenta la falta CONFIRMADA (is_absent y estado
-      // "Ausente" coherentes). Un día cubierto, un descanso o una marcación
-      // incompleta no generan descuento por falta injustificada.
+      // Inasistencias: la falta confirmada (is_absent + estado "Ausente") y las
+      // jornadas programadas del período SIN ninguna marcación, incluidas las que no
+      // tienen registro de asistencia generado. Un día cubierto (feriado, vacación,
+      // justificación, permiso sin goce) o con marcación incompleta no se descuenta
+      // como falta completa: queda para regularización.
       const absentRecords = attendanceForDiscounts.filter(r => isConfirmedAbsence(r));
-      const absenceReviewRecords = attendanceForDiscounts.filter(r =>
-        (r.is_absent || r.status === "Ausente") && !isConfirmedAbsence(r)
-      );
-      if (absenceReviewRecords.length > 0) {
+      const absenceInfo = absenceDaysByEmployee.get(emp.id) || { absenceDays: [], reviewDays: [] };
+      // Los días ya contados como falta confirmada por registro se excluyen de la
+      // detección por jornada para que ese día se descuente una sola vez.
+      const confirmedAbsenceDates = new Set(absentRecords.map(r => normDate(r.date)));
+      const scheduledAbsenceDays = absenceInfo.absenceDays.filter(day => !confirmedAbsenceDates.has(day.date));
+      const absenceDaysToDiscount = [...absentRecords, ...scheduledAbsenceDays];
+      if (absenceInfo.reviewDays.length > 0) {
         absenceReviewWarnings.push(
-          `${emp.employee_code} ${emp.first_name} ${emp.last_name}: ${absenceReviewRecords.length} día(s) con datos de falta contradictorios (${absenceReviewRecords.slice(0, 3).map(r => normDate(r.date)).join(", ")})`
+          `${emp.employee_code} ${emp.first_name} ${emp.last_name}: ${absenceInfo.reviewDays.length} día(s) por regularizar (${absenceInfo.reviewDays.slice(0, 3).map(d => d.date).join(", ")})`
         );
+      }
+      if (absenceDaysToDiscount.length > 0) {
+        absenceDiscountSummary.push({
+          employee_code: emp.employee_code || "",
+          employee_name: `${emp.first_name} ${emp.last_name}`,
+          days: absenceDaysToDiscount.length,
+          dates: absenceDaysToDiscount.map(d => normDate(d.date)).filter(Boolean),
+        });
       }
       // ── Descuento por salida anticipada (concepto independiente) ──
       // Sin tolerancia: descuento desde el primer minuto. Excluye registros
@@ -1211,8 +1274,9 @@ export default function PayrollManagement() {
       const totalLateMinutes = lateRecords.reduce((sum, r) => sum + effectiveLateMinutes(r), 0);
       const hourlyRate = dailyRate > 0 ? roundMoney(dailyRate / 8) : 0;
       const tardinessDiscount = payrollType === "Quincenal" ? 0 : roundMoney(hourlyRate * (totalLateMinutes / 60));
-      // Descuento por inasistencias: un día de salario por cada falta completa.
-      const absenceDiscount = payrollType === "Quincenal" ? 0 : roundMoney(absentRecords.length * dailyRate);
+      // Descuento por inasistencias: un día de salario por cada falta completa
+      // (falta confirmada o jornada programada sin marcaciones).
+      const absenceDiscount = payrollType === "Quincenal" ? 0 : roundMoney(absenceDaysToDiscount.length * dailyRate);
       // ── Descuento por salida anticipada ──
       // Usa el mismo valor hora que tardanzas (salario diario / 8).
       const totalEarlyDepartureMinutes = earlyDepartureRecords.reduce((sum, r) => {
@@ -1229,7 +1293,7 @@ export default function PayrollManagement() {
       const extraContext = {
         derechohabientes: empDerechohabientes,
         late_records: lateRecords,
-        absent_records: absentRecords,
+        absent_records: absenceDaysToDiscount,
         early_departure_records: earlyDepartureRecords,
         afp: allAfps.find(a => a.id === emp.afp_id) || null,
         enable_tardiness_compensation: enableTardinessCompensation,
@@ -1329,8 +1393,8 @@ export default function PayrollManagement() {
         employee_code: emp.employee_code,
         department: emp.department_name,
         period: `${format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: es })}`,
-        attendance_period_start: periodFrom,
-        attendance_period_end: periodTo,
+        attendance_period_start: attendanceFrom,
+        attendance_period_end: attendanceTo,
         month: selectedMonth,
         year: selectedYear,
         payroll_type: payrollType,
@@ -1338,7 +1402,7 @@ export default function PayrollManagement() {
         advance_payment_id: advancePaymentId,
         worked_days: workedDays,
         subsidized_days: subsidizedDays,
-        non_worked_days: payrollType === "Quincenal" ? 0 : absentRecords.length,
+        non_worked_days: payrollType === "Quincenal" ? 0 : absenceDaysToDiscount.length,
         regular_hours: attendanceData.regular_hours,
         overtime_hours: roundMoney(overtimeHours25 + overtimeHours35),
         overtime_hours_25: roundMoney(overtimeHours25),
@@ -1408,9 +1472,16 @@ export default function PayrollManagement() {
           { duration: 15000 }
         );
       }
+      if (absenceDiscountSummary.length > 0) {
+        const totalAbsenceDays = absenceDiscountSummary.reduce((sum, item) => sum + item.days, 0);
+        toast.info(
+          `ℹ️ Descuento por faltas: ${totalAbsenceDays} día(s) sin marcaciones en ${absenceDiscountSummary.length} trabajador(es). ${absenceDiscountSummary.slice(0, 3).map(item => `${item.employee_code} ${item.employee_name}: ${item.days} día(s) [${item.dates.slice(0, 6).join(", ")}]`).join(" | ")}`,
+          { duration: 20000 }
+        );
+      }
       if (absenceReviewWarnings.length > 0) {
         toast.warning(
-          `⚠️ ${absenceReviewWarnings.length} trabajador(es) con días de ausencia inconsistentes: no se descontaron. Use "Regularizar asistencia" para revisarlos. ${absenceReviewWarnings.slice(0, 3).join(" | ")}`,
+          `⚠️ ${absenceReviewWarnings.length} trabajador(es) con jornadas por regularizar: no se descontaron como falta (marcación incompleta o cobertura pendiente). Use "Regularizar asistencia" para revisarlas. ${absenceReviewWarnings.slice(0, 3).join(" | ")}`,
           { duration: 12000 }
         );
       }
@@ -1844,7 +1915,10 @@ export default function PayrollManagement() {
                         onRemoveConcept={(idx) => setAdditionalConcepts(additionalConcepts.filter((_, i) => i !== idx))}
                         onRemoveEmployee={() => handleRemoveEmployee(payslip.employee_id)}
                         onViewPayslip={() => setPreviewPayslip(payslip)}
-                        onRecalculate={() => calculatePayroll()}
+                        onRecalculate={() => calculatePayroll(
+                          previewData[0]?.attendance_period_start,
+                          previewData[0]?.attendance_period_end
+                        )}
                       />
                     ))}
                   </div>

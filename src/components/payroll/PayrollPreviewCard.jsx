@@ -153,6 +153,13 @@ export default function PayrollPreviewCard({
         </div>
       )}
 
+      {payslip.non_worked_days > 0 && (
+        <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
+          <strong>Descuento por faltas:</strong> {payslip.non_worked_days} día(s) sin marcaciones
+          {canViewAmounts ? ` — S/ ${(payslip.absence_discount || 0).toFixed(2)}` : ""}
+        </div>
+      )}
+
       {hasAdditionalConcepts && (
         <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
           ✓ {empConcepts.length} concepto(s) adicional(es) aplicado(s)
