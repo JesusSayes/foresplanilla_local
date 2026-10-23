@@ -198,6 +198,86 @@ export const create = async (req, res) => {
   }
 };
 
+// La solicitud completa y la edición se confirman juntas; un fallo conserva el estado anterior.
+export const saveCompensation = async (req, res) => {
+  try {
+    const { incidents, replaceIds = [] } = req.body || {};
+    const first = incidents?.[0];
+    if (!Array.isArray(incidents) || !incidents.length || incidents.length > 100 ||
+        !Array.isArray(replaceIds) || replaceIds.some(id => typeof id !== 'string') ||
+        !first?.employee_id || typeof first.codigo_solicitud !== 'string' || !first.codigo_solicitud) {
+      return res.status(400).json({ error: 'Solicitud de compensación inválida' });
+    }
+    if (!canAccessEmployee(req, first.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
+    if (replaceIds.length && !['attendance.edit', 'attendance.approve_compensations', 'attendance.manage']
+      .some(permission => hasPermission(req.access, permission))) {
+      return res.status(403).json({ error: 'Sin permiso para editar compensaciones' });
+    }
+    if (replaceIds.length) {
+      const allowedIds = await resolveAccessibleEmployeeIds(req.access,
+        ['attendance.edit', 'attendance.approve_compensations', 'attendance.manage']);
+      if (allowedIds !== null && !allowedIds.includes(first.employee_id)) {
+        return res.status(403).json({ error: 'Sin permiso para editar compensaciones de esta sede' });
+      }
+    }
+    const rows = incidents.map(item => {
+      const incidentDate = toPrismaDate(item.incident_date);
+      if (!incidentDate || item.employee_id !== first.employee_id || item.codigo_solicitud !== first.codigo_solicitud ||
+          item.incident_type !== 'Compensación de Tardanza' || item.status !== 'Pendiente') {
+        throw Object.assign(new Error('Las fechas deben pertenecer a la misma solicitud pendiente'), { status: 400 });
+      }
+      return {
+        id: generate24HexId(), employee_id: first.employee_id,
+        attendance_record_id: item.attendance_record_id, incident_date: incidentDate,
+        incident_type: 'Compensación de Tardanza', status: 'Pendiente',
+        codigo_solicitud: first.codigo_solicitud, justification: item.justification,
+        authorizer_id: item.authorizer_id, authorizer_name: item.authorizer_name,
+        late_minutes_to_adjust: Number(item.late_minutes_to_adjust || 0),
+        hours_to_adjust: Number(item.hours_to_adjust || 0), full_day_justification: false,
+      };
+    });
+    const late = rows.reduce((sum, row) => sum + row.late_minutes_to_adjust, 0);
+    const overtime = rows.reduce((sum, row) => sum + Math.round(row.hours_to_adjust * 60), 0);
+    if (late <= 0 || late !== overtime || new Set(rows.map(row => row.attendance_record_id)).size !== rows.length) {
+      return res.status(400).json({ error: 'La tardanza y las HE deben sumar los mismos minutos, sin fechas duplicadas' });
+    }
+    const saved = await prisma.$transaction(async tx => {
+      const existing = await tx.attendance_incident.findMany({ where: { codigo_solicitud: first.codigo_solicitud } });
+      if (existing.length) {
+        // Reintento tras perder la respuesta: no volver a crear ni modificar lo registrado.
+        if (existing.some(row => row.employee_id !== first.employee_id)) {
+          throw Object.assign(new Error('Código de solicitud no disponible'), { status: 409 });
+        }
+        return existing;
+      }
+      if (replaceIds.length) {
+        const previous = await tx.attendance_incident.findMany({ where: { id: { in: replaceIds } } });
+        if (previous.length !== new Set(replaceIds).size || previous.some(row =>
+          row.employee_id !== first.employee_id || row.incident_type !== 'Compensación de Tardanza' ||
+          !['Pendiente', 'Rechazada'].includes(row.status))) {
+          throw Object.assign(new Error('La solicitud cambió o ya fue aprobada; actualice antes de editar'), { status: 409 });
+        }
+        await tx.attendance_incident.deleteMany({ where: { id: { in: replaceIds } } });
+      }
+      const result = [];
+      for (const data of rows) {
+        const record = await validateCompensationBalance(tx, data);
+        result.push(await tx.attendance_incident.create({ data }));
+        await tx.attendance_record.update({ where: { id: record.id }, data: {
+          status: 'Compensación',
+          notes: (record.notes ? record.notes + ' | ' : '') +
+            `Compensación solicitada: ${data.late_minutes_to_adjust} min tardanza, ${Math.round(data.hours_to_adjust * 60)} min HE`,
+        } });
+      }
+      return result;
+    }, { isolationLevel: 'Serializable' });
+    res.status(201).json(saved.map(serializeIncident));
+  } catch (error) {
+    res.status(error.code === 'P2034' ? 409 : error.status || 500).json({ error: error.code === 'P2034'
+      ? 'El saldo cambió durante la solicitud. Actualice e intente nuevamente.' : error.message });
+  }
+};
+
 export const update = async (req, res) => {
   try {
     const existing = await prisma.attendance_incident.findUnique({ where: { id: req.params.id } });
@@ -262,6 +342,7 @@ const controller = {
   getAll,
   getById,
   create,
+  saveCompensation,
   update,
   delete: remove, // aquí sí usamos la clave "delete"
   filter,

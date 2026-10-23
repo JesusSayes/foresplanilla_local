@@ -12,7 +12,11 @@
     },
     "commission_percentage": {
       "type": "number",
-      "description": "Porcentaje de comisi\u00f3n (%)"
+      "description": "Porcentaje de comisi\u00f3n por flujo (%)"
+    },
+    "mixed_commission_percentage": {
+      "type": "number",
+      "description": "Porcentaje de comisi\u00f3n mixta (%), aplicable a los trabajadores con tipo de comisi\u00f3n 'Mixta'. Si no est\u00e1 configurado, la boleta del trabajador con comisi\u00f3n Mixta no se genera hasta completarlo."
     },
     "obligatory_contribution_percentage": {
       "type": "number",

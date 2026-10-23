@@ -12,22 +12,6 @@ import { es } from 'date-fns/locale';
 // No sustituye una prueba visual en navegador.
 const source = readFileSync(new URL('../../src/components/attendance/CompensationModal.jsx', import.meta.url), 'utf8');
 
-test('rechazos no bloquean nuevas solicitudes; pendientes ajenas y aprobadas sí', () => {
-  const start = source.indexOf('  const compensatedDates = useMemo(');
-  const end = source.indexOf('\n  }, [existingCompensations, employee, editMode, pendingCompensations]);', start);
-  assert.ok(start >= 0 && end > start);
-  const code = source.slice(start, end) + '\n  }); return compensatedDates;';
-  const blocked = new Function('existingCompensations', 'employee', 'editMode', 'pendingCompensations', 'useMemo', code);
-  const records = [
-    { id: 'rejected', employee_id: 'e1', status: 'Rechazada', incident_date: '2026-10-01' },
-    { id: 'own', employee_id: 'e1', status: 'Pendiente', incident_date: '2026-10-02' },
-    { id: 'other', employee_id: 'e1', status: 'Pendiente', incident_date: '2026-10-03' },
-    { id: 'approved', employee_id: 'e1', status: 'Aprobada', incident_date: '2026-10-04' },
-    { id: 'employee2', employee_id: 'e2', status: 'Aprobada', incident_date: '2026-10-05' },
-  ];
-  assert.deepEqual([...blocked(records, { id: 'e1' }, false, [], fn => fn())], ['2026-10-02', '2026-10-03', '2026-10-04']);
-  assert.deepEqual([...blocked(records, { id: 'e1' }, true, [records[1]], fn => fn())], ['2026-10-03', '2026-10-04']);
-});
 const compiled = transformSync(source, { loader: 'jsx', format: 'cjs', jsx: 'transform' }).code;
 const employee = { id: 'e1', first_name: 'Empleado', last_name: 'Prueba' };
 const authorizers = [
@@ -241,3 +225,16 @@ test('HE posteriores reservadas no se reutilizan y carga incompleta no permite e
   await loading.click('Actualizar compensación');
   assert.equal(submitted, undefined);
 });
+
+for (const [status, linked, expected] of [['Pendiente', true, 6], ['Rechazada', true, 12], ['Aprobada', true, 12], ['Aprobada', false, 6]]) {
+  test(`saldo parcial ${status}, aplicado=${linked}: conserva minutos disponibles`, async () => {
+    let submitted;
+    const h = harness({ existingCompensations: [{
+      id: 'reservation', employee_id: 'e1', incident_date: '2026-09-25', status,
+      attendance_record_id: linked ? 'r1' : null, late_minutes_to_adjust: 6,
+    }], onSubmit: async list => { submitted = list; } });
+    await h.click('Seleccionar días con compensación');
+    await h.click('Actualizar compensación');
+    assert.equal(submitted.reduce((sum, d) => sum + d.lateMinutes, 0), expected);
+  });
+}

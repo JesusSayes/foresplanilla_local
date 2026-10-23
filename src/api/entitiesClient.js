@@ -77,7 +77,13 @@ export const entitiesAPI = {
   },
   ContractRenewalRule: createEntityAPI('/api/contracts/renewal-rules'),
   AttendanceRecord: createEntityAPI('/api/attendance/records'),
-  AttendanceIncident: createEntityAPI('/api/attendance/incidents'),
+  AttendanceIncident: {
+    ...createEntityAPI('/api/attendance/incidents'),
+    saveCompensation: async (incidents, replaceIds = []) => {
+      const response = await localClient.post('/api/attendance/incidents/compensation', { incidents, replaceIds });
+      return response.data;
+    },
+  },
   AttendanceEditRequest: {
     ...createEntityAPI('/api/attendance/edit-requests'),
     approve: async (id, data = {}) => {
