@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,14 @@ import { parseDateLima, dateToStringLima } from "@/lib/dateUtils";
 import { computeScheduledHours, computeScheduledHoursForPeriod } from "@/lib/attendanceMetrics";
 import { toast } from "sonner";
 import CompensationModal from "./CompensationModal";
+import {
+  buildCompensationIncidents,
+  markRecordsAsCompensated,
+  revertCompensatedRecords,
+  deleteCompensationsByCode,
+  deleteCompensations,
+  restoreCompensations,
+} from "@/lib/compensationIncidents";
 
 const PAGE_SIZE = 25;
 
@@ -83,6 +91,9 @@ export default function CompensationPanel({
   const [submitting, setSubmitting] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [pendingCompsForEdit, setPendingCompsForEdit] = useState([]);
+  // Código de solicitud estable durante la sesión del modal: un reintento reemplaza lo
+  // que haya quedado de un intento parcial en lugar de duplicarlo.
+  const pendingCodeRef = useRef(null);
 
   const selectedMonthDate = useMemo(() => {
     return new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
@@ -340,6 +351,7 @@ export default function CompensationPanel({
   }, [existingCompensations]);
 
   const handleOpenModal = (stat) => {
+    pendingCodeRef.current = null;
     setSelectedEmployee(stat.employee);
     setEditMode(false);
     setPendingCompsForEdit([]);
@@ -348,133 +360,108 @@ export default function CompensationPanel({
 
   const handleOpenEditModal = (stat) => {
     const editable = editableCompsByEmployee.get(stat.employee_id) || [];
+    pendingCodeRef.current = null;
     setSelectedEmployee(stat.employee);
     setEditMode(true);
     setPendingCompsForEdit(editable);
     setShowModal(true);
   };
 
-  const handleSubmitCompensation = async (selectedList, reason, authorizer) => {
-    setSubmitting(true);
-    try {
-      const codigoSolicitud = `COMP-${selectedEmployee.id}-${Date.now()}`;
-      const incidentsToCreate = selectedList.map((item) => ({
-        employee_id: selectedEmployee.id,
-        attendance_record_id: item.recordId,
-        incident_date: item.date,
-        incident_type: "Compensación de Tardanza",
-        justification: reason,
-        late_minutes_to_adjust: item.lateMinutes || 0,
-        hours_to_adjust: (item.overtimeMinutes || 0) / 60,
-        full_day_justification: false,
-        justified_time_start: item.record?.clock_in || null,
-        justified_time_end: item.record?.clock_out || null,
-        authorizer_id: authorizer.id,
-        authorizer_name: `${authorizer.first_name} ${authorizer.last_name}`,
-        codigo_solicitud: codigoSolicitud,
-        status: "Pendiente",
-      }));
-
-      if (incidentsToCreate.length > 0) {
-        await base44.entities.AttendanceIncident.bulkCreate(incidentsToCreate);
-      }
-
-      for (const item of selectedList) {
-        if (item.recordId) {
-          await base44.entities.AttendanceRecord.update(item.recordId, {
-            status: "Compensación",
-            notes:
-              (item.record?.notes ? item.record.notes + " | " : "") +
-              `Compensación solicitada: ${item.lateMinutes || 0} min tardanza, ${
-                item.overtimeMinutes || 0
-              } min HE`,
-          });
-        }
-      }
-
-      queryClient.invalidateQueries(["compensationIncidents"]);
-      queryClient.invalidateQueries(["compensationRecords"]);
-      queryClient.invalidateQueries(["compensationPrevMonthRecords"]);
-      queryClient.invalidateQueries(["allIncidents"]);
-      queryClient.invalidateQueries(["todayAttendance"]);
-      // Datos usados para recalcular la planilla y los saldos de HE/tardanza
-      queryClient.invalidateQueries(["attendanceRecords"]);
-      queryClient.invalidateQueries(["allRecordsForCompMetrics"]);
-      queryClient.invalidateQueries(["manualOvertime"]);
-
-      toast.success(
-        `✓ Compensación registrada para ${selectedList.length} día(s)`
-      );
-      setShowModal(false);
-      setSelectedEmployee(null);
-    } catch (error) {
-      toast.error("Error al registrar compensación: " + (error.message || ""));
-      throw error;
-    } finally {
-      setSubmitting(false);
-    }
+  // Refresca los datos que alimentan los saldos de HE/tardanza de compensaciones.
+  const refreshCompensationData = () => {
+    queryClient.invalidateQueries({ queryKey: ["compensationIncidents"] });
+    queryClient.invalidateQueries({ queryKey: ["compensationRecords"] });
+    queryClient.invalidateQueries({ queryKey: ["compensationPrevMonthRecords"] });
+    queryClient.invalidateQueries({ queryKey: ["allIncidents"] });
+    queryClient.invalidateQueries({ queryKey: ["todayAttendance"] });
+    queryClient.invalidateQueries({ queryKey: ["attendanceRecords"] });
+    queryClient.invalidateQueries({ queryKey: ["allRecordsForCompMetrics"] });
+    queryClient.invalidateQueries({ queryKey: ["manualOvertime"] });
   };
 
-  const handleEditCompensation = async (selectedList, reason, authorizer) => {
+  // La solicitud se registra completa o no se registra nada: los incidentes se crean en
+  // una sola operación y, si el marcado de los registros falla, se revierte todo. El
+  // código de solicitud se mantiene si el guardado falla, de modo que el reintento
+  // reemplaza lo que haya quedado en lugar de duplicarlo.
+  const handleSubmitCompensation = async (selectedList, reason, authorizer) => {
     setSubmitting(true);
+    const codigoSolicitud =
+      pendingCodeRef.current || `COMP-${selectedEmployee.id}-${Date.now()}`;
+    pendingCodeRef.current = codigoSolicitud;
+    let appliedStatus = [];
     try {
-      const toDelete = editableCompsByEmployee.get(selectedEmployee.id) || [];
-      for (const comp of toDelete) {
-        await base44.entities.AttendanceIncident.delete(comp.id);
-      }
-
-      const codigoSolicitud = `COMP-${selectedEmployee.id}-${Date.now()}`;
-      const incidentsToCreate = selectedList.map((item) => ({
-        employee_id: selectedEmployee.id,
-        attendance_record_id: item.recordId,
-        incident_date: item.date,
-        incident_type: "Compensación de Tardanza",
-        justification: reason,
-        late_minutes_to_adjust: item.lateMinutes || 0,
-        hours_to_adjust: (item.overtimeMinutes || 0) / 60,
-        full_day_justification: false,
-        justified_time_start: item.record?.clock_in || null,
-        justified_time_end: item.record?.clock_out || null,
-        authorizer_id: authorizer.id,
-        authorizer_name: `${authorizer.first_name} ${authorizer.last_name}`,
-        codigo_solicitud: codigoSolicitud,
-        status: "Pendiente",
-      }));
-
-      if (incidentsToCreate.length > 0) {
-        await base44.entities.AttendanceIncident.bulkCreate(incidentsToCreate);
-      }
-
-      for (const item of selectedList) {
-        if (item.recordId && item.record?.status !== "Compensación") {
-          await base44.entities.AttendanceRecord.update(item.recordId, {
-            status: "Compensación",
-          });
-        }
-      }
-
-      queryClient.invalidateQueries(["compensationIncidents"]);
-      queryClient.invalidateQueries(["compensationRecords"]);
-      queryClient.invalidateQueries(["compensationPrevMonthRecords"]);
-      queryClient.invalidateQueries(["allIncidents"]);
-      queryClient.invalidateQueries(["todayAttendance"]);
-      queryClient.invalidateQueries(["attendanceRecords"]);
-      queryClient.invalidateQueries(["allRecordsForCompMetrics"]);
-      queryClient.invalidateQueries(["manualOvertime"]);
-
-      toast.success(
-        `✓ Compensación actualizada (${selectedList.length} día(s))`
+      await deleteCompensationsByCode(codigoSolicitud);
+      await base44.entities.AttendanceIncident.bulkCreate(
+        buildCompensationIncidents({
+          selectedList,
+          employeeId: selectedEmployee.id,
+          codigoSolicitud,
+          reason,
+          authorizer,
+        })
       );
-      setShowModal(false);
-      setSelectedEmployee(null);
-      setEditMode(false);
-      setPendingCompsForEdit([]);
+      appliedStatus = await markRecordsAsCompensated(selectedList);
     } catch (error) {
-      toast.error("Error al actualizar compensación: " + (error.message || ""));
+      await revertCompensatedRecords(appliedStatus);
+      await deleteCompensationsByCode(codigoSolicitud, { ignoreErrors: true });
+      // Ante error los saldos se actualizan sin cerrar el modal, que conserva el
+      // formulario para reintentar.
+      refreshCompensationData();
       throw error;
     } finally {
       setSubmitting(false);
     }
+
+    pendingCodeRef.current = null;
+    refreshCompensationData();
+    toast.success(
+      `✓ Compensación registrada para ${selectedList.length} día(s)`
+    );
+    // El modal permanece abierto con los saldos actualizados, para poder usar el saldo
+    // restante de las jornadas ya utilizadas parcialmente sin reabrirlo.
+    return { registered: selectedList.length, codigoSolicitud };
+  };
+
+  // Edición: la solicitud anterior se reemplaza por la nueva. Si el guardado falla, la
+  // anterior se restaura tal como estaba (no se pierde) y la nueva se deshace completa.
+  const handleEditCompensation = async (selectedList, reason, authorizer) => {
+    setSubmitting(true);
+    const previousComps = pendingCompsForEdit;
+    const codigoSolicitud = `COMP-${selectedEmployee.id}-${Date.now()}`;
+    let appliedStatus = [];
+    try {
+      await deleteCompensations({
+        codes: previousComps.map((c) => c.codigo_solicitud),
+        ids: previousComps.filter((c) => !c.codigo_solicitud).map((c) => c.id),
+      });
+      await base44.entities.AttendanceIncident.bulkCreate(
+        buildCompensationIncidents({
+          selectedList,
+          employeeId: selectedEmployee.id,
+          codigoSolicitud,
+          reason,
+          authorizer,
+        })
+      );
+      appliedStatus = await markRecordsAsCompensated(selectedList, { withNotes: false });
+    } catch (error) {
+      await revertCompensatedRecords(appliedStatus);
+      await deleteCompensationsByCode(codigoSolicitud, { ignoreErrors: true });
+      await restoreCompensations(previousComps);
+      refreshCompensationData();
+      throw error;
+    } finally {
+      setSubmitting(false);
+    }
+
+    refreshCompensationData();
+    toast.success(
+      `✓ Compensación actualizada (${selectedList.length} día(s))`
+    );
+    setShowModal(false);
+    setSelectedEmployee(null);
+    setEditMode(false);
+    setPendingCompsForEdit([]);
   };
 
   const canManage =
