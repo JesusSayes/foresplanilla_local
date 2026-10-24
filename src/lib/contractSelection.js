@@ -86,7 +86,9 @@ export const pickContractForPeriod = (contracts, periodStartStr, periodEndStr) =
 
   if (overlapping.length > 0) {
     const contract = overlapping.find(isApprovedContract) || overlapping[0];
-    const contractApproved = isApprovedContract(contract);
+    // Una renovación no invalida el contrato histórico que cubre este período.
+    const contractApproved = isApprovedContract(contract) ||
+      String(contract?.status || "").trim().toLowerCase() === "renovado";
     return {
       contract,
       overlaps: overlapping.filter(c => c !== contract),
