@@ -53,6 +53,9 @@ export const pickEffectiveContract = (contracts, dateStr) => {
  * Contrato aplicable al período liquidado (histórico o actual).
  * La remuneración básica toma SIEMPRE el contrato APROBADO (estado "Vigente"):
  *   1. Contrato aprobado que solapa el período.
+ *   1b. Si el período lo cubre un contrato "Renovado" (renovación ya firmada) y ningún
+ *       aprobado lo solapa, se toma ese contrato: autoriza la remuneración del período
+ *       igual que uno Vigente.
  *   2. Si ninguno solapa, el aprobado más reciente ya iniciado al cierre del período
  *      (último contrato aprobado, nunca uno cuya vigencia empiece después).
  * Si no existe ningún contrato aprobado aplicable, se informa mediante
@@ -79,7 +82,16 @@ export const pickContractForPeriod = (contracts, periodStartStr, periodEndStr) =
   const periodStart = normDate(periodStartStr);
   const periodEnd = normDate(periodEndStr);
 
-  const overlapping = candidates.filter((c) => {
+  // Un contrato "Renovado" también representa el vínculo laboral del período, aunque
+  // su estado no sea "Vigente": su renovación ya está firmada. Se considera solo para
+  // la selección por solapamiento y siempre detrás de los aprobados, para no quitarles
+  // prioridad; la rama de respaldo (ningún contrato solapa el período) sigue leyendo
+  // `candidates`, de modo que un Renovado FUERA del período siga generando advertencia.
+  const renewedCandidates = approved.length > 0
+    ? sortByStartDesc(list.filter((c) => String(c?.status || "").trim().toLowerCase() === "renovado"))
+    : [];
+
+  const overlapping = [...candidates, ...renewedCandidates].filter((c) => {
     const start = startOf(c);
     if (!start) return false;
     if (periodEnd && start > periodEnd) return false;
@@ -90,7 +102,10 @@ export const pickContractForPeriod = (contracts, periodStartStr, periodEndStr) =
 
   if (overlapping.length > 0) {
     const contract = overlapping[0];
-    const contractApproved = isApprovedContract(contract);
+    // Un contrato "Renovado" autoriza la remuneración del período igual que uno
+    // "Vigente"; el respaldo de más abajo mantiene el criterio estricto.
+    const contractApproved = isApprovedContract(contract) ||
+      String(contract?.status || "").trim().toLowerCase() === "renovado";
     return {
       contract,
       overlaps: overlapping.slice(1),
