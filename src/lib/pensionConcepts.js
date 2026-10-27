@@ -188,10 +188,6 @@ export const getPensionAffiliationIssues = (employee, afp) => {
       issues.push("El trabajador está afiliado a una AFP pero no tiene AFP asignada");
     } else if (!afp) {
       issues.push("La AFP asignada al trabajador no existe en Datos Maestros");
-    } else if (isMixtaCommission(employee) && afp.mixed_commission_percentage == null) {
-      issues.push(
-        `La AFP ${afp.name} no tiene configurado el % de comisión mixta y el trabajador tiene comisión Mixta`
-      );
     }
   }
 

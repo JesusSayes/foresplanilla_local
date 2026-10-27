@@ -329,12 +329,11 @@ export class PayrollCalculator {
       const obligatoryValue = Number(afp.obligatory_contribution_percentage ?? 10);
       const obligatory = Number.isFinite(obligatoryValue) ? obligatoryValue : 10;
       const insurance = Number(afp.insurance_percentage) || 0;
-      // Comisión según el tipo de comisión del trabajador (Flujo / Mixta):
-      // Flujo → % de comisión por flujo de la AFP; Mixta → % de comisión mixta
-      // configurado en la AFP (el componente sobre el saldo no lo retiene el empleador).
+      // Regla de RRHH: Mixta descuenta aporte y seguro, sin comisión mensual.
+      // La comisión sobre el saldo no se retiene en la boleta.
       const commissionType = isMixtaCommission(employee) ? "Mixta" : "Flujo";
       const commission = commissionType === "Mixta"
-        ? (Number(afp.mixed_commission_percentage) || 0)
+        ? 0
         : (Number(afp.commission_percentage) || 0);
       const round2 = (v) => Math.round(v * 100) / 100;
 
@@ -447,7 +446,7 @@ export class PayrollCalculator {
     const pensionBase = safe(derived.remuneracion_afecta);
 
     // Validación pensionaria: si faltan datos de afiliación (sistema de pensiones, AFP
-    // asignada, % de comisión mixta) o existen conceptos AFP/ONP ambiguos, la boleta NO
+    // asignada) o existen conceptos AFP/ONP ambiguos, la boleta NO
     // se genera y se informa el motivo (el llamador la excluye de la planilla).
     this.pensionValidation = {
       blocked: false,
