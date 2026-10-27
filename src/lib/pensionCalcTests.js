@@ -195,31 +195,31 @@ test("Concepto ONP en trabajador AFP: bloquea la boleta", async () => {
   assert(result.pensionValidation.issues.some(i => /ONP/i.test(i)), "El motivo debe mencionar ONP");
 });
 
-// 11d. Comisión Mixta: usa el % de comisión mixta configurado en la AFP
-test("Comisión Mixta: usa el % de comisión mixta de la AFP", () => {
+// Mixta mantiene la regla de RRHH incluso si llegan porcentajes de otro origen.
+test("Comisión Mixta: no retiene comisión sobre el saldo", () => {
   const emp = makeEmployee({ afp_commission_type: "Mixta" });
   const afp = makeAFP({ commission_percentage: 1.69, mixed_commission_percentage: 1.25 });
-  const base = 3000;
   const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
-  const res = calc.calculatePensionContribution(base, { afp });
-  const comision = res.items.find(i => /comisi[oó]n/i.test(i.name));
-  assert(comision, "Debe existir el ítem de comisión");
-  assert(comision.amount === round2(base * 0.0125), `Comisión mixta esperada ${round2(base * 0.0125)}, vino ${comision.amount}`);
-  assert(/mixta/i.test(comision.name), `El nombre debe indicar comisión mixta, vino "${comision.name}"`);
+  const res = calc.calculatePensionContribution(3000, { afp });
+  assert(!res.items.some(i => i.code === "0601"), "Mixta no debe generar comisión mensual");
+  assert(res.totalAmount === 352.2, "Mixta debe descontar solo aporte y seguro");
 });
 
-// 11e. Comisión Mixta sin % configurado en la AFP: bloquea la boleta
-test("Comisión Mixta sin % configurado: bloquea la boleta", async () => {
-  const emp = makeEmployee({ id: "emp-1", afp_commission_type: "Mixta" });
-  const afp = makeAFP();
-  const concepts = [
-    { employee_id: "emp-1", concept_type: "Ingreso", concept_category: "Remuneración Base", concept_name: "Remuneración", is_dynamic: false, amount: 3000, is_recurring: true },
-  ];
-  const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
-  const result = await calc.calculatePayroll(concepts, { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp });
-  assert(result.pensionValidation.blocked, "Debe bloquear la boleta sin % de comisión mixta");
-  assert(result.pensionValidation.issues.some(i => /comisión mixta/i.test(i)), "El motivo debe mencionar la comisión mixta");
-});
+for (const mixedPercentage of [undefined, null, 0]) {
+  test(`Comisión Mixta con porcentaje ${mixedPercentage}: genera boleta con aporte y seguro`, async () => {
+    const emp = makeEmployee({ id: "emp-1", afp_commission_type: "Mixta" });
+    const afp = makeAFP({ mixed_commission_percentage: mixedPercentage });
+    const concepts = [
+      { employee_id: "emp-1", concept_type: "Ingreso", concept_category: "Remuneración Base", concept_name: "Remuneración", is_dynamic: false, amount: 3000, is_recurring: true },
+    ];
+    const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
+    const result = await calc.calculatePayroll(concepts, { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp });
+    assert(!result.pensionValidation.blocked, "Mixta no debe bloquear la boleta por falta de porcentaje");
+    assert(result.deductions.length === 2, "Debe generar solo aporte y seguro");
+    assert(result.totals.totalDeductions === 352.2, "Debe descontar aporte 300 y seguro 52.20");
+    assert(result.totals.netPay === 2647.8, "Debe conservar el neto de la regla de RRHH");
+  });
+}
 
 // 11f. Datos de afiliación incompletos: sistema de pensiones sin definir o AFP sin asignar
 test("Afiliación incompleta: bloquea la boleta", async () => {

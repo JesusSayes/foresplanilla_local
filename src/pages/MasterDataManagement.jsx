@@ -1746,17 +1746,6 @@ export default function MasterDataManagement() {
                         />
                       </div>
                       <div>
-                        <Label>% Comisión Mixta</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={formData.mixed_commission_percentage ?? ""}
-                          onChange={(e) => setFormData({ ...formData, mixed_commission_percentage: e.target.value === "" ? null : parseFloat(e.target.value) })}
-                          placeholder="Ej: 1.25"
-                        />
-                        <p className="text-xs text-slate-500 mt-1">Solo comisión Mixta</p>
-                      </div>
-                      <div>
                         <Label>% Aporte Obligatorio *</Label>
                         <Input
                           type="number"
