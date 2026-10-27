@@ -6,22 +6,33 @@ import {
   RELATIONSHIP_CODES,
 } from "@/lib/derechohabienteTemplate";
 
-// Guía visual de campos del formato TXT de derechohabientes.
-// Muestra posición, nombre, obligatoriedad, formato y ejemplo de cada campo,
-// más los códigos admitidos para tipo de documento, sexo y vínculo familiar.
+// Guía visual del formato TXT de derechohabientes realmente aceptado.
 export default function DerechohabienteImportGuide() {
   return (
     <div className="space-y-4 text-sm">
       <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
         <p className="text-slate-700 leading-relaxed">
-          <strong>Formato:</strong> TXT con separador{" "}
-          <code className="bg-slate-200 px-1 rounded">|</code> (pipe), codificación{" "}
-          <strong>Latin1 (ISO-8859-1)</strong>. La primera línea es un encabezado y
-          se ignora al importar. Las fechas usan el formato{" "}
-          <strong>DD/MM/YYYY</strong>. Los apellidos paterno y materno van en
-          columnas independientes. Conserve los ceros iniciales de los números de
-          documento.
+          <strong>Formato:</strong> el archivo TXT que descarga RR.HH. (24 columnas separadas por{" "}
+          <code className="bg-slate-200 px-1 rounded">|</code>) se importa tal cual, sin editarlo ni
+          convertirlo. Cada registro puede terminar con un{" "}
+          <code className="bg-slate-200 px-1 rounded">|</code> adicional: se tolera y no cuenta como
+          columna. El encabezado es opcional y se reconoce automáticamente.
         </p>
+        <ul className="list-disc ml-5 mt-2 text-xs text-slate-600 space-y-0.5">
+          <li>Codificación: UTF-8 o Windows-1252/Latin-1 (se detecta al leer el archivo).</li>
+          <li>Fin de línea Windows (CRLF) o Unix (LF), con o sin BOM.</li>
+          <li>Fechas <strong>DD/MM/YYYY</strong> y deben existir en el calendario.</li>
+          <li>
+            Documentos, teléfonos, mes de concepción y códigos se guardan como{" "}
+            <strong>texto</strong>: se conservan los ceros iniciales.
+          </li>
+          <li>
+            País y ubigeo se guardan tal como vienen (<code>PERÚ</code>,{" "}
+            <code>DEPARTAMENTO-PROVINCIA-DISTRITO</code>); no se exige código numérico ni se inventa
+            uno.
+          </li>
+          <li>Las líneas vacías se ignoran y los errores se informan con su número de línea.</li>
+        </ul>
       </div>
 
       <div>
@@ -48,18 +59,14 @@ export default function DerechohabienteImportGuide() {
                     <td className="px-2 py-1.5">
                       <span
                         className={
-                          f.req === "Obligatorio"
-                            ? "text-red-600 font-medium"
-                            : "text-slate-500"
+                          f.req === "Obligatorio" ? "text-red-600 font-medium" : "text-slate-500"
                         }
                       >
                         {f.req}
                       </span>
                     </td>
                     <td className="px-2 py-1.5 text-slate-600">{f.format}</td>
-                    <td className="px-2 py-1.5 font-mono text-slate-500">
-                      {f.example || "—"}
-                    </td>
+                    <td className="px-2 py-1.5 font-mono text-slate-500">{f.example || "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -99,6 +106,16 @@ export default function DerechohabienteImportGuide() {
             ))}
           </ul>
         </div>
+      </div>
+
+      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-xs text-indigo-900 space-y-1">
+        <p className="font-semibold">Antes de importar</p>
+        <p>
+          El derechohabiente se vincula al titular por su número de documento (y por el tipo cuando
+          hay más de un empleado con el mismo número). Los titulares inexistentes, las coincidencias
+          ambiguas y los registros ya guardados se omiten y se informan; no se crean empleados ni se
+          desactivan derechohabientes que no aparezcan en el archivo.
+        </p>
       </div>
     </div>
   );
