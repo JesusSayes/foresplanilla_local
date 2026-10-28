@@ -55,16 +55,23 @@ export const create = async (req, res) => {
     const userId = currentUser?.userId || currentUser?.id || 'system';
     const userEmail = currentUser?.email || 'system';
 
-    const record = await prisma.rmv.create({
-      data: {
-        id: generate24HexId(),
-        ...rest,
-        effective_date: effective_date ? new Date(effective_date) : null,
-        created_by_id: userId,
-        created_by: userEmail,
-        is_sample: false,
-      },
-    });
+    const record = await prisma.$transaction(async (tx) => {
+      const isActive = rest.is_active ?? true;
+      if (isActive) {
+        await tx.rmv.updateMany({ where: { is_active: true }, data: { is_active: false } });
+      }
+      return tx.rmv.create({
+        data: {
+          id: generate24HexId(),
+          ...rest,
+          is_active: isActive,
+          effective_date: effective_date ? new Date(effective_date) : null,
+          created_by_id: userId,
+          created_by: userEmail,
+          is_sample: false,
+        },
+      });
+    }, { isolationLevel: "Serializable" });
 
     res.status(201).json(record);
   } catch (error) {
@@ -87,13 +94,23 @@ export const update = async (req, res) => {
       ...rest
     } = req.body;
 
-    const record = await prisma.rmv.update({
-      where: { id },
-      data: {
-        ...rest,
-        effective_date: effective_date ? new Date(effective_date) : null,
-      },
-    });
+    const record = await prisma.$transaction(async (tx) => {
+      if (rest.is_active === true) {
+        await tx.rmv.updateMany({
+          where: { is_active: true, id: { not: id } },
+          data: { is_active: false },
+        });
+      }
+      return tx.rmv.update({
+        where: { id },
+        data: {
+          ...rest,
+          ...(effective_date !== undefined
+            ? { effective_date: effective_date ? new Date(effective_date) : null }
+            : {}),
+        },
+      });
+    }, { isolationLevel: "Serializable" });
 
     res.json(record);
   } catch (error) {

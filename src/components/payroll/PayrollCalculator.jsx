@@ -356,15 +356,15 @@ export class PayrollCalculator {
           detail: `Prima de seguro ${insurance}% de S/${base.toFixed(2)}`,
         });
       }
-      // 3) Comisión (solo si el porcentaje vigente es mayor que cero). AFP configuradas
-      // con comisión 0 no generan este ítem.
+      // 3) Comisión por flujo (solo si el porcentaje es mayor que cero). AFP configuradas
+      // con comisión 0 no generan este ítem; la comisión Mixta nunca llega aquí.
       if (commission > 0) {
         const comisionAmount = round2(base * (commission / 100));
         items.push({
-          name: `Comisión ${commissionType === "Mixta" ? "Mixta " : ""}AFP ${afp.name}`,
+          name: `Comisión AFP ${afp.name}`,
           code: "0601",
           amount: comisionAmount,
-          detail: `Comisión ${commissionType.toLowerCase()} ${commission}% de S/${base.toFixed(2)}`,
+          detail: `Comisión por flujo ${commission}% de S/${base.toFixed(2)}`,
         });
       }
 
