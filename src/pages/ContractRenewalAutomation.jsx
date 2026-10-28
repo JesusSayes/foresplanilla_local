@@ -16,6 +16,9 @@ import { format, differenceInDays } from "date-fns";
 import { toast } from "sonner";
 import { usePermissions } from "@/components/hooks/usePermissions";
 import ProcessRenewalModal from "@/components/contracts/ProcessRenewalModal";
+import RmvCompliancePanel from "@/components/contracts/RmvCompliancePanel";
+import RmvComplianceModal from "@/components/contracts/RmvComplianceModal";
+import { getActiveRmv, findContractsBelowRmv, isBelowRmvRule, ruleTypeOf } from "@/lib/rmvContractRule";
 
 export default function ContractRenewalAutomation() {
   const { user: currentUser } = useAuth();
@@ -32,9 +35,12 @@ export default function ContractRenewalAutomation() {
     auto_create_draft: false,
     only_renewable: true,
     draft_extension_months: 12,
+    rule_type: "expiration",
+    renewal_months: 12,
   });
   const [emailInput, setEmailInput] = useState("");
   const [showProcessModal, setShowProcessModal] = useState(false);
+  const [showRmvModal, setShowRmvModal] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -56,6 +62,13 @@ export default function ContractRenewalAutomation() {
     queryKey: ["allEmployees"],
     queryFn: async () => {
       return await entitiesAPI.Employee.list("-created_date");
+    },
+  });
+
+  const { data: rmvs = [] } = useQuery({
+    queryKey: ["rmvs"],
+    queryFn: async () => {
+      return await base44.entities.RMV.list("-effective_date");
     },
   });
 
@@ -97,16 +110,24 @@ export default function ContractRenewalAutomation() {
       return;
     }
 
+    const data = ruleTypeOf(ruleData) === "below_rmv"
+      ? { ...ruleData, rule_type: "below_rmv", renewal_months: ruleData.renewal_months || 12, contract_types: [] }
+      : { ...ruleData, rule_type: "expiration" };
+
     if (editingRule) {
-      updateRuleMutation.mutate({ id: editingRule.id, data: ruleData });
+      updateRuleMutation.mutate({ id: editingRule.id, data });
     } else {
-      createRuleMutation.mutate(ruleData);
+      createRuleMutation.mutate(data);
     }
   };
 
   const handleEdit = (rule) => {
     setEditingRule(rule);
-    setRuleData(rule);
+    setRuleData({
+      ...rule,
+      rule_type: ruleTypeOf(rule),
+      renewal_months: rule.renewal_months ?? 12,
+    });
     setShowRuleForm(true);
   };
 
@@ -171,6 +192,15 @@ export default function ContractRenewalAutomation() {
   };
 
   const expiringContracts = getExpiringContracts();
+
+  const activeRmv = getActiveRmv(rmvs);
+  const belowRmvRule = rules.find(r => isBelowRmvRule(r) && r.is_active) || rules.find(isBelowRmvRule) || null;
+  const belowRmvMatches = findContractsBelowRmv({
+    contracts,
+    employees: allEmployees,
+    activeRmv,
+    rule: belowRmvRule,
+  });
 
   if (permissionsLoading) {
     return (
@@ -269,6 +299,14 @@ export default function ContractRenewalAutomation() {
           </Card>
         )}
 
+        {/* Regla: sueldo base inferior a la RMV */}
+        <RmvCompliancePanel
+          activeRmv={activeRmv}
+          rule={belowRmvRule}
+          matches={belowRmvMatches}
+          onReview={() => setShowRmvModal(true)}
+        />
+
         {/* Reglas de Automatización */}
         <Card className="border-0 shadow-lg">
           <CardHeader className="border-b bg-slate-50/50">
@@ -291,13 +329,18 @@ export default function ContractRenewalAutomation() {
                           <Badge className={rule.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>
                             {rule.is_active ? "Activa" : "Inactiva"}
                           </Badge>
+                          <Badge className={isBelowRmvRule(rule) ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-700"}>
+                            {isBelowRmvRule(rule) ? "Sueldo inferior a RMV" : "Próximos a vencer"}
+                          </Badge>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                           <div>
-                            <p className="text-slate-600">Días antes</p>
+                            <p className="text-slate-600">{isBelowRmvRule(rule) ? "Renovación" : "Días antes"}</p>
                             <p className="font-semibold text-slate-900">
                               <Calendar className="w-3 h-3 inline mr-1" />
-                              {rule.days_before_expiration}
+                              {isBelowRmvRule(rule)
+                                ? `${rule.renewal_months ?? 12} meses`
+                                : rule.days_before_expiration}
                             </p>
                           </div>
                           <div>
@@ -349,6 +392,20 @@ export default function ContractRenewalAutomation() {
         </Card>
       </div>
 
+      {/* Modal de la regla RMV */}
+      <RmvComplianceModal
+        open={showRmvModal}
+        onClose={() => setShowRmvModal(false)}
+        matches={belowRmvMatches}
+        activeRmv={activeRmv}
+        rule={belowRmvRule}
+        userEmail={currentUser?.email}
+        onCompleted={() => {
+          queryClient.invalidateQueries(["allContracts"]);
+          queryClient.invalidateQueries(["allEmployees"]);
+        }}
+      />
+
       {/* Modal de Procesamiento */}
       <ProcessRenewalModal
         open={showProcessModal}
@@ -399,6 +456,30 @@ export default function ContractRenewalAutomation() {
                 />
               </div>
 
+              <div>
+                <Label>Tipo de Regla</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge
+                    className={`cursor-pointer ${ruleTypeOf(ruleData) !== "below_rmv" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"}`}
+                    onClick={() => setRuleData({ ...ruleData, rule_type: "expiration" })}
+                  >
+                    Próximos a vencer
+                  </Badge>
+                  <Badge
+                    className={`cursor-pointer ${ruleTypeOf(ruleData) === "below_rmv" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"}`}
+                    onClick={() => setRuleData({ ...ruleData, rule_type: "below_rmv", contract_types: [] })}
+                  >
+                    Sueldo inferior a la RMV
+                  </Badge>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  {ruleTypeOf(ruleData) === "below_rmv"
+                    ? "Detecta los contratos vigentes cuyo sueldo base en la ficha del empleado (Financiero) es menor que la RMV activa. Al aprobarlos se actualiza el sueldo a la RMV y se renueva el contrato."
+                    : "Detecta contratos próximos a vencer y genera notificaciones o borradores de renovación."}
+                </p>
+              </div>
+
+              {ruleTypeOf(ruleData) !== "below_rmv" && (<>
               <div>
                 <Label>Días antes del vencimiento</Label>
                 <Input
@@ -518,6 +599,23 @@ export default function ContractRenewalAutomation() {
                   </div>
                 )}
               </div>
+
+              </>)}
+
+              {ruleTypeOf(ruleData) === "below_rmv" && (
+                <div className="border-t pt-6">
+                  <Label>Duración del Contrato Renovado (meses)</Label>
+                  <Input
+                    type="number"
+                    value={ruleData.renewal_months ?? 12}
+                    onChange={(e) => setRuleData({ ...ruleData, renewal_months: parseInt(e.target.value) || 12 })}
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    El contrato renovado inicia el día siguiente al vencimiento (o el día de hoy si ya venció), con el
+                    sueldo actualizado a la RMV activa. El contrato anterior queda como "Renovado".
+                  </p>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-6 border-t">
                 <Button variant="outline" className="flex-1" onClick={resetForm}>
