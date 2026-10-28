@@ -189,6 +189,9 @@ export const getPensionAffiliationIssues = (employee, afp) => {
     } else if (!afp) {
       issues.push("La AFP asignada al trabajador no existe en Datos Maestros");
     }
+    // Con comisión Mixta la boleta solo descuenta aporte obligatorio y prima de seguro,
+    // por lo que el % de comisión mixta no es un dato necesario para calcular: su ausencia
+    // (o valor 0) no bloquea la generación de la boleta.
   }
 
   return issues;
