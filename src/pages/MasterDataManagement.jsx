@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { usePermissions } from "../components/hooks/usePermissions";
 import MasterDataFormModal from "../components/master/MasterDataFormModal";
+import { normalizeRmvDate, formatRmvDate } from "@/lib/rmvDate";
 
 export default function MasterDataManagement() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -251,17 +252,41 @@ export default function MasterDataManagement() {
     };
     const entity = entityMap[activeTab];
 
-    // Para RMV, desactivar todos los registros anteriores antes de crear uno nuevo
-    if (activeTab === "rmv" && !editingItem) {
-      try {
-        const activeRMVs = rmvRecords.filter(r => r.is_active);
-        for (const rmv of activeRMVs) {
-          await base44.entities.RMV.update(rmv.id, { is_active: false });
-        }
-        queryClient.invalidateQueries(["rmvs"]);
-      } catch (error) {
-        console.error("Error al desactivar RMV anteriores:", error);
+    if (activeTab === "rmv") {
+      const amount = Number(formData.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        toast.error("Ingresa un monto de RMV válido");
+        return;
       }
+      const effectiveDate = normalizeRmvDate(formData.effective_date);
+      if (!effectiveDate) {
+        toast.error("Selecciona la fecha de vigencia de la RMV");
+        return;
+      }
+      const data = { ...formData, amount, effective_date: effectiveDate };
+
+      if (!editingItem) {
+        // Al crear, la nueva RMV queda vigente explícitamente.
+        data.is_active = true;
+        try {
+          const activeRMVs = rmvRecords.filter(r => r.is_active);
+          for (const rmv of activeRMVs) {
+            await base44.entities.RMV.update(rmv.id, { is_active: false });
+          }
+          queryClient.invalidateQueries(["rmvs"]);
+        } catch (error) {
+          console.error("Error al desactivar RMV anteriores:", error);
+          toast.error("No se pudieron desactivar las RMV anteriores. No se guardó el registro.");
+          return;
+        }
+      }
+
+      if (editingItem) {
+        updateMutation.mutate({ entity, id: editingItem.id, data });
+      } else {
+        createMutation.mutate({ entity, data });
+      }
+      return;
     }
 
     if (editingItem) {
@@ -867,7 +892,7 @@ export default function MasterDataManagement() {
                             )}
                           </div>
                           <p className="text-sm text-slate-600 mb-1">
-                            <strong>Fecha de vigencia:</strong> {new Date(rmv.effective_date).toLocaleDateString('es-PE')}
+                            <strong>Fecha de vigencia:</strong> {formatRmvDate(rmv.effective_date)}
                           </p>
                           {rmv.notes && (
                             <p className="text-sm text-slate-600">{rmv.notes}</p>
@@ -1682,7 +1707,7 @@ export default function MasterDataManagement() {
                       <Label>Fecha de Vigencia *</Label>
                       <Input
                         type="date"
-                        value={formData.effective_date || ""}
+                        value={normalizeRmvDate(formData.effective_date)}
                         onChange={(e) => setFormData({ ...formData, effective_date: e.target.value })}
                       />
                     </div>

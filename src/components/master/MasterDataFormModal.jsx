@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { normalizeRmvDate } from "@/lib/rmvDate";
 
 const TAB_LABELS = {
   sites: "Sede", positions: "Cargo", departments: "Departamento", banks: "Banco",
@@ -79,7 +80,7 @@ export default function MasterDataFormModal({ activeTab, editingItem, formData, 
                 <Input type="number" step="0.01" value={formData.amount || ""} onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })} placeholder="Ej: 1025.00" />
                 {formData.amount && <p className="text-xs text-slate-600 mt-1">Asignación Familiar (10%): S/ {(formData.amount * 0.10).toFixed(2)}</p>}
               </div>
-              <div><Label>Fecha de Vigencia *</Label><Input type="date" value={formData.effective_date || ""} onChange={(e) => setFormData({ ...formData, effective_date: e.target.value })} /></div>
+              <div><Label>Fecha de Vigencia *</Label><Input type="date" value={normalizeRmvDate(formData.effective_date)} onChange={(e) => setFormData({ ...formData, effective_date: e.target.value })} /></div>
               <div><Label>Notas</Label><Textarea {...F("notes")} rows={3} placeholder="Observaciones..." /></div>
               {editingItem && checkbox("is_active", "is_active_rmv")}
               {!editingItem && <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg"><p className="text-xs text-amber-800">Al crear esta RMV, los registros anteriores se marcarán como históricos.</p></div>}
