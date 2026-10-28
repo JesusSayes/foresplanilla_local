@@ -328,13 +328,13 @@ export class PayrollCalculator {
       // Fallback a 10% únicamente si el aporte obligatorio no está configurado.
       const obligatory = afp.obligatory_contribution_percentage ?? 10;
       const insurance = afp.insurance_percentage || 0;
-      // Comisión según el tipo de comisión del trabajador (Flujo / Mixta):
-      // Flujo → % de comisión por flujo de la AFP; Mixta → % de comisión mixta
-      // configurado en la AFP (el componente sobre el saldo no lo retiene el empleador).
-      const commissionType = isMixtaCommission(employee) ? "Mixta" : "Flujo";
-      const commission = commissionType === "Mixta"
-        ? (Number(afp.mixed_commission_percentage) || 0)
-        : (afp.commission_percentage || 0);
+      // Comisión: solo se retiene a los trabajadores con comisión por FLUJO, usando el
+      // % de comisión por flujo configurado en la AFP.
+      // Con comisión MIXTA el sistema no retiene la comisión sobre el saldo en la boleta
+      // (regla de RRHH): el descuento se limita al aporte obligatorio y a la prima de
+      // seguro. Por eso mixed_commission_percentage no interviene en el cálculo y no se
+      // genera el concepto de descuento 0601, sin importar su valor (ausente, 0 o positivo).
+      const commission = isMixtaCommission(employee) ? 0 : (afp.commission_percentage || 0);
       const round2 = (v) => Math.round(v * 100) / 100;
 
       const items = [];
@@ -356,15 +356,15 @@ export class PayrollCalculator {
           detail: `Prima de seguro ${insurance}% de S/${base.toFixed(2)}`,
         });
       }
-      // 3) Comisión (solo si el porcentaje vigente es mayor que cero). AFP configuradas
-      // con comisión 0 no generan este ítem.
+      // 3) Comisión por flujo (solo si el porcentaje es mayor que cero). AFP configuradas
+      // con comisión 0 no generan este ítem; la comisión Mixta nunca llega aquí.
       if (commission > 0) {
         const comisionAmount = round2(base * (commission / 100));
         items.push({
-          name: `Comisión ${commissionType === "Mixta" ? "Mixta " : ""}AFP ${afp.name}`,
+          name: `Comisión AFP ${afp.name}`,
           code: "0601",
           amount: comisionAmount,
-          detail: `Comisión ${commissionType.toLowerCase()} ${commission}% de S/${base.toFixed(2)}`,
+          detail: `Comisión por flujo ${commission}% de S/${base.toFixed(2)}`,
         });
       }
 
@@ -440,8 +440,8 @@ export class PayrollCalculator {
     const pensionBase = safe(derived.remuneracion_afecta);
 
     // Validación pensionaria: si faltan datos de afiliación (sistema de pensiones, AFP
-    // asignada, % de comisión mixta) o existen conceptos AFP/ONP ambiguos, la boleta NO
-    // se genera y se informa el motivo (el llamador la excluye de la planilla).
+    // asignada) o existen conceptos AFP/ONP ambiguos, la boleta NO se genera y se informa
+    // el motivo (el llamador la excluye de la planilla).
     this.pensionValidation = {
       blocked: false,
       // En planilla quincenal no se descuentan aportes: la afiliación no condiciona la boleta.

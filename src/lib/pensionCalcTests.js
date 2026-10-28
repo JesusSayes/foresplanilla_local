@@ -20,6 +20,7 @@ const makeEmployee = (overrides = {}) => ({
   last_name: "Empleado",
   base_salary: 3000,
   pension_system: "AFP",
+  afp_id: "afp-1",
   afp_commission_type: "Flujo",
   ...overrides,
 });
@@ -40,6 +41,14 @@ const test = (name, fn) => {
 
 const assert = (cond, msg) => {
   if (!cond) throw new Error(msg);
+};
+
+// Comparación monetaria tolerante al error de coma flotante de la suma de componentes.
+const assertMoney = (actual, expected, msg) => {
+  assert(
+    typeof actual === "number" && Math.abs(actual - expected) < 0.005,
+    `${msg}: esperado ${expected.toFixed(2)}, vino ${actual}`
+  );
 };
 
 // 1. ONP: totalIncome = 2000 → descuento 260.00
@@ -148,8 +157,11 @@ test("Concepto AFP/ONP con importe propio: bloquea la boleta", async () => {
   const result = await calc.calculatePayroll([income, manualConcept], { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp });
   assert(result.pensionValidation.blocked, "Debe bloquear la boleta");
   assert(result.pensionValidation.issues.length > 0, "Debe informar el motivo del bloqueo");
+  // El cálculo automático NO se aplica: el único descuento AFP/ONP es el concepto
+  // ambiguo que originó el bloqueo (la boleta no se genera con este importe).
   const pensionDeds = result.deductions.filter(d => d.concept_category === "AFP/ONP");
-  assert(pensionDeds.length === 0, `No debe aplicar descuentos AFP/ONP, vino ${pensionDeds.length}`);
+  assert(pensionDeds.length === 1 && pensionDeds[0].concept_name === "AFP Personalizado",
+    `Solo debe figurar el concepto ambiguo (sin duplicar el cálculo automático), vino ${pensionDeds.length}`);
 });
 
 // 11b. Concepto GENERAL AFP/ONP: se ignora y NO desactiva el cálculo automático
@@ -182,30 +194,54 @@ test("Concepto ONP en trabajador AFP: bloquea la boleta", async () => {
   assert(result.pensionValidation.issues.some(i => /ONP/i.test(i)), "El motivo debe mencionar ONP");
 });
 
-// 11d. Comisión Mixta: usa el % de comisión mixta configurado en la AFP
-test("Comisión Mixta: usa el % de comisión mixta de la AFP", () => {
+// 11d. Comisión Mixta: solo aporte obligatorio + prima de seguro (sin comisión ni 0601)
+test("Comisión Mixta: no descuenta comisión ni genera el concepto 0601", () => {
   const emp = makeEmployee({ afp_commission_type: "Mixta" });
   const afp = makeAFP({ commission_percentage: 1.69, mixed_commission_percentage: 1.25 });
   const base = 3000;
   const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
   const res = calc.calculatePensionContribution(base, { afp });
-  const comision = res.items.find(i => /comisi[oó]n/i.test(i.name));
-  assert(comision, "Debe existir el ítem de comisión");
-  assert(comision.amount === round2(base * 0.0125), `Comisión mixta esperada ${round2(base * 0.0125)}, vino ${comision.amount}`);
-  assert(/mixta/i.test(comision.name), `El nombre debe indicar comisión mixta, vino "${comision.name}"`);
+  assert(res.items.length === 2, `Se esperaban 2 ítems (aporte + seguro), vino ${res.items.length}`);
+  assert(!res.items.some(i => i.code === "0601"), "No debe existir descuento con código 0601");
+  assert(!res.items.some(i => /comisi[oó]n/i.test(i.name)), "No debe generarse el ítem Comisión");
+  assertMoney(res.items[0].amount, 300, "Aporte obligatorio 10% de 3000");
+  assertMoney(res.items[1].amount, 52.2, "Prima de seguro 1.74% de 3000");
+  assertMoney(res.totalAmount, 352.2, "Total AFP");
 });
 
-// 11e. Comisión Mixta sin % configurado en la AFP: bloquea la boleta
-test("Comisión Mixta sin % configurado: bloquea la boleta", async () => {
-  const emp = makeEmployee({ id: "emp-1", afp_commission_type: "Mixta" });
-  const afp = makeAFP();
+// 11e. Comisión Mixta: el % de comisión mixta (ausente, null, 0 o positivo) no altera
+// el cálculo ni bloquea la boleta.
+test("Comisión Mixta: mixed_commission_percentage ausente/null/0/1.25 da el mismo resultado", async () => {
+  const scenarios = [
+    ["ausente", undefined],
+    ["null", null],
+    ["0", 0],
+    ["1.25", 1.25],
+  ];
   const concepts = [
     { employee_id: "emp-1", concept_type: "Ingreso", concept_category: "Remuneración Base", concept_name: "Remuneración", is_dynamic: false, amount: 3000, is_recurring: true },
   ];
-  const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
-  const result = await calc.calculatePayroll(concepts, { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp });
-  assert(result.pensionValidation.blocked, "Debe bloquear la boleta sin % de comisión mixta");
-  assert(result.pensionValidation.issues.some(i => /comisión mixta/i.test(i)), "El motivo debe mencionar la comisión mixta");
+  for (const [label, mixed] of scenarios) {
+    const afp = makeAFP();
+    if (mixed !== undefined) afp.mixed_commission_percentage = mixed;
+
+    const calc = new PayrollCalculator(makeEmployee({ id: "emp-1", afp_commission_type: "Mixta" }), 1, 2026, "Mensual");
+    const res = calc.calculatePensionContribution(3000, { afp });
+    assert(res.items.length === 2, `[${label}] 2 ítems esperados, vino ${res.items.length}`);
+    assertMoney(res.totalAmount, 352.2, `[${label}] total AFP`);
+
+    const result = await calc.calculatePayroll(concepts, { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp });
+    assert(
+      !result.pensionValidation.blocked,
+      `[${label}] no debe bloquear la boleta (${result.pensionValidation.issues.join(" / ")})`
+    );
+    assertMoney(result.totals.totalDeductions, 352.2, `[${label}] total de descuentos`);
+    assertMoney(result.totals.netPay, 2647.8, `[${label}] neto a pagar`);
+    assert(
+      !result.deductions.some(d => d.concept_code === "0601"),
+      `[${label}] no debe existir descuento con código 0601`
+    );
+  }
 });
 
 // 11f. Datos de afiliación incompletos: sistema de pensiones sin definir o AFP sin asignar
@@ -220,6 +256,20 @@ test("Afiliación incompleta: bloquea la boleta", async () => {
   const afpSinAsignar = new PayrollCalculator(makeEmployee({ id: "emp-1", afp_id: "" }), 1, 2026, "Mensual");
   const resB = await afpSinAsignar.calculatePayroll(concepts, { worked_days: 30, regular_hours: 0, overtime_hours: 0 }, 1130, { afp: null });
   assert(resB.pensionValidation.blocked, "AFP sin AFP asignada debe bloquear");
+});
+
+// 11g. Comisión Flujo: conserva la comisión calculada con commission_percentage
+// (la comisión mixta configurada en la AFP no interviene).
+test("Comisión Flujo: mantiene la comisión con commission_percentage", () => {
+  const emp = makeEmployee({ afp_commission_type: "Flujo" });
+  const afp = makeAFP({ commission_percentage: 1.5, mixed_commission_percentage: 9.99 });
+  const calc = new PayrollCalculator(emp, 1, 2026, "Mensual");
+  const res = calc.calculatePensionContribution(3000, { afp });
+  assert(res.items.length === 3, `Flujo debe tener 3 ítems (aporte + seguro + comisión), vino ${res.items.length}`);
+  const comision = res.items.find(i => i.code === "0601");
+  assert(comision, 'Debe existir el ítem de comisión con código "0601"');
+  assertMoney(comision.amount, 45, "Comisión por flujo 1.5% de 3000");
+  assertMoney(res.totalAmount, 397.2, "Total AFP con comisión por flujo");
 });
 
 // 8. Cambio de AFP / porcentajes: se refleja sin regenerar conceptos

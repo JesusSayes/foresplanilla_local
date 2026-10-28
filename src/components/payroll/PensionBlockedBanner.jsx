@@ -26,8 +26,8 @@ export default function PensionBlockedBanner({ workers = [] }) {
       </ul>
       <p className="text-xs text-red-700">
         Corrija la afiliación del trabajador en Gestión de Empleados (sistema de pensiones, AFP afiliada,
-        tipo de comisión y CUSPP), configure el % de comisión mixta de la AFP en Datos Maestros, o elimine
-        el concepto pensionario ambiguo en Conceptos de Planilla. Luego vuelva a calcular.
+        tipo de comisión y CUSPP) o elimine el concepto pensionario ambiguo en Conceptos de Planilla.
+        Luego vuelva a calcular.
       </p>
     </div>
   );
