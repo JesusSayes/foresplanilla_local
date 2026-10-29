@@ -30,7 +30,7 @@ export default function RmvCompliancePanel({ activeRmv, rule, matches, onReview 
           </div>
           <Button
             onClick={onReview}
-            disabled={!activeRmv || count === 0}
+            disabled={!activeRmv || rule?.is_active === false || count === 0}
             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -54,7 +54,7 @@ export default function RmvCompliancePanel({ activeRmv, rule, matches, onReview 
             <p className="text-sm text-slate-700 mb-3">
               <strong>{count}</strong> contrato{count !== 1 ? "s" : ""} vigente{count !== 1 ? "s" : ""} con sueldo base
               menor a S/ {Number(activeRmv.amount).toFixed(2)}. Al aprobarlos se actualiza el sueldo del empleado a la RMV
-              activa y se renueva el contrato por {months} mes{months !== 1 ? "es" : ""}.
+              activa desde el inicio del nuevo contrato. Los contratos a plazo fijo se renuevan por {months} mes{months !== 1 ? "es" : ""}; los indeterminados conservan su duración indefinida.
             </p>
             <div className="space-y-2">
               {matches.slice(0, 5).map(({ contract, employee, baseSalary }) => (

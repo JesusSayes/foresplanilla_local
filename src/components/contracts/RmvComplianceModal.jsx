@@ -7,7 +7,7 @@ import { X, Loader2, CheckCircle, AlertTriangle, TrendingUp } from "lucide-react
 import { toast } from "sonner";
 import { renewContractWithRmv } from "@/lib/rmvContractRenewal";
 
-export default function RmvComplianceModal({ open, onClose, matches, activeRmv, rule, userEmail, onCompleted }) {
+export default function RmvComplianceModal({ open, onClose, matches, activeRmv, rule, onCompleted }) {
   const [items, setItems] = useState([]);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [processing, setProcessing] = useState(false);
@@ -40,12 +40,11 @@ export default function RmvComplianceModal({ open, onClose, matches, activeRmv, 
         contract: item.contract,
         employee: item.employee,
         activeRmv,
-        months,
-        userEmail,
+        rule,
       });
       updateItem(item.contract.id, {
         status: "done",
-        message: `Contrato ${newContract.contract_number} generado (${newContract.start_date} al ${newContract.end_date})`,
+        message: `Contrato ${newContract.contract_number} generado (${String(newContract.start_date).slice(0, 10)} al ${newContract.end_date ? String(newContract.end_date).slice(0, 10) : "sin término"})`,
       });
       return true;
     } catch (error) {
@@ -58,7 +57,7 @@ export default function RmvComplianceModal({ open, onClose, matches, activeRmv, 
   };
 
   const runApproval = async (targets) => {
-    if (targets.length === 0) return;
+    if (processing || targets.length === 0) return;
     setProcessing(true);
     let ok = 0;
     let failed = 0;
@@ -117,9 +116,9 @@ export default function RmvComplianceModal({ open, onClose, matches, activeRmv, 
           ) : (
             <>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-                Al aprobar, el sueldo base del empleado se actualiza a <strong>S/ {rmvAmount.toFixed(2)}</strong>, el
+                Al aprobar, el nuevo contrato tendrá una remuneración de <strong>S/ {rmvAmount.toFixed(2)}</strong>, el
                 contrato anterior queda como <strong>Renovado</strong> y se crea el nuevo contrato vigente con esa
-                remuneración por {months} mes{months !== 1 ? "es" : ""}.
+                remuneración desde su fecha de inicio. Los contratos a plazo fijo se renuevan por {months} mes{months !== 1 ? "es" : ""}; los indeterminados permanecen sin fecha de término.
               </div>
 
               <div className="flex items-center gap-2 px-1">

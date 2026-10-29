@@ -68,7 +68,7 @@ export default function ContractRenewalAutomation() {
   const { data: rmvs = [] } = useQuery({
     queryKey: ["rmvs"],
     queryFn: async () => {
-      return await base44.entities.RMV.list("-effective_date");
+      return await entitiesAPI.RMV.list("-effective_date");
     },
   });
 
@@ -76,6 +76,7 @@ export default function ContractRenewalAutomation() {
     mutationFn: async (data) => {
       return await entitiesAPI.ContractRenewalRule.create(data);
     },
+    onError: (error) => toast.error(error.response?.data?.error || "No se pudo guardar la regla"),
     onSuccess: () => {
       queryClient.invalidateQueries(["contractRenewalRules"]);
       toast.success("Regla creada correctamente");
@@ -87,6 +88,7 @@ export default function ContractRenewalAutomation() {
     mutationFn: async ({ id, data }) => {
       return await entitiesAPI.ContractRenewalRule.update(id, data);
     },
+    onError: (error) => toast.error(error.response?.data?.error || "No se pudo guardar la regla"),
     onSuccess: () => {
       queryClient.invalidateQueries(["contractRenewalRules"]);
       toast.success("Regla actualizada correctamente");
@@ -98,6 +100,7 @@ export default function ContractRenewalAutomation() {
     mutationFn: async (id) => {
       return await entitiesAPI.ContractRenewalRule.delete(id);
     },
+    onError: (error) => toast.error(error.response?.data?.error || "No se pudo guardar la regla"),
     onSuccess: () => {
       queryClient.invalidateQueries(["contractRenewalRules"]);
       toast.success("Regla eliminada correctamente");
@@ -399,7 +402,6 @@ export default function ContractRenewalAutomation() {
         matches={belowRmvMatches}
         activeRmv={activeRmv}
         rule={belowRmvRule}
-        userEmail={currentUser?.email}
         onCompleted={() => {
           queryClient.invalidateQueries(["allContracts"]);
           queryClient.invalidateQueries(["allEmployees"]);
