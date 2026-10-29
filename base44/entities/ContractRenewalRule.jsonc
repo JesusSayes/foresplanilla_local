@@ -6,6 +6,20 @@
       "type": "string",
       "description": "Nombre de la regla"
     },
+    "rule_type": {
+      "type": "string",
+      "enum": [
+        "expiration",
+        "below_rmv"
+      ],
+      "default": "expiration",
+      "description": "Tipo de regla: 'expiration' = contratos pr\u00f3ximos a vencer; 'below_rmv' = contratos cuyo sueldo base del empleado (pesta\u00f1a Financiero) es menor que la RMV activa."
+    },
+    "renewal_months": {
+      "type": "integer",
+      "default": 12,
+      "description": "Meses de vigencia del contrato renovado por la regla 'below_rmv'. El nuevo contrato inicia el d\u00eda siguiente al vencimiento (o el d\u00eda actual si ya venci\u00f3) con el sueldo actualizado a la RMV activa."
+    },
     "is_active": {
       "type": "boolean",
       "default": true,

@@ -38,7 +38,12 @@ export default function ProcessRenewalModal({
   const [selectedContractIds, setSelectedContractIds] = useState(new Set());
   const logEndRef = useRef(null);
 
-  const activeRules = useMemo(() => (rules || []).filter(r => r.is_active), [rules]);
+  // Solo las reglas de vencimiento aplican al procesamiento de borradores;
+  // la regla "sueldo inferior a la RMV" se aprueba en su propio panel.
+  const activeRules = useMemo(
+    () => (rules || []).filter(r => r.is_active && (r.rule_type || "expiration") === "expiration"),
+    [rules]
+  );
 
   // Helper: nombre del empleado desde allEmployees (sin depender de filtro de status)
   const getEmployeeNameById = (employeeId) => {

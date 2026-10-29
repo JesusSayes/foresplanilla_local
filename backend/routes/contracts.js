@@ -7,6 +7,7 @@ import {
   loadAccessContext,
   requireAnyPermission,
 } from '../middleware/authorization.js';
+import { renewWithRmv } from '../services/rmvContractRenewal.js';
 import { generate24HexId } from '../utils/idGenerator.js';
 
 const router = express.Router();
@@ -116,6 +117,29 @@ router.get('/:id', requireAnyPermission(...VIEW_PERMISSIONS), attachEmployeeScop
   } catch (error) {
     console.error('Error fetching contract:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/:id/renew-rmv', requireAnyPermission('system.admin', 'contracts.renewal'), attachEmployeeScope('system.admin', 'contracts.renewal'), async (req, res) => {
+  let client;
+  try {
+    client = await pool.connect();
+    await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+    const result = await renewWithRmv(client, {
+      contractId: req.params.id, body: req.body, user: req.user,
+      canAccess: employeeId => canAccessEmployee(req, employeeId),
+    });
+    await syncEmployeeCosts(client, result.newContract);
+    await client.query('COMMIT');
+    res.status(201).json(result);
+  } catch (error) {
+    if (client) await client.query('ROLLBACK');
+    const concurrent = error.code === '40001' || error.code === '40P01';
+    res.status(concurrent ? 409 : error.status || 500).json({
+      error: concurrent ? 'Otro usuario modificó los datos. Actualice la lista y reintente.' : error.status ? error.message : 'No se pudo renovar el contrato. Verifique la actualización SQL de RMV.',
+    });
+  } finally {
+    client?.release();
   }
 });
 

@@ -239,6 +239,8 @@ model contract_renewal_rule {
   created_by_id          String?
   created_by             String?
   is_sample              Boolean?
+  rule_type              String    @default("expiration")
+  renewal_months         Int       @default(12)
 }
 
 model contract_template {
