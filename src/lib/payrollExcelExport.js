@@ -73,6 +73,11 @@ export const exportPayslipsToExcel = (payslipsData, allEmployees = [], filename,
       "Desc. Tardanzas": safeNum(p.tardiness_discount),
       "Desc. Salida Anticipada": safeNum(p.early_departure_discount),
       "Desc. Faltas": safeNum(p.absence_discount),
+      "Desc. Licencia sin Goce": safeNum(
+        (p.calculation_summary?.breakdown?.deductions?.items || [])
+          .filter(i => String(i.name || "").toLowerCase().includes("sin goce"))
+          .reduce((sum, i) => sum + Math.abs(safeNum(i.amount)), 0)
+      ),
       "Desc. Adelanto": safeNum(p.advance_deduction),
       "Desc. Préstamo": safeNum(p.loan_deduction),
       "Otros Descuentos": safeNum(p.other_deductions),

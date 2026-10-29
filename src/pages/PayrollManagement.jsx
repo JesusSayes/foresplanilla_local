@@ -34,13 +34,15 @@ import PayrollPreviewCard from "../components/payroll/PayrollPreviewCard";
 import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/lib/payrollUtils";
 import { calcEffectiveMetrics } from "@/lib/attendanceMetrics";
 import { pickContractForPeriod, describeContract } from "@/lib/contractSelection";
-import { applyContractSalaryToBaseConcepts } from "@/lib/baseSalaryConcept";
+import { applyContractualBaseSalary } from "@/lib/baseSalaryConcept";
+import { buildAttendanceDiscountConcepts } from "@/lib/attendanceDiscounts";
 import {
   computeMarkedLateMinutes,
   resolveDiscountLateMinutes,
   isConfirmedAbsence,
   isCoveredByApprovedIncident,
   hasClockMarkings,
+  isFullDayUnpaidLeaveRecord,
 } from "@/lib/attendanceReconciliation";
 import { createScheduleDayResolver } from "@/lib/workScheduleResolver";
 import { buildPayrollAbsenceDays } from "@/lib/scheduledAbsence";
@@ -975,7 +977,7 @@ export default function PayrollManagement() {
         !hasClockMarkings(r) &&
         !isCoveredByApprovedIncident(coveredIncidentsFor(normDate(r.date)))
       );
-      const absenceInfo = absenceDaysByEmployee.get(emp.id) || { absenceDays: [], reviewDays: [] };
+      const absenceInfo = absenceDaysByEmployee.get(emp.id) || { absenceDays: [], reviewDays: [], sinGoceDays: [] };
       // Los días ya contados como falta confirmada por registro se excluyen de la
       // detección por jornada para que ese día se descuente una sola vez.
       const confirmedAbsenceDates = new Set(absentRecords.map(r => normDate(r.date)));
@@ -1041,16 +1043,26 @@ export default function PayrollManagement() {
         workedDays = 30; // mes completo → siempre 30
       }
       if (workedDays < 0) workedDays = 0;
-      // Permiso sin goce (día completo): restar de días trabajados. El descuento
-      // viene del prorrateo de la remuneración base al reducir worked_days.
-      // Los permisos por horas no restan días (su descuento es un PayrollConcept).
-      const sinGoceFullDays = payrollType === "Quincenal"
-        ? 0
-        : empAttendance.filter(r => r.status === "Permiso sin goce" && (r.notes || "").includes("día completo")).length;
-      // Días trabajados y no laborados coherentes con las faltas descontables del
-      // período: cada falta descuenta un día de los días trabajados, y el prorrateo de
-      // la remuneración básica (base_salary / 30 × worked_days) es el ÚNICO descuento
-      // de ese día, para no cobrar dos veces la misma falta.
+      // Días contractuales del período (solo ingreso/cese): es la base del pago de la
+      // remuneración básica. Las faltas y las licencias sin goce NO se prorratean aquí.
+      const contractualWorkedDays = workedDays;
+
+      // Licencia sin goce de haber de DÍA COMPLETO: se descuenta como concepto
+      // independiente y resta un día trabajado. Se detecta por la justificación
+      // aprobada (Justificaciones) y por el estado del registro de asistencia, sin
+      // depender de que el registro exista ni de un texto en las observaciones.
+      // Los permisos sin goce POR HORAS no restan días: su descuento monetario es un
+      // concepto creado al aprobar la solicitud.
+      const unpaidLeaveDates = new Set([
+        ...(absenceInfo.sinGoceDays || []).map(day => normDate(day.date)),
+        ...empAttendance.filter(r => isFullDayUnpaidLeaveRecord(r)).map(r => normDate(r.date)),
+      ].filter(Boolean));
+      const sinGoceFullDays = payrollType === "Quincenal" ? 0 : unpaidLeaveDates.size;
+
+      // Días trabajados y no laborados del período: cada día no remunerado (falta
+      // injustificada o licencia sin goce) resta un día trabajado y suma un día no
+      // laborado. El descuento monetario se aplica UNA sola vez, como concepto
+      // independiente (ver más abajo), no por prorrateo de la básica.
       const daysResult = applyAbsenceDays({
         baseWorkedDays: workedDays,
         payrollType,
@@ -1059,10 +1071,11 @@ export default function PayrollManagement() {
       });
       workedDays = daysResult.workedDays;
       const nonWorkedDays = daysResult.nonWorkedDays;
-      // Días subsidiados: justificaciones aprobadas que cubren el día completo (descanso médico, etc.)
+      // Días subsidiados: justificaciones aprobadas que cubren el día completo (descanso
+      // médico, etc.). Una licencia sin goce NO es un día subsidiado: no se remunera.
       const subsidizedDays = payrollType === "Quincenal"
         ? 0
-        : empAttendance.filter(r => r.status === "Justificado").length;
+        : empAttendance.filter(r => r.status === "Justificado" && !unpaidLeaveDates.has(normDate(r.date))).length;
       
       // Horas extras y nocturnas calculadas desde los registros de asistencia del periodo.
       // horas_nocturnas: los registros de asistencia aún no cuentan con un campo dedicado,
@@ -1243,12 +1256,18 @@ export default function PayrollManagement() {
         }
       }
 
-      // La remuneración básica (concepto 00101) toma SIEMPRE el sueldo del contrato
-      // aprobado del período: si el concepto está configurado con un importe fijo
-      // obsoleto, se ajusta al sueldo contractual. Las fórmulas dinámicas no se
-      // tocan (leen base_salary, ya enriquecido con el contrato del período).
+      // La remuneración básica del período SIEMPRE sale del sueldo del contrato
+      // aprobado, prorrateado solo por los días contractuales (ingreso/cese). Un
+      // importe fijo obsoleto del concepto se reemplaza por ese valor.
+      // Las faltas y las licencias sin goce NO se prorratean aquí: se descuentan como
+      // conceptos independientes (buildAttendanceDiscountConcepts), evitando el doble
+      // descuento y mostrando el importe en la boleta.
       if (payrollType !== "Quincenal") {
-        conceptsForCalc = applyContractSalaryToBaseConcepts(conceptsForCalc, emp.base_salary);
+        conceptsForCalc = applyContractualBaseSalary(
+          conceptsForCalc,
+          emp.base_salary,
+          contractualWorkedDays
+        );
       }
 
       // Calcular descuentos por asistencia (solo para planillas NO quincenales).
@@ -1336,9 +1355,24 @@ export default function PayrollManagement() {
       const totalLateMinutes = lateRecords.reduce((sum, r) => sum + effectiveLateMinutes(r), 0);
       const hourlyRate = dailyRate > 0 ? roundMoney(dailyRate / 8) : 0;
       const tardinessDiscount = payrollType === "Quincenal" ? 0 : roundMoney(hourlyRate * (totalLateMinutes / 60));
-      // Descuento por inasistencias: NO se aplica un descuento monetario separado.
-      // Cada falta ya descontó su día en worked_days (prorrateo de la remuneración
-      // básica), y descontarlo además aquí cobraría dos veces la misma falta.
+
+      // ── Descuento por inasistencias y por licencia sin goce (conceptos propios) ──
+      // Se calculan sobre el valor diario del sueldo del contrato y se entregan al
+      // motor como conceptos de descuento: aparecen en la boleta, reducen el neto y la
+      // base previsional (AFP/ONP) una sola vez. La remuneración básica se paga por los
+      // días contractuales, así que este concepto es el único descuento del día.
+      const attendanceDiscounts = buildAttendanceDiscountConcepts({
+        employeeId: emp.id,
+        baseSalary: baseSalaryForCalc,
+        absenceDays: absenceDaysToDiscount.length,
+        unpaidLeaveDays: sinGoceFullDays,
+        payrollType,
+      });
+      if (attendanceDiscounts.concepts.length > 0) {
+        conceptsForCalc = [...conceptsForCalc, ...attendanceDiscounts.concepts];
+      }
+      const absenceDiscountAmount = attendanceDiscounts.absenceAmount;
+      const unpaidLeaveDiscountAmount = attendanceDiscounts.unpaidLeaveAmount;
       // ── Descuento por salida anticipada ──
       // Usa el mismo valor hora que tardanzas (salario diario / 8).
       const totalEarlyDepartureMinutes = earlyDepartureRecords.reduce((sum, r) => {
@@ -1460,9 +1494,10 @@ export default function PayrollManagement() {
         result.summary.result.totalDeductions = adjustedDeductions;
         result.summary.result.netPay = adjustedNetPay;
       }
-      // other_deductions: descuentos del calculador que NO están en campos dedicados (AFP/ONP, Renta)
+      // other_deductions: descuentos del calculador que NO están en campos dedicados
+      // (AFP/ONP, Renta, préstamos, inasistencias y licencia sin goce).
       const otherDeductionsFromCalc = roundMoney(
-        safePayrollNumber(result.totals.totalDeductions) - pensionDeductionAmount - quintaResult.conceptIncomeTax - loanDeductionAmount
+        safePayrollNumber(result.totals.totalDeductions) - pensionDeductionAmount - quintaResult.conceptIncomeTax - loanDeductionAmount - absenceDiscountAmount - unpaidLeaveDiscountAmount
       );
 
       const rawPayslip = {
@@ -1510,9 +1545,10 @@ export default function PayrollManagement() {
         income_tax: incomeTaxAmount,
         tardiness_discount: tardinessDiscount,
         early_departure_discount: earlyDepartureDiscount,
-        // Sin descuento monetario separado por inasistencia: cada falta ya descontó su
-        // día en worked_days (prorrateo). El detalle queda en non_worked_days.
-        absence_discount: 0,
+        // Descuento por inasistencias injustificadas (concepto independiente en la
+        // boleta). Las licencias sin goce van en su propio concepto de descuento y su
+        // importe queda en el desglose (calculation_summary).
+        absence_discount: absenceDiscountAmount,
         loan_deduction: loanDeductionAmount,
         advance_deduction: advanceDeduction,
         other_deductions: otherDeductionsFromCalc,
