@@ -1,3 +1,4 @@
+import { correctEmployeeCodes } from '../controllers/employeeCodeController.js';
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
 import {
@@ -19,6 +20,8 @@ import {
 const router = express.Router();
 
 router.use(authenticateToken);
+
+router.post('/correct-codes', loadAccessContext, requireAnyPermission('system.admin', 'employees.edit'), attachEmployeeScope('system.admin', 'employees.edit'), correctEmployeeCodes);
 
 router.get('/accessible', loadAccessContext, listAccessibleEmployees);
 router.get('/', loadAccessContext, attachEmployeeReadScope, listEmployees);

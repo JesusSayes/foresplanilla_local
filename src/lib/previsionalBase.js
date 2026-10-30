@@ -53,7 +53,7 @@ export const sumFamilyAllowance = (incomes = []) => {
 // Se reconocen por system_logic_type y, como respaldo, por palabras clave del nombre.
 // Los montos de descuento se guardan en negativo; se usan en valor absoluto.
 const ATTENDANCE_DISCOUNT_LOGIC = ["absence_discount", "tardiness_discount", "early_departure_discount"];
-const ATTENDANCE_DISCOUNT_KEYWORDS = ["falta", "inasistencia", "tardanza", "permiso", "salida anticipada", "sin goce"];
+const ATTENDANCE_DISCOUNT_KEYWORDS = ["falta", "inasistencia", "tardanza", "permiso", "salida anticipada", "sin goce", "justificad"];
 
 export const sumAttendanceDiscounts = (deductions = []) => {
   if (!Array.isArray(deductions)) return 0;

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users, Plus, Edit, Eye, UserX, UserCheck, Search,
-  Briefcase, Shield, History, Upload
+  Briefcase, Shield, History, Upload, Copy
 } from "lucide-react";
 import { createPageUrl } from "../utils";
 import { useNavigate } from "react-router-dom";
@@ -21,6 +21,8 @@ import EmployeeHistory from "../components/employees/EmployeeHistory";
 import AFPChangeHistoryPanel from "../components/employees/AFPChangeHistoryPanel";
 import EmployeeForm from "../components/employees/EmployeeForm";
 import ImportDerechohabientesModal from "../components/employees/ImportDerechohabientesModal";
+import EmployeeCodeAuditModal from "../components/employees/EmployeeCodeAuditModal";
+import { normalizeEmployeeCode, normalizeDocumentNumber, findEmployeeCodeDuplicates } from "@/lib/employeeCode";
 
 export default function EmployeeManagement() {
   const { user, isLoadingAuth } = useAuth();
@@ -46,6 +48,7 @@ export default function EmployeeManagement() {
   const [formErrors, setFormErrors] = useState([]);
   const [showImportDH, setShowImportDH] = useState(false);
   const [derechohabienteFilter, setDerechohabienteFilter] = useState("all");
+  const [showCodeAudit, setShowCodeAudit] = useState(false);
 
   const { hasPermission, getAccessibleSites, canViewFinancials, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
@@ -527,6 +530,9 @@ export default function EmployeeManagement() {
   };
 
   const handleSubmit = async () => {
+    // Los códigos y documentos se comparan normalizados para que mayúsculas o
+    // espacios no permitan registrar dos veces a la misma persona.
+
     // Validar campo obligatorio de marcación siempre
     if (!formData.attendance_method) {
       setFormErrors(["El campo 'Tipo de Marcación' en la pestaña Laboral es obligatorio"]);
@@ -571,13 +577,33 @@ export default function EmployeeManagement() {
       errors.push("El Carné de Extranjería debe tener máximo 12 caracteres");
     }
 
-    // Validar documento duplicado
-    const existingEmployee = allEmployees.find(emp =>
-      emp.document_number === formData.document_number &&
-      emp.document_type === formData.document_type
-    );
-    if (existingEmployee) {
-      errors.push(`Ya existe un empleado con este ${formData.document_type}: ${formData.document_number} — ${existingEmployee.first_name} ${existingEmployee.last_name} (${existingEmployee.employee_code})`);
+    // Se contrasta contra la base recién leída: evita duplicados por reintentos
+    // o por registros creados mientras el formulario estaba abierto.
+    let latestEmployees = allEmployees;
+    try {
+      latestEmployees = await entitiesAPI.Employee.list("-created_date");
+    } catch (error) {
+      console.error("No se pudo verificar duplicados en el servidor:", error);
+      setFormErrors(["No se pudieron verificar los duplicados. Reintente antes de guardar."]);
+      return;
+    }
+
+    // Un código de empleado pertenece a una sola persona
+    const codeKey = normalizeEmployeeCode(formData.employee_code);
+    if (codeKey) {
+      const codeOwner = latestEmployees.find(emp => normalizeEmployeeCode(emp.employee_code) === codeKey);
+      if (codeOwner) {
+        errors.push(`El código ${formData.employee_code} ya está asignado a ${codeOwner.first_name} ${codeOwner.last_name}. Cierra y vuelve a abrir el formulario para generar un código libre, o corrige los códigos duplicados antes de continuar.`);
+      }
+    }
+
+    // Un documento (tipo + número) solo puede estar registrado una vez
+    const docKey = normalizeDocumentNumber(formData.document_type, formData.document_number);
+    if (docKey) {
+      const docOwner = latestEmployees.find(emp => normalizeDocumentNumber(emp.document_type, emp.document_number) === docKey);
+      if (docOwner) {
+        errors.push(`Ya existe un empleado con este ${formData.document_type}: ${formData.document_number} — ${docOwner.first_name} ${docOwner.last_name} (${docOwner.employee_code}). Un documento solo puede registrarse una vez.`);
+      }
     }
 
     if (errors.length > 0) {
@@ -586,7 +612,7 @@ export default function EmployeeManagement() {
     }
 
     setFormErrors([]);
-    createEmployeeMutation.mutate(buildEmployeePayload(formData));
+    createEmployeeMutation.mutate(buildEmployeePayload({ ...formData, employee_code: normalizeEmployeeCode(formData.employee_code) }));
   };
 
   const handleStatusChange = async (emp, newStatus) => {
@@ -648,6 +674,9 @@ export default function EmployeeManagement() {
     : accessibleSites === null
       ? allEmployees
       : allEmployees.filter(emp => accessibleSites.includes(emp.site));
+
+  // Códigos repetidos en la base: se muestran como aviso en el botón de revisión
+  const duplicateCodeGroups = findEmployeeCodeDuplicates(allEmployees);
 
   const departmentNames = [...new Set(siteAllowedEmployees.map(e => e.department_name))].filter(Boolean);
   const contractTypes = [...new Set(siteAllowedEmployees.map(e => e.contract_type))].filter(Boolean);
@@ -793,6 +822,17 @@ export default function EmployeeManagement() {
               >
                 <Shield className="w-4 h-4 mr-2" />
                 Importar Empleados
+              </Button>
+            )}
+            {(hasPermission("employees.edit") || hasPermission("employees.create")) && (
+              <Button
+                variant="outline"
+                onClick={() => setShowCodeAudit(true)}
+                title="Verificar que no existan códigos de empleado duplicados"
+                className={duplicateCodeGroups.length > 0 ? "border-amber-300 text-amber-700 hover:bg-amber-50" : ""}
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Revisar códigos{duplicateCodeGroups.length > 0 ? ` (${duplicateCodeGroups.length})` : ""}
               </Button>
             )}
             <Button
@@ -1015,6 +1055,18 @@ export default function EmployeeManagement() {
           onClose={() => setShowImportDH(false)}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["derechohabientes"] });
+          }}
+        />
+      )}
+
+      {/* Revisión de códigos duplicados */}
+      {showCodeAudit && (
+        <EmployeeCodeAuditModal
+          employees={allEmployees}
+          onClose={() => setShowCodeAudit(false)}
+          onCorrected={() => {
+            queryClient.invalidateQueries(["allEmployees"]);
+            queryClient.invalidateQueries(["employeeChanges"]);
           }}
         />
       )}

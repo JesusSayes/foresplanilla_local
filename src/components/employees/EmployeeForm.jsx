@@ -14,6 +14,7 @@ import { format, subMonths } from "date-fns";
 import { toast } from "sonner";
 import { usePermissions } from "../hooks/usePermissions";
 import { uploadFile } from "@/services/uploadService";
+import { generateNextEmployeeCode } from "@/lib/employeeCode";
 
 export default function EmployeeForm({
   editingEmployee,
@@ -42,16 +43,12 @@ export default function EmployeeForm({
   const { canViewFinancials } = usePermissions();
   const showFinancials = showFinancialsProp ?? canViewFinancials();
 
-  // Auto-generar código FPxxxx al abrir para nuevo empleado
+  // Auto-generar código FPxxxx al abrir para nuevo empleado.
+  // generateNextEmployeeCode considera TODOS los códigos ya registrados y
+  // avanza hasta encontrar uno libre: nunca repite el código de otro empleado.
   React.useEffect(() => {
     if (!editingEmployee) {
-      const fpCodes = allEmployees
-        .map(e => e.employee_code)
-        .filter(c => c && /^FP\d{4}$/.test(c))
-        .map(c => parseInt(c.slice(2), 10));
-      const maxNum = fpCodes.length > 0 ? Math.max(...fpCodes) : 0;
-      const nextNum = String(maxNum + 1).padStart(4, "0");
-      setFormData(prev => ({ ...prev, employee_code: `FP${nextNum}` }));
+      setFormData(prev => ({ ...prev, employee_code: generateNextEmployeeCode(allEmployees) }));
     }
   }, []);
 
