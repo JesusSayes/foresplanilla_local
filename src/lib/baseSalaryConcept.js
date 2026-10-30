@@ -31,3 +31,34 @@ export const applyContractSalaryToBaseConcepts = (concepts, contractSalary) => {
     isFixedBaseSalaryConcept(concept) ? { ...concept, amount: salary } : concept
   );
 };
+
+const BASE_SALARY_NAME_RE = /remuneraci[oó]n\s*(b[aá]sica|base)/i;
+
+/** ¿El concepto representa la remuneración básica, sea fijo o dinámico? */
+export const isBaseSalaryConcept = (concept) => {
+  if (!concept) return false;
+  if (concept.system_logic_type) return false;
+  const category = String(concept.concept_category || "").toLowerCase();
+  if (category.includes("remuneración base") || category.includes("remuneracion base")) return true;
+  if (BASE_SALARY_NAME_RE.test(concept.concept_name || "")) return true;
+  return BASE_SALARY_CODES.includes(String(concept.concept_code || "").trim());
+};
+
+/**
+ * Remuneración básica del período: sueldo del contrato prorrateado SOLO por los días
+ * contractuales (ingreso/cese en el mes). Las faltas y las licencias sin goce NO se
+ * prorratean aquí: se descuentan como conceptos independientes en la boleta
+ * (src/lib/attendanceDiscounts.js), de modo que el descuento sea visible y no se
+ * cobre dos veces el mismo día.
+ */
+export const applyContractualBaseSalary = (concepts, contractSalary, contractualDays = 30) => {
+  const salary = Number(contractSalary) || 0;
+  if (salary <= 0) return concepts || [];
+  const days = Math.min(30, Math.max(0, Number(contractualDays) || 0));
+  const amount = Math.round(((salary / 30) * days) * 100) / 100;
+  return (concepts || []).map((concept) =>
+    isBaseSalaryConcept(concept)
+      ? { ...concept, is_dynamic: false, calculation_formula: "", amount }
+      : concept
+  );
+};

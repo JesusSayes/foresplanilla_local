@@ -187,6 +187,25 @@ const FULL_DAY_COVERING_TYPES = [
   "Onomástico",
 ];
 
+/** Justificación NO remunerada: licencia/permiso sin goce de haber. */
+export const UNPAID_LEAVE_TYPE = "Licencia sin Goce de Haber";
+
+// "Permiso sin goce (horas): 09:00 - 12:00" → permiso por horas: no resta días
+// (su descuento monetario es un concepto creado al aprobar la solicitud).
+const HOURS_LEAVE_RE = /\(\s*horas\s*\)/i;
+
+/** Permiso sin goce de DÍA COMPLETO registrado en el control de asistencia. */
+export const isFullDayUnpaidLeaveRecord = (record) =>
+  record?.status === "Permiso sin goce" && !HOURS_LEAVE_RE.test(record?.notes || "");
+
+/** Justificación aprobada de licencia sin goce que cubre el día completo. */
+export const findApprovedUnpaidLeave = (approvedIncidents = []) =>
+  (approvedIncidents || []).find(
+    (i) =>
+      i.incident_type === UNPAID_LEAVE_TYPE &&
+      (i.full_day_justification || !(i.justified_time_start || i.justified_time_end))
+  );
+
 /** Incidente aprobado que cubre la jornada completa (día completo o tipo que cubre el día). */
 const findFullDayCover = (approvedIncidents = []) =>
   (approvedIncidents || []).find(
@@ -225,13 +244,20 @@ export const classifyAbsenceDay = ({
     return { kind: ABSENCE_KIND.COVERED, reason: "Vacaciones aprobadas" };
   }
 
+  // Licencia sin goce de haber (justificación aprobada de ese tipo o estado del
+  // registro): la jornada NO es remunerada. Se evalúa antes que la cobertura por
+  // justificación para que no se trate como ausencia remunerada (descanso médico).
+  if (findApprovedUnpaidLeave(approvedIncidents) || isFullDayUnpaidLeaveRecord(record)) {
+    return { kind: ABSENCE_KIND.SIN_GOCE, reason: "Licencia sin goce de haber (día completo)" };
+  }
+
   const fullDayCover = findFullDayCover(approvedIncidents);
   if (fullDayCover) {
     return { kind: ABSENCE_KIND.COVERED, reason: `Cubierta por ${fullDayCover.incident_type}` };
   }
 
-  if (record?.status === "Permiso sin goce" || approvedIncidents.some(i => i.incident_type === "Licencia sin Goce de Haber")) {
-    return { kind: ABSENCE_KIND.SIN_GOCE, reason: "Permiso sin goce de haber" };
+  if (record?.status === "Permiso sin goce") {
+    return { kind: ABSENCE_KIND.COVERED, reason: "Permiso sin goce por horas" };
   }
 
   const markings = getSegmentClockTimes(record);
