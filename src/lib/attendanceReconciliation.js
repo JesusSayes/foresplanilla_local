@@ -239,6 +239,12 @@ export const classifyAbsenceDay = ({
   isVacation = false,
   isHoliday = false,
 }) => {
+  // Si el horario ya no está disponible, conservar la jornada histórica del
+  // registro. Un descanso o una exoneración explícitos del resolver prevalecen.
+  if ((!scheduleDay || scheduleDay.unknown) && record?.scheduled_start && record?.scheduled_end) {
+    scheduleDay = { start: record.scheduled_start, end: record.scheduled_end };
+  }
+
   const isWorkable = !!(scheduleDay?.start && scheduleDay?.end);
 
   if (isHoliday) {
@@ -297,7 +303,9 @@ export const classifyAbsenceDay = ({
     return { kind: ABSENCE_KIND.REVIEW, reason: `Marcado como ausente con estado "${record?.status || "sin estado"}"` };
   }
   if (!record?.is_absent && record?.status === "Ausente") {
-    return { kind: ABSENCE_KIND.REVIEW, reason: "Estado Ausente sin el indicador de falta" };
+    // Ya se validaron jornada laborable, ausencia de marcaciones y cobertura.
+    // El indicador histórico puede estar desactualizado respecto del estado.
+    return { kind: ABSENCE_KIND.CONFIRMED, reason: "Ausente sin marcaciones ni justificación en jornada laborable" };
   }
   if (record?.status === "Justificado") {
     return { kind: ABSENCE_KIND.COVERED, reason: "Justificación aprobada" };
