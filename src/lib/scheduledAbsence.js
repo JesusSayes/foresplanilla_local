@@ -22,8 +22,10 @@ const NO_DISCOUNT_STATUSES = ["Justificado", "Vacaciones", "Compensación", "Per
  * (una entrada sin salida) ni los registros que declaran una falta con
  * marcaciones: quedan para regularización (reviewDays).
  *
- * Devuelve Map<employeeId, { absenceDays, reviewDays }>, cada día como
+ * Devuelve Map<employeeId, { absenceDays, reviewDays, sinGoceDays }>, cada día como
  * { date, reason }, para que la planilla muestre y verifique el detalle.
+ * `sinGoceDays` son las licencias sin goce de haber aprobadas: no son faltas, se
+ * descuentan como concepto independiente en la boleta.
  */
 export const buildPayrollAbsenceDays = ({
   employees = [],
@@ -66,11 +68,23 @@ export const buildPayrollAbsenceDays = ({
 
   const result = new Map();
   const addDay = (employeeId, bucket, row) => {
-    if (!result.has(employeeId)) result.set(employeeId, { absenceDays: [], reviewDays: [] });
-    result.get(employeeId)[bucket].push({ date: row.date, reason: row.reason });
+    if (!result.has(employeeId)) {
+      result.set(employeeId, { absenceDays: [], reviewDays: [], sinGoceDays: [] });
+    }
+    const bucketDays = result.get(employeeId)[bucket];
+    // Una jornada se computa una sola vez por tipo (sin duplicar el mismo día).
+    if (bucketDays.some((day) => day.date === row.date)) return;
+    bucketDays.push({ date: row.date, reason: row.reason });
   };
 
   for (const row of findings) {
+    // Licencia sin goce de haber aprobada: no es falta ni ausencia remunerada; se
+    // descuenta como concepto independiente y resta un día trabajado.
+    if (row.kind === ABSENCE_KIND.SIN_GOCE) {
+      addDay(row.employeeId, "sinGoceDays", row);
+      continue;
+    }
+
     const isAbsenceKind = row.kind === ABSENCE_KIND.CONFIRMED || row.kind === ABSENCE_KIND.REVIEW;
     if (!isAbsenceKind) continue;
 

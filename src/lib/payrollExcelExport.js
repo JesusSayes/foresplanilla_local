@@ -1,6 +1,7 @@
 // Exportación a Excel de la planilla (una fila por boleta).
 
 import * as XLSX from "xlsx";
+import { UNPAID_LEAVE_DISCOUNT_NAME } from "@/lib/attendanceDiscounts";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -73,6 +74,11 @@ export const exportPayslipsToExcel = (payslipsData, allEmployees = [], filename,
       "Desc. Tardanzas": safeNum(p.tardiness_discount),
       "Desc. Salida Anticipada": safeNum(p.early_departure_discount),
       "Desc. Faltas": safeNum(p.absence_discount),
+      "Desc. Licencia sin Goce": safeNum(
+        (p.calculation_summary?.breakdown?.deductions?.items || [])
+          .filter(i => i.name === UNPAID_LEAVE_DISCOUNT_NAME)
+          .reduce((sum, i) => sum + Math.abs(safeNum(i.amount)), 0)
+      ),
       "Desc. Adelanto": safeNum(p.advance_deduction),
       "Desc. Préstamo": safeNum(p.loan_deduction),
       "Otros Descuentos": safeNum(p.other_deductions),
