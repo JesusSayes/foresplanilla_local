@@ -29,6 +29,7 @@ import PayrollHistoryTab from "../components/payroll/PayrollHistoryTab";
 import ContractAlertBanner from "../components/payroll/ContractAlertBanner";
 import PensionBlockedBanner from "../components/payroll/PensionBlockedBanner";
 import AbsenceReviewBanner from "../components/payroll/AbsenceReviewBanner";
+import MissingClockOutAlert from "../components/payroll/MissingClockOutAlert";
 import ContractAlertModal from "../components/payroll/ContractAlertModal";
 import PayrollPreviewCard from "../components/payroll/PayrollPreviewCard";
 import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/lib/payrollUtils";
@@ -36,6 +37,7 @@ import { calcEffectiveMetrics } from "@/lib/attendanceMetrics";
 import { pickContractForPeriod, describeContract } from "@/lib/contractSelection";
 import { applyContractualBaseSalary } from "@/lib/baseSalaryConcept";
 import { buildAttendanceDiscountConcepts } from "@/lib/attendanceDiscounts";
+import { buildAffectationMap, buildJustifiedHoursDiscount } from "@/lib/justifiedDiscounts";
 import {
   computeMarkedLateMinutes,
   resolveDiscountLateMinutes,
@@ -173,6 +175,9 @@ export default function PayrollManagement() {
   const [pensionBlockedWorkers, setPensionBlockedWorkers] = useState([]);
   // Jornadas del período pendientes de regularización (no se descuentan como falta).
   const [absenceReviewDetails, setAbsenceReviewDetails] = useState([]);
+  // Jornadas con entrada registrada y sin salida, donde sí se descontaron las horas
+  // aprobadas de una justificación con afectación "Descuento".
+  const [missingClockOutDetails, setMissingClockOutDetails] = useState([]);
   // Boletas calculadas que esperan la confirmación explícita del usuario.
   const [pendingGeneration, setPendingGeneration] = useState(null);
   const [showContractAlert, setShowContractAlert] = useState(false);
@@ -381,6 +386,17 @@ export default function PayrollManagement() {
     queryKey: ["payrollHolidays"],
     queryFn: async () => {
       const res = await withRetry(() => base44.entities.Holiday.list("-date", 500));
+      return Array.isArray(res) ? res : (res?.items || []);
+    },
+    staleTime: 0,
+  });
+
+  // Catálogo de tipos de incidente: define la afectación de cada justificación
+  // ("Permiso" = no descuenta, "Descuento" = descuenta las horas aprobadas).
+  const incidentTypesQuery = useQuery({
+    queryKey: ["payrollIncidentTypes"],
+    queryFn: async () => {
+      const res = await withRetry(() => base44.entities.IncidentType.list());
       return Array.isArray(res) ? res : (res?.items || []);
     },
     staleTime: 0,
@@ -655,6 +671,7 @@ export default function PayrollManagement() {
         ["allWorkSchedules"],
         ["payrollHolidays"],
         ["payrollApprovedIncidents"],
+        ["payrollIncidentTypes"],
       ];
       await Promise.all(criticalKeys.map(key => queryClient.refetchQueries({ queryKey: key, exact: true })));
 
@@ -697,6 +714,8 @@ export default function PayrollManagement() {
       const workSchedules = queryClient.getQueryData(["allWorkSchedules"]) ?? [];
       const holidayRecords = queryClient.getQueryData(["payrollHolidays"]) ?? [];
       const approvedIncidents = queryClient.getQueryData(["payrollApprovedIncidents"]) ?? [];
+      // Afectación configurada de cada tipo de incidente (Permiso / Descuento).
+      const affectationMap = buildAffectationMap(queryClient.getQueryData(["payrollIncidentTypes"]) ?? []);
       // Cuotas del período agrupadas por empleado (solo de préstamos activos)
       const loanInstallmentsByEmployee = buildInstallmentsByEmployee(loanInstallments, activeLoansData);
 
@@ -811,6 +830,8 @@ export default function PayrollManagement() {
     const ignoredPensionConcepts = new Set();
     // Detalle de las faltas descontadas, para que RR. HH. pueda verificarlas.
     const absenceDiscountSummary = [];
+    // Jornadas con entrada sin salida donde se descontaron las horas aprobadas.
+    const missingClockOutRows = [];
 
     // Helper: contrato APROBADO (estado "Vigente") que corresponde al período.
     //   1. Contrato aprobado que solapa el período (inicio ≤ fin mes, fin ≥ inicio mes o nulo)
@@ -1336,6 +1357,12 @@ export default function PayrollManagement() {
       // Sin tolerancia: descuento desde el primer minuto. Excluye registros
       // justificados, de vacaciones, compensación, permiso sin goce y ausentes.
       // No interpreta una marcación de salida ausente como salida anticipada.
+      // Minutos de salida anticipada de una jornada (usa lo almacenado por el motor,
+      // que considera las justificaciones aprobadas; si no, lo calcula al vuelo).
+      const earlyDepartureMinutesFor = (r) =>
+        r.early_departure_minutes != null && r.early_departure_minutes > 0
+          ? r.early_departure_minutes
+          : getEarlyDepartureMinutes(r, []);
       const earlyDepartureRecords = attendanceForDiscounts.filter(r =>
         r.status !== "Justificado" && r.status !== "Vacaciones" &&
         r.status !== "Compensación" && r.status !== "Permiso sin goce" &&
@@ -1356,6 +1383,49 @@ export default function PayrollManagement() {
       const hourlyRate = dailyRate > 0 ? roundMoney(dailyRate / 8) : 0;
       const tardinessDiscount = payrollType === "Quincenal" ? 0 : roundMoney(hourlyRate * (totalLateMinutes / 60));
 
+      // ── Descuento por HORAS de justificaciones aprobadas con afectación "Descuento" ──
+      // La afectación se lee del catálogo de incidentes (no del nombre): un permiso no
+      // descuenta. Se descuenta una sola vez: se omiten las fechas ya descontadas como
+      // falta completa o licencia sin goce y se restan los minutos ya cobrados ese día
+      // por tardanza o salida anticipada.
+      const chargedMinutesByDate = new Map();
+      attendanceForDiscounts.forEach((record) => {
+        const day = normDate(record.date);
+        chargedMinutesByDate.set(
+          day,
+          (chargedMinutesByDate.get(day) || 0) + effectiveLateMinutes(record) + earlyDepartureMinutesFor(record)
+        );
+      });
+      const justifiedHoursDiscount = buildJustifiedHoursDiscount({
+        employeeId: emp.id,
+        baseSalary: baseSalaryForCalc,
+        payrollType,
+        incidents: approvedIncidents,
+        affectationMap,
+        periodStart: attendanceFrom,
+        periodEnd: attendanceTo,
+        alreadyDiscountedDates: new Set([
+          ...absenceDaysToDiscount.map((day) => normDate(day.date)),
+          ...unpaidLeaveDates,
+        ].filter(Boolean)),
+        records: attendanceForDiscounts,
+        chargedMinutesByDate,
+      });
+      if (justifiedHoursDiscount.concept) {
+        conceptsForCalc = [...conceptsForCalc, justifiedHoursDiscount.concept];
+      }
+      justifiedHoursDiscount.missingClockOut.forEach((alert) => {
+        const day = justifiedHoursDiscount.days.find((d) => d.date === alert.date);
+        missingClockOutRows.push({
+          employee_id: emp.id,
+          employee_code: emp.employee_code || "",
+          employee_name: `${emp.first_name} ${emp.last_name}`,
+          date: alert.date,
+          types: alert.types,
+          hours: day?.hours || 0,
+        });
+      });
+
       // ── Descuento por inasistencias y por licencia sin goce (conceptos propios) ──
       // Se calculan sobre el valor diario del sueldo del contrato y se entregan al
       // motor como conceptos de descuento: aparecen en la boleta, reducen el neto y la
@@ -1375,14 +1445,10 @@ export default function PayrollManagement() {
       const unpaidLeaveDiscountAmount = attendanceDiscounts.unpaidLeaveAmount;
       // ── Descuento por salida anticipada ──
       // Usa el mismo valor hora que tardanzas (salario diario / 8).
-      const totalEarlyDepartureMinutes = earlyDepartureRecords.reduce((sum, r) => {
-        // Usar el valor almacenado por el motor si está disponible (considera
-        // justificaciones aprobadas). Si no, calcular inline como respaldo.
-        if (r.early_departure_minutes != null && r.early_departure_minutes > 0) {
-          return sum + r.early_departure_minutes;
-        }
-        return sum + getEarlyDepartureMinutes(r, []);
-      }, 0);
+      const totalEarlyDepartureMinutes = earlyDepartureRecords.reduce(
+        (sum, r) => sum + earlyDepartureMinutesFor(r),
+        0
+      );
       const earlyDepartureDiscount = payrollType === "Quincenal" ? 0 : roundMoney(hourlyRate * (totalEarlyDepartureMinutes / 60));
 
       // Datos adicionales para lógica del sistema (derechohabientes, tardanzas, inasistencias)
@@ -1575,6 +1641,7 @@ export default function PayrollManagement() {
       const calculatedPayslips = payslipsData.filter(Boolean);
       setPensionBlockedWorkers(pensionBlockedWorkers);
       setAbsenceReviewDetails(absenceReviewDetails);
+      setMissingClockOutDetails(missingClockOutRows);
       setPreviewData(calculatedPayslips);
       setShowPreview(true);
       setContractAlerts({ noApproved: noApprovedContractWorkers, conflicts: contractConflicts });
@@ -2002,6 +2069,7 @@ export default function PayrollManagement() {
                   />
                   <PensionBlockedBanner workers={pensionBlockedWorkers} />
                   <AbsenceReviewBanner pending={absenceReviewDetails} />
+                  <MissingClockOutAlert rows={missingClockOutDetails} />
                   <div className="mb-6 flex gap-3 flex-wrap">
                     <Button
                       onClick={() => generatePayrollSummaryPDF({
