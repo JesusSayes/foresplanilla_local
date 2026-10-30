@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   FileText, Plus, Edit, Download, Search, Calendar,
-  CheckCircle, AlertCircle, XCircle, Star, PenLine, Shield, Users
+  CheckCircle, AlertCircle, XCircle, Star, PenLine, Shield, Users, ScrollText
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -20,6 +20,7 @@ import { todayLima, parseDateLima } from "@/lib/dateUtils";
 import { pickEffectiveContract } from "@/lib/contractSelection";
 import { toast } from "sonner";
 import { generateContractPDF } from "../components/contracts/ContractTemplate";
+import SignedContractViewer from "../components/contracts/SignedContractViewer";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { MapPin } from "lucide-react";
 
@@ -44,6 +45,7 @@ export default function ContractManagement() {
   const [signatureImageUrl, setSignatureImageUrl] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [siteFilterContracts, setSiteFilterContracts] = useState("all");
+  const [viewingContract, setViewingContract] = useState(null);
   const PAGE_SIZE = 50;
 
   const queryClient = useQueryClient();
@@ -727,6 +729,17 @@ export default function ContractManagement() {
                               <SelectItem value="Renovado">Renovado</SelectItem>
                             </SelectContent>
                           </Select>
+                          {contract.is_digitally_signed && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                              onClick={() => setViewingContract(contract)}
+                              title="Consultar el contrato firmado y sus datos guardados"
+                            >
+                              <ScrollText className="w-4 h-4 mr-1" /> Ver firmado
+                            </Button>
+                          )}
                           <Button size="sm" variant="outline" onClick={() => handleGeneratePDF(contract)} title="Generar PDF">
                             <Download className="w-4 h-4" />
                           </Button>
@@ -994,6 +1007,17 @@ export default function ContractManagement() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Consulta de contrato firmado (solo lectura) */}
+      {viewingContract && (
+        <SignedContractViewer
+          contract={viewingContract}
+          employee={allEmployees.find(e => e.id === viewingContract.employee_id) || null}
+          template={contractTemplates.find(t => t.id === viewingContract.template_id) || null}
+          companyInfo={companyInfo || null}
+          onClose={() => setViewingContract(null)}
+        />
       )}
 
       {/* Conflict Modal */}

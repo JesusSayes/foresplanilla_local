@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { buildOrderedSections } from "@/lib/contractSections";
 
-export const generateContractPDF = async (employee, contract, companyData = {}, templateData = null) => {
+export const buildContractPDF = async (employee, contract, companyData = {}, templateData = null) => {
   const doc = new jsPDF();
   doc.setFont("times");
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -400,8 +400,16 @@ export const generateContractPDF = async (employee, contract, companyData = {}, 
     doc.setTextColor(0, 0, 0);
   }
 
-  doc.save(`Contrato_${employee.last_name}_${employee.first_name}_${contract.contract_number || contract.id}.pdf`);
+  return doc;
+};
 
+export const contractFileName = (employee, contract) =>
+  `Contrato_${employee?.last_name || ""}_${employee?.first_name || ""}_${contract?.contract_number || contract?.id || ""}.pdf`;
+
+// Genera el PDF del contrato y lo descarga (mismo resultado que antes).
+export const generateContractPDF = async (employee, contract, companyData = {}, templateData = null) => {
+  const doc = await buildContractPDF(employee, contract, companyData, templateData);
+  doc.save(contractFileName(employee, contract));
   return doc;
 };
 
