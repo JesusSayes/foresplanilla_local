@@ -92,11 +92,12 @@ test('configuración inválida se rechaza sin escrituras', async t => {
 });
 
 test('creación de empleado persiste la política parametrizada', async t => {
-  t.mock.method(pool, 'query', async (sql, params) => {
+  t.mock.method(pool, 'connect', async () => ({ release() {}, query: async (sql, params) => {
+    if (!sql.includes('INSERT INTO employee')) return { rows: [] };
     assert.match(sql, /overtime_payment_mode/); assert.equal(params.length, 61);
     assert.equal(params[60], 'compensation_only');
     return { rows: [{ id: 'e1', overtime_payment_mode: params[60] }] };
-  });
+  } }));
   const res = response(); await createEmployee(request({ first_name: 'Empleado', overtime_payment_mode: 'compensation_only' }), res);
   assert.equal(res.statusCode, 201); assert.equal(res.body.overtime_payment_mode, 'compensation_only');
 });

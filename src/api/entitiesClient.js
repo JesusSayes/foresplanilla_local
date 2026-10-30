@@ -45,6 +45,10 @@ export const entitiesAPI = {
   QuintaCategoriaConfig: createEntityAPI('/api/payroll/supplements/QuintaCategoriaConfig'),
   VentaVacaciones: createEntityAPI('/api/payroll/supplements/VentaVacaciones'),
   Employee: {
+    correctCodes: async (changes) => {
+      const response = await localClient.post('/api/employees/correct-codes', changes);
+      return response.data;
+    },
     ...createEntityAPI('/api/employees'),
     accessible: async (permissions) => {
       const response = await localClient.get('/api/employees/accessible', {

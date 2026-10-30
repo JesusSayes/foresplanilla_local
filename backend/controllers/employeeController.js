@@ -1,3 +1,4 @@
+import { normalizeEmployeeCode, normalizeDocumentNumber } from '../../src/lib/employeeCode.js';
 import pool, { query } from '../config/database.js';
 import { isValidOvertimePaymentMode } from '../services/overtimePaymentPolicy.js';
 import { buildFilterQuery, buildSortQuery } from '../utils/queryBuilder.js';
@@ -124,7 +125,20 @@ export const getEmployee = async (req, res) => {
   }
 };
 
+const employeeIdentityConflict = async (client, data, excludeId, previous = {}) => {
+  const code = normalizeEmployeeCode(data.employee_code);
+  const doc = normalizeDocumentNumber(data.document_type ?? previous.document_type, data.document_number ?? previous.document_number);
+  const checkCode = Object.hasOwn(data, 'employee_code') && code && code !== normalizeEmployeeCode(previous.employee_code);
+  const checkDoc = (Object.hasOwn(data, 'document_type') || Object.hasOwn(data, 'document_number')) && doc && doc !== normalizeDocumentNumber(previous.document_type, previous.document_number);
+  if (!checkCode && !checkDoc) return null;
+  const { rows } = await client.query('SELECT id, employee_code, document_type, document_number FROM employee');
+  if (checkCode && rows.some(e => e.id !== excludeId && normalizeEmployeeCode(e.employee_code) === code)) return 'El código de empleado ya está asignado';
+  if (checkDoc && rows.some(e => e.id !== excludeId && normalizeDocumentNumber(e.document_type, e.document_number) === doc)) return 'El documento ya está registrado';
+  return null;
+};
+
 export const createEmployee = async (req, res) => {
+  let client;
   try {
     const data = req.body;
     if (Object.hasOwn(data, 'overtime_payment_mode') && !isValidOvertimePaymentMode(data.overtime_payment_mode)) {
@@ -189,11 +203,23 @@ export const createEmployee = async (req, res) => {
     ];
 
     if (data.overtime_payment_mode !== undefined) values.push(data.overtime_payment_mode);
-    const result = await query(sql, values);
+    client = await pool.connect();
+    await client.query('BEGIN');
+    await client.query('LOCK TABLE employee IN SHARE ROW EXCLUSIVE MODE');
+    const conflict = await employeeIdentityConflict(client, data);
+    if (conflict) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: conflict });
+    }
+    const result = await client.query(sql, values);
+    await client.query('COMMIT');
     res.status(201).json(result.rows[0]);
   } catch (error) {
+    if (client) await client.query('ROLLBACK');
     console.error('Error creating employee:', error);
     res.status(500).json({ error: 'Error al crear empleado' });
+  } finally {
+    client?.release();
   }
 };
 
@@ -208,6 +234,9 @@ export const updateEmployee = async (req, res) => {
     if (!canAccessEmployee(req, id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
 
     await client.query('BEGIN');
+    if (['employee_code', 'document_type', 'document_number'].some(field => Object.hasOwn(data, field))) {
+      await client.query('LOCK TABLE employee IN SHARE ROW EXCLUSIVE MODE');
+    }
     const existing = await client.query('SELECT * FROM employee WHERE id = $1 FOR UPDATE', [id]);
     if (existing.rows.length === 0) {
       await client.query('ROLLBACK');
@@ -231,6 +260,12 @@ export const updateEmployee = async (req, res) => {
     ) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Tipo de comisión AFP inválido' });
+    }
+
+    const conflict = await employeeIdentityConflict(client, data, id, existing.rows[0]);
+    if (conflict) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: conflict });
     }
 
     const fields = [];
