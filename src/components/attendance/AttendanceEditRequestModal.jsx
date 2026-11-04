@@ -50,7 +50,7 @@ export default function AttendanceEditRequestModal({ record, employee, onClose, 
     notes:  record?.notes  || "",
   };
 
-  const [formValues, setFormValues] = useState(initialValues);
+  const [formValues, setFormValues] = useState({ ...initialValues, status: "" });
   const [reason, setReason]         = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg]     = useState("");
@@ -88,7 +88,7 @@ export default function AttendanceEditRequestModal({ record, employee, onClose, 
     setActiveSegments(segIdx); // collapse back
   };
 
-  const changedFields = Object.keys(FIELD_LABELS).filter(k => formValues[k] !== initialValues[k]);
+  const changedFields = Object.keys(FIELD_LABELS).filter(k => (k !== "status" || formValues.status) && formValues[k] !== initialValues[k]);
 
   const validateTime = (t) => !t || /^\d{2}:\d{2}$/.test(t);
 
@@ -97,6 +97,10 @@ export default function AttendanceEditRequestModal({ record, employee, onClose, 
 
     if (changedFields.length === 0) {
       setErrorMsg("No hay cambios para solicitar. Modifica al menos un campo.");
+      return;
+    }
+    if (!formValues.status) {
+      setErrorMsg("Debes seleccionar el estado del día antes de enviar la solicitud.");
       return;
     }
     if (!reason.trim()) {
@@ -277,9 +281,13 @@ export default function AttendanceEditRequestModal({ record, employee, onClose, 
           {/* Status + Notes */}
           <div className="grid grid-cols-2 gap-4 pt-1">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Estado</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Estado <span className="text-red-500">*</span>
+              </label>
               <Select value={formValues.status} onValueChange={v => set("status", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className={!formValues.status && errorMsg ? "border-red-400" : ""}>
+                  <SelectValue placeholder="Seleccione el estado..." />
+                </SelectTrigger>
                 <SelectContent>
                   {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>

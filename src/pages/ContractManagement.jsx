@@ -46,6 +46,7 @@ export default function ContractManagement() {
   const [signatureImageUrl, setSignatureImageUrl] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [siteFilterContracts, setSiteFilterContracts] = useState("all");
+  const [staffStatusFilter, setStaffStatusFilter] = useState("Activo"); // Activo | Cesado | all
   const [viewingContract, setViewingContract] = useState(null);
   const PAGE_SIZE = 50;
 
@@ -53,10 +54,9 @@ export default function ContractManagement() {
   const { hasPermission, employee, getAccessibleSites, loading: loadingPerms } = usePermissions();
 
   const { data: allEmployees = [] } = useQuery({
-    queryKey: ["allEmployees"],
-    queryFn: async () => {
-      return await entitiesAPI.Employee.filter({ status: "Activo" });
-    },
+    queryKey: ["allEmployees", "contracts"],
+    // Incluir activos y cesados para consultar el historial de contratos.
+    queryFn: () => entitiesAPI.Employee.list("-created_date"),
   });
 
   const { data: areaUnidadCargos = [] } = useQuery({
@@ -373,6 +373,8 @@ export default function ContractManagement() {
     const matchesSign = signatureFilter === "all" || (signatureFilter === "signed" ? isSigned : !isSigned);
     // Filtro de sede (selector UI)
     const matchesSite = siteFilterContracts === "all" || emp.site === siteFilterContracts;
+    // Filtro de personal: activo / cesado
+    const matchesStaff = staffStatusFilter === "all" || (emp.status || "Activo") === staffStatusFilter;
 
     // Filtro de vencimiento
     let matchesExpiry = true;
@@ -393,7 +395,7 @@ export default function ContractManagement() {
       }
     }
 
-    return matchesSearch && matchesStatus && matchesSign && matchesSite && matchesExpiry && (expiryFilter === "all" || c.status === "Vigente");
+    return matchesSearch && matchesStatus && matchesSign && matchesSite && matchesExpiry && matchesStaff && (expiryFilter === "all" || c.status === "Vigente");
   });
 
   const totalPages = Math.ceil(filteredContracts.length / PAGE_SIZE);
@@ -408,6 +410,7 @@ export default function ContractManagement() {
     if (!emp) return false;
     if (accessibleSites === undefined) return false;
     if (isSiteRestricted && !accessibleSites.includes(emp.site)) return false;
+    if (staffStatusFilter !== "all" && (emp.status || "Activo") !== staffStatusFilter) return false;
     return true;
   });
   const stats = {
@@ -553,6 +556,14 @@ export default function ContractManagement() {
                   <SelectItem value="Vencido">Vencido</SelectItem>
                   <SelectItem value="Rescindido">Rescindido</SelectItem>
                   <SelectItem value="Renovado">Renovado</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={staffStatusFilter} onValueChange={(v) => { setStaffStatusFilter(v); setCurrentPage(1); }}>
+                <SelectTrigger className="w-36"><SelectValue placeholder="Personal" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Activo">Personal Activo</SelectItem>
+                  <SelectItem value="Cesado">Personal Cesado</SelectItem>
+                  <SelectItem value="all">Activos y cesados</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={signatureFilter} onValueChange={(v) => { setSignatureFilter(v); setCurrentPage(1); }}>
@@ -817,6 +828,7 @@ export default function ContractManagement() {
                           <Input placeholder="Buscar empleado..." value={employeeSearchTerm} onChange={(e) => setEmployeeSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
                         </div>
                         {allEmployees
+                          .filter(emp => emp.status !== "Cesado" || emp.id === formData.employee_id)
                           .filter(emp =>
                             !isSiteRestricted ||
                             (Array.isArray(accessibleSites) && accessibleSites.includes(emp.site))
