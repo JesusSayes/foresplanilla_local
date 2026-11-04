@@ -45,6 +45,7 @@ export default function ContractManagement() {
   const [signatureImageUrl, setSignatureImageUrl] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [siteFilterContracts, setSiteFilterContracts] = useState("all");
+  const [staffStatusFilter, setStaffStatusFilter] = useState("Activo"); // Activo | Cesado | all
   const [viewingContract, setViewingContract] = useState(null);
   const PAGE_SIZE = 50;
 
@@ -58,7 +59,9 @@ export default function ContractManagement() {
 
   const { data: allEmployees = [] } = useQuery({
     queryKey: ["allEmployees"],
-    queryFn: () => base44.entities.Employee.filter({ status: "Activo" }),
+    // Se cargan activos y cesados: los contratos del personal cesado deben poder
+    // consultarse en cualquier momento mediante el filtro de personal.
+    queryFn: () => base44.entities.Employee.list("-created_date"),
   });
 
   const { data: areaUnidadCargos = [] } = useQuery({
@@ -392,6 +395,8 @@ export default function ContractManagement() {
     const matchesSign = signatureFilter === "all" || (signatureFilter === "signed" && c.is_digitally_signed) || (signatureFilter === "pending" && !c.is_digitally_signed);
     // Filtro de sede (selector UI)
     const matchesSite = siteFilterContracts === "all" || emp.site === siteFilterContracts;
+    // Filtro de personal: activo / cesado
+    const matchesStaff = staffStatusFilter === "all" || (emp.status || "Activo") === staffStatusFilter;
     
     // Filtro de vencimiento
     let matchesExpiry = true;
@@ -412,7 +417,7 @@ export default function ContractManagement() {
       }
     }
     
-    return matchesSearch && matchesStatus && matchesSign && matchesSite && matchesExpiry;
+    return matchesSearch && matchesStatus && matchesSign && matchesSite && matchesExpiry && matchesStaff;
   });
 
   const totalPages = Math.ceil(filteredContracts.length / PAGE_SIZE);
@@ -427,6 +432,7 @@ export default function ContractManagement() {
     if (!emp) return false;
     if (accessibleSites === undefined) return false;
     if (isSiteRestricted && !accessibleSites.includes(emp.site)) return false;
+    if (staffStatusFilter !== "all" && (emp.status || "Activo") !== staffStatusFilter) return false;
     return true;
   });
   const stats = {
@@ -572,6 +578,14 @@ export default function ContractManagement() {
                   <SelectItem value="Vencido">Vencido</SelectItem>
                   <SelectItem value="Rescindido">Rescindido</SelectItem>
                   <SelectItem value="Renovado">Renovado</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={staffStatusFilter} onValueChange={(v) => { setStaffStatusFilter(v); setCurrentPage(1); }}>
+                <SelectTrigger className="w-36"><SelectValue placeholder="Personal" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Activo">Personal Activo</SelectItem>
+                  <SelectItem value="Cesado">Personal Cesado</SelectItem>
+                  <SelectItem value="all">Activos y cesados</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={signatureFilter} onValueChange={(v) => { setSignatureFilter(v); setCurrentPage(1); }}>
@@ -817,6 +831,7 @@ export default function ContractManagement() {
                           <Input placeholder="Buscar empleado..." value={employeeSearchTerm} onChange={(e) => setEmployeeSearchTerm(e.target.value)} className="h-8" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
                         </div>
                         {allEmployees
+                          .filter(e => e.status !== "Cesado" || e.id === formData.employee_id)
                           .filter(e => !isSiteRestricted || (Array.isArray(accessibleSites) && accessibleSites.includes(e.site)))
                           .filter(e => e.first_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || e.last_name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || e.employee_code.toLowerCase().includes(employeeSearchTerm.toLowerCase()))
                           .map(e => (
