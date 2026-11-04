@@ -46,7 +46,7 @@ export default function AttendanceEditRequestModal({ record, employee, requester
     clock_out_3: normalizeTime(record?.clock_out_3),
     clock_in_4:  normalizeTime(record?.clock_in_4),
     clock_out_4: normalizeTime(record?.clock_out_4),
-    status: record?.status || "Completo",
+    status: "",
     notes:  record?.notes  || "",
   };
 
@@ -97,6 +97,10 @@ export default function AttendanceEditRequestModal({ record, employee, requester
 
     if (changedFields.length === 0) {
       setErrorMsg("No hay cambios para solicitar. Modifica al menos un campo.");
+      return;
+    }
+    if (!formValues.status) {
+      setErrorMsg("Debes seleccionar el estado del día antes de enviar la solicitud.");
       return;
     }
     if (!reason.trim()) {
@@ -286,9 +290,13 @@ export default function AttendanceEditRequestModal({ record, employee, requester
           {/* Status + Notes */}
           <div className="grid grid-cols-2 gap-4 pt-1">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Estado</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Estado <span className="text-red-500">*</span>
+              </label>
               <Select value={formValues.status} onValueChange={v => set("status", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className={!formValues.status && errorMsg ? "border-red-400" : ""}>
+                  <SelectValue placeholder="Seleccione el estado..." />
+                </SelectTrigger>
                 <SelectContent>
                   {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
