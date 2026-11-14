@@ -131,3 +131,25 @@ test('sin descuentos externos mantiene compatibilidad y quincenal sin descuentos
     if (type === 'Quincenal') assert.equal(zero.totals.totalDeductions, 0);
   }
 });
+
+for (const commissionType of ['Flujo', 'Mixta']) {
+  test(`exención AFP desde los 65 años conserva aporte y comisión ${commissionType}`, async () => {
+    const afp = { id: 'afp-test', name: 'AFP local', obligatory_contribution_percentage: '10.00', insurance_percentage: '1.37', commission_percentage: '1.55' };
+    const run = (birth_date, month = 10, type = 'Mensual') =>
+      new PayrollCalculator({ pension_system: 'AFP', afp_id: afp.id, afp_commission_type: commissionType, birth_date }, month, 2026, type)
+        .calculatePayroll([income('Remuneración Básica', 1000)], {}, 1130, { afp });
+    for (const [birth, month] of [['1961-10-01', 10], ['1961-10-31T00:00:00.000Z', 10], ['1961-10-31', 11], ['1960-12-31', 1], ['1960-10-31', 10], ['1950-10-31', 10]]) {
+      const result = await run(birth, month);
+      assert.equal(result.deductions.some(c => c.concept_code === '0606'), false);
+      assert.equal(result.deductions.find(c => c.concept_code === '0608').calculated_amount, 100);
+      assert.equal(result.totals.totalDeductions, commissionType === 'Flujo' ? 115.5 : 100);
+      assert.deepEqual(result.errors, []);
+    }
+    // Antes de cumplir 65 o sin fecha válida se conserva la prima de seguro.
+    for (const [birth, month] of [['1961-10-31', 9], ['1962-10-31', 10], [null, 10], ['fecha inválida', 10]]) {
+      const result = await run(birth, month);
+      assert.equal(result.deductions.find(c => c.concept_code === '0606').calculated_amount, 13.7);
+    }
+    assert.equal((await run('1961-10-31', 10, 'Quincenal')).deductions.length, 0);
+  });
+}
