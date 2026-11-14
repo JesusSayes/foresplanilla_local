@@ -12,6 +12,7 @@ import {
   pensionConceptKey,
 } from "@/lib/pensionConcepts";
 import { computePrevisionalVariables } from "@/lib/previsionalBase";
+import { isAfpInsuranceExemptByAge } from "@/lib/afpInsuranceAge";
 
 // Catálogo de lógicas del sistema disponibles
 export const SYSTEM_LOGIC_TYPES = {
@@ -328,7 +329,10 @@ export class PayrollCalculator {
       // Fallback a 10% únicamente si el aporte obligatorio no está configurado.
       const obligatoryValue = Number(afp.obligatory_contribution_percentage ?? 10);
       const obligatory = Number.isFinite(obligatoryValue) ? obligatoryValue : 10;
-      const insurance = Number(afp.insurance_percentage) || 0;
+      const rawInsurance = Number(afp.insurance_percentage) || 0;
+      // Prima de seguro (0606): exenta desde el mes en que cumple 65 años.
+      // El aporte obligatorio (0608) y la comisión (0601) no cambian.
+      const insuranceExemptByAge = isAfpInsuranceExemptByAge(employee.birth_date, this.month, this.year);
       // Regla de RRHH: Mixta descuenta aporte y seguro, sin comisión mensual.
       // La comisión sobre el saldo no se retiene en la boleta.
       const commissionType = isMixtaCommission(employee) ? "Mixta" : "Flujo";
@@ -346,14 +350,17 @@ export class PayrollCalculator {
         amount: aporteAmount,
         detail: `Aporte obligatorio ${obligatory}% de S/${base.toFixed(2)}`,
       });
-      // 2) Prima de seguro (solo si el porcentaje es mayor que cero)
-      if (insurance > 0) {
-        const seguroAmount = round2(base * (insurance / 100));
+      // 2) Prima de seguro (solo si el porcentaje es mayor que cero). Si el trabajador
+      // cumple 65 años en el periodo o ya los cumplió, el importe es 0 y no se descuenta.
+      if (rawInsurance > 0) {
+        const seguroAmount = insuranceExemptByAge ? 0 : round2(base * (rawInsurance / 100));
         items.push({
           name: `Prima de Seguro AFP ${afp.name}`,
           code: "0606",
           amount: seguroAmount,
-          detail: `Prima de seguro ${insurance}% de S/${base.toFixed(2)}`,
+          detail: insuranceExemptByAge
+            ? `Exento: 65 años o más al cierre del periodo ${this.month}/${this.year}`
+            : `Prima de seguro ${rawInsurance}% de S/${base.toFixed(2)}`,
         });
       }
       // 3) Comisión por flujo (solo si el porcentaje es mayor que cero). AFP configuradas
