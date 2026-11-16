@@ -289,6 +289,37 @@ export class PayrollCalculator {
   }
 
   /**
+   * ESSALUD (aportación del empleador).
+   * base_essalud = máximo(remuneración básica del período, RMV del período).
+   * El porcentaje no se fija en el código: se evalúa la fórmula configurada del
+   * concepto reemplazando base_salary por esa base, de modo que el aporte cambia
+   * solo si se cambia la fórmula en Conceptos de Planilla.
+   */
+  calculateEssaludContribution(concept, context, baseRemuneration) {
+    const base = essaludBase(baseRemuneration, context.rmv);
+    const formula = String(concept.calculation_formula || "").trim();
+    const rawAmount = formula
+      ? this.evaluateFormula(formula, { ...context, base_salary: base })
+      : parseFloat(concept.amount) || 0;
+    const amount = Math.round((Number(rawAmount) || 0) * 100) / 100;
+
+    this.logCalculation({
+      concept: concept.concept_name,
+      system_logic_type: "essalud_contribution",
+      result: amount,
+      detail: `ESSALUD: base S/${base.toFixed(2)} (remuneración básica S/${(Number(baseRemuneration) || 0).toFixed(2)}, RMV del período S/${(Number(context.rmv) || 0).toFixed(2)})`,
+      status: "success",
+    });
+
+    return {
+      ...concept,
+      calculated_amount: amount,
+      calculation_method: formula ? "dynamic" : "fixed",
+      applied_date: new Date().toISOString(),
+    };
+  }
+
+  /**
    * Calcula el descuento automático al sistema de pensiones (AFP u ONP)
    * según la configuración del empleado y su AFP asignada.
    * @param {number} pensionBase - Base pensionaria = remuneración básica ejecutada
@@ -438,6 +469,19 @@ export class PayrollCalculator {
     }
 
     const { incomes, deductions, contributions } = groups;
+
+    // ESSALUD (aportación del empleador): base = máximo(remuneración básica del
+    // período, RMV vigente del período). Se calcula aquí, con los conceptos ya
+    // ejecutados, porque la remuneración básica es el importe calculado por el
+    // concepto de Remuneración Base. El porcentaje se conserva en la fórmula
+    // configurada del concepto.
+    (concepts || [])
+      .filter((concept) => isEssaludContribution(concept) && this.shouldApplyConcept(concept))
+      .forEach((concept) => {
+        contributions.push(
+          this.calculateEssaludContribution(concept, context, derived.remuneracion_mensual)
+        );
+      });
 
     // Calcular totales — sanitizar cada acumulador para evitar Infinity/NaN propagado
     const safe = (v) => (Number.isFinite(v) && Math.abs(v) <= 500_000 ? v : 0);

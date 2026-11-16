@@ -36,6 +36,9 @@ import { safePayrollNumber, roundMoney, sanitizePayslip, formatMoney } from "@/l
 import { calcEffectiveMetrics } from "@/lib/attendanceMetrics";
 import { pickContractForPeriod, describeContract } from "@/lib/contractSelection";
 import { applyContractualBaseSalary } from "@/lib/baseSalaryConcept";
+import { selectRmvForPeriod } from "@/lib/rmvPeriod";
+import { bonusProrationFactor, applyBonusProration } from "@/lib/proratedBonuses";
+import { buildEmployeeCostConcepts, filterCoveredCostConcepts } from "@/lib/employeeCostConcepts";
 import { buildAttendanceDiscountConcepts } from "@/lib/attendanceDiscounts";
 import { buildAffectationMap, buildJustifiedHoursDiscount } from "@/lib/justifiedDiscounts";
 import {
@@ -277,11 +280,12 @@ export default function PayrollManagement() {
   });
   const { data: payrollConcepts = [] } = payrollConceptsQuery;
 
+  // RMV del PERÍODO liquidado, no la vigente hoy.
   const rmvQuery = useQuery({
-    queryKey: ["rmv"],
+    queryKey: ["rmv", selectedMonth, selectedYear],
     queryFn: async () => {
-      const rmvs = await withRetry(() => base44.entities.RMV.filter({ is_active: true }, "-effective_date"));
-      return rmvs.length > 0 ? rmvs[0] : { amount: 1130 };
+      const rmvs = await withRetry(() => base44.entities.RMV.list("-effective_date"));
+      return selectRmvForPeriod(rmvs, selectedMonth, selectedYear) || { amount: 1130 };
     },
   });
   const { data: rmvData } = rmvQuery;
@@ -659,7 +663,7 @@ export default function PayrollManagement() {
         ["allEmployees"],
         ["attendanceRecords", selectedMonth, selectedYear],
         ["payrollConcepts", selectedMonth, selectedYear],
-        ["rmv"],
+        ["rmv", selectedMonth, selectedYear],
         ["allAfps"],
         ["payrollConfig"],
         ["payslips", selectedMonth, selectedYear],
@@ -702,7 +706,7 @@ export default function PayrollManagement() {
         console.warn("[Planilla] No se pudo leer la asistencia del período completo; se usa la copia en caché.", error);
       }
       const payrollConcepts = queryClient.getQueryData(["payrollConcepts", selectedMonth, selectedYear]) ?? [];
-      const rmvData = queryClient.getQueryData(["rmv"]) ?? { amount: 1130 };
+      const rmvData = queryClient.getQueryData(["rmv", selectedMonth, selectedYear]) ?? { amount: 1130 };
       const allAfps = queryClient.getQueryData(["allAfps"]) ?? [];
       const payrollConfig = queryClient.getQueryData(["payrollConfig"]) ?? { quincenal_percentage: 40, quincenal_cutoff_day: 7 };
       const existingPayslips = queryClient.getQueryData(["payslips", selectedMonth, selectedYear]) ?? [];
@@ -830,6 +834,8 @@ export default function PayrollManagement() {
     const ignoredPensionConcepts = new Set();
     // Detalle de las faltas descontadas, para que RR. HH. pueda verificarlas.
     const absenceDiscountSummary = [];
+    // Bonos del período sin posibilidad de prorrateo (total de días igual a cero).
+    const bonusProrationIssues = [];
     // Jornadas con entrada sin salida donde se descontaron las horas aprobadas.
     const missingClockOutRows = [];
 
@@ -1159,43 +1165,15 @@ export default function PayrollManagement() {
       };
 
       // Conceptos fijos del empleado (actividad, alimento, movilidad)
-      const employeeFixedConcepts = [];
-      if (emp.activity_cost > 0) {
-        employeeFixedConcepts.push({ employee_id: emp.id, concept_type: "Ingreso", concept_category: "Bonificaciones", concept_name: "Costo Actividad", amount: emp.activity_cost, is_dynamic: false, applies_to_payroll_types: ["Quincenal", "Mensual", "Adicional", "SNP"] });
-      }
-      if (emp.food_cost > 0) {
-        employeeFixedConcepts.push({ employee_id: emp.id, concept_type: "Ingreso", concept_category: "Bonificaciones", concept_name: "Costo Alimento", amount: emp.food_cost, is_dynamic: false, applies_to_payroll_types: ["Quincenal", "Mensual", "Adicional", "SNP"] });
-      }
-      if (emp.transport_cost > 0) {
-        employeeFixedConcepts.push({ employee_id: emp.id, concept_type: "Ingreso", concept_category: "Asignaciones", concept_name: "Costo Movilidad", amount: emp.transport_cost, is_dynamic: false, applies_to_payroll_types: ["Quincenal", "Mensual", "Adicional", "SNP"] });
-      }
+      const employeeFixedConcepts = buildEmployeeCostConcepts(emp);
 
       // Obtener conceptos del empleado (generales + específicos + fijos del empleado)
       const generalConcepts = payrollConcepts.filter(c => c.employee_id === "general");
       const specificConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
-      // Fuente única de configuración: los conceptos de planilla configurados (PayrollConcept).
-      // Los campos del contrato (activity_cost, food_cost, transport_cost) son DATOS que los
-      // conceptos configurados pueden referenciar vía fórmula. Para evitar duplicidad, los
-      // conceptos fijos autogenerados desde el contrato SOLO se incluyen si NO existe un
-      // concepto configurado que cubra el mismo costo (por variable de fórmula o por nombre).
+      // Los conceptos fijos generados desde el contrato solo se incluyen si ningún
+      // concepto configurado cubre ya ese costo (evita pagar dos veces el mismo bono).
       const configuredConcepts = [...generalConcepts, ...specificConcepts];
-      const coversCost = (costVariable, nameRegex) =>
-        configuredConcepts.some(c => {
-          const formula = String(c.calculation_formula || "").toLowerCase();
-          const name = (c.concept_name || "").toLowerCase().trim();
-          return formula.includes(costVariable) || nameRegex.test(name);
-        });
-      const costCoverage = {
-        activity_cost: coversCost("activity_cost", /actividad/i),
-        food_cost: coversCost("food_cost", /alimentaci[oó]n|alimento/i),
-        transport_cost: coversCost("transport_cost", /movilidad|transporte/i),
-      };
-      const fixedConceptsForMonth = employeeFixedConcepts.filter(c => {
-        if (c.concept_name === "Costo Actividad") return !costCoverage.activity_cost;
-        if (c.concept_name === "Costo Alimento") return !costCoverage.food_cost;
-        if (c.concept_name === "Costo Movilidad") return !costCoverage.transport_cost;
-        return true;
-      });
+      const fixedConceptsForMonth = filterCoveredCostConcepts(employeeFixedConcepts, configuredConcepts);
       const allEmpConcepts = [...generalConcepts, ...specificConcepts, ...fixedConceptsForMonth];
 
       // Porcentaje quincenal desde la configuración (decimal, ej: 0.40)
@@ -1297,6 +1275,12 @@ export default function PayrollManagement() {
           emp.base_salary,
           contractualWorkedDays
         );
+        // Bonos del período (costo actividad, movilidad, alimentación y equivalentes)
+        // proporcionales a los días trabajados: factor = trabajados / (trabajados + no
+        // trabajados). Se aplica una sola vez y solo a importes fijos sin fórmula.
+        const bonusFactor = bonusProrationFactor(workedDays, nonWorkedDays);
+        conceptsForCalc = applyBonusProration(conceptsForCalc, bonusFactor);
+        if (bonusFactor === null) bonusProrationIssues.push(`${emp.employee_code || emp.id} ${emp.first_name} ${emp.last_name}: sin días trabajados ni no trabajados`);
       }
 
       // Calcular descuentos por asistencia (solo para planillas NO quincenales).
@@ -1650,6 +1634,10 @@ export default function PayrollManagement() {
       setPensionBlockedWorkers(pensionBlockedWorkers);
       setAbsenceReviewDetails(absenceReviewDetails);
       setMissingClockOutDetails(missingClockOutRows);
+      // Bonos sin prorrateo posible: se informa la inconsistencia (no se divide entre cero).
+      if (bonusProrationIssues.length > 0) {
+        toast.warning(`⚠️ Bonos del período sin prorratear por días: ${bonusProrationIssues.slice(0, 3).join(" | ")}`, { duration: 12000 });
+      }
       setPreviewData(calculatedPayslips);
       setShowPreview(true);
       setContractAlerts({ noApproved: noApprovedContractWorkers, conflicts: contractConflicts });
