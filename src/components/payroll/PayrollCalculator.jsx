@@ -13,6 +13,7 @@ import {
 } from "@/lib/pensionConcepts";
 import { computePrevisionalVariables } from "@/lib/previsionalBase";
 import { isAfpInsuranceExemptByAge } from "@/lib/afpInsuranceAge";
+import { isEssaludContribution, essaludBase } from "@/lib/essaludContribution";
 
 // Catálogo de lógicas del sistema disponibles
 export const SYSTEM_LOGIC_TYPES = {
@@ -606,6 +607,12 @@ export class PayrollCalculator {
         continue;
       }
       if (isLegacyAutoPensionConcept(concept)) {
+        continue;
+      }
+      // ESSALUD se calcula de forma centralizada (ver calculateEssaludContribution):
+      // su base es el mayor valor entre la remuneración básica YA ejecutada y la RMV
+      // del período, datos que no están disponibles al recorrer los conceptos.
+      if (isEssaludContribution(concept)) {
         continue;
       }
 
