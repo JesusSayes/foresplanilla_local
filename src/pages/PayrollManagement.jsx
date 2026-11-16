@@ -1126,12 +1126,20 @@ export default function PayrollManagement() {
         const remainingComp = compHours - deduct25;
         return sum + Math.max(0, ot35 - Math.min(ot35, remainingComp));
       }, 0);
-      // Horas extras manuales (registradas desde el panel de asistencia)
-      // Solo se suman las con destino "pago". Las manuales con destino "compensacion"
-      // se excluyen del pago. Se suman al cálculo automático una sola vez.
-      const empManualOT = (manualOvertimeRecords || []).filter(r =>
-        r.employee_id === emp.id && (r.overtime_destination || "pago") === "pago"
-      );
+      // Horas extras manuales (panel de asistencia): solo las activas con destino
+      // "pago". El destino de la jornada es independiente y NO se exige que sea
+      // "pago" (las manuales son adicionales y la jornada conserva su tratamiento).
+      // Las de destino "compensacion" no se pagan ni suman al saldo. Se conserva el
+      // requisito de HE autorizadas de la jornada.
+      const journeyById = new Map((empAttendance || []).map(r => [r.id, r]));
+      const empManualOT = (manualOvertimeRecords || []).filter(r => {
+        if (r.employee_id !== emp.id) return false;
+        if (r.status && r.status !== "Activo") return false;
+        if ((r.overtime_destination || "pago") !== "pago") return false;
+        if (!r.attendance_record_id) return true; // sin jornada: validado al registrar
+        const journey = journeyById.get(r.attendance_record_id);
+        return journey ? journey.overtime_authorized === true : true;
+      });
       const manualOT25 = empManualOT.reduce((sum, r) =>
         sum + (r.overtime_hours_25 || 0) + (r.overtime_minutes_25 || 0) / 60, 0);
       const manualOT35 = empManualOT.reduce((sum, r) =>

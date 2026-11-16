@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, CheckCircle2, Clock, Pencil, Plus, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
@@ -122,10 +123,6 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
     journeyIssues.push(
       `Hay ${journeyRecords.length} registros de asistencia para el ${journeyDate}: seleccione la jornada correcta.`
     );
-  } else if (destination === "pago" && journey?.overtime_destination === "compensacion") {
-    journeyIssues.push(
-      "La jornada está destinada a compensación: no se pueden registrar esas horas para pago. Cambie el destino de la jornada mediante una acción explícita si corresponde."
-    );
   } else if (destination === "pago" && journey?.overtime_authorized !== true) {
     journeyIssues.push(
       "La jornada no está autorizada para pago: autorice la jornada (acción explícita) o registre las horas con destino Compensación."
@@ -140,6 +137,18 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
   const existingDestinations = [...new Set(activeRecords.map(r => r.overtime_destination || "pago"))];
   const destinationMismatch = existingDestinations.length > 0 && !existingDestinations.includes(destination);
   const destinationLabel = (d) => (d === "compensacion" ? "Compensación" : "Pago");
+
+  // Horas manuales de Pago sobre una jornada destinada a Compensación: son horas
+  // ADICIONALES y no cambian el destino ni las horas calculadas de la jornada. El
+  // registro exige una confirmación explícita de RR. HH. (no es una detección
+  // automática de duplicados).
+  const requiresAdditionalConfirmation =
+    destination === "pago" && journey?.overtime_destination === "compensacion";
+  const [confirmAdditional, setConfirmAdditional] = useState(false);
+
+  useEffect(() => {
+    setConfirmAdditional(false);
+  }, [destination, selectedRecordId]);
 
   // Validation: check if any payslip for this period is closed/paid
   const closedPayslip = payslips.find(p => p.status === "Aprobada" || p.status === "Pagada");
@@ -167,6 +176,10 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
     }
     if (!reason.trim()) {
       toast.error("El motivo/nota es obligatorio.");
+      return;
+    }
+    if (requiresAdditionalConfirmation && !confirmAdditional) {
+      toast.error("Debe confirmar que las horas son adicionales y no corresponden a horas ya compensadas.");
       return;
     }
     if ((minutes25 > 0 && minutes25 >= 60) || (minutes35 > 0 && minutes35 >= 60)) {
@@ -212,6 +225,7 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
       );
       setHours25(0); setMinutes25(0); setHours35(0); setMinutes35(0); setReason("");
       setReplacingRecordId(null);
+      setConfirmAdditional(false);
       setDestination(journey?.overtime_destination === "compensacion" ? "compensacion" : "pago");
       refetch();
       queryClient.invalidateQueries({ queryKey: ["manualOvertime"] });
@@ -261,6 +275,7 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
     setMinutes35(record.overtime_minutes_35 || 0);
     setDestination(record.overtime_destination === "compensacion" ? "compensacion" : "pago");
     setReason(record.reason || "");
+    setConfirmAdditional(false);
   };
 
   return (
@@ -487,6 +502,29 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
                   </SelectContent>
                 </Select>
               </div>
+              {requiresAdditionalConfirmation && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-800">
+                      La jornada del <strong>{journeyDate}</strong> está destinada a <strong>Compensación</strong>. Estas
+                      horas manuales son adicionales: se pagarán en planilla y la jornada conserva su destino y sus horas
+                      de compensación sin cambios.
+                    </p>
+                  </div>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={confirmAdditional}
+                      onCheckedChange={(v) => setConfirmAdditional(v === true)}
+                      className="mt-0.5"
+                    />
+                    <span className="text-xs text-amber-900">
+                      Confirmo que estas horas son adicionales y no corresponden a horas ya registradas o utilizadas para
+                      compensación
+                    </span>
+                  </label>
+                </div>
+              )}
               {destinationMismatch && (
                 <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
@@ -517,7 +555,7 @@ export default function ManualOvertimeModal({ employee, defaultMonth, defaultYea
                   </Button>
                 </div>
               )}
-              <Button onClick={handleSave} disabled={saving || journeyIssues.length > 0} className="w-full bg-red-600 hover:bg-red-700">
+              <Button onClick={handleSave} disabled={saving || journeyIssues.length > 0 || (requiresAdditionalConfirmation && !confirmAdditional)} className="w-full bg-red-600 hover:bg-red-700">
                 <Plus className="w-4 h-4 mr-2" />
                 {saving ? "Guardando..." : replacingRecordId ? "Guardar corrección" : "Registrar Horas Extras Manuales"}
               </Button>
