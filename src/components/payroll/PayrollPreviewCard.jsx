@@ -160,6 +160,38 @@ export default function PayrollPreviewCard({
         </div>
       )}
 
+      {(() => {
+        const med = payslip.calculation_summary?.medical_subsidy;
+        if (!med) return null;
+        const totalDays = (med.employer_days || 0) + (med.subsidized_days || 0);
+        if (totalDays === 0) return null;
+        return (
+          <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-900 space-y-1">
+            <p className="font-semibold">
+              Descanso médico — acumulado previo del año: {med.prior_accumulated_days || 0} día(s)
+            </p>
+            <p>
+              Días remunerados por el empleador (código 20): <strong>{med.employer_days || 0}</strong>
+              {" · "}Días subsidiados (código 21): <strong>{med.subsidized_days || 0}</strong>
+            </p>
+            <p>
+              Subsidio 0916:{" "}
+              <strong>
+                {med.subsidy_amount == null
+                  ? "pendiente de validación"
+                  : `S/ ${Number(med.subsidy_amount).toFixed(2)}`}
+              </strong>
+              {" · "}Base diaria:{" "}
+              {med.base?.pending ? "pendiente" : `S/ ${Number(med.base?.average_daily || 0).toFixed(2)}`}
+              {med.base?.divisor ? ` (${med.base.total} / ${med.base.divisor})` : ""}
+            </p>
+            {(med.validation?.messages || []).map((message, idx) => (
+              <p key={idx} className="text-amber-800">⚠️ {message}</p>
+            ))}
+          </div>
+        );
+      })()}
+
       {hasAdditionalConcepts && (
         <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
           ✓ {empConcepts.length} concepto(s) adicional(es) aplicado(s)

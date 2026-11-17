@@ -196,6 +196,19 @@ export default function JustifyModal({
       // al editar (para no romper la agrupación) y se genera uno nuevo al crear.
       const codigoSolicitud = existingIncident?.codigo_solicitud || generateCodigoSolicitud();
 
+      // Datos del sustento del descanso médico (solo aplican a ese tipo de incidencia).
+      const isMedicalRest = justificationData.incident_type === "Descanso Médico";
+      const medicalPayload = isMedicalRest
+        ? {
+            citt_number: String(justificationData.citt_number ?? existingIncident?.citt_number ?? "").trim(),
+            citt_status: justificationData.citt_status ?? existingIncident?.citt_status ?? "",
+            subsidy_daily_base: Number(justificationData.subsidy_daily_base) > 0
+              ? Number(justificationData.subsidy_daily_base)
+              : 0,
+            subsidy_daily_base_reason: String(justificationData.subsidy_daily_base_reason || "").trim(),
+          }
+        : {};
+
       for (const dStr of targetDates) {
         // ── Guardar incidente ──────────────────────────────────────────────
         const incidentPayload = {
@@ -211,6 +224,7 @@ export default function JustifyModal({
           late_minutes_to_adjust: 0,
           status: "Pendiente",
           codigo_solicitud: codigoSolicitud,
+          ...medicalPayload,
         };
 
         const existingInc = incidentsByDate[dStr];
@@ -534,6 +548,64 @@ export default function JustifyModal({
                 </p>
                 )}
                 </div>
+
+                {/* ── Descanso médico: sustento del subsidio (CITT / base sustentada) ── */}
+                {justificationData.incident_type === "Descanso Médico" && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                    <p className="text-xs font-semibold text-blue-900">
+                      Sustento del descanso médico (subsidio por incapacidad temporal)
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">N° CITT</label>
+                        <Input
+                          placeholder="Opcional (certificado EsSalud)"
+                          value={justificationData.citt_number || ""}
+                          onChange={(e) => setJustificationData({ ...justificationData, citt_number: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">Estado del sustento</label>
+                        <Select
+                          value={justificationData.citt_status || ""}
+                          onValueChange={(v) => setJustificationData({ ...justificationData, citt_status: v })}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Sin definir" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Pendiente">Pendiente</SelectItem>
+                            <SelectItem value="Validado">Validado</SelectItem>
+                            <SelectItem value="No aplica">No aplica</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">Base diaria sustentada (S/)</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Solo si falta historial"
+                          value={justificationData.subsidy_daily_base ?? ""}
+                          onChange={(e) => setJustificationData({ ...justificationData, subsidy_daily_base: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">Sustento de la base</label>
+                        <Input
+                          placeholder="Fuente, período e importes"
+                          value={justificationData.subsidy_daily_base_reason || ""}
+                          onChange={(e) => setJustificationData({ ...justificationData, subsidy_daily_base_reason: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-blue-800">
+                      Los primeros 20 días del año los remunera el empleador; desde el día 21 corresponden al
+                      subsidio. Un CITT pendiente no convierte el descanso en falta.
+                    </p>
+                  </div>
+                )}
 
                 {/* ── Período a justificar ──────────────────────────────────── */}
             <div>
