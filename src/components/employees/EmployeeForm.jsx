@@ -598,7 +598,7 @@ export default function EmployeeForm({
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label className="text-xs text-slate-500">Remuneración (S/)</Label>
-                    <Input value={vigentContract ? (vigentContract.salary || 0).toFixed(2) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
+                    <Input value={vigentContract ? Number(vigentContract.salary || 0).toFixed(2) : "—"} disabled className="bg-slate-100 text-slate-600 cursor-not-allowed" />
                   </div>
                   <div>
                     <Label className="text-xs text-slate-500">Horas Semanales</Label>

@@ -1,4 +1,5 @@
 import payrollSupplementsRoutes from './routes/payroll/supplements.js';
+import { jsonNumbers } from './utils/jsonNumbers.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import path from 'path';
@@ -87,6 +88,7 @@ import { obtenerTipoCambioDiario } from './services/tipoCambioService.js';
 dotenv.config();
 
 const app = express();
+app.set('json replacer', jsonNumbers);
 const PORT = process.env.PORT || 3001;
 
 // Crear directorio logs
