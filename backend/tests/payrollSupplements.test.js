@@ -126,3 +126,29 @@ for (const failInsert of [false, true]) test(`reemplazo de HE es atómico; falla
   assert.equal(commands.at(-1), failInsert ? 'ROLLBACK' : 'COMMIT');
   assert.ok(commands.some(sql => sql.includes('FOR UPDATE')));
 });
+
+for (const [name, destination, authorized, confirmed, status, expected] of [
+  ['adicionales pagables sobre compensación', 'compensacion', true, true, 'Completo', 201],
+  ['sin confirmación', 'compensacion', true, false, 'Completo', 400],
+  ['sin autorización', 'compensacion', false, true, 'Completo', 400],
+  ['vacaciones', 'compensacion', true, true, 'Vacaciones', 400],
+  ['jornada de pago existente', 'pago', true, false, 'Completo', 201],
+]) test(`HE manuales: ${name}`, async t => {
+  let inserted = false;
+  const commands = mockTransaction(t, async (sql, params) => {
+    if (sql.includes('SELECT id FROM public.employee')) return { rows: [{ id: 'e1' }] };
+    if (sql.includes('FROM attendance_record')) return { rows: [{ id: 'a1', employee_id: 'e1', overtime_authorized: authorized, overtime_destination: destination, status }] };
+    if (sql.startsWith('INSERT')) {
+      inserted = true;
+      assert.doesNotMatch(sql, /additional_hours_confirmed/);
+      assert.ok(params.includes('pago'));
+      return { rows: [{ ...overtime, attendance_record_id: 'a1', overtime_destination: 'pago' }] };
+    }
+    return { rows: [] };
+  });
+  const result = await call('/HorasExtrasManual', 'post', request({ ...overtime, attendance_date: '2026-09-25', overtime_destination: 'pago', additional_hours_confirmed: confirmed }));
+  assert.equal(result.statusCode, expected);
+  assert.equal(inserted, expected === 201);
+  assert.ok(!commands.some(sql => /UPDATE\s+(public\.)?attendance_record/i.test(sql)));
+  assert.equal(commands.at(-1), expected === 201 ? 'COMMIT' : 'ROLLBACK');
+});

@@ -44,7 +44,7 @@ export async function validateOvertimePaymentPolicy(db, payslips) {
           AND m.status = 'Activo' AND COALESCE(m.overtime_destination, 'pago') = 'pago'
           AND (m.attendance_record_id IS NULL OR EXISTS (
             SELECT 1 FROM attendance_record a WHERE a.id = m.attendance_record_id
-              AND a.employee_id = m.employee_id AND COALESCE(a.overtime_destination, 'pago') = 'pago'
+              AND a.employee_id = m.employee_id
               AND a.overtime_authorized = true AND COALESCE(a.status, '') <> 'Vacaciones'))
         FOR SHARE OF m`, payslip.employee_id, month, year, payslip.payroll_type || 'Mensual');
     const allowed = rate => [...records, ...manual].reduce((sum, r) => sum + Number(r[`overtime_hours_${rate}`] || 0) + Number(r[`overtime_minutes_${rate}`] || 0) / 60, 0);

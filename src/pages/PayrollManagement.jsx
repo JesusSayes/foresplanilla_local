@@ -35,6 +35,9 @@ import PayrollPreviewCard from "../components/payroll/PayrollPreviewCard";
 import { safePayrollNumber, roundMoney, sanitizePayslip } from "@/lib/payrollUtils";
 import { pickContractForPeriod, describeContract } from "@/lib/contractSelection";
 import { applyContractualBaseSalary } from "@/lib/baseSalaryConcept";
+import { selectRmvForPeriod } from "@/lib/rmvPeriod";
+import { bonusProrationFactor, applyBonusProration } from "@/lib/proratedBonuses";
+import { buildEmployeeCostConcepts, filterCoveredCostConcepts } from "@/lib/employeeCostConcepts";
 import { buildAttendanceDiscountConcepts } from "@/lib/attendanceDiscounts";
 import { buildAffectationMap, buildJustifiedHoursDiscount } from "@/lib/justifiedDiscounts";
 import {
@@ -253,11 +256,15 @@ export default function PayrollManagement() {
   });
   const { data: payrollConcepts = [] } = payrollConceptsQuery;
 
+  // RMV del PERÍODO liquidado, no la vigente hoy.
   const rmvQuery = useQuery({
-    queryKey: ["rmv"],
+    queryKey: ["rmv", selectedMonth, selectedYear],
     queryFn: async () => {
-      const rmvs = await withRetry(() => entitiesAPI.RMV.filter({ is_active: true }, "-effective_date"));
-      return rmvs.length > 0 ? rmvs[0] : { amount: 1130 };
+      const rmvs = await withRetry(() => entitiesAPI.RMV.list("-effective_date"));
+      const selected = selectRmvForPeriod(rmvs, selectedMonth, selectedYear);
+      if (!selected || !(Number(selected.amount) > 0)) throw new Error("No hay RMV vigente configurada para el período seleccionado");
+      return selected;
+
     },
   });
   const { data: rmvData } = rmvQuery;
@@ -614,7 +621,7 @@ export default function PayrollManagement() {
         ["payrollCompensationIncidents", selectedMonth, selectedYear],
         ["attendanceRecords", selectedMonth, selectedYear],
         ["payrollConcepts", selectedMonth, selectedYear],
-        ["rmv"],
+        ["rmv", selectedMonth, selectedYear],
         ["allAfps"],
         ["payrollConfig"],
         ["payslips", selectedMonth, selectedYear],
@@ -649,7 +656,7 @@ export default function PayrollManagement() {
       // No calcular descuentos con una copia incompleta si falla la lectura.
       const attendanceRecords = await fetchAttendanceRecordsForPeriod(attendanceFrom, attendanceTo);
       const payrollConcepts = queryClient.getQueryData(["payrollConcepts", selectedMonth, selectedYear]) ?? [];
-      const rmvData = queryClient.getQueryData(["rmv"]) ?? { amount: 1130 };
+      const rmvData = queryClient.getQueryData(["rmv", selectedMonth, selectedYear]) ?? { amount: 1130 };
       const allAfps = queryClient.getQueryData(["allAfps"]) ?? [];
       const payrollConfig = queryClient.getQueryData(["payrollConfig"]) ?? { quincenal_percentage: 40, quincenal_cutoff_day: 7 };
       const existingPayslips = queryClient.getQueryData(["payslips", selectedMonth, selectedYear]) ?? [];
@@ -761,6 +768,8 @@ export default function PayrollManagement() {
     const ignoredPensionConcepts = new Set();
     // Detalle de las faltas descontadas, para que RR. HH. pueda verificarlas.
     const absenceDiscountSummary = [];
+    // Bonos del período sin posibilidad de prorrateo (total de días igual a cero).
+    const bonusProrationIssues = [];
     // Jornadas con entrada sin salida donde se descontaron las horas aprobadas.
     const missingClockOutRows = [];
 
@@ -1059,13 +1068,21 @@ export default function PayrollManagement() {
         const remainingComp = compHours - deduct25;
         return sum + Math.max(0, ot35 - Math.min(ot35, remainingComp));
       }, 0);
-      // Horas extras manuales (registradas desde el panel de asistencia)
-      // Solo se suman las con destino "pago". Las manuales con destino "compensacion"
-      // se excluyen del pago. Se suman al cálculo automático una sola vez.
-      const empManualOT = (manualOvertimeRecords || []).filter(r =>
-        r.employee_id === emp.id && (r.overtime_destination || "pago") === "pago" &&
-        (!r.attendance_record_id || otPayableRecords.some(a => a.id === r.attendance_record_id))
-      );
+      // Horas extras manuales (panel de asistencia): solo las activas con destino
+      // "pago". El destino de la jornada es independiente y NO se exige que sea
+      // "pago" (las manuales son adicionales y la jornada conserva su tratamiento).
+      // Las de destino "compensacion" no se pagan ni suman al saldo. Se conserva el
+      // requisito de HE autorizadas de la jornada.
+      const journeyById = new Map((empAttendance || []).map(r => [r.id, r]));
+      const empManualOT = (manualOvertimeRecords || []).filter(r => {
+        if (r.employee_id !== emp.id) return false;
+        if (r.status !== "Activo") return false;
+        if ((r.overtime_destination || "pago") !== "pago") return false;
+        if (!r.attendance_record_id) return true; // sin jornada: validado al registrar
+        const journey = journeyById.get(r.attendance_record_id);
+        return journey?.overtime_authorized === true && journey.status !== "Vacaciones";
+      });
+
       const manualOT25 = empManualOT.reduce((sum, r) =>
         sum + (r.overtime_hours_25 || 0) + (r.overtime_minutes_25 || 0) / 60, 0);
       const manualOT35 = empManualOT.reduce((sum, r) =>
@@ -1085,43 +1102,15 @@ export default function PayrollManagement() {
       };
 
       // Conceptos fijos del empleado (actividad, alimento, movilidad)
-      const employeeFixedConcepts = [];
-      if (emp.activity_cost > 0) {
-        employeeFixedConcepts.push({ employee_id: emp.id, concept_type: "Ingreso", concept_category: "Bonificaciones", concept_name: "Costo Actividad", amount: emp.activity_cost, is_dynamic: false, applies_to_payroll_types: ["Quincenal", "Mensual", "Adicional", "SNP"] });
-      }
-      if (emp.food_cost > 0) {
-        employeeFixedConcepts.push({ employee_id: emp.id, concept_type: "Ingreso", concept_category: "Bonificaciones", concept_name: "Costo Alimento", amount: emp.food_cost, is_dynamic: false, applies_to_payroll_types: ["Quincenal", "Mensual", "Adicional", "SNP"] });
-      }
-      if (emp.transport_cost > 0) {
-        employeeFixedConcepts.push({ employee_id: emp.id, concept_type: "Ingreso", concept_category: "Asignaciones", concept_name: "Costo Movilidad", amount: emp.transport_cost, is_dynamic: false, applies_to_payroll_types: ["Quincenal", "Mensual", "Adicional", "SNP"] });
-      }
+      const employeeFixedConcepts = buildEmployeeCostConcepts(emp);
 
       // Obtener conceptos del empleado (generales + específicos + fijos del empleado)
       const generalConcepts = payrollConcepts.filter(c => c.employee_id === "general");
       const specificConcepts = [...payrollConcepts, ...additionalConcepts].filter(c => c.employee_id === emp.id);
-      // Fuente única de configuración: los conceptos de planilla configurados (PayrollConcept).
-      // Los campos del contrato (activity_cost, food_cost, transport_cost) son DATOS que los
-      // conceptos configurados pueden referenciar vía fórmula. Para evitar duplicidad, los
-      // conceptos fijos autogenerados desde el contrato SOLO se incluyen si NO existe un
-      // concepto configurado que cubra el mismo costo (por variable de fórmula o por nombre).
+      // Los conceptos fijos generados desde el contrato solo se incluyen si ningún
+      // concepto configurado cubre ya ese costo (evita pagar dos veces el mismo bono).
       const configuredConcepts = [...generalConcepts, ...specificConcepts];
-      const coversCost = (costVariable, nameRegex) =>
-        configuredConcepts.some(c => {
-          const formula = String(c.calculation_formula || "").toLowerCase();
-          const name = (c.concept_name || "").toLowerCase().trim();
-          return formula.includes(costVariable) || nameRegex.test(name);
-        });
-      const costCoverage = {
-        activity_cost: coversCost("activity_cost", /actividad/i),
-        food_cost: coversCost("food_cost", /alimentaci[oó]n|alimento/i),
-        transport_cost: coversCost("transport_cost", /movilidad|transporte/i),
-      };
-      const fixedConceptsForMonth = employeeFixedConcepts.filter(c => {
-        if (c.concept_name === "Costo Actividad") return !costCoverage.activity_cost;
-        if (c.concept_name === "Costo Alimento") return !costCoverage.food_cost;
-        if (c.concept_name === "Costo Movilidad") return !costCoverage.transport_cost;
-        return true;
-      });
+      const fixedConceptsForMonth = filterCoveredCostConcepts(employeeFixedConcepts, configuredConcepts);
       const allEmpConcepts = [...generalConcepts, ...specificConcepts, ...fixedConceptsForMonth];
 
       // Porcentaje quincenal desde la configuración (decimal, ej: 0.40)
@@ -1223,6 +1212,12 @@ export default function PayrollManagement() {
           emp.base_salary,
           contractualWorkedDays
         );
+        // Bonos del período (costo actividad, movilidad, alimentación y equivalentes)
+        // proporcionales a los días trabajados: factor = trabajados / (trabajados + no
+        // trabajados). Se aplica una sola vez y solo a importes fijos sin fórmula.
+        const bonusFactor = bonusProrationFactor(workedDays, nonWorkedDays);
+        conceptsForCalc = applyBonusProration(conceptsForCalc, bonusFactor);
+        if (bonusFactor === null) bonusProrationIssues.push(`${emp.employee_code || emp.id} ${emp.first_name} ${emp.last_name}: sin días trabajados ni no trabajados`);
       }
 
       // Calcular descuentos por asistencia (solo para planillas NO quincenales).
@@ -1581,6 +1576,10 @@ export default function PayrollManagement() {
       setPensionBlockedWorkers(pensionBlockedWorkers);
       setAbsenceReviewDetails(absenceReviewDetails);
       setMissingClockOutDetails(missingClockOutRows);
+      // Bonos sin prorrateo posible: se informa la inconsistencia (no se divide entre cero).
+      if (bonusProrationIssues.length > 0) {
+        toast.warning(`⚠️ Bonos del período sin prorratear por días: ${bonusProrationIssues.slice(0, 3).join(" | ")}`, { duration: 12000 });
+      }
       setPreviewData(calculatedPayslips);
       setShowPreview(true);
       setContractAlerts({ noApproved: noApprovedContractWorkers, conflicts: contractConflicts });
