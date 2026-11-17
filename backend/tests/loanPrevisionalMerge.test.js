@@ -91,7 +91,7 @@ for (const manual of [false, true]) {
     assert.equal(result.context.descuentos_asistencia, 20);
     assert.equal(result.context.remuneracion_afecta, 980);
     assert.equal(result.totals.totalDeductions, 127.40);
-    assert.equal(result.totals.totalContributions, 88.20);
+    assert.equal(result.totals.totalContributions, 101.70); // ESSALUD usa el mínimo RMV, sin alterar ONP.
     assert.equal(result.totals.netPay - 20, 852.60);
     assert.equal(result.deductions.length, 1);
     assert.deepEqual(result.errors, []);
@@ -153,3 +153,50 @@ for (const commissionType of ['Flujo', 'Mixta']) {
     assert.equal((await run('1961-10-31', 10, 'Quincenal')).deductions.length, 0);
   });
 }
+
+const { selectRmvForPeriod } = loadSource('lib/rmvPeriod.js');
+const { bonusProrationFactor, applyBonusProration } = loadSource('lib/proratedBonuses.js');
+const { buildEmployeeCostConcepts, filterCoveredCostConcepts } = loadSource('lib/employeeCostConcepts.js');
+
+test('RMV histórica incluye registros desactivados y no toma vigencias futuras', () => {
+  const rows = [{ amount: '1130', effective_date: '2025-01-01T00:00:00.000Z', is_active: false }, { amount: '1200', effective_date: '2027-01-01', is_active: true }];
+  assert.equal(selectRmvForPeriod(rows, 9, 2026).amount, '1130');
+  assert.equal(selectRmvForPeriod(rows, 1, 2027).amount, '1200');
+  assert.equal(selectRmvForPeriod(rows, 12, 2024), null);
+  assert.equal(selectRmvForPeriod([], 9, 2026), null);
+});
+
+for (const formulaBase of ['base_salary', 'remuneracion_afecta', 'remuneracion_mensual']) {
+  test(`ESSALUD respeta mínimo RMV y porcentaje configurado con ${formulaBase}`, async () => {
+    for (const [salary, rate, expected] of [[900, 0.09, 101.7], [1130, 0.09, 101.7], [1500, 0.09, 135], [900, 0.1, 113]]) {
+      const result = await new PayrollCalculator({ pension_system: 'ONP', base_salary: salary }, 9, 2026)
+        .calculatePayroll([
+          income('Remuneración Básica', salary),
+          income('Horas Extras al 25%', 100),
+          { concept_name: 'ESSALUD', concept_type: 'Aportación', is_dynamic: true, calculation_formula: `${formulaBase} * ${rate}` },
+        ], {}, '1130', { attendance_discount_amount: 20 });
+      assert.equal(result.contributions.length, 1);
+      assert.equal(result.totals.totalContributions, expected);
+      assert.equal(result.context.remuneracion_afecta, salary + 80);
+      assert.equal(result.totals.totalDeductions, Math.round((salary + 80) * 0.13 * 100) / 100);
+      assert.deepEqual(result.errors, []);
+    }
+  });
+}
+
+test('bonos: 10 de 30 días, cero y mes completo; no modifica contrato ni duplica fórmulas', () => {
+  const employee = { id: 'e1', activity_cost: '300', food_cost: '150', transport_cost: '90' };
+  const original = { ...employee };
+  const fixed = buildEmployeeCostConcepts(employee);
+  const dynamic = { concept_name: 'Movilidad', concept_type: 'Ingreso', is_dynamic: true, calculation_formula: 'transport_cost / 30 * worked_days' };
+  const concepts = [...filterCoveredCostConcepts(fixed, [dynamic]), dynamic];
+  assert.equal(concepts.length, 3);
+  assert.deepEqual(applyBonusProration(concepts, bonusProrationFactor(10, 20)).slice(0, 2).map(c => c.amount), [100, 50]);
+  assert.equal(applyBonusProration(concepts, 1)[0].amount, 300);
+  assert.equal(applyBonusProration(concepts, 0)[0].amount, 0);
+  assert.equal(applyBonusProration(concepts, 1 / 3)[2], dynamic);
+  assert.equal(bonusProrationFactor(0, 0), null);
+  assert.equal(bonusProrationFactor(0, 30), 0);
+  assert.deepEqual(employee, original);
+  assert.equal(fixed[0].amount, '300');
+});

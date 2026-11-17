@@ -101,7 +101,8 @@ for (const name of Object.keys(schemas)) {
     res.json(serializeSupplement(name, result.rows[0]));
   }));
   router.post(`/${name}`, ...guard(name, 'create'), handler(async (req, res) => {
-    const data = validateSupplement(name, req.body, true);
+    const { additional_hours_confirmed, ...payload } = req.body;
+    const data = validateSupplement(name, name === 'HorasExtrasManual' ? payload : req.body, true);
     if (data.employee_id && !requireEmployeeAccess(req, res, data.employee_id)) return;
     if ('created_by' in schemas[name].properties) data.created_by = req.user.email;
     if (schemas[name].properties.status) data.status = schemas[name].properties.status.default || 'Pendiente';
@@ -117,7 +118,9 @@ for (const name of Object.keys(schemas)) {
         const record = data.attendance_record_id ? records.find(r => r.id === data.attendance_record_id) : records.length === 1 ? records[0] : null;
         if (!record) throw badRequest('Seleccione una jornada de asistencia existente y única');
         if (record.status === 'Vacaciones') throw badRequest('No se permiten HE durante vacaciones');
-        if ((record.overtime_destination || 'pago') !== data.overtime_destination) throw badRequest('El destino debe coincidir con la jornada de asistencia');
+        if (data.overtime_destination === 'pago' && record.overtime_destination === 'compensacion' && additional_hours_confirmed !== true) {
+          throw badRequest('Confirme que las horas manuales son adicionales y no se utilizan para compensación');
+        }
         if (data.overtime_destination === 'pago' && record.overtime_authorized !== true) throw badRequest('La jornada no tiene HE autorizadas para pago');
         data.attendance_record_id = record.id;
         if (data.replaces_record_id) {

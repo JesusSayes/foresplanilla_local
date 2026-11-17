@@ -45,3 +45,35 @@ test('exportación conserva apellidos compuestos y ceros del documento', () => {
   assert.equal(row['Nro. Doc. Derechohab.'], '00123456');
   assert.equal(row['Nro. Doc. Titular'], '00012345');
 });
+
+test('HE manuales adicionales se pagan sin convertir las HE automáticas de compensación', async () => {
+  const db = { $queryRawUnsafe: async sql => {
+    if (sql.includes('horasextrasmanual')) {
+      assert.match(sql, /m.status = 'Activo'/);
+      assert.match(sql, /a.overtime_authorized = true/);
+      assert.doesNotMatch(sql, /a.overtime_destination/);
+      return [{ overtime_hours_25: '1.00', overtime_minutes_25: 30 }];
+    }
+    assert.match(sql, /overtime_destination, 'pago'\) = 'pago'/);
+    return []; // Jornada de compensación: sus horas automáticas no se pagan.
+  } };
+  const slip = { employee_id: 'e1', year: 2026, month: 9, payroll_type: 'Mensual', overtime_hours_25: 1.5 };
+  await validateOvertimePaymentPolicy(db, [slip]);
+  await assert.rejects(validateOvertimePaymentPolicy(db, [{ ...slip, overtime_hours_25: 2 }]), { status: 409 });
+});
+
+test('preview paga manuales autorizadas de compensación y excluye jornadas ausentes o no autorizadas', () => {
+  const source = readFileSync(new URL('../../src/pages/PayrollManagement.jsx', import.meta.url), 'utf8');
+  const start = source.indexOf('      const journeyById =');
+  const end = source.indexOf('      const manualOT25 =', start);
+  const filter = new Function('empAttendance', 'manualOvertimeRecords', 'emp', source.slice(start, end) + '\nreturn empManualOT;');
+  const manual = { employee_id: 'e1', attendance_record_id: 'a1', status: 'Activo', overtime_destination: 'pago' };
+  const attendance = { id: 'a1', overtime_destination: 'compensacion', overtime_authorized: true, status: 'Completo' };
+  assert.deepEqual(filter([attendance], [manual], { id: 'e1' }), [manual]);
+  for (const journey of [[], [{ ...attendance, overtime_authorized: false }], [{ ...attendance, status: 'Vacaciones' }]]) {
+    assert.deepEqual(filter(journey, [manual], { id: 'e1' }), []);
+  }
+  for (const patch of [{ status: 'Revertido' }, { overtime_destination: 'compensacion' }, { employee_id: 'other' }]) {
+    assert.deepEqual(filter([attendance], [{ ...manual, ...patch }], { id: 'e1' }), []);
+  }
+});
