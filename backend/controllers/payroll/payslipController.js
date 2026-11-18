@@ -1,3 +1,4 @@
+import { validateMedicalPayroll } from '../../services/medicalPayrollValidation.js';
 import { applyLoanInstallments, revertLoanInstallments } from "../../services/loanPayroll.js";
 import prisma from "../../config/prisma.js";
 import { validateOvertimePaymentPolicy } from "../../services/overtimePaymentPolicy.js";
@@ -57,6 +58,7 @@ export const create = async (req, res) => {
     }
 
     const payslip = await prisma.$transaction(async db => {
+      await validateMedicalPayroll(db, [req.body]);
       await validateOvertimePaymentPolicy(db, [req.body]);
       const created = await db.payslip.create({ data: req.body });
       await applyLoanInstallments(db, [created]);
@@ -172,6 +174,7 @@ export const bulkCreate = async (req, res) => {
     const chunkSize = 50;
     const replaceExisting = req.query.replace === 'true';
     const persistPayslips = async (db) => {
+      await validateMedicalPayroll(db, formattedPayslips, { replace: replaceExisting });
       await validateOvertimePaymentPolicy(db, formattedPayslips);
       if (replaceExisting) {
         const replacementGroups = Object.values(formattedPayslips.reduce((groups, payslip) => {
@@ -196,6 +199,10 @@ export const bulkCreate = async (req, res) => {
             }))
           }
         });
+        if (stale.some(p => p.calculation_summary?.medical_subsidy &&
+            (['Aprobada', 'Pagada'].includes(p.status) || p.digital_signature_url))) {
+          throw Object.assign(new Error('No se pueden reemplazar boletas médicas aprobadas, pagadas o firmadas'), { status: 409 });
+        }
         await revertLoanInstallments(db, stale.map(p => p.id));
         await db.payslip.deleteMany({ where: { id: { in: stale.map(p => p.id) } } });
       }
@@ -253,6 +260,10 @@ export const update = async (req, res) => {
       if (!canAccessEmployee(req, latest.employee_id)) {
         throw Object.assign(new Error('Acceso denegado al empleado'), { status: 403 });
       }
+      if (latest.calculation_summary?.medical_subsidy && Object.hasOwn(req.body, 'calculation_summary') && !req.body.calculation_summary?.medical_subsidy) {
+        throw Object.assign(new Error('No se puede eliminar el detalle médico de una boleta mediante una actualización'), { status: 409 });
+      }
+      await validateMedicalPayroll(db, [{ ...latest, ...req.body }]);
       await validateOvertimePaymentPolicy(db, [{ ...latest, ...req.body }]);
       if (changesLoanSchedule(req.body)) await revertLoanInstallments(db, [latest.id]);
       const updated = await db.payslip.update({ where: { id: req.params.id }, data: req.body });
@@ -340,6 +351,12 @@ export const bulkUpdate = async (req, res) => {
         throw Object.assign(new Error('Acceso denegado al empleado'), { status: 403 });
       }
       const byId = new Map(latest.map(p => [p.id, p]));
+      for (const patch of updates) {
+        if (byId.get(patch.id)?.calculation_summary?.medical_subsidy && Object.hasOwn(patch, 'calculation_summary') && !patch.calculation_summary?.medical_subsidy) {
+          throw Object.assign(new Error('No se puede eliminar el detalle médico de una boleta'), { status: 409 });
+        }
+      }
+      await validateMedicalPayroll(db, updates.map(p => ({ ...byId.get(p.id), ...p })));
       await validateOvertimePaymentPolicy(db, updates.map(p => ({ ...byId.get(p.id), ...p })));
       const result = [];
       for (const { id, ...data } of updates) {

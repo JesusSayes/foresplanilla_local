@@ -51,6 +51,8 @@ import {
 import { createScheduleDayResolver } from "@/lib/workScheduleResolver";
 import { buildPayrollAbsenceDays } from "@/lib/scheduledAbsence";
 import { applyAbsenceDays } from "@/lib/payrollDays";
+import { computeEmployeeMedicalSubsidy } from "@/lib/medicalSubsidyPayroll";
+import useMedicalRestIncidents, { medicalIncidentsQueryKey } from "@/hooks/useMedicalRestIncidents";
 import { fetchAttendanceRecordsForPeriod, toDateStr } from "@/lib/attendancePeriodFetch";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
 import { isEmploymentDateValid } from "@/lib/employmentDate";
@@ -399,6 +401,9 @@ export default function PayrollManagement() {
     staleTime: 0,
   });
 
+  // Descansos médicos aprobados del año: acumulado de 20 días y subsidio 0916.
+  useMedicalRestIncidents(selectedYear);
+
   // Cuotas de préstamo pendientes del período: se descuentan automáticamente en
   // la planilla mensual (una cuota por mes y por préstamo activo).
   const loanInstallmentsQuery = useQuery({
@@ -633,6 +638,8 @@ export default function PayrollManagement() {
         ["payrollHolidays"],
         ["payrollApprovedIncidents"],
         ["payrollIncidentTypes"],
+        ["allPayslips"],
+        medicalIncidentsQueryKey(selectedYear),
       ];
       await Promise.all(criticalKeys.map(key => queryClient.refetchQueries({ queryKey: key, exact: true })));
 
@@ -667,6 +674,8 @@ export default function PayrollManagement() {
       const activeLoansData = queryClient.getQueryData(["activeLoans"]) ?? [];
       const holidayRecords = queryClient.getQueryData(["payrollHolidays"]) ?? [];
       const approvedIncidents = queryClient.getQueryData(["payrollApprovedIncidents"]) ?? [];
+      const allPayslipsData = queryClient.getQueryData(["allPayslips"]) ?? [];
+      const medicalRestIncidents = queryClient.getQueryData(medicalIncidentsQueryKey(selectedYear)) ?? [];
       // Afectación configurada de cada tipo de incidente (Permiso / Descuento).
       const affectationMap = buildAffectationMap(queryClient.getQueryData(["payrollIncidentTypes"]) ?? []);
       // Cuotas del período agrupadas por empleado (solo de préstamos activos)
@@ -772,6 +781,8 @@ export default function PayrollManagement() {
     const bonusProrationIssues = [];
     // Jornadas con entrada sin salida donde se descontaron las horas aprobadas.
     const missingClockOutRows = [];
+    // Descanso médico: avisos de validación (base pendiente, conflictos, límite, CITT).
+    const medicalSubsidyWarnings = [];
 
     // Helper: contrato APROBADO (estado "Vigente") que corresponde al período.
     //   1. Contrato aprobado que solapa el período (inicio ≤ fin mes, fin ≥ inicio mes o nulo)
@@ -1034,11 +1045,28 @@ export default function PayrollManagement() {
       });
       workedDays = daysResult.workedDays;
       const nonWorkedDays = daysResult.nonWorkedDays;
-      // Días subsidiados: justificaciones aprobadas que cubren el día completo (descanso
-      // médico, etc.). Una licencia sin goce NO es un día subsidiado: no se remunera.
-      const subsidizedDays = payrollType === "Quincenal"
-        ? 0
-        : empAttendance.filter(r => r.status === "Justificado" && !unpaidLeaveDates.has(normDate(r.date))).length;
+      // ── Descanso médico: días 20 (empleador) / 21 (subsidiados) e importe 0916 ──
+      // Se clasifica por FECHAS ÚNICAS acumuladas del año, no por el estado "Justificado".
+      const employeeMedicalIncidents = medicalRestIncidents.filter(i => i.employee_id === emp.id && isEmploymentDateValid(emp, i.incident_date));
+      const medicalDates = new Set(employeeMedicalIncidents.map(i => normDate(i.incident_date)));
+      const medicalConflictDates = [
+        ...unpaidLeaveDates,
+        ...absenceDaysToDiscount.map(d => normDate(d.date)),
+        ...[...medicalDates].filter(d => isCoveredByApprovedVacation(emp.id, d)),
+        ...empAttendance.filter(r => r.clock_in || r.clock_out || r.clock_in_2 || r.clock_out_2).map(r => normDate(r.date)),
+      ];
+      const medical = computeEmployeeMedicalSubsidy({
+        employeeId: emp.id, medicalRestIncidents: employeeMedicalIncidents, approvedIncidents,
+        conflictDates: medicalConflictDates, periodStart: periodStartStr, periodEnd: periodEndStr,
+        payslips: allPayslipsData, payrollType, contractualWorkedDays, workedDays,
+        employmentStart: emp.hire_date,
+      });
+      const subsidizedDays = medical.subsidizedDays;
+      if (medical.messages.length > 0) medicalSubsidyWarnings.push(`${emp.employee_code || emp.id} ${emp.first_name} ${emp.last_name}: ${medical.messages.join(" ")}`);
+      if (medical.snapshot?.validation?.blocked) {
+        throw new Error(`Descanso médico de ${emp.employee_code || emp.id}: ${medical.messages.join(" ")}`);
+      }
+      const medicalPeriodDates = new Set(medical.snapshot?.days?.map(d => d.date) || []);
 
       // Horas extras y nocturnas calculadas desde los registros de asistencia del periodo.
       // horas_nocturnas: los registros de asistencia aún no cuentan con un campo dedicado,
@@ -1093,8 +1121,8 @@ export default function PayrollManagement() {
         (sum, record) => sum + Number(record.horas_nocturnas ?? record.night_hours ?? 0), 0
       );
       const attendanceData = {
-        worked_days: workedDays,
-        regular_hours: empAttendance.reduce((sum, r) => sum + (r.worked_hours || 0), 0),
+        worked_days: medical.attendedDays,
+        regular_hours: empAttendance.filter(r => !medicalPeriodDates.has(normDate(r.date))).reduce((sum, r) => sum + (r.worked_hours || 0), 0),
         overtime_hours: overtimeHours25 + overtimeHours35,
         horas_extras_25: overtimeHours25,
         horas_extras_35: overtimeHours35,
@@ -1207,11 +1235,13 @@ export default function PayrollManagement() {
       // conceptos independientes (buildAttendanceDiscountConcepts), evitando el doble
       // descuento y mostrando el importe en la boleta.
       if (payrollType !== "Quincenal") {
-        conceptsForCalc = applyContractualBaseSalary(
-          conceptsForCalc,
-          emp.base_salary,
-          contractualWorkedDays
-        );
+        // Días remunerados por la básica: los días subsidiados (código 21) los reemplaza
+        // el subsidio 0916, que se agrega UNA sola vez como ingreso.
+        conceptsForCalc = applyContractualBaseSalary(conceptsForCalc, emp.base_salary, medical.remunerationDays);
+        if (medical.snapshot) {
+          conceptsForCalc = conceptsForCalc.filter(c => String(c.concept_code || "").trim() !== "0916");
+          if (medical.subsidyConcept) conceptsForCalc.push(medical.subsidyConcept);
+        }
         // Bonos del período (costo actividad, movilidad, alimentación y equivalentes)
         // proporcionales a los días trabajados: factor = trabajados / (trabajados + no
         // trabajados). Se aplica una sola vez y solo a importes fijos sin fórmula.
@@ -1401,6 +1431,8 @@ export default function PayrollManagement() {
         // Las faltas y licencias sin goce ya entran como conceptos del motor;
         // incluirlas aquí también reduciría dos veces la base previsional.
         attendance_discount_amount: roundMoney(tardinessDiscount + earlyDepartureDiscount),
+        // Descanso médico: instantánea de días 20/21 y subsidio 0916 del período.
+        medical_subsidy: medical.snapshot,
       };
 
       const result = await calculator.calculatePayroll(conceptsForCalc, attendanceData, rmvData?.amount || 1130, extraContext);
@@ -1513,9 +1545,9 @@ export default function PayrollManagement() {
         payroll_type: payrollType,
         payroll_number: payrollNumber,
         advance_payment_id: advancePaymentId,
-        worked_days: workedDays,
+        worked_days: medical.attendedDays,
         subsidized_days: subsidizedDays,
-        non_worked_days: nonWorkedDays,
+        non_worked_days: nonWorkedDays + medical.employerDays,
         regular_hours: attendanceData.regular_hours,
         overtime_hours: roundMoney(overtimeHours25 + overtimeHours35),
         overtime_hours_25: roundMoney(overtimeHours25),
@@ -1580,6 +1612,7 @@ export default function PayrollManagement() {
       if (bonusProrationIssues.length > 0) {
         toast.warning(`⚠️ Bonos del período sin prorratear por días: ${bonusProrationIssues.slice(0, 3).join(" | ")}`, { duration: 12000 });
       }
+      if (medicalSubsidyWarnings.length > 0) toast.warning(`⚠️ Descanso médico: ${medicalSubsidyWarnings.slice(0, 3).join(" | ")}`, { duration: 20000 });
       setPreviewData(calculatedPayslips);
       setShowPreview(true);
       setContractAlerts({ noApproved: noApprovedContractWorkers, conflicts: contractConflicts });
@@ -1648,14 +1681,20 @@ export default function PayrollManagement() {
           const [hY, hM, hD] = empDebug.hire_date.split("T")[0].split("-").map(Number);
           if (hY === selectedYear && hM === selectedMonth && hD > 1) {
             // Días esperados: prorrateo por ingreso en el mes menos los días no
-            // laborados descontados (faltas y permisos sin goce de día completo).
-            const expected = 30 - hD + 1 - (p.non_worked_days || 0);
+            // laborados descontados (faltas y permisos sin goce de día completo) y los
+            // días de descanso médico (código 20 del empleador + código 21 subsidiado).
+            const med = p.calculation_summary?.medical_subsidy || {};
+            const expected = 30 - hD + 1 - (p.non_worked_days || 0) - (med.subsidized_days || 0);
             if (p.worked_days !== expected) {
               console.warn(`[Días Laborados] ${p.employee_name}: calculado=${p.worked_days}, esperado=${expected} (ingreso ${empDebug.hire_date})`);
             }
           }
         }
       });
+    } catch (error) {
+      setPreviewData([]);
+      setShowPreview(false);
+      toast.error(error.message || "No se pudo calcular la planilla", { duration: 20000 });
     } finally {
       setIsCalculating(false);
     }

@@ -295,8 +295,8 @@ export class PayrollCalculator {
    * concepto reemplazando base_salary por esa base, de modo que el aporte cambia
    * solo si se cambia la fórmula en Conceptos de Planilla.
    */
-  calculateEssaludContribution(concept, context, baseRemuneration) {
-    const base = essaludBase(baseRemuneration, context.rmv);
+  calculateEssaludContribution(concept, context, baseRemuneration, subsidizedDays = 0) {
+    const base = essaludBase(baseRemuneration, context.rmv, { subsidizedDays, monthDays: new Date(this.year, this.month, 0).getDate() });
     const formula = String(concept.calculation_formula || "").trim();
     const rawAmount = formula
       ? this.evaluateFormula(formula, {
@@ -346,14 +346,16 @@ export class PayrollCalculator {
     // aporte obligatorio, comisión y prima de seguro se muestran por separado).
 
     if (pensionSystem === "ONP") {
-      const amount = base * 0.13;
-      const rounded = Math.round(amount * 100) / 100;
+      // ONP: el subsidio por incapacidad temporal (0916) NO integra la base.
+      const onpBase = Math.max(0, Number(context.onp_pension_base ?? pensionBase) || 0);
+      const amount = onpBase * 0.13;
+      const roundedOnp = Math.round(amount * 100) / 100;
       return {
-        items: [{ name: "ONP", code: "0607", amount: rounded, detail: `ONP 13% de S/${base.toFixed(2)}` }],
-        totalAmount: rounded,
+        items: [{ name: "ONP", code: "0607", amount: roundedOnp, detail: `ONP 13% de S/${onpBase.toFixed(2)}` }],
+        totalAmount: roundedOnp,
         name: "ONP",
         code: "0607",
-        detail: `ONP 13% de S/${base.toFixed(2)}`,
+        detail: `ONP 13% de S/${onpBase.toFixed(2)}`,
       };
     }
 
@@ -473,16 +475,28 @@ export class PayrollCalculator {
 
     const { incomes, deductions, contributions } = groups;
 
+    // ── Descanso médico: subsidio por incapacidad temporal (código 0916) ──
+    // El importe del subsidio afecta SOLO la base AFP del SPP. No integra la base ONP,
+    // la base de ESSALUD ni la proyección de renta de quinta categoría (matriz 0916).
+    const medicalSubsidy = context.medical_subsidy || null;
+    const medicalSubsidyAmount = Math.max(0, Number(context.medical_subsidy_amount) || 0);
+    const medicalSubsidizedDays = Math.max(0, Number(context.medical_subsidized_days) || 0);
+
     // ESSALUD (aportación del empleador): base = máximo(remuneración básica del
-    // período, RMV vigente del período). Se calcula aquí, con los conceptos ya
-    // ejecutados, porque la remuneración básica es el importe calculado por el
-    // concepto de Remuneración Base. El porcentaje se conserva en la fórmula
-    // configurada del concepto.
+    // período, RMV vigente prorrateada por los días NO subsidiados). Se calcula aquí,
+    // con los conceptos ya ejecutados, porque la remuneración básica es el importe
+    // calculado por el concepto de Remuneración Base. El porcentaje se conserva en la
+    // fórmula configurada del concepto.
     (concepts || [])
       .filter((concept) => isEssaludContribution(concept) && this.shouldApplyConcept(concept))
       .forEach((concept) => {
         contributions.push(
-          this.calculateEssaludContribution(concept, context, derived.remuneracion_mensual)
+          this.calculateEssaludContribution(
+            concept,
+            context,
+            derived.remuneracion_mensual,
+            medicalSubsidizedDays
+          )
         );
       });
 
@@ -501,6 +515,15 @@ export class PayrollCalculator {
     // − descuentos de asistencia. Es la base sobre la que se calculan automáticamente los
     // aportes AFP/ONP según los porcentajes configurados para el sistema de pensiones.
     const pensionBase = safe(derived.remuneracion_afecta);
+
+    // Base de cada sistema previsional para el subsidio 0916:
+    //   ONP: la remuneración afecta NO incluye el subsidio.
+    //   AFP/SPP: la base incluye el subsidio (reglas del sistema privado).
+    const onpPensionBase = pensionBase;
+    const afpPensionBase = safe(pensionBase + medicalSubsidyAmount);
+    context.onp_pension_base = onpPensionBase;
+    context.afp_pension_base = afpPensionBase;
+    const pensionBaseForSystem = this.employee?.pension_system === "AFP" ? afpPensionBase : onpPensionBase;
 
     // Validación pensionaria: si faltan datos de afiliación (sistema de pensiones, AFP
     // asignada) o existen conceptos AFP/ONP ambiguos, la boleta NO
@@ -527,8 +550,8 @@ export class PayrollCalculator {
     // Se calcula DESPUÉS de procesar todos los ingresos para usar la base pensionaria real.
     // Solo se aplica el régimen del trabajador (AFP con su AFP/comisión, u ONP), y se omite
     // en planillas quincenales (sin descuentos) o si la base pensionaria es cero o negativa.
-    if (!this.pensionValidation.blocked && this.payrollType !== "Quincenal" && pensionBase > 0) {
-      const pensionCalc = this.calculatePensionContribution(pensionBase, context);
+    if (!this.pensionValidation.blocked && this.payrollType !== "Quincenal" && pensionBaseForSystem > 0) {
+      const pensionCalc = this.calculatePensionContribution(pensionBaseForSystem, context);
       // Agregar cada componente (aporte obligatorio, prima de seguro, comisión) como
       // un descuento independiente, según la ley peruana.
       (pensionCalc.items || []).forEach((item) => {
@@ -560,6 +583,17 @@ export class PayrollCalculator {
     const totalContributions = safe(contributions.reduce((sum, c) => sum + c.calculated_amount, 0));
     const netPay = safe(totalIncome - totalDeductions);
 
+    // Instantánea del descanso médico dentro del resumen persistido (misma fuente para
+    // vista previa, boleta, PDF, Excel y contabilidad: no se recalcula por exportador).
+    const summary = this.generateSummary(incomes, deductions, contributions, totalIncome, totalDeductions, netPay);
+    if (medicalSubsidy) summary.medical_subsidy = {
+      ...medicalSubsidy,
+      contribution_bases: { onp: onpPensionBase, afp: afpPensionBase,
+        essalud: essaludBase(derived.remuneracion_mensual, context.rmv, {
+          subsidizedDays: medicalSubsidizedDays, monthDays: new Date(this.year, this.month, 0).getDate(),
+        }) },
+    };
+
     return {
       employee: this.employee,
       period: `${this.month}/${this.year}`,
@@ -577,7 +611,7 @@ export class PayrollCalculator {
       calculationLog: this.calculationLog,
       errors: this.errors,
       pensionValidation: this.pensionValidation,
-      summary: this.generateSummary(incomes, deductions, contributions, totalIncome, totalDeductions, netPay)
+      summary
     };
   }
 
@@ -601,6 +635,9 @@ export class PayrollCalculator {
     const quincenalAmount = this.payrollType === "Quincenal"
       ? rawSalary * (this.quincenalPct ?? 0.40)
       : rawSalary;
+
+    // Descanso médico: instantánea del período (días 20/21 e importe del subsidio 0916).
+    const medicalSubsidy = extraContext.medical_subsidy || null;
 
     return {
       base_salary: baseSalary,            // Siempre el salario del contrato
@@ -637,6 +674,10 @@ export class PayrollCalculator {
       loan_installments: extraContext.loan_installments || [],
       afp: extraContext.afp || null,
       enable_tardiness_compensation: extraContext.enable_tardiness_compensation || false,
+      // Descanso médico: subsidio por incapacidad temporal (código 0916).
+      medical_subsidy: medicalSubsidy,
+      medical_subsidy_amount: Math.max(0, Number(medicalSubsidy?.subsidy_amount) || 0),
+      medical_subsidized_days: Math.max(0, Number(medicalSubsidy?.subsidized_days) || 0),
     };
   }
 

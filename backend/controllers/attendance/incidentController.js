@@ -1,3 +1,4 @@
+import { splitMedicalFields, withMedicalFields, saveMedicalFields } from '../../services/medicalIncidentFields.js';
 import { compensationMinutes } from '../../services/compensationOvertime.js';
 import { attendanceDateFilter } from '../../utils/attendanceDateFilter.js';
 import prisma from "../../config/prisma.js";
@@ -62,7 +63,7 @@ export const getAll = async (req, res) => {
       where: req.accessibleEmployeeIds === null ? {} : { employee_id: { in: req.accessibleEmployeeIds } },
       orderBy: { created_date: 'desc' }
     });
-    res.json(incidents.map(serializeIncident));
+    res.json((await withMedicalFields(prisma, incidents)).map(serializeIncident));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -146,7 +147,7 @@ export const filter = async (req, res) => {
       orderBy
     });
 
-    res.json(incidents.map(serializeIncident));
+    res.json((await withMedicalFields(prisma, incidents)).map(serializeIncident));
   } catch (error) {
     console.error('Error filtrando incidents', error);
     res.status(500).json({ error: error.message });
@@ -161,7 +162,7 @@ export const getById =  async (req, res) => {
     });
     if (!incident) return res.status(404).json({ error: 'Incident not found' });
     if (!canAccessEmployee(req, incident.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
-    res.json(serializeIncident(incident));
+    res.json(serializeIncident((await withMedicalFields(prisma, [incident]))[0]));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -169,7 +170,8 @@ export const getById =  async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const { id, created_date, updated_date, created_by, incident_date, review_date,...data } = req.body;
+    const split = splitMedicalFields(req.body, req.access);
+    const { id, created_date, updated_date, created_by, incident_date, review_date,...data } = split.data;
     if (!canAccessEmployee(req, data.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
     const incidentDate = toPrismaDate(incident_date);
     if (!incidentDate) return res.status(400).json({ error: 'Fecha de incidente inválida' });
@@ -191,7 +193,12 @@ export const create = async (req, res) => {
           } });
           return created;
         }, { isolationLevel: 'Serializable' })
-      : await prisma.attendance_incident.create({ data: incidentData });
+      : Object.keys(split.medical).length
+        ? await prisma.$transaction(async tx => {
+            const created = await tx.attendance_incident.create({ data: incidentData });
+            return saveMedicalFields(tx, created, split.medical);
+          })
+        : await prisma.attendance_incident.create({ data: incidentData });
     res.status(201).json(serializeIncident(incident));
   } catch (error) {
     res.status(error.code === 'P2034' ? 409 : error.status || 500).json({ error: error.code === 'P2034' ? 'El saldo cambió durante la solicitud. Actualice e intente nuevamente.' : error.message });
@@ -283,7 +290,9 @@ export const update = async (req, res) => {
     const existing = await prisma.attendance_incident.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Incident not found' });
     if (!canAccessEmployee(req, existing.employee_id)) return res.status(403).json({ error: 'Acceso denegado al empleado' });
-    const { incident_date, review_date, ...data } = req.body;
+    const currentMedical = (await withMedicalFields(prisma, [existing]))[0];
+    const split = splitMedicalFields(req.body, req.access, currentMedical);
+    const { incident_date, review_date, ...data } = split.data;
     if (existing.incident_type === 'Compensación de Tardanza' && ['Aprobada', 'Rechazada'].includes(data.status)) {
       const permissions = ['attendance.approve_compensations', 'attendance.manage'];
       if (!permissions.some(permission => hasPermission(req.access, permission)) ||
@@ -317,7 +326,12 @@ export const update = async (req, res) => {
           updateData.overtime_minutes_35 = next.overtime_minutes_35;
           return tx.attendance_incident.update({ where: { id: req.params.id }, data: updateData });
         }, { isolationLevel: 'Serializable' })
-      : await prisma.attendance_incident.update({ where: { id: req.params.id }, data: updateData });
+      : Object.keys(split.medical).length
+        ? await prisma.$transaction(async tx => {
+            const updated = await tx.attendance_incident.update({ where: { id: req.params.id }, data: updateData });
+            return saveMedicalFields(tx, updated, split.medical);
+          })
+        : await prisma.attendance_incident.update({ where: { id: req.params.id }, data: updateData });
     res.json(serializeIncident(incident));
   } catch (error) {
     res.status(error.code === 'P2034' ? 409 : error.status || 500).json({ error: error.code === 'P2034' ? 'El saldo cambió durante la solicitud. Actualice e intente nuevamente.' : error.message });
