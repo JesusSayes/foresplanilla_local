@@ -34,6 +34,8 @@ export const exportPayslipsToExcel = (payslipsData, allEmployees = [], filename,
       : safeNum(p.net_pay);
     // Desglose AFP/ONP desde el breakdown (coincide con el PDF de la boleta)
     const afp = getAfpBreakdown(p);
+    // Detalle PLAME conciliable del descanso médico (misma instantánea de la boleta).
+    const med = p.calculation_summary?.medical_subsidy || {};
     // Desglose de pago de horas extras al 25% y 35% (si está disponible en el breakdown)
     const hePay = getOvertimePaySplit(p);
     return {
@@ -50,6 +52,11 @@ export const exportPayslipsToExcel = (payslipsData, allEmployees = [], filename,
       "Días Trabajados": safeNum(p.worked_days),
       "Días No Laborados": safeNum(p.non_worked_days),
       "Días Subsidiados": safeNum(p.subsidized_days),
+      "Días Susp. 20 (Empleador)": safeNum(med.employer_days),
+      "Subsidio 0916": safeNum(med.subsidy_amount),
+      "Base Diaria Subsidio": med.base?.pending || med.base?.source === "por_contingencia" ? "" : safeNum(med.base?.average_daily),
+      "Divisor Subsidio": safeNum(med.base?.divisor),
+      "CITT": (med.citt_numbers || []).join(" / "),
       "Salario Base": safeNum(p.base_salary),
       "Costo Actividad": safeNum(p.activity_cost_amount ?? getCostFromSummary(p, "activity_cost", ["actividad", "costo actividad"])),
       "Costo Alimento": safeNum(p.food_cost_amount ?? getCostFromSummary(p, "food_cost", ["alimentación", "costo alimentación", "costo alimento"])),

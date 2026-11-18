@@ -22,6 +22,17 @@ export const isEssaludContribution = (concept) => {
   return norm(concept.concept_name).includes("essalud");
 };
 
-/** Base de cálculo: el mayor valor entre la remuneración básica y la RMV del período. */
-export const essaludBase = (baseRemuneration, rmvAmount) =>
-  Math.max(Number(baseRemuneration) || 0, Number(rmvAmount) || 0);
+/**
+ * Base de cálculo: el mayor valor entre la remuneración básica y la RMV del período.
+ *
+ * Días subsidiados por incapacidad temporal (código 21): el subsidio no integra la
+ * base y la base mínima (RMV) se prorratea por los días NO subsidiados del mes. Un mes
+ * íntegramente subsidiado, sin otra remuneración afecta, no genera aporte mínimo.
+ * Sin días subsidiados el resultado es idéntico al anterior.
+ */
+export const essaludBase = (baseRemuneration, rmvAmount, { subsidizedDays = 0, monthDays = 30 } = {}) => {
+  const subsidized = Math.min(Math.max(0, Number(subsidizedDays) || 0), Math.max(1, Number(monthDays) || 30));
+  const totalDays = Math.max(1, Number(monthDays) || 30);
+  const proportionalRmv = (Number(rmvAmount) || 0) * ((totalDays - subsidized) / totalDays);
+  return Math.max(Number(baseRemuneration) || 0, proportionalRmv);
+};
