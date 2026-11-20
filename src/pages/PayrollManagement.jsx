@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { parseDateLima } from "@/lib/dateUtils";
 import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import AttendancePeriodModal from "../components/payroll/AttendancePeriodModal";
 import PayrollConfigModal from "../components/payroll/PayrollConfigModal";
 import { createPageUrl } from "../utils";
@@ -161,6 +162,7 @@ export default function PayrollManagement() {
   const [pendingAction, setPendingAction] = useState(null); // 'preview' | 'generate'
   const [showPayrollConfig, setShowPayrollConfig] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [calculationError, setCalculationError] = useState("");
   // Inconsistencias de contrato detectadas en el cálculo: trabajadores sin contrato
   // aprobado (Vigente) aplicable al período y contratos superpuestos.
   const [contractAlerts, setContractAlerts] = useState({ noApproved: [], conflicts: [] });
@@ -616,6 +618,7 @@ export default function PayrollManagement() {
     if (isCalculating) return;
 
     setIsCalculating(true);
+    setCalculationError("");
     try {
       // ── Forzar datos frescos con React Query para evitar valores capturados por renders anteriores ──
       // Garantiza que la primera vista previa produzca los mismos montos que las siguientes,
@@ -646,8 +649,9 @@ export default function PayrollManagement() {
       // Si alguna consulta crítica falló, cancelar el proceso sin crear boletas.
       const failedKey = criticalKeys.find(key => queryClient.getQueryState(key)?.status === "error");
       if (failedKey) {
-        toast.error("Error al cargar datos de planilla. Reintente en unos segundos.");
-        return;
+        const error = queryClient.getQueryState(failedKey)?.error;
+        const detail = error?.response?.data?.error || error?.response?.data?.message || error?.message;
+        throw new Error(`Error al cargar datos de planilla (${failedKey[0]}). ${detail || "Reintente en unos segundos."}`);
       }
 
       // Leer datos frescos desde la caché y sombrear las variables del closure
@@ -1694,7 +1698,9 @@ export default function PayrollManagement() {
     } catch (error) {
       setPreviewData([]);
       setShowPreview(false);
-      toast.error(error.message || "No se pudo calcular la planilla", { duration: 20000 });
+      const message = error?.response?.data?.error || error?.response?.data?.message || error.message || "No se pudo calcular la planilla";
+      setCalculationError(String(message));
+      toast.error(String(message), { duration: 20000 });
     } finally {
       setIsCalculating(false);
     }
@@ -1973,6 +1979,14 @@ export default function PayrollManagement() {
             </div>
           </CardContent>
         </Card>
+
+        <Toaster />
+        {calculationError && (
+          <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+            <p className="text-sm text-red-700 font-medium">No se pudo generar la vista previa: {calculationError}</p>
+          </div>
+        )}
 
         {/* ── Indicador de carga / error de datos de planilla ── */}
         {(payrollDataLoading || isCalculating) && (
