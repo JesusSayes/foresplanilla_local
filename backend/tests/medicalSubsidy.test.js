@@ -48,6 +48,24 @@ test('conflicto de fechas bloquea el resultado sin correr el día 21', () => {
   const result = snapshot(incidents('2026-04-01', 22), { conflictDates: ['2026-04-01'] });
   assert.equal(result.subsidized_days, 2);
   assert.equal(result.validation.blocked, true);
+  assert.match(result.validation.messages.join(' '), /2026-04-01/);
+  assert.match(result.validation.messages.join(' '), /asistencia/);
+});
+test('códigos de empleado repetidos no mezclan descansos ni ausencias de distintos IDs', () => {
+  const result = computeEmployeeMedicalSubsidy({
+    employeeId: 'e1', payrollType: 'Mensual', periodStart: '2026-10-01', periodEnd: '2026-10-31',
+    contractualWorkedDays: 30, workedDays: 30,
+    medicalRestIncidents: [
+      ...incidents('2026-10-12', 1, { employee_code: 'FP0279' }),
+      ...incidents('2026-09-17', 10, { employee_id: 'e2', employee_code: 'FP0279' }),
+    ],
+    approvedIncidents: [{ employee_id: 'e2', employee_code: 'FP0279', incident_date: '2026-10-12',
+      incident_type: 'Licencia sin Goce de Haber', status: 'Aprobada', full_day_justification: true }],
+  });
+  assert.equal(result.snapshot.validation.blocked, false);
+  assert.equal(result.snapshot.prior_accumulated_days, 0);
+  assert.equal(result.employerDays, 1);
+  assert.equal(result.subsidizedDays, 0);
 });
 test('base faltante o sin sustento bloquea; CITT pendiente no crea una falta', () => {
   const missing = snapshot(incidents('2026-04-01', 30, { subsidy_daily_base: null }));

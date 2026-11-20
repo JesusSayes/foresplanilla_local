@@ -333,7 +333,7 @@ const buildContingencySnapshot = ({
       conflicts.push({
         date: day,
         types: [
-          ...(externalConflicts.has(day) ? ["Vacaciones / falta / licencia sin goce"] : []),
+          ...(externalConflicts.has(day) ? ["Marcación de asistencia / vacaciones / falta / licencia sin goce"] : []),
           ...others.map((i) => i.incident_type).filter(Boolean),
         ],
         medical_incident_ids: (byDate.get(day) || []).map((i) => i.id).filter(Boolean),
@@ -416,12 +416,12 @@ const buildContingencySnapshot = ({
   }
   if (conflicts.length > 0) {
     messages.push(
-      `${conflicts.length} día(s) con doble clasificación (descanso médico y otra ausencia). Resuelva el conflicto: esos días no se clasificaron como 20/21.`
+      `${conflicts.length} día(s) con descanso médico y asistencia u otra ausencia: ${conflicts.map(c => `${c.date} (${c.types.join(", ")})`).join("; ")}. Resuelva el conflicto: esos días no se clasificaron como 20/21.`
     );
   }
   if (duplicateDocuments.length > 0) {
     messages.push(
-      `${duplicateDocuments.length} fecha(s) con más de un documento de descanso médico. Se contaron una sola vez; verifique los certificados duplicados.`
+      `${duplicateDocuments.length} fecha(s) con más de un documento de descanso médico: ${duplicateDocuments.map(d => d.date).join(", ")}. Se contaron una sola vez; verifique los certificados duplicados.`
     );
   }
   if (alreadyPaid.size > 0) {
