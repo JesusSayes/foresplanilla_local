@@ -1066,9 +1066,17 @@ export default function PayrollManagement() {
         employmentStart: emp.hire_date,
       });
       const subsidizedDays = medical.subsidizedDays;
-      if (medical.messages.length > 0) medicalSubsidyWarnings.push(`${emp.employee_code || emp.id} ${emp.first_name} ${emp.last_name}: ${medical.messages.join(" ")}`);
+      const medicalEmployeeLabel = `${emp.first_name || ""} ${emp.last_name || ""} | ${emp.document_type || "Documento"}: ${emp.document_number || "sin registrar"} | Código: ${emp.employee_code || "sin código"} | ID: ${emp.id}`;
+      const medicalPeriodLabel = `Período: ${periodStartStr} al ${periodEndStr}`;
+      if (medical.messages.length > 0) medicalSubsidyWarnings.push(`${medicalEmployeeLabel} | ${medicalPeriodLabel}: ${medical.messages.join(" ")}`);
       if (medical.snapshot?.validation?.blocked) {
-        throw new Error(`Descanso médico de ${emp.employee_code || emp.id}: ${medical.messages.join(" ")}`);
+        const medicalConflicts = (medical.snapshot.contingencies || [medical.snapshot]).flatMap(part => part.conflicts || []);
+        const conflictingMarks = empAttendance.filter(r =>
+          medicalConflicts.some(c => c.date === normDate(r.date)) &&
+          (r.clock_in || r.clock_out || r.clock_in_2 || r.clock_out_2)
+        ).map(r => `${normDate(r.date)} (entrada: ${r.clock_in || "—"}, salida: ${r.clock_out || "—"}, entrada 2: ${r.clock_in_2 || "—"}, salida 2: ${r.clock_out_2 || "—"})`);
+        const medicalPeriodDatesLabel = [...medicalDates].filter(d => d >= periodStartStr && d <= periodEndStr).sort().join(", ");
+        throw new Error(`Descanso médico de ${medicalEmployeeLabel} | ${medicalPeriodLabel} | Fechas de descanso registradas: ${medicalPeriodDatesLabel}. ${medical.messages.join(" ")}${conflictingMarks.length ? ` Marcaciones en días de descanso médico: ${conflictingMarks.join("; ")}. Revise la asistencia y el descanso aprobado de esas fechas.` : ""}`);
       }
       const medicalPeriodDates = new Set(medical.snapshot?.days?.map(d => d.date) || []);
 
