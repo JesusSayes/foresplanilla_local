@@ -53,6 +53,7 @@ import { createScheduleDayResolver } from "@/lib/workScheduleResolver";
 import { buildPayrollAbsenceDays } from "@/lib/scheduledAbsence";
 import { applyAbsenceDays } from "@/lib/payrollDays";
 import { computeEmployeeMedicalSubsidy } from "@/lib/medicalSubsidyPayroll";
+import { collectMedicalRestDates } from "@/lib/medicalSubsidy";
 import useMedicalRestIncidents, { medicalIncidentsQueryKey } from "@/hooks/useMedicalRestIncidents";
 import { fetchAttendanceRecordsForPeriod, toDateStr } from "@/lib/attendancePeriodFetch";
 import { getFamilyAllowanceEligibility } from "@/lib/familyAllowance";
@@ -1053,11 +1054,17 @@ export default function PayrollManagement() {
       // Se clasifica por FECHAS ÚNICAS acumuladas del año, no por el estado "Justificado".
       const employeeMedicalIncidents = medicalRestIncidents.filter(i => i.employee_id === emp.id && isEmploymentDateValid(emp, i.incident_date));
       const medicalDates = new Set(employeeMedicalIncidents.map(i => normDate(i.incident_date)));
+      // El descanso aprobado de día completo prevalece sobre las marcaciones,
+      // incluidas las horas que genera la aprobación de un permiso.
+      const fullDayMedicalDates = new Set(collectMedicalRestDates(employeeMedicalIncidents).dates);
       const medicalConflictDates = [
         ...unpaidLeaveDates,
         ...absenceDaysToDiscount.map(d => normDate(d.date)),
         ...[...medicalDates].filter(d => isCoveredByApprovedVacation(emp.id, d)),
-        ...empAttendance.filter(r => r.clock_in || r.clock_out || r.clock_in_2 || r.clock_out_2).map(r => normDate(r.date)),
+        ...empAttendance.filter(r =>
+          !fullDayMedicalDates.has(normDate(r.date)) &&
+          (r.clock_in || r.clock_out || r.clock_in_2 || r.clock_out_2)
+        ).map(r => normDate(r.date)),
       ];
       const medical = computeEmployeeMedicalSubsidy({
         employeeId: emp.id, medicalRestIncidents: employeeMedicalIncidents, approvedIncidents,
